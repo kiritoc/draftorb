@@ -3,7 +3,7 @@
 ## Current status
 - Phase: 1 (Support / Diamond)
 - Current milestone: M0 Foundations (Complete) -> M1 ETL (Complete) -> M2 Engine
-- Last updated: 2026-10-22 by GitHub Copilot (T-011)
+- Last updated: 2026-10-22 by GitHub Copilot (T-012)
 
 ## Epic status
 | Epic | Status | Notes |
@@ -40,6 +40,26 @@ T-012 (Player discovery by tier) or T-020 (Rank weighting module)
 - Next step:
 - Pitfalls / notes for next AI:
 ```
+
+### 2026-10-22 — Copilot CLI — Ticket T-012
+- Done:
+  - Implemented tier-based player discovery in `packages/etl/src/players.ts` with default tier sequence `EMERALD..CHALLENGER`, per-tier quotas, rank score conversion (`tier + division + LP`), resumable `ingest_state` progress, and SQLite upserts for player rows.
+  - Exposed player discovery from `packages/etl/src/index.ts` and added CLI support in `packages/etl/src/cli.ts` (`pnpm etl players`, plus `--platform`, `--tiers`, `--quota`, `--reset`).
+  - Added unit coverage in `packages/etl/src/players.test.ts` for rank score calculation and quota/resume logic.
+- Files touched:
+  - `packages/etl/src/players.ts`
+  - `packages/etl/src/players.test.ts`
+  - `packages/etl/src/index.ts`
+  - `packages/etl/src/cli.ts`
+  - `docs/TICKETS.md`
+  - `docs/PROGRESS.md`
+- Tests: `pnpm test && pnpm typecheck && pnpm lint` (8 test files, 63 tests passed).
+- State left: DONE
+- Next step: T-013 (Match ingestion)
+- Pitfalls / notes for next AI:
+  - `playerRankScore()` intentionally uses a tier base + division ladder + capped LP bonus; it is deterministic and suitable for persisted rank_score values.
+  - Discovery is resumable per platform/tier via the `ingest_state` table; the state is currently treated as a completion marker after a successful fetch for that tier.
+  - The CLI uses quota entries in `EMERALD:250,...` format, but keep the default values in sync with `DEFAULT_PLAYER_QUOTAS`.
 
 ### 2026-10-22 — Antigravity (Gemini 3.8 Flash) — Ticket T-010
 - Done:

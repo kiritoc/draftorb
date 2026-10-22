@@ -20,9 +20,10 @@ import { performance } from 'node:perf_hooks';
 import { parseArgs } from 'node:util';
 
 import { importStaticData } from './ddragon';
+import { openDb, migrate, getMigrationStatus } from './db';
+import { discoverPlayersByTier } from './players';
 import { RiotClient, RiotAuthError } from './riot';
 import { formatCoverageReport, validateChampionTagsFile } from './tags';
-import { openDb, migrate, getMigrationStatus } from './db';
 
 // ---------------------------------------------------------------------------
 // Constants & types
@@ -232,6 +233,72 @@ async function runCheckKey(args: string[]): Promise<void> {
   log.detail('Active App Limits:', client.getRateLimiter().getAppLimits());
 }
 
+async function runPlayers(args: string[]): Promise<void> {
+  const { values, positionals } = parseArgs({
+    args,
+    allowPositionals: true,
+    strict: false,
+    options: {
+      platform: { type: 'string', short: 'p' },
+      tiers: { type: 'string' },
+      quota: { type: 'string' },
+      reset: { type: 'boolean', default: false },
+    },
+  });
+
+  const [platformArg] = positionals;
+  const platformValue = typeof values.platform === 'string' ? values.platform : undefined;
+  const tiersValue = typeof values.tiers === 'string' ? values.tiers : undefined;
+  const quotaValue = typeof values.quota === 'string' ? values.quota : undefined;
+  const resetValue = values.reset === true;
+  const platform = parsePlatform(platformArg ?? platformValue);
+  const tiers = tiersValue
+    ? tiersValue
+        .split(',')
+        .map((tier: string) => tier.trim())
+        .filter((tier: string) => tier.length > 0)
+    : undefined;
+  const quotas = quotaValue
+    ? Object.fromEntries(
+        quotaValue
+          .split(',')
+          .map((pair: string) => pair.trim())
+          .filter((pair: string) => pair.length > 0)
+          .map((pair: string) => {
+            const [tier, limit] = pair.split(':');
+            if (!tier || limit === undefined) {
+              throw new UsageError(
+                `Invalid quota entry "${pair}". Expected format like "EMERALD:200,DIAMOND:200".`,
+              );
+            }
+            return [tier.toUpperCase(), Number.parseInt(limit, 10)];
+          }),
+      )
+    : undefined;
+
+  log.info(`Discovering players for platform "${platform}"...`);
+  const dbPath = resolveDbPath();
+  const db = openDb(dbPath);
+  try {
+    const result = await discoverPlayersByTier({
+      platform,
+      tiers,
+      quotas,
+      db,
+      reset: resetValue,
+    });
+
+    log.info(`Discovered ${result.totalStored} players across ${result.tierResults.length} tiers.`);
+    for (const tierResult of result.tierResults) {
+      log.detail(
+        `${tierResult.tier}: ${tierResult.stored} stored (${tierResult.fetched} fetched, status=${tierResult.status})`,
+      );
+    }
+  } finally {
+    db.close();
+  }
+}
+
 async function runMigrate(args: string[]): Promise<void> {
   const [dbPathArg] = parsePositionals(args, 1, 'migrate [db-path]');
   const dbPath = resolveDbPath(dbPathArg);
@@ -280,6 +347,12 @@ const COMMANDS: readonly Command[] = [
     usage: 'check-key [platform]',
     description: `Test Riot API key connectivity (default platform: ${DEFAULT_PLATFORM})`,
     run: runCheckKey,
+  },
+  {
+    name: 'players',
+    usage: 'players [platform] [--tiers=EMERALD,DIAMOND,...] [--quota=EMERALD:250,...]',
+    description: 'Discover players by tier and persist their rank data into SQLite',
+    run: runPlayers,
   },
   {
     name: 'migrate',

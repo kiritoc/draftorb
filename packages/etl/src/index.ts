@@ -76,4 +76,15 @@ export {
   type RiotParticipantDto,
 } from './riot';
 
+export {
+  DEFAULT_PLAYER_QUOTAS,
+  DEFAULT_PLAYER_TIER_SEQUENCE,
+  discoverPlayersByTier,
+  playerRankScore,
+  runPlayerDiscovery,
+  type PlayerDiscoveryOptions,
+  type PlayerDiscoveryResult,
+  type TierDiscoveryResult,
+} from './players';
+
 export { getMigrationStatus, migrate, openDb } from './db';

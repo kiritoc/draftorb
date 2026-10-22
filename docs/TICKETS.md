@@ -2,7 +2,7 @@
 Format: `ID | Title | Deps | Status | Acceptance`. Status: TODO, DOING, REVIEW, DONE, BLOCKED. Only one ticket DOING per AI session. Size: S (<1h), M (half day), L (1 day). When a ticket is too big, split it and add sub-tickets (T-xxx.a).
 
 ## E0 Foundations
-- **T-001 | Monorepo scaffold (S)** | – | TODO | pnpm workspaces (`shared, engine, etl, web`), TS strict base config, Vitest, ESLint, Prettier, scripts `dev/test/typecheck/lint`. Acceptance: `pnpm install && pnpm test && pnpm typecheck` pass on clean Windows machine.
+- **T-001 | Monorepo scaffold (S)** | – | DONE | pnpm workspaces (`shared, engine, etl, web`), TS strict base config, Vitest, ESLint, Prettier, scripts `dev/test/typecheck/lint`. Acceptance: `pnpm install && pnpm test && pnpm typecheck` pass on clean Windows machine.
 - **T-002 | Shared types + zod schemas (M)** | T-001 | TODO | Types for Champion, Role, Rank, DraftInput, Slot, Recommendation, GameState, data JSON formats (DATA_MODEL.md). Acceptance: schemas + unit tests; no logic.
 - **T-003 | Data Dragon importer (S)** | T-002 | TODO | Script downloads latest version champions/items/runes -> `data/public/<patch>/champions.json, items.json, runes.json`. Acceptance: runs with `pnpm etl static`, validated by zod.
 - **T-004 | Support champion tags (M)** | T-003 | TODO | `data/manual/champion-tags.json` with all supports + common flex picks, schema in shared. Acceptance: validation script passes; coverage report lists missing champions.

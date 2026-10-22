@@ -1,0 +1,29 @@
+{
+  "name": "draftorb",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Free League of Legends draft and itemization assistant",
+  "scripts": {
+    "dev": "pnpm --filter @draftorb/web dev",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --build",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.25.1",
+    "eslint": "^9.25.1",
+    "prettier": "^3.5.3",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.31.0",
+    "vitest": "^3.1.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "packageManager": "pnpm@9.15.4"
+}

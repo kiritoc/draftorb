@@ -27,6 +27,17 @@ Documented limitation.
 ### D-009 — English only in the repo — ACCEPTED
 Code, docs, commits, tickets, bugs, logs and UI text are English. Chat language with AI assistants is free; anything written to files is English.
 
+### D-010 — Dependencies for T-001 scaffold — ACCEPTED
+All MIT-licensed, free, widely used:
+- **typescript** 5.x — TypeScript compiler (devDep)
+- **vitest** 3.x — Test runner, fast, Vite-native (devDep)
+- **eslint** 9.x — Linter, flat config (devDep)
+- **@eslint/js** + **typescript-eslint** — ESLint TypeScript support (devDep)
+- **prettier** 3.x — Code formatter (devDep)
+- **react** 19.x + **react-dom** 19.x — UI framework (web dep)
+- **vite** 6.x + **@vitejs/plugin-react** — Build tool (web devDep)
+- **tailwindcss** 3.x + **postcss** + **autoprefixer** — Styling (web devDep)
+
 ### Template
 ```
 ### D-xxx — Title — STATUS

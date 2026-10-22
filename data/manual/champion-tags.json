@@ -1,0 +1,1122 @@
+{
+  "1": {
+    "championId": 1,
+    "damageType": "AP",
+    "archetype": "mage",
+    "hardEngage": true,
+    "peel": true,
+    "poke": true,
+    "waveclear": true,
+    "scaling": {
+      "early": false,
+      "mid": true,
+      "late": true
+    },
+    "range": "RANGED",
+    "ccCount": 1
+  },
+  "3": {
+    "championId": 3,
+    "damageType": "AP",
+    "archetype": "engage",
+    "hardEngage": true,
+    "peel": true,
+    "poke": true,
+    "waveclear": true,
+    "scaling": {
+      "early": false,
+      "mid": true,
+      "late": true
+    },
+    "range": "MELEE",
+    "ccCount": 3
+  },
+  "7": {
+    "championId": 7,
+    "damageType": "AP",
+    "archetype": "assassin",
+    "hardEngage": false,
+    "peel": false,
+    "poke": true,
+    "waveclear": true,
+    "scaling": {
+      "early": true,
+      "mid": true,
+      "late": false
+    },
+    "range": "RANGED",
+    "ccCount": 1
+  },
+  "9": {
+    "championId": 9,
+    "damageType": "AP",
+    "archetype": "mage",
+    "hardEngage": true,
+    "peel": true,
+    "poke": true,
+    "waveclear": true,
+    "scaling": {
+      "early": false,
+      "mid": true,
+      "late": true
+    },
+    "range": "RANGED",
+    "ccCount": 2
+  },
+  "12": {
+    "championId": 12,
+    "damageType": "AP",
+    "archetype": "engage",
+    "hardEngage": true,
+    "peel": true,
+    "poke": false,
+    "waveclear": false,
+    "scaling": {
+      "early": true,
+      "mid": true,
+      "late": true
+    },
+    "range": "MELEE",
+    "ccCount": 3
+  },
+  "14": {
+    "championId": 14,
+    "damageType": "AD",
+    "archetype": "tank",
+    "hardEngage": true,
+    "peel": true,
+    "poke": true,
+    "waveclear": true,
+    "scaling": {
+      "early": false,
+      "mid": true,
+      "late": true
+    },
+    "range": "MELEE",
+    "ccCount": 3
+  },
+  "16": {
+    "championId": 16,
+    "damageType": "AP",
+    "archetype": "enchanter",
+    "hardEngage": false,
+    "peel": true,
+    "poke": true,
+    "waveclear": false,
+    "scaling": {
+      "early": false,
+      "mid": true,
+      "late": true
+    },
+    "range": "RANGED",
+    "ccCount": 2
+  },
+  "17": {
+    "championId": 17,
+    "damageType": "AP",
+    "archetype": "poke",
+    "hardEngage": false,
+    "peel": false,
+    "poke": true,
+    "waveclear": true,
+    "scaling": {
+      "early": true,
+      "mid": true,
+      "late": true
+    },
+    "range": "RANGED",
+    "ccCount": 2
+  },
+  "21": {
+    "championId": 21,
+    "damageType": "AD",
+    "archetype": "poke",
+    "hardEngage": false,
+    "peel": false,
+    "poke": true,
+    "waveclear": true,
+    "scaling": {
+      "early": true,
+      "mid": true,
+      "late": false
+    },
+    "range": "RANGED",
+    "ccCount": 1
+  },
+  "22": {
+    "championId": 22,
+    "damageType": "AD",
+    "archetype": "marksman",
+    "hardEngage": true,
+    "peel": true,
+    "poke": true,
+    "waveclear": false,
+    "scaling": {
+      "early": true,
+      "mid": true,
+      "late": false
+    },
+    "range": "RANGED",
+    "ccCount": 2
+  },
+  "25": {
+    "championId": 25,
+    "damageType": "AP",
+    "archetype": "catcher",
+    "hardEngage": false,
+    "peel": true,
+    "poke": true,
+    "waveclear": true,
+    "scaling": {
+      "early": false,
+      "mid": true,
+      "late": true
+    },
+    "range": "RANGED",
+    "ccCount": 2
+  },
+  "26": {
+    "championId": 26,
+    "damageType": "AP",
+    "archetype": "enchanter",
+    "hardEngage": false,
+    "peel": true,
+    "poke": true,
+    "waveclear": true,
+    "scaling": {
+      "early": false,
+      "mid": true,
+      "late": true
+    },
+    "range": "RANGED",
+    "ccCount": 2
+  },
+  "29": {
+    "championId": 29,
+    "damageType": "MIXED",
+    "archetype": "assassin",
+    "hardEngage": false,
+    "peel": false,
+    "poke": true,
+    "waveclear": true,
+    "scaling": {
+      "early": true,
+      "mid": true,
+      "late": true
+    },
+    "range": "RANGED",
+    "ccCount": 1
+  },
+  "30": {
+    "championId": 30,
+    "damageType": "AP",
+    "archetype": "mage",
+    "hardEngage": false,
+    "peel": false,
+    "poke": true,
+    "waveclear": true,
+    "scaling": {
+      "early": false,
+      "mid": true,
+      "late": true
+    },
+    "range": "RANGED",
+    "ccCount": 1
+  },
+  "31": {
+    "championId": 31,
+    "damageType": "AP",
+    "archetype": "tank",
+    "hardEngage": true,
+    "peel": true,
+    "poke": true,
+    "waveclear": true,
+    "scaling": {
+      "early": false,
+      "mid": true,
+      "late": true
+    },
+    "range": "MELEE",
+    "ccCount": 3
+  },
+  "32": {
+    "championId": 32,
+    "damageType": "AP",
+    "archetype": "engage",
+    "hardEngage": true,
+    "peel": true,
+    "poke": false,
+    "waveclear": true,
+    "scaling": {
+      "early": false,
+      "mid": true,
+      "late": true
+    },
+    "range": "MELEE",
+    "ccCount": 2
+  },
+  "33": {
+    "championId": 33,
+    "damageType": "AP",
+    "archetype": "engage",
+    "hardEngage": true,
+    "peel": true,
+    "poke": false,
+    "waveclear": false,
+    "scaling": {
+      "early": false,
+      "mid": true,
+      "late": true
+    },
+    "range": "MELEE",
+    "ccCount": 3
+  },
+  "34": {
+    "championId": 34,
+    "damageType": "AP",
+    "archetype": "mage",
+    "hardEngage": false,
+    "peel": true,
+    "poke": true,
+    "waveclear": true,
+    "scaling": {
+      "early": false,
+      "mid": true,
+      "late": true
+    },
+    "range": "RANGED",
+    "ccCount": 3
+  },
+  "35": {
+    "championId": 35,
+    "damageType": "MIXED",
+    "archetype": "catcher",
+    "hardEngage": false,
+    "peel": true,
+    "poke": true,
+    "waveclear": true,
+    "scaling": {
+      "early": true,
+      "mid": true,
+      "late": false
+    },
+    "range": "MELEE",
+    "ccCount": 2
+  },
+  "37": {
+    "championId": 37,
+    "damageType": "AP",
+    "archetype": "enchanter",
+    "hardEngage": true,
+    "peel": true,
+    "poke": true,
+    "waveclear": false,
+    "scaling": {
+      "early": false,
+      "mid": true,
+      "late": true
+    },
+    "range": "RANGED",
+    "ccCount": 2
+  },
+  "40": {
+    "championId": 40,
+    "damageType": "AP",
+    "archetype": "enchanter",
+    "hardEngage": false,
+    "peel": true,
+    "poke": true,
+    "waveclear": false,
+    "scaling": {
+      "early": false,
+      "mid": true,
+      "late": true
+    },
+    "range": "RANGED",
+    "ccCount": 3
+  },
+  "43": {
+    "championId": 43,
+    "damageType": "AP",
+    "archetype": "enchanter",
+    "hardEngage": false,
+    "peel": true,
+    "poke": true,
+    "waveclear": true,
+    "scaling": {
+      "early": true,
+      "mid": true,
+      "late": false
+    },
+    "range": "RANGED",
+    "ccCount": 2
+  },
+  "44": {
+    "championId": 44,
+    "damageType": "AP",
+    "archetype": "warden",
+    "hardEngage": false,
+    "peel": true,
+    "poke": false,
+    "waveclear": false,
+    "scaling": {
+      "early": false,
+      "mid": true,
+      "late": true
+    },
+    "range": "MELEE",
+    "ccCount": 1
+  },
+  "45": {
+    "championId": 45,
+    "damageType": "AP",
+    "archetype": "mage",
+    "hardEngage": false,
+    "peel": true,
+    "poke": true,
+    "waveclear": true,
+    "scaling": {
+      "early": false,
+      "mid": true,
+      "late": true
+    },
+    "range": "RANGED",
+    "ccCount": 1
+  },
+  "48": {
+    "championId": 48,
+    "damageType": "AD",
+    "archetype": "warden",
+    "hardEngage": false,
+    "peel": true,
+    "poke": false,
+    "waveclear": false,
+    "scaling": {
+      "early": true,
+      "mid": true,
+      "late": false
+    },
+    "range": "MELEE",
+    "ccCount": 2
+  },
+  "50": {
+    "championId": 50,
+    "damageType": "AP",
+    "archetype": "catcher",
+    "hardEngage": false,
+    "peel": true,
+    "poke": true,
+    "waveclear": true,
+    "scaling": {
+      "early": false,
+      "mid": true,
+      "late": true
+    },
+    "range": "RANGED",
+    "ccCount": 2
+  },
+  "53": {
+    "championId": 53,
+    "damageType": "AP",
+    "archetype": "catcher",
+    "hardEngage": true,
+    "peel": true,
+    "poke": false,
+    "waveclear": false,
+    "scaling": {
+      "early": true,
+      "mid": true,
+      "late": false
+    },
+    "range": "MELEE",
+    "ccCount": 3
+  },
+  "54": {
+    "championId": 54,
+    "damageType": "AP",
+    "archetype": "engage",
+    "hardEngage": true,
+    "peel": true,
+    "poke": true,
+    "waveclear": true,
+    "scaling": {
+      "early": false,
+      "mid": true,
+      "late": true
+    },
+    "range": "MELEE",
+    "ccCount": 2
+  },
+  "57": {
+    "championId": 57,
+    "damageType": "AP",
+    "archetype": "engage",
+    "hardEngage": true,
+    "peel": true,
+    "poke": true,
+    "waveclear": true,
+    "scaling": {
+      "early": false,
+      "mid": true,
+      "late": true
+    },
+    "range": "MELEE",
+    "ccCount": 4
+  },
+  "59": {
+    "championId": 59,
+    "damageType": "AD",
+    "archetype": "engage",
+    "hardEngage": true,
+    "peel": true,
+    "poke": true,
+    "waveclear": true,
+    "scaling": {
+      "early": true,
+      "mid": true,
+      "late": false
+    },
+    "range": "MELEE",
+    "ccCount": 2
+  },
+  "60": {
+    "championId": 60,
+    "damageType": "AP",
+    "archetype": "catcher",
+    "hardEngage": false,
+    "peel": true,
+    "poke": true,
+    "waveclear": false,
+    "scaling": {
+      "early": true,
+      "mid": true,
+      "late": false
+    },
+    "range": "RANGED",
+    "ccCount": 1
+  },
+  "61": {
+    "championId": 61,
+    "damageType": "AP",
+    "archetype": "mage",
+    "hardEngage": true,
+    "peel": true,
+    "poke": true,
+    "waveclear": true,
+    "scaling": {
+      "early": false,
+      "mid": true,
+      "late": true
+    },
+    "range": "RANGED",
+    "ccCount": 2
+  },
+  "63": {
+    "championId": 63,
+    "damageType": "AP",
+    "archetype": "mage",
+    "hardEngage": false,
+    "peel": false,
+    "poke": true,
+    "waveclear": true,
+    "scaling": {
+      "early": true,
+      "mid": true,
+      "late": true
+    },
+    "range": "RANGED",
+    "ccCount": 1
+  },
+  "74": {
+    "championId": 74,
+    "damageType": "AP",
+    "archetype": "poke",
+    "hardEngage": false,
+    "peel": true,
+    "poke": true,
+    "waveclear": true,
+    "scaling": {
+      "early": true,
+      "mid": true,
+      "late": false
+    },
+    "range": "RANGED",
+    "ccCount": 1
+  },
+  "78": {
+    "championId": 78,
+    "damageType": "AD",
+    "archetype": "warden",
+    "hardEngage": true,
+    "peel": true,
+    "poke": true,
+    "waveclear": false,
+    "scaling": {
+      "early": true,
+      "mid": true,
+      "late": false
+    },
+    "range": "MELEE",
+    "ccCount": 4
+  },
+  "79": {
+    "championId": 79,
+    "damageType": "AP",
+    "archetype": "engage",
+    "hardEngage": true,
+    "peel": true,
+    "poke": true,
+    "waveclear": true,
+    "scaling": {
+      "early": false,
+      "mid": true,
+      "late": true
+    },
+    "range": "MELEE",
+    "ccCount": 3
+  },
+  "80": {
+    "championId": 80,
+    "damageType": "AD",
+    "archetype": "assassin",
+    "hardEngage": true,
+    "peel": true,
+    "poke": true,
+    "waveclear": true,
+    "scaling": {
+      "early": true,
+      "mid": false,
+      "late": false
+    },
+    "range": "MELEE",
+    "ccCount": 2
+  },
+  "89": {
+    "championId": 89,
+    "damageType": "AP",
+    "archetype": "engage",
+    "hardEngage": true,
+    "peel": true,
+    "poke": false,
+    "waveclear": false,
+    "scaling": {
+      "early": true,
+      "mid": true,
+      "late": false
+    },
+    "range": "MELEE",
+    "ccCount": 3
+  },
+  "98": {
+    "championId": 98,
+    "damageType": "MIXED",
+    "archetype": "warden",
+    "hardEngage": true,
+    "peel": true,
+    "poke": false,
+    "waveclear": false,
+    "scaling": {
+      "early": true,
+      "mid": true,
+      "late": true
+    },
+    "range": "MELEE",
+    "ccCount": 2
+  },
+  "99": {
+    "championId": 99,
+    "damageType": "AP",
+    "archetype": "mage",
+    "hardEngage": false,
+    "peel": true,
+    "poke": true,
+    "waveclear": true,
+    "scaling": {
+      "early": false,
+      "mid": true,
+      "late": true
+    },
+    "range": "RANGED",
+    "ccCount": 2
+  },
+  "101": {
+    "championId": 101,
+    "damageType": "AP",
+    "archetype": "poke",
+    "hardEngage": false,
+    "peel": false,
+    "poke": true,
+    "waveclear": true,
+    "scaling": {
+      "early": false,
+      "mid": true,
+      "late": true
+    },
+    "range": "RANGED",
+    "ccCount": 2
+  },
+  "111": {
+    "championId": 111,
+    "damageType": "AP",
+    "archetype": "engage",
+    "hardEngage": true,
+    "peel": true,
+    "poke": false,
+    "waveclear": false,
+    "scaling": {
+      "early": true,
+      "mid": true,
+      "late": false
+    },
+    "range": "MELEE",
+    "ccCount": 4
+  },
+  "113": {
+    "championId": 113,
+    "damageType": "AP",
+    "archetype": "engage",
+    "hardEngage": true,
+    "peel": true,
+    "poke": false,
+    "waveclear": true,
+    "scaling": {
+      "early": false,
+      "mid": true,
+      "late": true
+    },
+    "range": "MELEE",
+    "ccCount": 4
+  },
+  "117": {
+    "championId": 117,
+    "damageType": "AP",
+    "archetype": "enchanter",
+    "hardEngage": false,
+    "peel": true,
+    "poke": true,
+    "waveclear": false,
+    "scaling": {
+      "early": true,
+      "mid": true,
+      "late": true
+    },
+    "range": "RANGED",
+    "ccCount": 3
+  },
+  "142": {
+    "championId": 142,
+    "damageType": "AP",
+    "archetype": "poke",
+    "hardEngage": false,
+    "peel": true,
+    "poke": true,
+    "waveclear": true,
+    "scaling": {
+      "early": true,
+      "mid": true,
+      "late": false
+    },
+    "range": "RANGED",
+    "ccCount": 1
+  },
+  "143": {
+    "championId": 143,
+    "damageType": "AP",
+    "archetype": "mage",
+    "hardEngage": false,
+    "peel": true,
+    "poke": true,
+    "waveclear": true,
+    "scaling": {
+      "early": true,
+      "mid": true,
+      "late": false
+    },
+    "range": "RANGED",
+    "ccCount": 2
+  },
+  "147": {
+    "championId": 147,
+    "damageType": "AP",
+    "archetype": "enchanter",
+    "hardEngage": true,
+    "peel": true,
+    "poke": true,
+    "waveclear": true,
+    "scaling": {
+      "early": false,
+      "mid": true,
+      "late": true
+    },
+    "range": "RANGED",
+    "ccCount": 2
+  },
+  "154": {
+    "championId": 154,
+    "damageType": "AP",
+    "archetype": "engage",
+    "hardEngage": true,
+    "peel": true,
+    "poke": false,
+    "waveclear": true,
+    "scaling": {
+      "early": false,
+      "mid": true,
+      "late": true
+    },
+    "range": "MELEE",
+    "ccCount": 3
+  },
+  "161": {
+    "championId": 161,
+    "damageType": "AP",
+    "archetype": "poke",
+    "hardEngage": false,
+    "peel": false,
+    "poke": true,
+    "waveclear": true,
+    "scaling": {
+      "early": false,
+      "mid": true,
+      "late": true
+    },
+    "range": "RANGED",
+    "ccCount": 2
+  },
+  "163": {
+    "championId": 163,
+    "damageType": "AP",
+    "archetype": "catcher",
+    "hardEngage": false,
+    "peel": true,
+    "poke": true,
+    "waveclear": true,
+    "scaling": {
+      "early": false,
+      "mid": true,
+      "late": true
+    },
+    "range": "RANGED",
+    "ccCount": 2
+  },
+  "164": {
+    "championId": 164,
+    "damageType": "AD",
+    "archetype": "diver",
+    "hardEngage": true,
+    "peel": false,
+    "poke": true,
+    "waveclear": false,
+    "scaling": {
+      "early": true,
+      "mid": true,
+      "late": false
+    },
+    "range": "MELEE",
+    "ccCount": 3
+  },
+  "200": {
+    "championId": 200,
+    "damageType": "AD",
+    "archetype": "skirmisher",
+    "hardEngage": true,
+    "peel": false,
+    "poke": false,
+    "waveclear": false,
+    "scaling": {
+      "early": true,
+      "mid": true,
+      "late": true
+    },
+    "range": "MELEE",
+    "ccCount": 1
+  },
+  "201": {
+    "championId": 201,
+    "damageType": "AP",
+    "archetype": "warden",
+    "hardEngage": false,
+    "peel": true,
+    "poke": true,
+    "waveclear": false,
+    "scaling": {
+      "early": false,
+      "mid": true,
+      "late": true
+    },
+    "range": "MELEE",
+    "ccCount": 3
+  },
+  "223": {
+    "championId": 223,
+    "damageType": "AP",
+    "archetype": "warden",
+    "hardEngage": true,
+    "peel": true,
+    "poke": true,
+    "waveclear": false,
+    "scaling": {
+      "early": false,
+      "mid": true,
+      "late": true
+    },
+    "range": "MELEE",
+    "ccCount": 3
+  },
+  "235": {
+    "championId": 235,
+    "damageType": "AD",
+    "archetype": "marksman",
+    "hardEngage": false,
+    "peel": true,
+    "poke": true,
+    "waveclear": false,
+    "scaling": {
+      "early": true,
+      "mid": true,
+      "late": true
+    },
+    "range": "RANGED",
+    "ccCount": 2
+  },
+  "267": {
+    "championId": 267,
+    "damageType": "AP",
+    "archetype": "enchanter",
+    "hardEngage": false,
+    "peel": true,
+    "poke": true,
+    "waveclear": false,
+    "scaling": {
+      "early": false,
+      "mid": true,
+      "late": true
+    },
+    "range": "RANGED",
+    "ccCount": 3
+  },
+  "350": {
+    "championId": 350,
+    "damageType": "AP",
+    "archetype": "enchanter",
+    "hardEngage": false,
+    "peel": true,
+    "poke": true,
+    "waveclear": false,
+    "scaling": {
+      "early": false,
+      "mid": true,
+      "late": true
+    },
+    "range": "RANGED",
+    "ccCount": 2
+  },
+  "412": {
+    "championId": 412,
+    "damageType": "MIXED",
+    "archetype": "catcher",
+    "hardEngage": true,
+    "peel": true,
+    "poke": true,
+    "waveclear": false,
+    "scaling": {
+      "early": true,
+      "mid": true,
+      "late": false
+    },
+    "range": "RANGED",
+    "ccCount": 3
+  },
+  "427": {
+    "championId": 427,
+    "damageType": "AP",
+    "archetype": "enchanter",
+    "hardEngage": false,
+    "peel": true,
+    "poke": false,
+    "waveclear": false,
+    "scaling": {
+      "early": false,
+      "mid": true,
+      "late": true
+    },
+    "range": "RANGED",
+    "ccCount": 3
+  },
+  "432": {
+    "championId": 432,
+    "damageType": "MIXED",
+    "archetype": "catcher",
+    "hardEngage": true,
+    "peel": true,
+    "poke": true,
+    "waveclear": false,
+    "scaling": {
+      "early": false,
+      "mid": true,
+      "late": true
+    },
+    "range": "RANGED",
+    "ccCount": 2
+  },
+  "497": {
+    "championId": 497,
+    "damageType": "AP",
+    "archetype": "engage",
+    "hardEngage": true,
+    "peel": true,
+    "poke": false,
+    "waveclear": false,
+    "scaling": {
+      "early": false,
+      "mid": true,
+      "late": true
+    },
+    "range": "RANGED",
+    "ccCount": 2
+  },
+  "518": {
+    "championId": 518,
+    "damageType": "AP",
+    "archetype": "catcher",
+    "hardEngage": true,
+    "peel": true,
+    "poke": true,
+    "waveclear": true,
+    "scaling": {
+      "early": true,
+      "mid": true,
+      "late": false
+    },
+    "range": "RANGED",
+    "ccCount": 2
+  },
+  "526": {
+    "championId": 526,
+    "damageType": "AP",
+    "archetype": "engage",
+    "hardEngage": true,
+    "peel": true,
+    "poke": false,
+    "waveclear": false,
+    "scaling": {
+      "early": true,
+      "mid": true,
+      "late": false
+    },
+    "range": "MELEE",
+    "ccCount": 3
+  },
+  "555": {
+    "championId": 555,
+    "damageType": "AD",
+    "archetype": "assassin",
+    "hardEngage": true,
+    "peel": false,
+    "poke": false,
+    "waveclear": false,
+    "scaling": {
+      "early": true,
+      "mid": true,
+      "late": false
+    },
+    "range": "MELEE",
+    "ccCount": 2
+  },
+  "711": {
+    "championId": 711,
+    "damageType": "AP",
+    "archetype": "mage",
+    "hardEngage": true,
+    "peel": true,
+    "poke": true,
+    "waveclear": true,
+    "scaling": {
+      "early": true,
+      "mid": true,
+      "late": true
+    },
+    "range": "RANGED",
+    "ccCount": 2
+  },
+  "800": {
+    "championId": 800,
+    "damageType": "AP",
+    "archetype": "mage",
+    "hardEngage": false,
+    "peel": true,
+    "poke": true,
+    "waveclear": true,
+    "scaling": {
+      "early": false,
+      "mid": true,
+      "late": true
+    },
+    "range": "RANGED",
+    "ccCount": 2
+  },
+  "875": {
+    "championId": 875,
+    "damageType": "AD",
+    "archetype": "engage",
+    "hardEngage": true,
+    "peel": true,
+    "poke": false,
+    "waveclear": false,
+    "scaling": {
+      "early": true,
+      "mid": true,
+      "late": false
+    },
+    "range": "MELEE",
+    "ccCount": 2
+  },
+  "888": {
+    "championId": 888,
+    "damageType": "AP",
+    "archetype": "enchanter",
+    "hardEngage": false,
+    "peel": true,
+    "poke": true,
+    "waveclear": false,
+    "scaling": {
+      "early": false,
+      "mid": true,
+      "late": true
+    },
+    "range": "RANGED",
+    "ccCount": 2
+  },
+  "902": {
+    "championId": 902,
+    "damageType": "AP",
+    "archetype": "enchanter",
+    "hardEngage": false,
+    "peel": true,
+    "poke": true,
+    "waveclear": false,
+    "scaling": {
+      "early": false,
+      "mid": true,
+      "late": true
+    },
+    "range": "RANGED",
+    "ccCount": 1
+  },
+  "910": {
+    "championId": 910,
+    "damageType": "AP",
+    "archetype": "mage",
+    "hardEngage": false,
+    "peel": true,
+    "poke": true,
+    "waveclear": true,
+    "scaling": {
+      "early": false,
+      "mid": true,
+      "late": true
+    },
+    "range": "RANGED",
+    "ccCount": 3
+  }
+}

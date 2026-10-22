@@ -5,7 +5,7 @@ Format: `ID | Title | Deps | Status | Acceptance`. Status: TODO, DOING, REVIEW, 
 - **T-001 | Monorepo scaffold (S)** | – | DONE | pnpm workspaces (`shared, engine, etl, web`), TS strict base config, Vitest, ESLint, Prettier, scripts `dev/test/typecheck/lint`. Acceptance: `pnpm install && pnpm test && pnpm typecheck` pass on clean Windows machine.
 - **T-002 | Shared types + zod schemas (M)** | T-001 | DONE | Types for Champion, Role, Rank, DraftInput, Slot, Recommendation, GameState, data JSON formats (DATA_MODEL.md). Acceptance: schemas + unit tests; no logic.
 - **T-003 | Data Dragon importer (S)** | T-002 | DONE | Script downloads latest version champions/items/runes -> `data/public/<patch>/champions.json, items.json, runes.json`. Acceptance: runs with `pnpm etl static`, validated by zod.
-- **T-004 | Support champion tags (M)** | T-003 | TODO | `data/manual/champion-tags.json` with all supports + common flex picks, schema in shared. Acceptance: validation script passes; coverage report lists missing champions.
+- **T-004 | Support champion tags (M)** | T-003 | DONE | `data/manual/champion-tags.json` with all supports + common flex picks, schema in shared. Acceptance: validation script passes; coverage report lists missing champions.
 
 ## E1 ETL
 - **T-010 | Riot client + rate limiter (M)** | T-001 | TODO | See RIOT_API.md. Acceptance: tests with mocked HTTP for 429/5xx/401 and rate limiting.

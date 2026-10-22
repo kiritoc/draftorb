@@ -136,6 +136,12 @@ export type Champion = z.infer<typeof championSchema>;
 export const championsMapSchema = z.record(z.string(), championSchema);
 export type ChampionsMap = z.infer<typeof championsMapSchema>;
 
+export const damageTypeSchema = z.enum(['AD', 'AP', 'MIXED', 'NONE']);
+export type DamageType = z.infer<typeof damageTypeSchema>;
+
+export const championRangeSchema = z.enum(['MELEE', 'RANGED']);
+export type ChampionRange = z.infer<typeof championRangeSchema>;
+
 export const championTagsScalingSchema = z
   .object({
     early: z.boolean(),
@@ -147,14 +153,14 @@ export const championTagsScalingSchema = z
 export const championTagsSchema = z
   .object({
     championId: championIdSchema,
-    damageType: z.enum(['AD', 'AP', 'MIXED', 'NONE']),
+    damageType: damageTypeSchema,
     archetype: z.string().min(1),
     hardEngage: z.boolean(),
     peel: z.boolean(),
     poke: z.boolean(),
     waveclear: z.boolean(),
     scaling: championTagsScalingSchema,
-    range: z.enum(['MELEE', 'RANGED']),
+    range: championRangeSchema,
     ccCount: z.number().int().nonnegative(),
   })
   .strict();
@@ -185,7 +191,14 @@ export const manifestSchema = z
   .strict();
 export type Manifest = z.infer<typeof manifestSchema>;
 
-export const championTagsMapSchema = z.record(z.string(), championTagsSchema);
+export const championTagsMapSchema = z
+  .record(z.string(), championTagsSchema)
+  .refine(
+    (entries) => Object.entries(entries).every(([key, val]) => key === String(val.championId)),
+    {
+      message: 'Every record key in championTagsMap must match its championId',
+    },
+  );
 export type ChampionTagsMap = z.infer<typeof championTagsMapSchema>;
 
 export const supportPairEntrySchema = z.tuple([

@@ -2,10 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import {
   championIdSchema,
+  championRangeSchema,
   championRoleProbabilitiesSchema,
   championSchema,
   championsMapSchema,
   championTagsMapSchema,
+  championTagsSchema,
+  damageTypeSchema,
   draftInputSchema,
   gameStateSchema,
   itemIdSchema,
@@ -107,6 +110,27 @@ describe('shared schemas', () => {
       },
     };
     expect(championTagsMapSchema.parse(tags)).toEqual(tags);
+    expect(championTagsSchema.parse(tags['41'])).toEqual(tags['41']);
+    expect(damageTypeSchema.parse('AP')).toBe('AP');
+    expect(championRangeSchema.parse('RANGED')).toBe('RANGED');
+
+    // Mismatched map key vs championId
+    expect(() =>
+      championTagsMapSchema.parse({
+        '999': {
+          championId: 41,
+          damageType: 'AP',
+          archetype: 'enchanter',
+          hardEngage: false,
+          peel: true,
+          poke: true,
+          waveclear: false,
+          scaling: { early: false, mid: true, late: true },
+          range: 'RANGED',
+          ccCount: 2,
+        },
+      }),
+    ).toThrow();
 
     const manifest = {
       patch: '14.23',

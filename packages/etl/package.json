@@ -17,6 +17,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "etl": "tsx src/cli.ts",
-    "static": "tsx src/cli.ts static"
+    "static": "tsx src/cli.ts static",
+    "validate-tags": "tsx src/cli.ts validate-tags"
   }
 }

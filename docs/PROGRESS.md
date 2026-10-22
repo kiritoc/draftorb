@@ -2,15 +2,15 @@
 
 ## Current status
 - Phase: 1 (Support / Diamond)
-- Current milestone: M0 Foundations
-- Last updated: 2026-10-22 by Gemini (T-003)
+- Current milestone: M0 Foundations (Complete) -> M1 ETL
+- Last updated: 2026-10-22 by Gemini (T-004)
 
 ## Epic status
 | Epic | Status | Notes |
 |---|---|---|
-| E0 Foundations | IN PROGRESS | T-001 DONE, T-002 DONE, T-003 DONE |
-| E1 ETL | NOT STARTED | |
-| E2 Engine | NOT STARTED | |
+| E0 Foundations | DONE | T-001..T-004 DONE |
+| E1 ETL | NOT STARTED | Ready to start T-010 |
+| E2 Engine | NOT STARTED | Ready to start T-020 |
 | E3 Web MVP | NOT STARTED | |
 | E4 Runes | NOT STARTED | |
 | E5 Items | NOT STARTED | |
@@ -23,7 +23,7 @@
 - Last aggregation: -
 
 ## Next recommended ticket
-T-004
+T-010 (or T-020)
 
 ## Open questions for the owner
 - (none)
@@ -40,6 +40,34 @@ T-004
 - Next step:
 - Pitfalls / notes for next AI:
 ```
+
+### 2026-10-22 — Gemini — Ticket T-004
+- Done:
+  - Created `data/manual/champion-tags.json` with 70 champions: all 43 support champions from Data Dragon (100% coverage) plus 27 common and off-meta flex picks.
+  - Exported `damageTypeSchema`, `DamageType`, `championRangeSchema`, and `ChampionRange` in `@draftorb/shared`.
+  - Added key-to-championId match refinement in `championTagsMapSchema` in `@draftorb/shared` to enforce ID integrity.
+  - Implemented pure coverage evaluator (`evaluateChampionTagsCoverage`), report formatter (`formatCoverageReport`), and file validator (`validateChampionTagsFile`) in `packages/etl/src/tags.ts`.
+  - Added `validate-tags` command to ETL CLI (`packages/etl/src/cli.ts`) and `"validate:tags"` script in root and ETL package.json.
+  - Added unit test suite in `packages/etl/src/tags.test.ts` (5 tests covering pure coverage logic, missing supports detection, report formatting, real file validation, and error handling) and updated shared schema tests.
+- Files touched:
+  - `data/manual/champion-tags.json`
+  - `packages/shared/src/index.ts`
+  - `packages/shared/src/index.test.ts`
+  - `packages/etl/src/tags.ts`
+  - `packages/etl/src/tags.test.ts`
+  - `packages/etl/src/index.ts`
+  - `packages/etl/src/cli.ts`
+  - `packages/etl/package.json`
+  - `package.json`
+  - `docs/TICKETS.md`
+  - `docs/PROGRESS.md`
+- Tests: `pnpm test && pnpm typecheck && pnpm lint` (4 test files, 24 tests passed), and `pnpm validate:tags` (100% support coverage, 70 champions tagged, untagged champions listed).
+- State left: DONE
+- Next step: T-010 (Riot client + rate limiter) or T-020 (Rank weighting module)
+- Pitfalls / notes for next AI:
+  - Thresh and Rakan are ranged in game mechanics (range 450 and 300 respectively); tagged as `RANGED`.
+  - `championTagsMapSchema` enforces that dictionary keys match the inner `championId` as strings.
+  - `pnpm validate:tags` enforces 100% coverage of champions tagged with `SUPPORT` in `champions.json`; if any support champion is missing in the future, the validation script exits with code 1.
 
 ### 2026-10-22 — Gemini — Ticket T-003
 - Done:

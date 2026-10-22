@@ -7,6 +7,7 @@
  */
 
 import { importStaticData } from './ddragon';
+import { formatCoverageReport, validateChampionTagsFile } from './tags';
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
@@ -41,6 +42,31 @@ async function main(): Promise<void> {
       break;
     }
 
+    case 'validate-tags':
+    case 'tags:validate': {
+      console.log('[ETL] Validating manual champion tags and coverage...');
+      const tagsFilePath = args[1];
+      const championsFilePath = args[2];
+
+      const result = await validateChampionTagsFile({
+        tagsFilePath,
+        championsFilePath,
+      });
+
+      console.log(formatCoverageReport(result.coverage));
+
+      if (!result.isValid) {
+        console.error('[ETL] Validation FAILED with errors:');
+        for (const error of result.errors) {
+          console.error(`  - ${error}`);
+        }
+        process.exit(1);
+      }
+
+      console.log('[ETL] Champion tags validation PASSED.');
+      break;
+    }
+
     default: {
       console.error(`[ETL] Unknown command: "${command}"`);
       printHelp();
@@ -54,8 +80,9 @@ function printHelp(): void {
 DraftOrb ETL CLI
 
 Commands:
-  static [version]   Download latest (or specified) champions, items, runes from Data Dragon
-  help               Show this help message
+  static [version]              Download latest (or specified) champions, items, runes from Data Dragon
+  validate-tags [tags] [champs] Validate manual champion tags and report coverage
+  help                          Show this help message
 
 Target state commands (in development):
   migrate            Create or upgrade SQLite database

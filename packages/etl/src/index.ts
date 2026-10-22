@@ -24,3 +24,14 @@ export {
   type RawDDragonRunePerk,
   type RawDDragonRuneTree,
 } from './ddragon';
+
+export {
+  evaluateChampionTagsCoverage,
+  findLatestChampionsPath,
+  formatCoverageReport,
+  validateChampionTagsFile,
+  type ChampionCoverageItem,
+  type ChampionTagsCoverageReport,
+  type ValidateTagsOptions,
+  type ValidateTagsResult,
+} from './tags';

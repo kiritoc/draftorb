@@ -13,7 +13,8 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "etl": "tsx packages/etl/src/cli.ts"
+    "etl": "tsx packages/etl/src/cli.ts",
+    "validate:tags": "tsx packages/etl/src/cli.ts validate-tags"
   },
   "devDependencies": {
     "@eslint/js": "^9.25.1",

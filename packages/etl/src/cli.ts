@@ -7,6 +7,7 @@
  */
 
 import { importStaticData } from './ddragon';
+import { RiotClient, RiotAuthError } from './riot';
 import { formatCoverageReport, validateChampionTagsFile } from './tags';
 
 async function main(): Promise<void> {
@@ -19,6 +20,28 @@ async function main(): Promise<void> {
   }
 
   switch (command) {
+    case 'check-key':
+    case 'riot:check': {
+      const platformArg = (args[1] ?? 'euw1') as Parameters<RiotClient['getChallengerLeague']>[0];
+      console.log(`[ETL] Checking Riot API key against platform "${platformArg}"...`);
+      try {
+        const client = new RiotClient();
+        const challenger = await client.getChallengerLeague(platformArg);
+        console.log(
+          `[ETL] Riot API key is valid! Successfully reached ${platformArg} Challenger league ("${challenger.name}").`,
+        );
+        console.log(`  - Entries: ${challenger.entries.length} players found`);
+        console.log(`  - Active App Limits:`, client.getRateLimiter().getAppLimits());
+      } catch (err: unknown) {
+        if (err instanceof RiotAuthError) {
+          console.error(`[ETL] Authentication error: ${err.message}`);
+          process.exit(1);
+        }
+        throw err;
+      }
+      break;
+    }
+
     case 'static': {
       const versionArg = args[1];
       console.log(
@@ -82,6 +105,7 @@ DraftOrb ETL CLI
 Commands:
   static [version]              Download latest (or specified) champions, items, runes from Data Dragon
   validate-tags [tags] [champs] Validate manual champion tags and report coverage
+  check-key [platform]          Test Riot API key connectivity (default platform: euw1)
   help                          Show this help message
 
 Target state commands (in development):

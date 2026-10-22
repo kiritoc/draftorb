@@ -1,0 +1,21 @@
+{
+  "tier": "CHALLENGER",
+  "leagueId": "challenger-league-euw",
+  "queue": "RANKED_SOLO_5x5",
+  "name": "Braum's Vanguard",
+  "entries": [
+    {
+      "summonerId": "challenger-summoner-1",
+      "puuid": "challenger-puuid-1",
+      "leaguePoints": 950,
+      "rank": "I",
+      "wins": 340,
+      "losses": 250,
+      "veteran": true,
+      "inactive": false,
+      "freshBlood": false,
+      "hotStreak": true
+    }
+  ]
+}
+

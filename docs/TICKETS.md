@@ -8,7 +8,7 @@ Format: `ID | Title | Deps | Status | Acceptance`. Status: TODO, DOING, REVIEW, 
 - **T-004 | Support champion tags (M)** | T-003 | DONE | `data/manual/champion-tags.json` with all supports + common flex picks, schema in shared. Acceptance: validation script passes; coverage report lists missing champions.
 
 ## E1 ETL
-- **T-010 | Riot client + rate limiter (M)** | T-001 | TODO | See RIOT_API.md. Acceptance: tests with mocked HTTP for 429/5xx/401 and rate limiting.
+- **T-010 | Riot client + rate limiter (M)** | T-001 | DONE | See RIOT_API.md. Acceptance: tests with mocked HTTP for 429/5xx/401 and rate limiting.
 - **T-011 | SQLite schema + migrations (S)** | T-001 | TODO | DATA_MODEL.md tables, migration runner. Acceptance: `pnpm etl migrate` idempotent.
 - **T-012 | Player discovery by tier (M)** | T-010,T-011 | TODO | Collect players Emerald..Challenger (config), store rank_score. Acceptance: resumable, per-tier quotas.
 - **T-013 | Match ingestion (L)** | T-012 | TODO | Fetch ranked solo matches per player, dedupe, patch filter, store. Acceptance: kill/restart resumes; progress log; no duplicate rows.

@@ -1,0 +1,77 @@
+{
+  "metadata": {
+    "dataVersion": "2",
+    "matchId": "EUW1_7100000001",
+    "participants": [
+      "puuid-ally-top",
+      "puuid-ally-jungle",
+      "puuid-ally-mid",
+      "puuid-ally-adc",
+      "puuid-ally-support",
+      "puuid-enemy-top",
+      "puuid-enemy-jungle",
+      "puuid-enemy-mid",
+      "puuid-enemy-adc",
+      "puuid-enemy-support"
+    ]
+  },
+  "info": {
+    "gameCreation": 1729000000000,
+    "gameDuration": 1820,
+    "gameEndTimestamp": 1729001820000,
+    "gameId": 7100000001,
+    "gameMode": "CLASSIC",
+    "gameVersion": "14.21.628.9812",
+    "queueId": 420,
+    "participants": [
+      {
+        "puuid": "puuid-ally-support",
+        "participantId": 5,
+        "teamId": 100,
+        "championId": 412,
+        "championName": "Thresh",
+        "teamPosition": "UTILITY",
+        "win": true,
+        "kills": 2,
+        "deaths": 3,
+        "assists": 18,
+        "champLevel": 14,
+        "item0": 3869,
+        "item1": 3109,
+        "item2": 3110,
+        "item3": 3117,
+        "item4": 0,
+        "item5": 0,
+        "item6": 3364,
+        "perks": {
+          "statPerks": {
+            "defense": 5001,
+            "flex": 5008,
+            "offense": 5008
+          },
+          "styles": [
+            {
+              "description": "primaryStyle",
+              "style": 8400,
+              "selections": [
+                { "perk": 8439, "var1": 500, "var2": 0, "var3": 0 },
+                { "perk": 8463, "var1": 300, "var2": 0, "var3": 0 },
+                { "perk": 8444, "var1": 200, "var2": 0, "var3": 0 },
+                { "perk": 8451, "var1": 150, "var2": 0, "var3": 0 }
+              ]
+            },
+            {
+              "description": "subStyle",
+              "style": 8300,
+              "selections": [
+                { "perk": 8304, "var1": 10, "var2": 0, "var3": 0 },
+                { "perk": 8347, "var1": 5, "var2": 0, "var3": 0 }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
+

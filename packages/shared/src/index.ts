@@ -7,6 +7,8 @@
 
 import { z } from 'zod';
 
+export { z };
+
 export const SHARED_VERSION = '0.0.1' as const;
 
 export const roleSchema = z.enum(['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT']);

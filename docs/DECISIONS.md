@@ -69,6 +69,12 @@ Consequences:
 - Alternatives: Ambient `declare` statements or relying on `DOM` lib (pollutes non-browser code with DOM types).
 - Consequences: Strict typing for Node.js APIs in ETL package without affecting pure engine constraints.
 
+### D-015 — In-house rate limiter and Riot client without external runtime libraries — ACCEPTED
+- Context: Ticket T-010 requires a Riot API client honoring dual-window rate limits (`X-App-Rate-Limit` and `X-Method-Rate-Limit`), `Retry-After` backoff on 429, exponential backoff on 5xx, and aborting with "key expired?" on 401/403.
+- Decision: Implement `RiotRateLimiter` and `RiotClient` in TypeScript using native `fetch` and zero additional runtime dependencies. Support dependency-injected `sleepFn` and `nowFn` for sub-second deterministic unit tests.
+- Alternatives: Third-party rate limiters (e.g. `bottleneck`, `limiter`). Rejected to keep runtime dependencies zero, avoid bundle bloat or ESM quirks, and enable exact compatibility with Riot's multi-window header specification (`X-App-Rate-Limit: 20:1,100:120`).
+- Consequences: Fully typed, zero-overhead, 100% testable client with deterministic virtual-clock tests and native zod response validation.
+
 ### Template
 ```
 ### D-xxx — Title — STATUS

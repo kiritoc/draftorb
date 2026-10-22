@@ -1,0 +1,33 @@
+[
+  {
+    "leagueId": "9b12a3d0-3798-4444-9382-3580579cbb45",
+    "queueType": "RANKED_SOLO_5x5",
+    "tier": "DIAMOND",
+    "rank": "I",
+    "summonerId": "test-summoner-id-1",
+    "puuid": "test-puuid-1",
+    "leaguePoints": 75,
+    "wins": 120,
+    "losses": 98,
+    "veteran": false,
+    "inactive": false,
+    "freshBlood": false,
+    "hotStreak": true
+  },
+  {
+    "leagueId": "9b12a3d0-3798-4444-9382-3580579cbb45",
+    "queueType": "RANKED_SOLO_5x5",
+    "tier": "DIAMOND",
+    "rank": "I",
+    "summonerId": "test-summoner-id-2",
+    "puuid": "test-puuid-2",
+    "leaguePoints": 22,
+    "wins": 85,
+    "losses": 80,
+    "veteran": true,
+    "inactive": false,
+    "freshBlood": false,
+    "hotStreak": false
+  }
+]
+

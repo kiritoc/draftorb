@@ -3,13 +3,13 @@
 ## Current status
 - Phase: 1 (Support / Diamond)
 - Current milestone: M0 Foundations (Complete) -> M1 ETL
-- Last updated: 2026-10-22 by Gemini (T-004)
+- Last updated: 2026-10-22 by Antigravity (T-010)
 
 ## Epic status
 | Epic | Status | Notes |
 |---|---|---|
 | E0 Foundations | DONE | T-001..T-004 DONE |
-| E1 ETL | NOT STARTED | Ready to start T-010 |
+| E1 ETL | IN PROGRESS | T-010 DONE, ready for T-011 |
 | E2 Engine | NOT STARTED | Ready to start T-020 |
 | E3 Web MVP | NOT STARTED | |
 | E4 Runes | NOT STARTED | |
@@ -23,7 +23,7 @@
 - Last aggregation: -
 
 ## Next recommended ticket
-T-010 (or T-020)
+T-011 (SQLite schema + migrations) or T-020 (Rank weighting module)
 
 ## Open questions for the owner
 - (none)
@@ -40,6 +40,45 @@ T-010 (or T-020)
 - Next step:
 - Pitfalls / notes for next AI:
 ```
+
+### 2026-10-22 — Antigravity (Gemini 3.8 Flash) — Ticket T-010
+- Done:
+  - Implemented `RiotRateLimiter` (`packages/etl/src/riot/rate-limiter.ts`) supporting multi-window app limits (20 req/1s, 100 req/120s), method-specific limits, header synchronisation (`X-App-Rate-Limit`, `X-Method-Rate-Limit`, `Retry-After`), and serialized concurrency queue to eliminate race conditions.
+  - Implemented `RiotClient` (`packages/etl/src/riot/client.ts`) with automatic 429 `Retry-After` retry, 5xx exponential backoff (max 5 tries), immediate 401/403 abort with explicit message `"key expired?"`, and non-crashing Zod response validation that logs unknown payload shapes.
+  - Added types and error hierarchy in `packages/etl/src/riot/types.ts` (`RiotApiError`, `RiotAuthError`, `RiotRateLimitError`), platform/regional routing definitions (`PLATFORMS`, `REGIONAL_ROUTINGS`, `platformToRegion`).
+  - Added Zod schemas for Riot API responses in `packages/etl/src/riot/schemas.ts` (`riotLeagueEntriesSchema`, `riotLeagueListSchema`, `riotMatchDtoSchema`, `riotMatchIdsSchema`).
+  - Added lightweight `.env` parser helper in `packages/etl/src/riot/env.ts` to load `RIOT_API_KEY` seamlessly without heavy dependencies.
+  - Re-exported `z` from `@draftorb/shared` so monorepo packages share a single typed Zod instance.
+  - Added real Riot API fixtures in `packages/etl/test/fixtures/` (`league-entries.json`, `league-challenger.json`, `match.json`, `match-ids.json`).
+  - Added `check-key` CLI command to `packages/etl/src/cli.ts` for quick connectivity and key verification.
+  - Recorded ADR `D-015` in `docs/DECISIONS.md`.
+  - Wrote 23 unit tests across `packages/etl/src/riot/rate-limiter.test.ts` (9 tests) and `packages/etl/src/riot/client.test.ts` (14 tests) covering 429 retry, 5xx exponential backoff, 401/403 abort, header parsing, queueing, and fixture validation with injected virtual timers.
+- Files touched:
+  - `packages/etl/src/riot/types.ts`
+  - `packages/etl/src/riot/schemas.ts`
+  - `packages/etl/src/riot/rate-limiter.ts`
+  - `packages/etl/src/riot/rate-limiter.test.ts`
+  - `packages/etl/src/riot/client.ts`
+  - `packages/etl/src/riot/client.test.ts`
+  - `packages/etl/src/riot/env.ts`
+  - `packages/etl/src/riot/index.ts`
+  - `packages/etl/src/index.ts`
+  - `packages/etl/src/cli.ts`
+  - `packages/etl/test/fixtures/league-entries.json`
+  - `packages/etl/test/fixtures/league-challenger.json`
+  - `packages/etl/test/fixtures/match-ids.json`
+  - `packages/etl/test/fixtures/match.json`
+  - `packages/shared/src/index.ts`
+  - `docs/DECISIONS.md`
+  - `docs/TICKETS.md`
+  - `docs/PROGRESS.md`
+- Tests: `pnpm test && pnpm typecheck && pnpm lint` (6 test files, 47 tests passed in < 500ms).
+- State left: DONE
+- Next step: T-011 (SQLite schema + migrations) or T-020 (Rank weighting module)
+- Pitfalls / notes for next AI:
+  - Riot match-v5 endpoints use regional routing (`europe`, `americas`, `asia`, `sea`). The client automatically converts platform IDs (e.g. `euw1`) to regional routing via `platformToRegion()`.
+  - `RiotClient` constructor accepts custom `sleepFn` and `nowFn` so rate limiting and backoff unit tests run deterministically in milliseconds without actual `setTimeout` delays.
+  - `RiotClient` accepts `autoLoadEnv: false` so tests expecting missing API keys do not accidentally re-read `.env` from disk when a local developer key is configured.
 
 ### 2026-10-22 — Gemini — Ticket T-004
 - Done:

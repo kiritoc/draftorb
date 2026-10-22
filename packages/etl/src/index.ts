@@ -4,5 +4,23 @@
  * ETL commands are invoked via `pnpm etl <command>`.
  */
 
-/** Placeholder export — real ETL code added in later tickets. */
 export const ETL_VERSION = '0.0.1' as const;
+
+export {
+  fetchChampions,
+  fetchItems,
+  fetchLatestVersion,
+  fetchRunes,
+  getPatchFromVersion,
+  importStaticData,
+  mapChampionTagsToRoles,
+  transformChampions,
+  transformItems,
+  transformRunes,
+  type ImportOptions,
+  type ImportResult,
+  type RawDDragonChampion,
+  type RawDDragonItem,
+  type RawDDragonRunePerk,
+  type RawDDragonRuneTree,
+} from './ddragon';

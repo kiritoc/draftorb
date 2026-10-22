@@ -4,6 +4,7 @@ import {
   championIdSchema,
   championRoleProbabilitiesSchema,
   championSchema,
+  championsMapSchema,
   championTagsMapSchema,
   draftInputSchema,
   gameStateSchema,
@@ -18,6 +19,7 @@ import {
   roleSchema,
   runePageSchema,
   runeTreeSchema,
+  runeTreesSchema,
   slotSchema,
   supportBaselineEntrySchema,
   supportBaselineTableSchema,
@@ -83,6 +85,7 @@ describe('shared schemas', () => {
       roles: ['SUPPORT'],
     };
     expect(championSchema.parse(champion)).toEqual(champion);
+    expect(championsMapSchema.parse({ '41': champion })).toEqual({ '41': champion });
 
     const roleMap = {
       '41': { SUPPORT: 0.82, ADC: 0.12, MID: 0.06, TOP: 0, JUNGLE: 0 },
@@ -118,7 +121,9 @@ describe('shared schemas', () => {
 
   it('rejects invalid champion ids and blanks', () => {
     expect(() => championIdSchema.parse(0)).toThrow();
-    expect(() => championSchema.parse({ id: 41, name: '', icon: 'x', roles: ['SUPPORT'] })).toThrow();
+    expect(() =>
+      championSchema.parse({ id: 41, name: '', icon: 'x', roles: ['SUPPORT'] }),
+    ).toThrow();
     expect(() => itemIdSchema.parse(-10)).toThrow();
   });
 
@@ -173,6 +178,7 @@ describe('shared schemas', () => {
       ],
     };
     expect(runeTreeSchema.parse(tree)).toEqual(tree);
+    expect(runeTreesSchema.parse([tree])).toEqual([tree]);
 
     const runePage = {
       primaryStyleId: 8000,

@@ -133,6 +133,9 @@ export const championSchema = z
   .strict();
 export type Champion = z.infer<typeof championSchema>;
 
+export const championsMapSchema = z.record(z.string(), championSchema);
+export type ChampionsMap = z.infer<typeof championsMapSchema>;
+
 export const championTagsScalingSchema = z
   .object({
     early: z.boolean(),
@@ -274,6 +277,9 @@ export const runeTreeSchema = z
   })
   .strict();
 export type RuneTree = z.infer<typeof runeTreeSchema>;
+
+export const runeTreesSchema = z.array(runeTreeSchema);
+export type RuneTrees = z.infer<typeof runeTreesSchema>;
 
 export const runePageSchema = z
   .object({

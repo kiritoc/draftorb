@@ -3,12 +3,12 @@
 ## Current status
 - Phase: 1 (Support / Diamond)
 - Current milestone: M0 Foundations
-- Last updated: 2026-10-22 by Gemini (T-002 remediation)
+- Last updated: 2026-10-22 by Gemini (T-003)
 
 ## Epic status
 | Epic | Status | Notes |
 |---|---|---|
-| E0 Foundations | IN PROGRESS | T-001 DONE, T-002 DONE |
+| E0 Foundations | IN PROGRESS | T-001 DONE, T-002 DONE, T-003 DONE |
 | E1 ETL | NOT STARTED | |
 | E2 Engine | NOT STARTED | |
 | E3 Web MVP | NOT STARTED | |
@@ -19,11 +19,11 @@
 
 ## Data collection status
 - Riot key: (valid until ...)
-- Games collected: 0 | Diamond: 0 | Patch: -
+- Games collected: 0 | Diamond: 0 | Patch: 16.21 (static imported)
 - Last aggregation: -
 
 ## Next recommended ticket
-T-003
+T-004
 
 ## Open questions for the owner
 - (none)
@@ -40,6 +40,40 @@ T-003
 - Next step:
 - Pitfalls / notes for next AI:
 ```
+
+### 2026-10-22 — Gemini — Ticket T-003
+- Done:
+  - Added `championsMapSchema` and `runeTreesSchema` in `@draftorb/shared`.
+  - Implemented Data Dragon importer in `packages/etl/src/ddragon.ts` with pure transformers, version patch extractor (`getPatchFromVersion`), tag-to-role mapper (`mapChampionTagsToRoles`), and fetch functions with optional injection for unit testing.
+  - Implemented ETL CLI in `packages/etl/src/cli.ts` supporting `pnpm etl static [version]`.
+  - Added root and package script mappings for `etl` and `static`.
+  - Recorded ADRs `D-013` (tsx) and `D-014` (@types/node) in `docs/DECISIONS.md`.
+  - Wrote comprehensive unit tests in `packages/etl/src/ddragon.test.ts` (7 tests covering edge cases, transformers, mock fetch, and disk file emission).
+  - Executed `pnpm etl static` and verified downloaded data for patch 16.21: 173 champions, 859 items, 5 rune trees, all validated by Zod schemas in `data/public/16.21/`.
+- Files touched:
+  - `packages/shared/src/index.ts`
+  - `packages/shared/src/index.test.ts`
+  - `packages/etl/src/ddragon.ts`
+  - `packages/etl/src/ddragon.test.ts`
+  - `packages/etl/src/cli.ts`
+  - `packages/etl/src/index.ts`
+  - `packages/etl/package.json`
+  - `packages/etl/tsconfig.json`
+  - `package.json`
+  - `docs/DECISIONS.md`
+  - `docs/TICKETS.md`
+  - `docs/PROGRESS.md`
+  - `data/public/16.21/champions.json`
+  - `data/public/16.21/items.json`
+  - `data/public/16.21/runes.json`
+- Tests: `npm test && npm run typecheck && npm run lint` (3 test files, 19 tests passed), and `pnpm etl static` (live import + Zod validation).
+- State left: DONE
+- Next step: T-004 (Support champion tags)
+- Pitfalls / notes for next AI:
+  - Data Dragon contains obsolete/internal items with empty `name` (e.g. `2008`, `226660`); `transformItems` filters them out because `itemSchema` requires `name.min(1)`.
+  - Data Dragon `runesReforged.json` contains extra fields (`longDesc`); `transformRunes` maps only the fields defined in `runePerkSchema` to comply with `.strict()`.
+  - `data/public/<patch>/*.json` files are committed as public assets according to `DATA_MODEL.md`.
+
 
 ### 2026-10-22 — Claude Opus 4.6 (Thinking) — Ticket T-001
 - Done: Full monorepo scaffold with pnpm workspaces (shared, engine, etl, web), TypeScript strict config, Vitest, ESLint (flat config), Prettier, Vite + React + Tailwind for web app

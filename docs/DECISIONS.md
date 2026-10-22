@@ -57,6 +57,18 @@ Consequences:
 - Alternatives: Joi, Yup, TypeBox, Valibot. Zod is standard in TypeScript/React monorepos, tree-shakeable, zero-runtime-dependencies beyond itself, and infers static TypeScript types without duplication.
 - Consequences: Shared package depends on `zod`. Engine and web can safely import schemas without bundling extra runtime dependencies.
 
+### D-013 — tsx dependency for ETL TypeScript CLI execution — ACCEPTED
+- Context: Ticket T-003 and Epic E1 implement CLI commands (`pnpm etl static`, `migrate`, etc.) in TypeScript. Scripts must run seamlessly across Windows, macOS, and Linux without requiring a pre-build step in dev workflows.
+- Decision: Add `tsx` (devDependency in root, MIT license, free) to execute TypeScript CLI files directly via Node.
+- Alternatives: `ts-node` (slower, complex ESM loader issues), native `--experimental-strip-types` (requires Node 22.6+, not backwards compatible with Node 20 LTS baseline), pre-compiling with `tsc` before every command (slow DX, extra build friction for CLI commands).
+- Consequences: `pnpm etl <command>` invokes `tsx packages/etl/src/cli.ts <command>` seamlessly on all platforms.
+
+### D-014 — @types/node devDependency for Node.js API typing — ACCEPTED
+- Context: `packages/etl` implements Node.js scripts using `node:fs/promises`, `node:path`, `node:os`, `process`, and `fetch`. TypeScript compiler requires Node type definitions to type-check Node-specific packages.
+- Decision: Add `@types/node` (^26.x, MIT license, free) as a root devDependency and enable `"types": ["node"]` in `packages/etl/tsconfig.json`.
+- Alternatives: Ambient `declare` statements or relying on `DOM` lib (pollutes non-browser code with DOM types).
+- Consequences: Strict typing for Node.js APIs in ETL package without affecting pure engine constraints.
+
 ### Template
 ```
 ### D-xxx — Title — STATUS

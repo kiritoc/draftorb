@@ -2,14 +2,14 @@
 
 ## Current status
 - Phase: 1 (Support / Diamond)
-- Current milestone: M0 Foundations (Complete) -> M1 ETL
-- Last updated: 2026-10-22 by Antigravity (T-010)
+- Current milestone: M0 Foundations (Complete) -> M1 ETL (Complete) -> M2 Engine
+- Last updated: 2026-10-22 by GitHub Copilot (T-011)
 
 ## Epic status
 | Epic | Status | Notes |
 |---|---|---|
 | E0 Foundations | DONE | T-001..T-004 DONE |
-| E1 ETL | IN PROGRESS | T-010 DONE, ready for T-011 |
+| E1 ETL | DONE | T-010..T-011 DONE; ready for T-012 |
 | E2 Engine | NOT STARTED | Ready to start T-020 |
 | E3 Web MVP | NOT STARTED | |
 | E4 Runes | NOT STARTED | |
@@ -23,7 +23,7 @@
 - Last aggregation: -
 
 ## Next recommended ticket
-T-011 (SQLite schema + migrations) or T-020 (Rank weighting module)
+T-012 (Player discovery by tier) or T-020 (Rank weighting module)
 
 ## Open questions for the owner
 - (none)
@@ -209,3 +209,51 @@ T-011 (SQLite schema + migrations) or T-020 (Rank weighting module)
 - Pitfalls / notes for next AI:
   - All static and aggregated formats needed for T-003 and E1 now have validation schemas in `@draftorb/shared`.
   - File length for `packages/shared/src/index.ts` is 291 lines (< 300 lines rule). If adding more schemas, consider modularizing into domain files (e.g. `draft.ts`, `items.ts`, `runes.ts`).
+
+### 2026-10-22 — Antigravity — Ticket T-011
+- Done:
+  - Fixed `getMigrationStatus()` in `packages/etl/src/db/migrate.ts` to compute `pending` as the set difference between the migration files on disk and the versions already applied. This avoids negative or incorrect pending counts when a migration was deleted/renamed.
+  - Added `missingVersions` reporting so applied migrations absent from the migration directory are surfaced as a deployment anomaly.
+  - Added a regression test in `packages/etl/src/db/migrate.test.ts` covering the missing-disk-file case.
+- Files touched:
+  - `packages/etl/src/db/migrate.ts`
+  - `packages/etl/src/db/migrate.test.ts`
+- Tests: `pnpm vitest run packages/etl/src/db/migrate.test.ts` (9 tests passed)
+- State left: REVIEW
+- Next step: continue T-011 and complete the migration runner acceptance checks with the rest of the ETL suite.
+- Pitfalls / notes for next AI:
+  - `pending` now reflects the difference of sets, not arithmetic on counts.
+  - `missingVersions` is intentionally explicit and should be treated as an operational warning, not a normal pending migration.
+
+### 2026-10-22 — Antigravity — Ticket T-011
+- Done:
+  - Fixed the SQLite connection setup in `packages/etl/src/db/migrate.ts` to enable `PRAGMA foreign_keys = ON` in `openDb()`, matching the default enforcement expected by SQLite-safe schema work.
+  - Documented the review point that `PRAGMA foreign_keys` must be set outside a transaction; if a migration needs to temporarily disable it, that must happen before `BEGIN IMMEDIATE` because SQLite ignores the pragma once a transaction is active.
+  - Added regression coverage in `packages/etl/src/db/migrate.test.ts` to assert the opened database has WAL + foreign keys enabled.
+- Files touched:
+  - `packages/etl/src/db/migrate.ts`
+  - `packages/etl/src/db/migrate.test.ts`
+  - `docs/TICKETS.md`
+  - `docs/PROGRESS.md`
+- Tests: `pnpm exec vitest run packages/etl/src/db/migrate.test.ts` (12/12 passed).
+- State left: DONE
+- Next step: T-012 (Player discovery by tier)
+- Pitfalls / notes for next AI:
+  - SQLite’s `foreign_keys` pragma is connection-scoped and must be configured on the DB handle before any migration transaction begins.
+  - A migration that needs to disable `foreign_keys` for table rebuilds must do it before `BEGIN IMMEDIATE`; once inside the transaction, SQLite will ignore the change.
+
+### 2026-10-22 — GitHub Copilot — Ticket T-011
+- Done:
+  - Fixed the SQLite migration runner in `packages/etl/src/db/migrate.ts` to avoid masking original errors, avoid unnecessary write locks on already-applied migrations, and centralize migration table creation.
+  - Moved `busy_timeout` to `openDb()` so the connection setting is applied consistently.
+  - Added filename validation to reject malformed migration names and kept `getMigrationStatus()` behavior correct for applied-but-missing versions.
+  - Added a transaction-based re-check under write lock for pending migrations and contextualized failure messages on migration errors.
+- Files touched:
+  - `packages/etl/src/db/migrate.ts`
+  - `packages/etl/src/db/migrate.test.ts`
+- Tests: `pnpm vitest run packages/etl/src/db/migrate.test.ts` and `pnpm test -- --run && pnpm typecheck && pnpm lint` — all green.
+- State left: DONE
+- Next step: T-012 (Player discovery by tier) or continue with the next ETL ingestion ticket.
+- Pitfalls / notes for next AI:
+  - The migration transaction is now wrapped in `db.transaction()` with a re-check under the write lock and a contextualized error message.
+  - `getMigrationStatus()` still treats `missingVersions` as applied entries without a matching SQL file on disk, which is useful for migration hygiene and debugging.

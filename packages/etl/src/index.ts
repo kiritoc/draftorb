@@ -75,3 +75,5 @@ export {
   type RiotMatchMetadataDto,
   type RiotParticipantDto,
 } from './riot';
+
+export { getMigrationStatus, migrate, openDb } from './db';

@@ -14,6 +14,11 @@ data/raw/
 data/*.sqlite
 data/*.db
 
+# Test databases
+*.db
+test-*.db
+test-*.sqlite
+
 # IDE
 .vscode/
 .idea/

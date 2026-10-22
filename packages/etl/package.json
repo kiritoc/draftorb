@@ -12,12 +12,17 @@
     }
   },
   "dependencies": {
-    "@draftorb/shared": "workspace:*"
+    "@draftorb/shared": "workspace:*",
+    "better-sqlite3": "13.0.3"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "etl": "tsx src/cli.ts",
     "static": "tsx src/cli.ts static",
-    "validate-tags": "tsx src/cli.ts validate-tags"
+    "validate-tags": "tsx src/cli.ts validate-tags",
+    "migrate": "tsx src/cli.ts migrate"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0"
   }
 }

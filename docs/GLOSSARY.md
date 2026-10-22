@@ -1,0 +1,22 @@
+# GLOSSARY
+- **Draft / champ select**: pick & ban phase.
+- **Blind pick**: picking without seeing enemy picks.
+- **ADC / Bot / Support / Jungle / Mid / Top**: roles (`ADC`, `SUPPORT`, ... in code).
+- **Synergy**: how well two allied champions perform together.
+- **Counter**: matchup advantage vs an enemy champion. **Hard counter** = level 3.
+- **Level 1-3**: strength of a synergy/counter badge (SPECS §5).
+- **Delta (pp)**: winrate difference in percentage points vs baseline, after shrinkage.
+- **Shrinkage**: pulling an estimate toward the baseline when sample is small (Bayesian).
+- **Baseline**: a champion's average winrate in a role/rank bucket.
+- **WPA**: win probability added (Coachless metric).
+- **Rank bucket**: tier group used in data (Emerald, Diamond, Master+).
+- **Experts rule**: runes/items use games from the user's rank and above.
+- **Fed**: enemy with disproportionate kills/gold/items (threat score).
+- **Threat score**: numeric estimate of how dangerous an enemy is now.
+- **Ahead/behind**: game state bucket from gold/kills difference.
+- **LCU**: League Client Update local API (champ select, etc.).
+- **Live Client Data API**: official local in-game API on port 2999.
+- **Data Dragon**: Riot's static data CDN (champions, items, runes, icons).
+- **PUUID**: Riot's global player id.
+- **Patch**: game version `major.minor` (e.g. 26.21).
+- **Golden test**: fixed scenario with expected output.

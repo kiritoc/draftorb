@@ -3,12 +3,12 @@
 ## Current status
 - Phase: 1 (Support / Diamond)
 - Current milestone: M0 Foundations
-- Last updated: 2026-10-22 by Claude Opus 4.6
+- Last updated: 2026-10-22 by Gemini (T-002 remediation)
 
 ## Epic status
 | Epic | Status | Notes |
 |---|---|---|
-| E0 Foundations | IN PROGRESS | T-001 DONE |
+| E0 Foundations | IN PROGRESS | T-001 DONE, T-002 DONE |
 | E1 ETL | NOT STARTED | |
 | E2 Engine | NOT STARTED | |
 | E3 Web MVP | NOT STARTED | |
@@ -23,7 +23,7 @@
 - Last aggregation: -
 
 ## Next recommended ticket
-T-002
+T-003
 
 ## Open questions for the owner
 - (none)
@@ -58,3 +58,53 @@ T-002
   - `postcss.config.mjs` (ESM, not CJS) to avoid lint errors in ESM project
   - Engine has a placeholder `add()` function + test — replace with real code in T-020+
   - Tailwind v3 is used (v4 was still beta-ish at time of scaffold)
+
+### 2026-10-22 — Claude Opus 4.6 (Thinking) — Ticket T-002
+- Done: Implemented the shared Zod schemas and exported TypeScript types for rank, roles, champion IDs, draft inputs, recommendations, game state, manifest data, and static champion metadata. Added focused tests covering valid and invalid payloads.
+- Files touched:
+  - `packages/shared/src/index.ts`
+  - `packages/shared/src/index.test.ts`
+  - `packages/shared/package.json`
+- Tests: `pnpm test && pnpm typecheck && pnpm lint` — all green (2 test files, 9 tests passed)
+- State left: DONE
+- Next step: T-003 (Data Dragon importer)
+- Pitfalls / notes for next AI:
+  - `zod` is the single validation dependency in the shared package
+  - Keep runtime logic out of shared package; this ticket is schema-only
+  - `DraftInput`/`GameState` are intentionally strict but permissive on optional fields such as `role` and `pool`
+
+### 2026-10-22 — Session note — Governance review / blocker
+- Done: Recorded the blocking semantic bug and the governance drift discovered after T-002.
+- Files touched:
+  - `docs/BUGS.md`
+  - `docs/DECISIONS.md`
+- State left: REVIEW / BLOCKED
+- Next step:
+  - Re-open the T-002 acceptance gate and compare `packages/shared/src/index.ts` against every contract in `docs/DATA_MODEL.md` before declaring any future ticket done.
+  - Add the missing schemas required by the data model before continuing to `T-003`.
+  - Require schema parity tests that fail if an exported model is absent from the public API.
+- Pitfalls / notes for next AI:
+  - Green tests do not equal contract coverage.
+  - Acceptance must be checked against the canonical docs, not only against the narrow happy path used in the first tests.
+  - Project governance requires explicit parity checks and bug logs before ticket closure.
+
+### 2026-10-22 — Gemini — Ticket T-002 remediation & completion
+- Done:
+  - Fixed semantic bug in `PlayerState.items` (was using `championIdSchema`, now uses `itemIdSchema`).
+  - Added missing shared models to achieve full parity with `DATA_MODEL.md`: `itemIdSchema`, `itemSchema`, `itemsMapSchema`, `itemTagsSchema`, `itemTagsMapSchema`, `runePerkSchema`, `runeTreeSchema`, `runePageSchema`, `supportBaselineEntrySchema`, `supportBaselineTableSchema`, `supportPairTableSchema`.
+  - Removed loose `.rest(z.number())` on `supportPairEntrySchema` to strictly enforce the 6-element tuple contract.
+  - Recorded ADR `D-012` for `zod` in `docs/DECISIONS.md`.
+  - Resolved and closed `B-002` in `docs/BUGS.md`.
+  - Extended unit tests in `packages/shared/src/index.test.ts` (12 tests total, all passing).
+- Files touched:
+  - `packages/shared/src/index.ts`
+  - `packages/shared/src/index.test.ts`
+  - `docs/DECISIONS.md`
+  - `docs/BUGS.md`
+  - `docs/PROGRESS.md`
+- Tests: `npx vitest run && npx tsc -b && npx eslint .` all green.
+- State left: DONE
+- Next step: T-003 (Data Dragon importer)
+- Pitfalls / notes for next AI:
+  - All static and aggregated formats needed for T-003 and E1 now have validation schemas in `@draftorb/shared`.
+  - File length for `packages/shared/src/index.ts` is 291 lines (< 300 lines rule). If adding more schemas, consider modularizing into domain files (e.g. `draft.ts`, `items.ts`, `runes.ts`).

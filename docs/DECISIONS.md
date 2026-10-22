@@ -38,6 +38,25 @@ All MIT-licensed, free, widely used:
 - **vite** 6.x + **@vitejs/plugin-react** — Build tool (web devDep)
 - **tailwindcss** 3.x + **postcss** + **autoprefixer** — Styling (web devDep)
 
+### D-011 — Contract parity before ticket closure — PROPOSED
+Context: `T-002` was marked DONE even though the shared package did not implement all schemas required by `docs/DATA_MODEL.md` and the downstream ETL ticket `T-003`.
+
+Decision: Every shared-data ticket must include an explicit parity check against the canonical data contract before status is marked `DONE` or `REVIEW`. The acceptance criteria must list the exact schemas and payload shapes covered, and tests must fail if a required data model is absent.
+
+Alternatives considered:
+- Close on green unit tests only: rejected because it allows false positives when the shared contract is incomplete.
+- Require only a code diff review: rejected because it is too easy to miss missing exported schemas and downstream breakage.
+
+Consequences:
+- Future tickets will be blocked until the schemas, exported types, and validation tests align with `DATA_MODEL.md` and any linked ETL/export requirements.
+- This adds a mandatory governance gate and reduces the risk of semantic validation gaps in the next ticket.
+
+### D-012 — zod dependency for shared validation schemas — ACCEPTED
+- Context: Ticket T-002 requires runtime validation schemas and TypeScript types for draft inputs, recommendations, game state, Data Dragon static data, and exported JSON formats.
+- Decision: Use `zod` (^4.x / 4.6.7, MIT) as the single validation dependency in `@draftorb/shared`.
+- Alternatives: Joi, Yup, TypeBox, Valibot. Zod is standard in TypeScript/React monorepos, tree-shakeable, zero-runtime-dependencies beyond itself, and infers static TypeScript types without duplication.
+- Consequences: Shared package depends on `zod`. Engine and web can safely import schemas without bundling extra runtime dependencies.
+
 ### Template
 ```
 ### D-xxx — Title — STATUS

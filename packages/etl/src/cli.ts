@@ -21,6 +21,7 @@ import { parseArgs } from 'node:util';
 
 import { importStaticData } from './ddragon';
 import { openDb, migrate, getMigrationStatus } from './db';
+import { ingestMatches } from './matches';
 import { discoverPlayersByTier } from './players';
 import { RiotClient, RiotAuthError } from './riot';
 import { formatCoverageReport, validateChampionTagsFile } from './tags';
@@ -299,6 +300,72 @@ async function runPlayers(args: string[]): Promise<void> {
   }
 }
 
+async function runMatches(args: string[]): Promise<void> {
+  const { values, positionals } = parseArgs({
+    args,
+    allowPositionals: true,
+    strict: false,
+    options: {
+      platform: { type: 'string', short: 'p' },
+      patch: { type: 'string' },
+      'per-player': { type: 'string' },
+      limit: { type: 'string' },
+      queue: { type: 'string' },
+      'min-duration': { type: 'string' },
+      reset: { type: 'boolean', default: false },
+    },
+  });
+
+  const [platformArg] = positionals;
+  const platform = parsePlatform(
+    platformArg ?? (typeof values.platform === 'string' ? values.platform : undefined),
+  );
+  const patch = typeof values.patch === 'string' ? values.patch : undefined;
+  if (patch !== undefined && !/^\d+\.\d+$/.test(patch)) {
+    throw new UsageError(`Invalid patch "${patch}". Expected a format like "16.21".`);
+  }
+  const parsePositiveInt = (value: unknown, flag: string): number | undefined => {
+    if (value === undefined) return undefined;
+    const parsed = Number.parseInt(String(value), 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      throw new UsageError(`Invalid ${flag} "${String(value)}". Expected a positive integer.`);
+    }
+    return parsed;
+  };
+  const matchesPerPlayer = parsePositiveInt(values['per-player'], '--per-player');
+  const playerLimit = parsePositiveInt(values.limit, '--limit');
+  const queueId = parsePositiveInt(values.queue, '--queue');
+  const minDurationSeconds = parsePositiveInt(values['min-duration'], '--min-duration');
+  const resetValue = values.reset === true;
+
+  log.info(
+    `Ingesting ranked matches for platform "${platform}"${patch ? ` (patch ${patch})` : ''}...`,
+  );
+  const dbPath = resolveDbPath();
+  const db = openDb(dbPath);
+  try {
+    const result = await ingestMatches({
+      platform,
+      patch,
+      matchesPerPlayer,
+      playerLimit,
+      queueId,
+      minDurationSeconds,
+      reset: resetValue,
+      db,
+      onProgress: (message) => log.info(message),
+    });
+
+    log.info(
+      `Done: ${result.playersProcessed} players processed (${result.playersSkipped} skipped), ` +
+        `${result.stored} matches stored, ${result.duplicates} duplicates, ` +
+        `${result.filtered} filtered, ${result.invalid} invalid.`,
+    );
+  } finally {
+    db.close();
+  }
+}
+
 async function runMigrate(args: string[]): Promise<void> {
   const [dbPathArg] = parsePositionals(args, 1, 'migrate [db-path]');
   const dbPath = resolveDbPath(dbPathArg);
@@ -355,6 +422,13 @@ const COMMANDS: readonly Command[] = [
     run: runPlayers,
   },
   {
+    name: 'matches',
+    usage:
+      'matches [platform] [--patch=16.21] [--per-player=20] [--limit=N] [--queue=420] [--min-duration=900] [--reset]',
+    description: 'Ingest ranked solo matches for discovered players (resumable, Ctrl+C safe)',
+    run: runMatches,
+  },
+  {
     name: 'migrate',
     usage: 'migrate [db-path]',
     description: `Create or upgrade SQLite database (default: <package root>/data/${DEFAULT_DB_FILENAME}, or $${DB_ENV_VAR})`,
@@ -363,8 +437,6 @@ const COMMANDS: readonly Command[] = [
 ];
 
 const PLANNED_COMMANDS: readonly { name: string; description: string }[] = [
-  { name: 'players', description: 'Discover players by tier' },
-  { name: 'matches', description: 'Ingest matches' },
   { name: 'aggregate', description: 'Compute aggregated tables' },
   { name: 'export', description: 'Write versioned JSON and manifest' },
   { name: 'status', description: 'Show counts and progress' },
@@ -383,7 +455,10 @@ function formatHelp(): string {
     c.aliases?.length ? `${c.usage} (alias: ${c.aliases.join(', ')})` : c.usage;
 
   const labels = [...COMMANDS.map(labelOf), 'help'];
-  const width = Math.max(...labels.map((l) => l.length), ...PLANNED_COMMANDS.map((c) => c.name.length));
+  const width = Math.max(
+    ...labels.map((l) => l.length),
+    ...PLANNED_COMMANDS.map((c) => c.name.length),
+  );
 
   const lines = [
     'DraftOrb ETL CLI',

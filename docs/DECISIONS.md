@@ -81,6 +81,24 @@ Consequences:
 - Alternatives: Include LP in a single numeric score using a fixed cap; rejected because any cap saturates for high-LP apex players and rounded scores can collapse distinct LP values. A single unbounded LP score would also blur the boundaries between rank tiers.
 - Consequences: `rank_score` is a stable tier/division value suitable for coarse aggregation, not a unique rank or within-division ordering. Exact ordering remains lossless in the stored rank fields. This score is distinct from the coarser rank buckets used by SPECS §3.
 
+### D-017 — Rejected matches recorded in `match_rejects` for cross-player dedupe — PROPOSED
+- Context: T-013 ingests ranked solo matches per player. The same match appears for up to 10 players (match ids come from each player's history), and refetching a match already rejected (wrong queue, too short, off-patch, invalid payload) wastes API budget. The spec does not say what to do with filtered matches.
+- Decision: New table `match_rejects(match_id PK, reason, patch, checked_at)` where `reason` is `queue|short|patch|invalid`. Any match already in `match_rejects` counts as `filtered` without a Riot call. A `patch` reject stores the match's actual patch: when a run targets that patch (`--patch` equal, or any patch when `--patch` is omitted), the reject row is deleted and the match is re-evaluated. `queue`, `short`, and `invalid` rejects are permanent.
+- Alternatives: (a) drop filtered ids silently — rejected, duplicates work across players; (b) store rejected ids inside the per-player cursor JSON — rejected, dedupe must be global, not per player; (c) re-evaluate every reject when the target patch changes — rejected for `queue`/`short`/`invalid` since those properties cannot change.
+- Consequences: one extra table (migration `002_match_rejects`); patch-filtered matches stay recoverable for future patches; a run with no `--patch` re-evaluates every `patch` reject.
+
+### D-018 — Incremental match listing via `startTime` on done cursors — PROPOSED
+- Context: T-013 must resume after kill/restart and also pick up new games on later runs. RIOT_API.md fixes ranked solo = queue 420 but says nothing about re-running ingestion.
+- Decision: Per-player cursor in `ingest_state` (`match-ingest:<platform>:<puuid>`) holds `{ status, snapshot, processed, lastGameCreation, stored, duplicates, filtered, invalid, updatedAt }`. `partial` cursors re-scan their stored snapshot (completed players are not re-listed). `done` cursors call `match-v5` with `startTime = lastGameCreation` (the max `gameCreation` of stored matches), so a later run only lists new games. `--reset` clears cursors and `match_rejects`. Note `startTime` includes games already seen, so `matches`/rejects dedupe stays load-bearing.
+- Alternatives: (a) always re-list the full history — rejected, wasteful and slow; (b) store the last-seen match id and page until it — rejected, paging backwards through thousands of ids costs more than a `startTime` filter.
+- Consequences: repeats of a stored game cost one extra `getMatch` call each (they dedupe on `match_id` only after fetch); `lastGameCreation` only advances on stored matches so filtered games never shrink the window.
+
+### D-019 — `matches.avg_rank_score` = mean `rank_score` of known participants — PROPOSED
+- Context: `matches.avg_rank_score` exists in DATA_MODEL.md but its computation is unspecified. At ingestion time only seed players have a `rank_score`; other participants are unknown.
+- Decision: `avg_rank_score` is the mean of `players.rank_score` over the match's participant puuids found in the `players` table; if none are known, it falls back to the seed player's own `rank_score`. T-014 may refine it once participant ranks are extracted.
+- Alternatives: (a) use the seed player's score directly — rejected, ignores that teammates are usually near the seed's rank and biases nothing toward match reality; (b) leave NULL — rejected, downstream buckets need a number.
+- Consequences: approximate by construction (documented approximation like D-008); recompute is cheap if participant ranks become available.
+
 ### Template
 ```
 ### D-xxx — Title — STATUS

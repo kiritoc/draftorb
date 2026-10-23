@@ -26,9 +26,14 @@ CREATE TABLE item_events (    -- from timelines (epic E5)
   team_gold_diff INTEGER, kills_diff INTEGER
 );
 CREATE TABLE ingest_state (key TEXT PRIMARY KEY, value TEXT);  -- cursors for resumability
+CREATE TABLE match_rejects (  -- matches seen and rejected, deduped across players
+  match_id TEXT PRIMARY KEY, reason TEXT NOT NULL,
+  patch TEXT,                 -- actual patch of the match (reason='patch' only)
+  checked_at INTEGER NOT NULL
+);
 CREATE INDEX idx_part_champ_role ON participants(champion_id, role);
 ```
-Notes: `rank_score` = coarse tier/division score at collection time (approximation, documented in RIOT_API.md). Exact rank ordering uses the stored `tier`, `division`, and `lp` fields separately. The score uses the D-016 tier base and division bonus formula; it excludes LP and is distinct from the SPECS §3 weighting buckets. Store only needed fields.
+Notes: `rank_score` = coarse tier/division score at collection time (approximation, documented in RIOT_API.md). Exact rank ordering uses the stored `tier`, `division`, and `lp` fields separately. The score uses the D-016 tier base and division bonus formula; it excludes LP and is distinct from the SPECS §3 weighting buckets. Store only needed fields. `match_rejects` records match ids already evaluated and rejected (wrong queue, too short, off-patch, invalid payload) so shared matches are not re-fetched per player; a `patch` reject keeps the match's actual patch so a later run targeting that patch re-evaluates it (D-017).
 
 ## Aggregated tables (SQLite) — recomputed per patch
 - `role_prob(champion_id, role, games, prob)`

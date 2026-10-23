@@ -3,13 +3,13 @@
 ## Current status
 - Phase: 1 (Support / Diamond)
 - Current milestone: M0 Foundations (Complete) -> M1 ETL (Complete) -> M2 Engine
-- Last updated: 2026-10-23 by Copilot SDK in VS Code
+- Last updated: 2026-10-23 by Devin
 
 ## Epic status
 | Epic | Status | Notes |
 |---|---|---|
 | E0 Foundations | DONE | T-001..T-004 DONE |
-| E1 ETL | DONE | T-010..T-012 DONE; T-013 ready |
+| E1 ETL | DONE | T-010..T-013 DONE; T-014 ready |
 | E2 Engine | NOT STARTED | Ready to start T-020 |
 | E3 Web MVP | NOT STARTED | |
 | E4 Runes | NOT STARTED | |
@@ -23,7 +23,7 @@
 - Last aggregation: -
 
 ## Next recommended ticket
-T-013 (Match ingestion)
+T-014 (Participant extraction)
 
 ## Open questions for the owner
 - None.
@@ -40,6 +40,35 @@ T-013 (Match ingestion)
 - Next step:
 - Pitfalls / notes for next AI:
 ```
+
+### 2026-10-23 — Devin — Ticket T-013
+- Done:
+  - Implemented match ingestion in `packages/etl/src/matches.ts` + `matches-store.ts`: per-player ranked solo id listing (queue 420, `type=ranked`, paged by 100), fetch + zod revalidation of every `getMatch` payload (client returns raw on schema mismatch -> counted `invalid`, recorded in `match_rejects`), filters (queue, duration < 15 min, `--patch`), storage in `matches` with `INSERT OR IGNORE`.
+  - Resumability: per-player cursor in `ingest_state` (`match-ingest:<platform>:<puuid>`) persists the id snapshot + `processed` after every match, so kill/restart resumes mid-player; `done` cursors list only ids newer than `lastGameCreation` via Riot `startTime` (epoch seconds).
+  - Dedup: new `match_rejects` table (migration `002_match_rejects.sql`) remembers rejected ids across players; `patch` rejects keep the actual patch and are re-evaluated when a run targets it (D-017).
+  - CLI `pnpm etl matches [platform] [--patch=16.21] [--per-player=20] [--limit=N] [--queue=420] [--min-duration=900] [--reset]` with per-player progress log (`[i/n] puuid… ids=.. stored=.. dup=.. filtered=.. invalid=..`).
+  - Made `db/migrate.test.ts` assertions read the migration list from disk so adding migration files no longer breaks the suite.
+  - Recorded ADRs D-017..D-019 (PROPOSED) in `docs/DECISIONS.md`.
+- Files touched:
+  - `packages/etl/migrations/002_match_rejects.sql`
+  - `packages/etl/src/matches.ts`
+  - `packages/etl/src/matches-store.ts`
+  - `packages/etl/src/matches.test.ts`
+  - `packages/etl/src/cli.ts`
+  - `packages/etl/src/index.ts`
+  - `packages/etl/src/db/migrate.test.ts`
+  - `docs/TICKETS.md`
+  - `docs/DATA_MODEL.md`
+  - `docs/DECISIONS.md`
+  - `docs/PROGRESS.md`
+- Tests: `pnpm test` (9 files, 77 tests passed), `pnpm typecheck`, `pnpm lint` all green.
+- State left: DONE
+- Next step: T-014 (Participant extraction).
+- Pitfalls / notes for next AI:
+  - Riot `startTime` is epoch **seconds** while `gameCreation` is ms — divide by 1000 when passing cursor timestamps.
+  - `match_rejects` rows with reason `patch` are deleted on re-evaluation; `queue`/`short`/`invalid` are permanent.
+  - On this VM, Node 20.19.0 segfaults loading better-sqlite3 (`napi_module_register_by_symbol`); Node 22 works. Run tests under Node 22 here.
+  - `pnpm format` reformats the whole repo including `pnpm-lock.yaml`; format only touched files instead.
 
 ### 2026-10-23 — Copilot SDK in VS Code — D-016 confirmation
 - Done:

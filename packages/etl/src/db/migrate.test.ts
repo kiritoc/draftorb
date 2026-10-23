@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { spawn } from 'node:child_process';
-import { unlinkSync, existsSync } from 'node:fs';
+import { readdirSync, unlinkSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { migrate, getMigrationStatus, openDb } from './migrate';
@@ -8,6 +8,15 @@ import { migrate, getMigrationStatus, openDb } from './migrate';
 const TEST_DB_PATH = 'test-migration.db';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, '../../../../');
+const MIGRATIONS_DIR = join(__dirname, '../../migrations');
+
+/** Migration versions on disk, in application order. */
+function expectedVersions(): string[] {
+  return readdirSync(MIGRATIONS_DIR)
+    .filter((f) => f.endsWith('.sql'))
+    .sort()
+    .map((f) => f.replace('.sql', ''));
+}
 
 function collectProcessOutput(
   child: ReturnType<typeof spawn>,
@@ -52,14 +61,15 @@ describe('migration runner', () => {
   it('should apply initial migration', () => {
     const db = openDb(TEST_DB_PATH);
     const applied = migrate(db);
+    const versions = expectedVersions();
 
-    expect(applied).toHaveLength(1);
+    expect(applied).toEqual(versions);
     expect(applied[0]).toBe('001_initial');
 
     const status = getMigrationStatus(db);
-    expect(status.applied).toBe(1);
+    expect(status.applied).toBe(versions.length);
     expect(status.pending).toBe(0);
-    expect(status.versions).toEqual(['001_initial']);
+    expect(status.versions).toEqual(versions);
 
     db.close();
   });
@@ -68,13 +78,13 @@ describe('migration runner', () => {
     const db = openDb(TEST_DB_PATH);
 
     const applied1 = migrate(db);
-    expect(applied1).toHaveLength(1);
+    expect(applied1).toHaveLength(expectedVersions().length);
 
     const applied2 = migrate(db);
     expect(applied2).toHaveLength(0);
 
     const status = getMigrationStatus(db);
-    expect(status.applied).toBe(1);
+    expect(status.applied).toBe(expectedVersions().length);
     expect(status.pending).toBe(0);
 
     db.close();
@@ -96,6 +106,7 @@ describe('migration runner', () => {
     expect(tableNames).toContain('participants');
     expect(tableNames).toContain('item_events');
     expect(tableNames).toContain('ingest_state');
+    expect(tableNames).toContain('match_rejects');
     expect(tableNames).toContain('role_prob');
     expect(tableNames).toContain('baseline');
     expect(tableNames).toContain('pair_ally');
@@ -139,7 +150,7 @@ describe('migration runner', () => {
       .prepare('SELECT * FROM _migrations')
       .all() as { version: string; applied_at: number }[];
 
-    expect(migrations).toHaveLength(1);
+    expect(migrations).toHaveLength(expectedVersions().length);
     expect(migrations[0]?.version).toBe('001_initial');
     expect(migrations[0]?.applied_at).toBeGreaterThan(0);
 
@@ -206,9 +217,9 @@ describe('migration runner', () => {
     migrate(db);
 
     const statusAfter = getMigrationStatus(db);
-    expect(statusAfter.applied).toBe(1);
+    expect(statusAfter.applied).toBe(expectedVersions().length);
     expect(statusAfter.pending).toBe(0);
-    expect(statusAfter.versions).toEqual(['001_initial']);
+    expect(statusAfter.versions).toEqual(expectedVersions());
 
     db.close();
   });
@@ -230,7 +241,7 @@ describe('migration runner', () => {
     const status = getMigrationStatus(db);
 
     expect(status.applied).toBe(2);
-    expect(status.pending).toBe(0);
+    expect(status.pending).toBe(expectedVersions().length - 1);
     expect(status.versions).toEqual(['001_initial', '999_missing']);
     expect(status.missingVersions).toEqual(['999_missing']);
 
@@ -243,7 +254,9 @@ describe('migration runner', () => {
       unlinkSync(dbPath);
     }
 
-    const migrateModuleUrl = pathToFileURL(join(PROJECT_ROOT, 'packages/etl/src/db/migrate.ts')).href;
+    const migrateModuleUrl = pathToFileURL(
+      join(PROJECT_ROOT, 'packages/etl/src/db/migrate.ts'),
+    ).href;
     const script = `
       import { openDb, migrate } from ${JSON.stringify(migrateModuleUrl)};
       const db = openDb(${JSON.stringify(dbPath)});
@@ -277,9 +290,9 @@ describe('migration runner', () => {
 
     const db = openDb(dbPath);
     const status = getMigrationStatus(db);
-    expect(status.applied).toBe(1);
+    expect(status.applied).toBe(expectedVersions().length);
     expect(status.pending).toBe(0);
-    expect(status.versions).toEqual(['001_initial']);
+    expect(status.versions).toEqual(expectedVersions());
     db.close();
 
     if (existsSync(dbPath)) {

@@ -5,10 +5,36 @@ import { discoverPlayersByTier, playerRankScore } from './players';
 import type { RiotClient } from './riot';
 
 describe('player discovery', () => {
-  it('calculates rank score from tier, division, and LP', () => {
-    expect(playerRankScore('EMERALD', 'IV', 0)).toBe(5.6);
-    expect(playerRankScore('DIAMOND', 'I', 25)).toBe(6.4);
-    expect(playerRankScore('CHALLENGER', 'I', 100)).toBe(8.15);
+  it('calculates rank score from tier and division, independently of LP', () => {
+    expect(playerRankScore('EMERALD', 'I')).toBeGreaterThan(playerRankScore('EMERALD', 'IV'));
+    expect(playerRankScore('DIAMOND', 'IV')).toBeGreaterThan(playerRankScore('EMERALD', 'I'));
+    expect(playerRankScore('MASTER', 'I')).toBeLessThan(playerRankScore('GRANDMASTER', 'I'));
+    expect(playerRankScore('GRANDMASTER', 'I')).toBeLessThan(playerRankScore('CHALLENGER', 'I'));
+    expect(playerRankScore('MASTER', 'I')).toBe(playerRankScore('MASTER', 'IV'));
+    expect(playerRankScore('DIAMOND', 'I')).toBe(6.75);
+  });
+
+  it('truncates to quota, ignores entries without puuid, skips completed tiers on resume', async () => {
+    const db = openDb(':memory:');
+    migrate(db);
+    const mk = (n: number, rank: string) =>
+      Array.from({ length: n }, (_, i) => ({ puuid: `e-${rank}-${i}`, tier: 'EMERALD', rank, leaguePoints: i }));
+    const getLeagueEntries = vi.fn(async (_p, _q, _t, division: string, page: number) =>
+      page > 1 ? [] : [...mk(10, division), { tier: 'EMERALD', rank: division, leaguePoints: 1 }],
+    );
+    const client = { getLeagueEntries } as unknown as RiotClient;
+    const opts = { platform: 'euw1' as const, db, client, tiers: ['EMERALD'], quotas: { EMERALD: 8 } };
+
+    const r1 = await discoverPlayersByTier(opts);
+    expect(r1.totalStored).toBe(8);
+    const divisions = db.prepare('SELECT DISTINCT division FROM players').all();
+    expect(divisions).toHaveLength(4); // quota spread across divisions
+
+    const calls = getLeagueEntries.mock.calls.length;
+    const r2 = await discoverPlayersByTier(opts);
+    expect(r2.tierResults[0]?.status).toBe('skipped');
+    expect(getLeagueEntries.mock.calls.length).toBe(calls); // no API call on resume
+    db.close();
   });
 
   it('stores discovered players, respects tier quotas, and writes resume state', async () => {
@@ -20,15 +46,16 @@ describe('player discovery', () => {
         if (tier === 'EMERALD') {
           return division === 'I'
             ? [
-                { puuid: 'emerald-1', tier: 'EMERALD', rank: 'III', leaguePoints: 42 },
-                { puuid: 'emerald-2', tier: 'EMERALD', rank: 'III', leaguePoints: 38 },
+                { puuid: 'emerald-1', tier: 'EMERALD', rank: 'I', leaguePoints: 42 },
               ]
+            : division === 'II'
+              ? [{ puuid: 'emerald-2', tier: 'EMERALD', rank: 'II', leaguePoints: 38 }]
             : [];
         }
 
         if (tier === 'DIAMOND') {
           return division === 'I'
-            ? [{ puuid: 'diamond-1', tier: 'DIAMOND', rank: 'II', leaguePoints: 55 }]
+            ? [{ puuid: 'diamond-1', tier: 'DIAMOND', rank: 'I', leaguePoints: 55 }]
             : [];
         }
 

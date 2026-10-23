@@ -102,16 +102,24 @@ export class RiotClient {
     let retries429 = 0;
 
     while (true) {
-      const response = await this.rateLimiter.execute(
-        () =>
-          this.fetchFn(url, {
-            headers: {
-              'X-Riot-Token': this.apiKey,
-              Accept: 'application/json',
-            },
-          }),
-        methodKey,
-      );
+      let response: Response;
+      try {
+        response = await this.rateLimiter.execute(
+          () =>
+            this.fetchFn(url, {
+              headers: { 'X-Riot-Token': this.apiKey, Accept: 'application/json' },
+            }),
+          methodKey,
+        );
+      } catch (error) {
+        // Network failure (ECONNRESET, DNS, timeout): same backoff policy as 5xx
+        retries5xx++;
+        if (retries5xx >= this.max5xxRetries) {
+          throw new RiotApiError(`Network error at ${url}: ${(error as Error).message}`, 0, url);
+        }
+        await this.sleepFn(this.initialBackoffMs * Math.pow(2, retries5xx - 1));
+        continue;
+      }
 
       // Update rate limiter limits from response headers
       const headerInfo = this.rateLimiter.updateFromHeaders(response.headers, methodKey);
@@ -161,7 +169,7 @@ export class RiotClient {
         }
 
         const waitSeconds = headerInfo.retryAfterSeconds ?? 1;
-        const waitMs = Math.max(waitSeconds * 1000, 500);
+        const waitMs = Math.max(waitSeconds * 1000, 500) * (headerInfo.retryAfterSeconds ? 1 : retries429); // no Retry-After: linear backoff
         await this.sleepFn(waitMs);
         continue;
       }

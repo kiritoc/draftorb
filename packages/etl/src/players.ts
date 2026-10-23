@@ -19,6 +19,19 @@ export const DEFAULT_PLAYER_QUOTAS: Readonly<Record<string, number>> = {
 } as const;
 
 const DIVISION_ORDER = ['I', 'II', 'III', 'IV'] as const;
+const TIER_BASE_SCORE: Readonly<Record<string, number>> = {
+  IRON: 0,
+  BRONZE: 1,
+  SILVER: 2,
+  GOLD: 3,
+  PLATINUM: 4,
+  EMERALD: 5,
+  DIAMOND: 6,
+  MASTER: 7,
+  GRANDMASTER: 8,
+  CHALLENGER: 9,
+};
+const APEX_TIERS = new Set(['MASTER', 'GRANDMASTER', 'CHALLENGER']);
 
 export interface PlayerDiscoveryOptions {
   platform?: Platform;
@@ -53,32 +66,17 @@ function normalizeTierList(tiers?: readonly string[]): string[] {
   return [...new Set(tiers.map((tier) => tier.toUpperCase()))];
 }
 
-export function playerRankScore(
-  tier: string,
-  division?: string,
-  lp: number = 0,
-): number {
-  const baseTierScore: Record<string, number> = {
-    IRON: 0,
-    BRONZE: 1,
-    SILVER: 2,
-    GOLD: 3,
-    PLATINUM: 4,
-    EMERALD: 5,
-    DIAMOND: 6,
-    MASTER: 7,
-    GRANDMASTER: 7,
-    CHALLENGER: 7,
-  };
-
-  const base = baseTierScore[tier.toUpperCase()] ?? 0;
+export function playerRankScore(tier: string, division?: string): number {
+  const normalizedTier = tier.toUpperCase();
+  const base = TIER_BASE_SCORE[normalizedTier] ?? 0;
   const normalizedDivision = division?.toUpperCase();
   const divisionIndex = normalizedDivision
     ? DIVISION_ORDER.findIndex((label) => label === normalizedDivision)
     : -1;
-  const divisionBonus = divisionIndex >= 0 ? (divisionIndex + 1) * 0.15 : 0;
-  const lpBonus = Math.min(Math.max(lp, 0), 100) / 100;
-  return Number((base + divisionBonus + lpBonus).toFixed(2));
+  const isApex = APEX_TIERS.has(normalizedTier);
+  const divisionBonus =
+    !isApex && divisionIndex >= 0 ? (DIVISION_ORDER.length - 1 - divisionIndex) * 0.25 : 0;
+  return base + divisionBonus;
 }
 
 function toPlayerRow(entry: RiotLeagueEntry, platform: Platform, tier: string): {
@@ -90,8 +88,8 @@ function toPlayerRow(entry: RiotLeagueEntry, platform: Platform, tier: string): 
   rank_score: number;
   updated_at: number;
 } {
-  const division = (entry.rank ?? 'IV').toUpperCase();
-  const puuid = entry.puuid ?? entry.summonerId ?? `${entry.leagueId ?? 'unknown'}:${entry.queueType}`;
+  const division = (entry.rank ?? 'I').toUpperCase();
+  const puuid = entry.puuid as string; // callers filter entries without puuid
 
   return {
     puuid,
@@ -99,16 +97,17 @@ function toPlayerRow(entry: RiotLeagueEntry, platform: Platform, tier: string): 
     tier: tier.toUpperCase(),
     division,
     lp: Number.isFinite(entry.leaguePoints) ? entry.leaguePoints : 0,
-    rank_score: playerRankScore(
-      tier,
-      division,
-      Number.isFinite(entry.leaguePoints) ? entry.leaguePoints : 0,
-    ),
+    rank_score: playerRankScore(tier, division),
     updated_at: Date.now(),
   };
 }
 
-async function getTierEntries(client: RiotClient, platform: Platform, tier: string): Promise<RiotLeagueEntry[]> {
+async function getTierEntries(
+  client: RiotClient,
+  platform: Platform,
+  tier: string,
+  quota: number,
+): Promise<RiotLeagueEntry[]> {
   const normalizedTier = tier.toUpperCase();
 
   if (['MASTER', 'GRANDMASTER', 'CHALLENGER'].includes(normalizedTier)) {
@@ -119,10 +118,14 @@ async function getTierEntries(client: RiotClient, platform: Platform, tier: stri
           ? await client.getGrandmasterLeague(platform)
           : await client.getChallengerLeague(platform);
 
-    return (league.entries ?? []).map((entry) => ({
+    return (league.entries ?? [])
+      .filter((entry) => typeof entry.puuid === 'string')
+      .sort((a, b) => b.leaguePoints - a.leaguePoints)
+      .slice(0, quota)
+      .map((entry) => ({
       queueType: 'RANKED_SOLO_5x5',
       tier: normalizedTier,
-      rank: typeof entry.rank === 'string' ? entry.rank : 'IV',
+      rank: 'I',
       leaguePoints: Number.isFinite(entry.leaguePoints) ? entry.leaguePoints : 0,
       wins: Number.isFinite(entry.wins) ? entry.wins : 0,
       losses: Number.isFinite(entry.losses) ? entry.losses : 0,
@@ -136,26 +139,23 @@ async function getTierEntries(client: RiotClient, platform: Platform, tier: stri
     }));
   }
 
+  // Spread the quota evenly over divisions (avoids a "Division I only" bias) and stop paging once reached.
+  const perDivision = Math.ceil(quota / DIVISION_ORDER.length);
   const entries: RiotLeagueEntry[] = [];
   for (const division of DIVISION_ORDER) {
+    const seen = new Set<string>();
     let page = 1;
-    for (;;) {
-      const pageEntries = await client.getLeagueEntries(
-        platform,
-        'RANKED_SOLO_5x5',
-        normalizedTier,
-        division,
-        page,
-      );
-
-      if (pageEntries.length === 0) {
-        break;
+    while (seen.size < perDivision) {
+      const pageEntries = await client.getLeagueEntries(platform, 'RANKED_SOLO_5x5', normalizedTier, division, page);
+      if (pageEntries.length === 0) break;
+      for (const e of pageEntries) {
+        if (e.puuid && !seen.has(e.puuid)) {
+          seen.add(e.puuid);
+          entries.push(e);
+          if (seen.size >= perDivision) break;
+        }
       }
-
-      entries.push(...pageEntries);
-      if (pageEntries.length < 100) {
-        break;
-      }
+      if (pageEntries.length < 100) break;
       page += 1;
     }
   }
@@ -191,10 +191,8 @@ export async function discoverPlayersByTier(
 
   const db = options.db ?? (await import('./db')).openDb(process.env.DRAFTORB_DB_PATH ?? 'data/DraftOrb.sqlite');
 
-  if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name = 'ingest_state'").get()) {
-    const { migrate } = await import('./db');
-    migrate(db);
-  }
+  const { migrate } = await import('./db');
+  migrate(db); // idempotent
 
   const tierResults: TierDiscoveryResult[] = [];
   let totalFetched = 0;
@@ -212,7 +210,12 @@ export async function discoverPlayersByTier(
     if (!options.reset) {
       const progress = readProgress(db, stateKey);
       if (progress) {
-        const parsed = JSON.parse(progress) as { completed?: boolean };
+        let parsed: { completed?: boolean } = {};
+        try {
+          parsed = JSON.parse(progress) as { completed?: boolean };
+        } catch {
+          /* corrupted state: redo this tier */
+        }
         if (parsed.completed) {
           tierResults.push({ tier: normalizedTier, pageCount: 0, fetched: 0, stored: 0, status: 'skipped' });
           continue;
@@ -220,11 +223,11 @@ export async function discoverPlayersByTier(
       }
     }
 
-    const entries = await getTierEntries(client, platform, normalizedTier);
+    const entries = await getTierEntries(client, platform, normalizedTier, quota);
     const rankedEntries = entries
       .filter((entry) => (entry.tier ?? '').toUpperCase() === normalizedTier)
-      .filter((entry) => entry.puuid || entry.summonerId || entry.leagueId)
-      .slice(0, quota);
+      .slice(0, quota)
+      .filter((entry) => typeof entry.puuid === 'string' && entry.puuid.length > 0)
 
     const upsert = db.prepare(`
       INSERT INTO players (puuid, platform, tier, division, lp, rank_score, updated_at)
@@ -238,12 +241,11 @@ export async function discoverPlayersByTier(
         updated_at = excluded.updated_at
     `);
 
-    let stored = 0;
-    for (const entry of rankedEntries) {
-      const row = toPlayerRow(entry, platform, normalizedTier);
-      upsert.run(row);
-      stored += 1;
-    }
+    const storeAll = db.transaction((list: RiotLeagueEntry[]) => {
+      for (const entry of list) upsert.run(toPlayerRow(entry, platform, normalizedTier));
+      return list.length;
+    });
+    const stored = storeAll(rankedEntries);
 
     totalFetched += rankedEntries.length;
     totalStored += stored;

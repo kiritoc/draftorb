@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { z } from '@draftorb/shared';
 import { RiotClient } from './client';
 import { RiotRateLimiter } from './rate-limiter';
-import { RiotAuthError, RiotRateLimitError } from './types';
+import { RiotApiError, RiotAuthError, RiotRateLimitError } from './types';
 
 function createMockResponse(
   status: number,
@@ -45,6 +45,53 @@ describe('RiotClient', () => {
   });
 
   describe('HTTP error handling & acceptance criteria', () => {
+    it('retries a rejected fetch with backoff and succeeds', async () => {
+      const fetchCalls: number[] = [];
+      const sleepDurations: number[] = [];
+      const mockFetch = vi.fn().mockImplementation(async () => {
+        fetchCalls.push(1);
+        if (fetchCalls.length === 1) {
+          throw new Error('Network unavailable');
+        }
+        return createMockResponse(200, { success: true });
+      });
+
+      const client = new RiotClient({
+        apiKey: dummyApiKey,
+        fetchFn: mockFetch,
+        initialBackoffMs: 200,
+        sleepFn: async (ms) => {
+          sleepDurations.push(ms);
+        },
+      });
+
+      await expect(
+        client.request('https://euw1.api.riotgames.com/test'),
+      ).resolves.toEqual({ success: true });
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(sleepDurations).toEqual([200]);
+    });
+
+    it('throws RiotApiError when rejected fetches exhaust the maximum tries', async () => {
+      const sleepDurations: number[] = [];
+      const mockFetch = vi.fn().mockRejectedValue(new Error('Network unavailable'));
+      const client = new RiotClient({
+        apiKey: dummyApiKey,
+        fetchFn: mockFetch,
+        initialBackoffMs: 100,
+        max5xxRetries: 3,
+        sleepFn: async (ms) => {
+          sleepDurations.push(ms);
+        },
+      });
+
+      await expect(client.request('https://euw1.api.riotgames.com/test')).rejects.toThrow(
+        RiotApiError,
+      );
+      expect(mockFetch).toHaveBeenCalledTimes(3);
+      expect(sleepDurations).toEqual([100, 200]);
+    });
+
     it('stops immediately on 401 Unauthorized with "key expired?" and does not retry', async () => {
       let fetchCalls = 0;
       const mockFetch = vi.fn().mockImplementation(async () => {

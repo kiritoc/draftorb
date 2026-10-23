@@ -120,6 +120,7 @@ describe('migration runner', () => {
     expect(indexNames).toContain('idx_part_puuid');
     expect(indexNames).toContain('idx_matches_platform_patch');
     expect(indexNames).toContain('idx_players_platform_tier');
+    expect(indexNames).toContain('idx_players_rank_score');
     expect(indexNames).toContain('idx_role_prob_champion');
     expect(indexNames).toContain('idx_baseline_champion_role');
     expect(indexNames).toContain('idx_pair_ally_support');
@@ -171,6 +172,26 @@ describe('migration runner', () => {
     expect(player?.platform).toBe('euw1');
     expect(player?.tier).toBe('DIAMOND');
 
+    db.close();
+  });
+
+  it('should allow item events with different types at the same timestamp and item', () => {
+    const db = openDb(TEST_DB_PATH);
+    migrate(db);
+
+    const insert = db.prepare(`
+      INSERT INTO item_events (match_id, puuid, ts, item_id, type, team_gold_diff, kills_diff)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    insert.run('test-match', 'test-puuid', 60000, 1001, 'ITEM_PURCHASED', 500, 1);
+    insert.run('test-match', 'test-puuid', 60000, 1001, 'ITEM_UNDO', 500, 1);
+
+    const events = db
+      .prepare('SELECT type FROM item_events WHERE match_id = ? ORDER BY type')
+      .all('test-match') as { type: string }[];
+
+    expect(events).toEqual([{ type: 'ITEM_PURCHASED' }, { type: 'ITEM_UNDO' }]);
     db.close();
   });
 

@@ -3,13 +3,13 @@
 ## Current status
 - Phase: 1 (Support / Diamond)
 - Current milestone: M0 Foundations (Complete) -> M1 ETL (Complete) -> M2 Engine
-- Last updated: 2026-10-22 by GitHub Copilot (T-012)
+- Last updated: 2026-10-23 by Copilot SDK in VS Code
 
 ## Epic status
 | Epic | Status | Notes |
 |---|---|---|
 | E0 Foundations | DONE | T-001..T-004 DONE |
-| E1 ETL | DONE | T-010..T-011 DONE; ready for T-012 |
+| E1 ETL | DONE | T-010..T-012 DONE; T-013 ready |
 | E2 Engine | NOT STARTED | Ready to start T-020 |
 | E3 Web MVP | NOT STARTED | |
 | E4 Runes | NOT STARTED | |
@@ -23,10 +23,10 @@
 - Last aggregation: -
 
 ## Next recommended ticket
-T-012 (Player discovery by tier) or T-020 (Rank weighting module)
+T-013 (Match ingestion)
 
 ## Open questions for the owner
-- (none)
+- None.
 
 ---
 ## Session log (newest first)
@@ -40,6 +40,47 @@ T-012 (Player discovery by tier) or T-020 (Rank weighting module)
 - Next step:
 - Pitfalls / notes for next AI:
 ```
+
+### 2026-10-23 — Copilot SDK in VS Code — D-016 confirmation
+- Done:
+  - Accepted the D-016 formula with `rank_score` limited to tier and division; raw LP remains available for exact rank ordering and is not capped or rounded into the score.
+  - Updated player score calculation, tests, and the related data-model and specification notes.
+- Files touched:
+  - `packages/etl/src/players.ts`
+  - `packages/etl/src/players.test.ts`
+  - `docs/DECISIONS.md`
+  - `docs/DATA_MODEL.md`
+  - `docs/SPECS.md`
+  - `docs/PROGRESS.md`
+- Tests: `pnpm test` (8 files, 68 tests passed), `pnpm typecheck`, `pnpm lint`, and `git diff --check` passed.
+- State left: DONE
+- Next step: Continue with T-013 (Match ingestion).
+- Pitfalls / notes for next AI:
+  - `rank_score` intentionally does not distinguish LP within a division or apex tier; use stored rank fields for exact comparisons.
+
+### 2026-10-23 — Copilot SDK in VS Code — Review follow-up
+- Done:
+  - Corrected the initial SQLite schema for optional mastery, item event uniqueness, valid participant roles, and player rank-score indexing.
+  - Added regression coverage for item event types sharing a timestamp/item, Riot fetch rejection retries and exhaustion, and pruning expired rate-limit timestamps.
+  - Clarified T-012 resumability and T-013 Riot payload revalidation acceptance criteria.
+  - Proposed D-016 for persisted rank_score and aligned DATA_MODEL.md and SPECS §3.
+- Files touched:
+  - `packages/etl/migrations/001_initial.sql`
+  - `packages/etl/src/db/migrate.test.ts`
+  - `packages/etl/src/players.test.ts`
+  - `packages/etl/src/riot/client.test.ts`
+  - `packages/etl/src/riot/rate-limiter.ts`
+  - `packages/etl/src/riot/rate-limiter.test.ts`
+  - `docs/DECISIONS.md`
+  - `docs/DATA_MODEL.md`
+  - `docs/SPECS.md`
+  - `docs/TICKETS.md`
+  - `docs/PROGRESS.md`
+- Tests: `pnpm test` (8 files, 68 tests passed); `pnpm typecheck` passed; `pnpm lint` passed.
+- State left: DONE (review follow-up resolved; all requested checks pass).
+- Next step: T-013 (Match ingestion).
+- Pitfalls / notes for next AI:
+  - D-016 is PROPOSED; confirm or revise the formula with the owner before relying on it as an accepted decision.
 
 ### 2026-10-22 — Copilot CLI — Ticket T-012
 - Done:

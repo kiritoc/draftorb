@@ -70,6 +70,11 @@ export class RiotRateLimiter {
     return this.appLimits;
   }
 
+  /** Returns the number of timestamps currently tracked for application limits. */
+  getTrackedCount(): number {
+    return this.appTimestamps.length;
+  }
+
   /**
    * Returns active method limit windows for a given method key.
    */
@@ -187,8 +192,10 @@ export class RiotRateLimiter {
       }
 
       if (waitMs <= 0) {
-        // Slot is open: record timestamp
+        // Slot is open: prune expired timestamps (bounded memory), then record
         const finalTime = this.now();
+        const maxWindowMs = Math.max(0, ...this.appLimits.map((w) => w.windowSeconds * 1000));
+        this.pruneBefore(this.appTimestamps, finalTime - maxWindowMs);
         this.appTimestamps.push(finalTime);
         if (methodKey) {
           let list = this.methodTimestamps.get(methodKey);
@@ -196,6 +203,8 @@ export class RiotRateLimiter {
             list = [];
             this.methodTimestamps.set(methodKey, list);
           }
+          const ml = this.methodLimits.get(methodKey) ?? [];
+          this.pruneBefore(list, finalTime - Math.max(0, ...ml.map((w) => w.windowSeconds * 1000)));
           list.push(finalTime);
         }
         return;
@@ -204,6 +213,12 @@ export class RiotRateLimiter {
       // Must wait for slot to free up
       await this.sleep(waitMs);
     }
+  }
+
+  private pruneBefore(list: number[], cutoff: number): void {
+    let i = 0;
+    while (i < list.length && (list[i] as number) <= cutoff) i++;
+    if (i > 0) list.splice(0, i);
   }
 
   private calculateWaitMs(timestamps: number[], windows: RateLimitWindow[], currentTime: number): number {

@@ -28,10 +28,10 @@ CREATE TABLE IF NOT EXISTS participants (
   puuid TEXT NOT NULL,
   team_id INTEGER NOT NULL,
   champion_id INTEGER NOT NULL,
-  role TEXT NOT NULL,
+  role TEXT NOT NULL CHECK (role IN ('TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT')),
   win INTEGER NOT NULL,
   rank_score REAL NOT NULL,
-  champion_games INTEGER NOT NULL,
+  champion_games INTEGER NOT NULL DEFAULT 0,
   keystone INTEGER NOT NULL,
   primary_style INTEGER NOT NULL,
   sub_style INTEGER NOT NULL,
@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS item_events (
   type TEXT NOT NULL,
   team_gold_diff INTEGER NOT NULL,
   kills_diff INTEGER NOT NULL,
-  PRIMARY KEY (match_id, puuid, ts, item_id)
+  PRIMARY KEY (match_id, puuid, ts, item_id, type)
 );
 
 CREATE TABLE IF NOT EXISTS ingest_state (
@@ -65,6 +65,7 @@ CREATE INDEX IF NOT EXISTS idx_part_match_id ON participants(match_id);
 CREATE INDEX IF NOT EXISTS idx_part_puuid ON participants(puuid);
 CREATE INDEX IF NOT EXISTS idx_matches_platform_patch ON matches(platform, patch);
 CREATE INDEX IF NOT EXISTS idx_players_platform_tier ON players(platform, tier);
+CREATE INDEX IF NOT EXISTS idx_players_rank_score ON players(rank_score);
 
 -- Aggregated tables (recomputed per patch)
 CREATE TABLE IF NOT EXISTS role_prob (

@@ -75,6 +75,12 @@ Consequences:
 - Alternatives: Third-party rate limiters (e.g. `bottleneck`, `limiter`). Rejected to keep runtime dependencies zero, avoid bundle bloat or ESM quirks, and enable exact compatibility with Riot's multi-window header specification (`X-App-Rate-Limit: 20:1,100:120`).
 - Consequences: Fully typed, zero-overhead, 100% testable client with deterministic virtual-clock tests and native zod response validation.
 
+### D-016 — Persisted player rank_score formula — ACCEPTED
+- Context: Player discovery stores a numeric `rank_score`, while the weighting logic in SPECS §3 uses broad rank buckets.
+- Decision: Persist `rank_score` as the tier base plus division bonus. Tier bases are IRON=0, BRONZE=1, SILVER=2, GOLD=3, PLATINUM=4, EMERALD=5, DIAMOND=6, MASTER=7, GRANDMASTER=8, CHALLENGER=9. For non-apex tiers, division bonuses are IV=0, III=0.25, II=0.50, I=0.75. MASTER, GRANDMASTER, and CHALLENGER have no division bonus. Do not include LP in `rank_score`; retain the raw `tier`, `division`, and `lp` fields and compare them separately when exact rank ordering is needed (tier first, then division for non-apex tiers, then LP; apex tiers use tier then LP).
+- Alternatives: Include LP in a single numeric score using a fixed cap; rejected because any cap saturates for high-LP apex players and rounded scores can collapse distinct LP values. A single unbounded LP score would also blur the boundaries between rank tiers.
+- Consequences: `rank_score` is a stable tier/division value suitable for coarse aggregation, not a unique rank or within-division ordering. Exact ordering remains lossless in the stored rank fields. This score is distinct from the coarser rank buckets used by SPECS §3.
+
 ### Template
 ```
 ### D-xxx — Title — STATUS

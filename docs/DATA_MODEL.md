@@ -4,7 +4,7 @@
 ```sql
 CREATE TABLE players (
   puuid TEXT PRIMARY KEY, platform TEXT, tier TEXT, division TEXT, lp INTEGER,
-  rank_score REAL,            -- see SPECS §3
+  rank_score REAL,            -- tier + division score from D-016; not an exact rank or SPECS §3 bucket
   updated_at INTEGER
 );
 CREATE TABLE matches (
@@ -28,7 +28,7 @@ CREATE TABLE item_events (    -- from timelines (epic E5)
 CREATE TABLE ingest_state (key TEXT PRIMARY KEY, value TEXT);  -- cursors for resumability
 CREATE INDEX idx_part_champ_role ON participants(champion_id, role);
 ```
-Notes: `rank_score` = player rank at collection time (approximation, documented in RIOT_API.md). Store only needed fields.
+Notes: `rank_score` = coarse tier/division score at collection time (approximation, documented in RIOT_API.md). Exact rank ordering uses the stored `tier`, `division`, and `lp` fields separately. The score uses the D-016 tier base and division bonus formula; it excludes LP and is distinct from the SPECS §3 weighting buckets. Store only needed fields.
 
 ## Aggregated tables (SQLite) — recomputed per patch
 - `role_prob(champion_id, role, games, prob)`

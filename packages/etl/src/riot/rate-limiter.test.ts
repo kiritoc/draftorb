@@ -34,6 +34,22 @@ describe('RiotRateLimiter', () => {
       expect(limiter.getAppLimits()).toEqual(DEFAULT_APP_LIMITS);
     });
 
+    it('prunes expired app timestamps over many acquisitions', async () => {
+      let currentTime = 0;
+      const limiter = new RiotRateLimiter({ now: () => currentTime });
+      const maxAppLimit = Math.max(...DEFAULT_APP_LIMITS.map((limit) => limit.maxRequests));
+      let maxTrackedCount = 0;
+
+      for (let i = 0; i < 1000; i++) {
+        await limiter.acquire();
+        maxTrackedCount = Math.max(maxTrackedCount, limiter.getTrackedCount());
+        currentTime += 120_001;
+      }
+
+      expect(maxTrackedCount).toBeLessThanOrEqual(maxAppLimit);
+      expect(limiter.getTrackedCount()).toBeLessThanOrEqual(maxAppLimit);
+    });
+
     it('allows requests within limit without waiting', async () => {
       let currentTime = 1000;
       let sleptMs = 0;
@@ -148,4 +164,3 @@ describe('RiotRateLimiter', () => {
     });
   });
 });
-

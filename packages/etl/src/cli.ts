@@ -192,7 +192,9 @@ async function runStatic(args: string[]): Promise<void> {
   const result = await importStaticData({ version });
   const elapsed = ((performance.now() - startTime) / 1000).toFixed(2);
 
-  log.info(`Imported patch ${result.patch} (Data Dragon version ${result.version}) in ${elapsed}s:`);
+  log.info(
+    `Imported patch ${result.patch} (Data Dragon version ${result.version}) in ${elapsed}s:`,
+  );
   log.detail(`Champions: ${result.championsCount} validated -> ${result.outputPaths.champions}`);
   log.detail(`Items: ${result.itemsCount} validated -> ${result.outputPaths.items}`);
   log.detail(`Rune trees: ${result.runeTreesCount} validated -> ${result.outputPaths.runes}`);

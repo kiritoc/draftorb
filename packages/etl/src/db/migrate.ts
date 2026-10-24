@@ -126,9 +126,9 @@ export function getMigrationStatus(db: Database.Database): {
   ensureMigrationsTable(db);
 
   const migrations = getMigrations();
-  const applied = db
-    .prepare('SELECT version FROM _migrations ORDER BY version')
-    .all() as { version: string }[];
+  const applied = db.prepare('SELECT version FROM _migrations ORDER BY version').all() as {
+    version: string;
+  }[];
 
   const appliedSet = new Set(applied.map((m) => m.version));
   const pendingVersions = migrations

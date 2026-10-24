@@ -96,7 +96,7 @@ describe('migration runner', () => {
 
     const tables = db
       .prepare(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE '_migrations' ORDER BY name"
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE '_migrations' ORDER BY name",
       )
       .all() as { name: string }[];
 
@@ -146,9 +146,10 @@ describe('migration runner', () => {
     const db = openDb(TEST_DB_PATH);
     migrate(db);
 
-    const migrations = db
-      .prepare('SELECT * FROM _migrations')
-      .all() as { version: string; applied_at: number }[];
+    const migrations = db.prepare('SELECT * FROM _migrations').all() as {
+      version: string;
+      applied_at: number;
+    }[];
 
     expect(migrations).toHaveLength(expectedVersions().length);
     expect(migrations[0]?.version).toBe('001_initial');
@@ -197,9 +198,7 @@ describe('migration runner', () => {
 
     insert.run('test-puuid', 'euw1', 'DIAMOND', 'I', 75, 6.0, Date.now());
 
-    const player = db
-      .prepare('SELECT * FROM players WHERE puuid = ?')
-      .get('test-puuid') as
+    const player = db.prepare('SELECT * FROM players WHERE puuid = ?').get('test-puuid') as
       | {
           puuid: string;
           platform: string;
@@ -256,7 +255,7 @@ describe('migration runner', () => {
   it('should report pending based on disk files and missing applied versions', () => {
     const db = openDb(TEST_DB_PATH);
     db.prepare(
-      'CREATE TABLE IF NOT EXISTS _migrations (version TEXT PRIMARY KEY, applied_at INTEGER NOT NULL)'
+      'CREATE TABLE IF NOT EXISTS _migrations (version TEXT PRIMARY KEY, applied_at INTEGER NOT NULL)',
     ).run();
     db.prepare('INSERT INTO _migrations (version, applied_at) VALUES (?, ?)').run(
       '001_initial',

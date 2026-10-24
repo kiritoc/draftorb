@@ -1,6 +1,7 @@
 # DATA MODEL
 
 ## SQLite (local, `data/DraftOrb.sqlite`, gitignored)
+
 ```sql
 CREATE TABLE players (
   puuid TEXT PRIMARY KEY, platform TEXT, tier TEXT, division TEXT, lp INTEGER,
@@ -37,9 +38,11 @@ CREATE TABLE match_rejects (  -- matches seen and rejected, deduped across playe
 );
 CREATE INDEX idx_part_champ_role ON participants(champion_id, role);
 ```
+
 Notes: `rank_score` = coarse tier/division score at collection time (approximation, documented in RIOT_API.md). Exact rank ordering uses the stored `tier`, `division`, and `lp` fields separately. The score uses the D-016 tier base and division bonus formula; it excludes LP and is distinct from the SPECS §3 weighting buckets. Store only needed fields. `match_rejects` records match ids already evaluated and rejected (wrong queue, too short, off-patch, invalid payload) so shared matches are not re-fetched per player; a `patch` reject keeps the match's actual patch so it is re-evaluated once a run's `--since-patch` window includes it (D-017).
 
 ## Aggregated tables (SQLite) — recomputed per patch; role-generic (Phase 1 populates only `my_role = 'SUPPORT'`)
+
 - `role_prob(champion_id, role, games, prob)`
 - `baseline(champion_id, role, rank_bucket, wins_w, games_w, games_w2)` (weighted; `games_w2` = sum of squared weights for `n_eff`, SPECS §3)
 - `pair_ally(my_champion_id, my_role, other_champion_id, other_role, rank_bucket, wins_w, games_w, games_w2)`
@@ -52,7 +55,9 @@ Notes: `rank_score` = coarse tier/division score at collection time (approximati
 Adding a role means data only: no schema or code change. Migration 004 (T-011.b) creates these tables.
 
 ## Exported JSON (`data/public/<patch>/`) — role-keyed from day one
+
 Validated by one zod schema family parameterized by role (`packages/shared`, T-002.b). The role is carried by the file path, not by a column in the rows (the SQLite tables keep `my_role`). The web app loads only the roles listed in `manifest.json`. Keep each file < 5 MB gzip.
+
 ```
 manifest.json          // { patch, generatedAt, region, rankBuckets, roles: ["SUPPORT"], files[], schemaVersion }
 champions.json         // id, name, icon, roles
@@ -66,6 +71,7 @@ roles/<ROLE>/lane-full.json   // [championId, partnerId, opp1Id, opp2Id, bucket,
 roles/<ROLE>/runes/<championId>.json  // contexts -> top pages
 roles/<ROLE>/builds/<championId>.json // item build stats
 ```
+
 Every exported row carries `games_w2` so the engine can compute `n_eff` (SPECS §3). Rows are exported only when `n_eff >= exportMinGames` (config, default 10), and `exportMinGames <= minGames` so tightening `minGames` never needs a re-export. Size budget: `lane-*` and `*-pairs` files are the largest; if a file would exceed 5 MB, raise `exportMinGames` for that file and record it in the manifest.
 
 Manual files (committed, hand-written, zod-validated): `data/manual/champion-tags.json`, `data/manual/item-tags.json`, `data/manual/gameplans/*.md`.

@@ -1,4 +1,5 @@
 # GLOSSARY
+
 - **Draft / champ select**: pick & ban phase.
 - **Blind pick**: picking without seeing enemy picks.
 - **ADC / Bot / Support / Jungle / Mid / Top**: roles (`ADC`, `SUPPORT`, ... in code).

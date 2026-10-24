@@ -65,9 +65,9 @@ describe('RiotClient', () => {
         },
       });
 
-      await expect(
-        client.request('https://euw1.api.riotgames.com/test'),
-      ).resolves.toEqual({ success: true });
+      await expect(client.request('https://euw1.api.riotgames.com/test')).resolves.toEqual({
+        success: true,
+      });
       expect(mockFetch).toHaveBeenCalledTimes(2);
       expect(sleepDurations).toEqual([200]);
     });
@@ -212,9 +212,7 @@ describe('RiotClient', () => {
         },
       });
 
-      const result = await client.request<{ data: string }>(
-        'https://euw1.api.riotgames.com/test',
-      );
+      const result = await client.request<{ data: string }>('https://euw1.api.riotgames.com/test');
 
       expect(result).toEqual({ data: 'recovered' });
       expect(fetchCalls).toBe(3);

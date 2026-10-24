@@ -13,10 +13,7 @@ import { resolve } from 'node:path';
 export function loadEnv(envPath?: string): void {
   const candidatePaths = envPath
     ? [envPath]
-    : [
-        resolve(process.cwd(), '.env'),
-        resolve(process.cwd(), '../../.env'),
-      ];
+    : [resolve(process.cwd(), '.env'), resolve(process.cwd(), '../../.env')];
 
   for (const path of candidatePaths) {
     if (existsSync(path)) {
@@ -51,10 +48,7 @@ export function parseAndApplyEnv(content: string): void {
     const key = trimmed.slice(0, equalIndex).trim();
     let val = trimmed.slice(equalIndex + 1).trim();
 
-    if (
-      (val.startsWith('"') && val.endsWith('"')) ||
-      (val.startsWith("'") && val.endsWith("'"))
-    ) {
+    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
       val = val.slice(1, -1);
     }
 
@@ -63,4 +57,3 @@ export function parseAndApplyEnv(content: string): void {
     }
   }
 }
-

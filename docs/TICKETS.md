@@ -1,7 +1,9 @@
 # TICKETS
+
 Format: `ID | Title | Deps | Status | Acceptance`. Status: TODO, DOING, REVIEW, DONE, BLOCKED. Only one ticket DOING per AI session. Size: S (<1h), M (half day), L (1 day). When a ticket is too big, split it and add sub-tickets (T-xxx.a).
 
 ## E0 Foundations
+
 - **T-001 | Monorepo scaffold (S)** | – | DONE | pnpm workspaces (`shared, engine, etl, web`), TS strict base config, Vitest, ESLint, Prettier, scripts `dev/test/typecheck/lint`. Acceptance: `pnpm install && pnpm test && pnpm typecheck` pass on clean Windows machine.
 - **T-002 | Shared types + zod schemas (M)** | T-001 | DONE | Types for Champion, Role, Rank, DraftInput, Slot, Recommendation, GameState, data JSON formats (DATA_MODEL.md). Acceptance: schemas + unit tests; no logic.
 - **T-003 | Data Dragon importer (S)** | T-002 | DONE | Script downloads latest version champions/items/runes -> `data/public/<patch>/champions.json, items.json, runes.json`. Acceptance: runs with `pnpm etl static`, validated by zod.
@@ -9,6 +11,7 @@ Format: `ID | Title | Deps | Status | Acceptance`. Status: TODO, DOING, REVIEW, 
 - **T-004 | Support champion tags (M)** | T-003 | DONE | `data/manual/champion-tags.json` with all supports + common flex picks, schema in shared. Acceptance: validation script passes; coverage report lists missing champions.
 
 ## E1 ETL
+
 - **T-010 | Riot client + rate limiter (M)** | T-001 | DONE | See RIOT_API.md. Acceptance: tests with mocked HTTP for 429/5xx/401 and rate limiting.
 - **T-011 | SQLite schema + migrations (S)** | T-001 | DONE | DATA_MODEL.md tables, migration runner. Acceptance: `pnpm etl migrate` idempotent; `getMigrationStatus()` reports pending from disk and flags applied versions missing from the migration directory without negative counts; SQLite connection enables `foreign_keys` and any temporary disable happens before `BEGIN IMMEDIATE`.
 - **T-011.b | Migration 004: generalized aggregates + item slot + expert columns (S)** | T-011 | TODO | `item_events.item_slot`; role-generic `baseline`/`pair_ally`/`pair_enemy`/`lane_vs`/`lane_full`/`rune_ctx` (with `my_role`); `participants.mastery_points` + `is_expert` (D-022); `item_build` context columns (DATA_MODEL.md). Migration 001 created the old support-specific aggregated tables (`support_id` columns, no `lane_*`/`my_role` tables): 004 drops and recreates them in the role-generic shape — acceptable because no production data exists yet (rebuild rule). Acceptance: `pnpm etl migrate` idempotent; migration test discovers 004 on disk.
@@ -22,6 +25,7 @@ Format: `ID | Title | Deps | Status | Acceptance`. Status: TODO, DOING, REVIEW, 
 - **T-019 | Export versioned JSON + manifest (S)** | T-015..T-018,T-002.b | TODO | Role-keyed layout in DATA_MODEL.md (`roles/<ROLE>/...`, manifest `roles` list, `schemaVersion`), `exportMinGames` filter, size checks. Acceptance: web can load them; schemaVersion present.
 
 ## E2 Engine
+
 - **T-020 | Rank weighting module (S)** | T-002 | TODO | Kernel + experts weights + recency decay + `n_eff` + equivalent-count conversion + influence matrix `influence[myRole][side][otherRole][phase]` (D-020, zod-validated config incl. `s`, `contextSlots`). Acceptance: unit tests on boundary values, incl. a non-support row (TOP); matrix validation rejects an incomplete row or a non-max opponent cell.
 - **T-021 | Role inference (M)** | T-002 | TODO | SPECS §4 with confidence. Acceptance: tests incl. flex champions, partially known roles.
 - **T-022 | Shrinkage + level mapping (S)** | T-002 | TODO | SPECS §5: shrinkage toward the previous layer in log-odds space on equivalent counts (`games_e = n_eff`, `wins_e = wins_w * n_eff / games_w`, D-021), global pair scale `s`. Acceptance: toy-data test proves `k` is in raw-game units (a heavily weighted small sample shrinks like `n_eff` raw games); low n_eff -> lowData; exact context with large n dominates, small n falls back to the pair estimate; same assertions hold on a non-support lane group (TOP, `lane_full` skipped).
@@ -33,6 +37,7 @@ Format: `ID | Title | Deps | Status | Acceptance`. Status: TODO, DOING, REVIEW, 
 - **T-027.b | Backtest harness: runes/items (M)** | T-018,T-051 | TODO | `pnpm etl backtest items` (D-023): calibration of the shrunk context win rates on holdout purchases, per `myRole`/phase, paired bootstrap vs baseline. Acceptance: report JSON written; toy dataset.
 
 ## E3 Web MVP
+
 - **T-030 | Web scaffold + data loader (S)** | T-001,T-019 | TODO | Vite/React/Tailwind, loads manifest + the JSON of roles listed in `manifest.roles`, shows patch. Acceptance: runs with sample data.
 - **T-031 | Draft screen (L)** | T-030 | TODO | 10 slots, searchable champion picker, optional role per slot, blind toggle, rank selector (Diamond default). Acceptance: any subset of inputs OK.
 - **T-032 | Recommendations list (M)** | T-023,T-031,T-002.b | TODO | Cards with reasons, level badges, sample sizes, lowData warning.
@@ -40,11 +45,13 @@ Format: `ID | Title | Deps | Status | Acceptance`. Status: TODO, DOING, REVIEW, 
 - **T-034 | Static deploy (S)** | T-027.a,T-032 | TODO | GitHub Pages/Cloudflare Pages + Action. Acceptance: public URL works; legal footer; a backtest report (frozen holdout) with log-loss significantly better than baseline-only is linked in the deploy notes, otherwise the app shows a visible "unvalidated model" banner (D-023).
 
 ## E4 Runes
+
 - **T-040 | Rune recommender in engine (M)** | T-018,T-023 | TODO | SPECS §8.1.
 - **T-041 | Runes UI (M)** | T-040,T-032 | TODO | Rune page display (icons), adaptation hints.
 - **T-042 | Gameplan notes (S)** | T-032 | TODO | Markdown per champion displayed after pick.
 
 ## E5 Items
+
 - **T-050 | Item tags catalog (M)** | T-003 | TODO | `item-tags.json` (armor/MR/antiheal/shield-breaker/burst/etc.).
 - **T-051 | Timeline ingestion + item builds aggregation (L)** | T-019,T-011.b | TODO | `item_events` (with `item_slot`, time and team gold diff per purchase), `item_build` by D-022 context. Specify: a "completed item" is a Data Dragon item with no `into` field that is not tagged consumable/trinket/ward (boots count; the support quest item line follows its own rule and is documented; consumable buys get `item_slot` NULL and never advance the completed-item index); ITEM_UNDO reverts the matching purchase, ITEM_SOLD removes the item from later states, destroyed items are ignored; the per-purchase threat-weighted enemy damage profile and `lane_key` are derived offline from the stored timeline; state-bucket thresholds come from config. Acceptance: fixture-based tests cover each rule.
 - **T-052 | GameState model (S)** | T-002 | TODO | Types + zod.
@@ -54,11 +61,13 @@ Format: `ID | Title | Deps | Status | Acceptance`. Status: TODO, DOING, REVIEW, 
 - **T-056 | Item recommender v2 (data-driven) (L)** | T-027.b,T-051,T-054 | TODO | Like-for-like context winrates (D-022) replace rules where `n_eff >= minGames`. Acceptance: back-off order tested; calibration checked by T-027.b on holdout purchases.
 
 ## E6 Live
+
 - **T-060 | LCU champ select adapter (M)** | T-031 | TODO | Reads session, emits DraftInput. Policy check recorded in DECISIONS.md.
 - **T-061 | Live Client Data adapter (M)** | T-055 | TODO | Emits GameState; estimate gold from items.
 - **T-062 | Electron shell + overlay (L)** | T-060,T-061 | TODO | Windows installer, minimal setup.
 
 ## E7 Vision
+
 - **T-070 | Screen capture module (M)** | T-062 | TODO
 - **T-071 | Champ select portrait recognition (L)** | T-070 | TODO | Template matching vs Data Dragon icons.
 - **T-072 | Scoreboard items + KDA OCR (L)** | T-070 | TODO
@@ -66,6 +75,7 @@ Format: `ID | Title | Deps | Status | Acceptance`. Status: TODO, DOING, REVIEW, 
 - **T-074 | Evaluation harness (M)** | T-071 | TODO | Screenshot dataset, accuracy report across resolutions/UI scales.
 
 ## Ticket template
+
 ```
 ### T-xxx — Title
 - Epic / Size / Deps

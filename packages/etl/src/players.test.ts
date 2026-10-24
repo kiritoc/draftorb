@@ -18,12 +18,23 @@ describe('player discovery', () => {
     const db = openDb(':memory:');
     migrate(db);
     const mk = (n: number, rank: string) =>
-      Array.from({ length: n }, (_, i) => ({ puuid: `e-${rank}-${i}`, tier: 'EMERALD', rank, leaguePoints: i }));
+      Array.from({ length: n }, (_, i) => ({
+        puuid: `e-${rank}-${i}`,
+        tier: 'EMERALD',
+        rank,
+        leaguePoints: i,
+      }));
     const getLeagueEntries = vi.fn(async (_p, _q, _t, division: string, page: number) =>
       page > 1 ? [] : [...mk(10, division), { tier: 'EMERALD', rank: division, leaguePoints: 1 }],
     );
     const client = { getLeagueEntries } as unknown as RiotClient;
-    const opts = { platform: 'euw1' as const, db, client, tiers: ['EMERALD'], quotas: { EMERALD: 8 } };
+    const opts = {
+      platform: 'euw1' as const,
+      db,
+      client,
+      tiers: ['EMERALD'],
+      quotas: { EMERALD: 8 },
+    };
 
     const r1 = await discoverPlayersByTier(opts);
     expect(r1.totalStored).toBe(8);
@@ -45,12 +56,10 @@ describe('player discovery', () => {
       getLeagueEntries: vi.fn(async (_platform, _queue, tier, division, _page) => {
         if (tier === 'EMERALD') {
           return division === 'I'
-            ? [
-                { puuid: 'emerald-1', tier: 'EMERALD', rank: 'I', leaguePoints: 42 },
-              ]
+            ? [{ puuid: 'emerald-1', tier: 'EMERALD', rank: 'I', leaguePoints: 42 }]
             : division === 'II'
               ? [{ puuid: 'emerald-2', tier: 'EMERALD', rank: 'II', leaguePoints: 38 }]
-            : [];
+              : [];
         }
 
         if (tier === 'DIAMOND') {
@@ -61,7 +70,9 @@ describe('player discovery', () => {
 
         return [];
       }),
-      getMasterLeague: vi.fn(async () => ({ entries: [{ puuid: 'master-1', tier: 'MASTER', rank: 'I', leaguePoints: 70 }] })),
+      getMasterLeague: vi.fn(async () => ({
+        entries: [{ puuid: 'master-1', tier: 'MASTER', rank: 'I', leaguePoints: 70 }],
+      })),
       getGrandmasterLeague: vi.fn(async () => ({ entries: [] })),
       getChallengerLeague: vi.fn(async () => ({ entries: [] })),
     } as unknown as RiotClient;
@@ -81,7 +92,9 @@ describe('player discovery', () => {
     expect(result.tierResults[1]?.stored).toBe(1);
     expect(result.tierResults[2]?.stored).toBe(1);
 
-    const playerCount = db.prepare('SELECT COUNT(*) AS count FROM players').get() as { count: number };
+    const playerCount = db.prepare('SELECT COUNT(*) AS count FROM players').get() as {
+      count: number;
+    };
     expect(playerCount.count).toBe(4);
 
     const progress = db

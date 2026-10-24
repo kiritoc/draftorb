@@ -54,13 +54,13 @@ pairSum  = sum over known slots s of                                        // l
 x       += s * pairSum                                      // s = global pair scale (config, default 1.0, fit by T-027.a)
 if the enemy lane-group champions of laneGroup(myRole) are known:             // layer 2
   x += conf_lane * laneTerm(lane_vs[c, laneGroup(myRole).enemies], q = sigmoid(x))
-if laneGroup(myRole).allies is non-empty and known:                           // layer 3 (skipped for 1v1 lane groups like TOP/MID, where lane_full would duplicate lane_vs)
+if laneGroup(myRole).allies is non-empty and known:                           // layer 3 (skipped for 1v1 lane groups (TOP, MID, JUNGLE), where lane_full would duplicate lane_vs)
   x += conf_lane * laneTerm(lane_full[c, laneGroup(myRole).allies, laneGroup(myRole).enemies], q = sigmoid(x))
 x += W_comp  * compNeed(c, allies, enemies)
 x += W_blind * blindSafety(c)                               // only if blindPick or few enemies known
 P(c) = sigmoid(x);  score(c) = P(c)
 ```
-- `laneGroup(myRole)` (config, D-021): `SUPPORT`/`ADC` = the bot lane (me, ally lane partner, enemy support + enemy ADC); `TOP` = me vs enemy top; `MID` = me vs enemy mid; `JUNGLE` = me vs enemy jungle plus an optional configured lane partner. A layer is skipped when one of its champions is unknown. `conf_lane` = product of the §4 confidences of the lane-group champions. Phase 1 populates only `myRole = SUPPORT`.
+- `laneGroup(myRole)` (config, D-021): `SUPPORT`/`ADC` = the bot lane (me, ally lane partner, enemy support + enemy ADC); `TOP` = me vs enemy top; `MID` = me vs enemy mid; `JUNGLE` = me vs enemy jungle (1v1, `lane_full` skipped). A layer is skipped when one of its champions is unknown. `conf_lane` = product of the §4 confidences of the lane-group champions. Phase 1 populates only `myRole = SUPPORT`.
 - Baseline gate: if the candidate's baseline `n_eff < minGames`, it gets no score and no rank: it goes to `insufficientData` (§7) with `nEff` and `rawGames` (golden rule 8), not to the ranked `recommendations`. The `k0` shrinkage only guards near-perfect records that already passed this gate.
 - Every probability passed to `logit` is clamped to `[eps, 1 - eps]` (eps = 1e-4), so a perfect or empty record can never produce an infinite or NaN score.
 - `pairTerm(c, s) = logit((wins_e + k*p0)/(games_e + k)) - logit(p0)`, k = prior strength (default 40 equivalent games). Pair terms are summed and correlated (several can describe the same matchups), so the global scale `s` absorbs systematic over-counting and is fit on the validation window (T-027.a).
@@ -112,7 +112,7 @@ Sorted desc. Always show why + sample sizes. Never show a % without sample size.
 ## 8. Runes & Items
 
 ### 8.1 Runes (UC3)
-For chosen champion and context: aggregated rune pages from experts (§3 experts rule, experts defined in D-022). Context slots are the top `contextSlots` (config, default 3) champions of the lane context, ordered by `influence[myRole][*][*][lane]` (D-020) — for a support: ally ADC + enemy support + enemy ADC; nothing is hardcoded to the bot lane. Contexts use the D-021 back-off chain, most specific first, dropping the least-influential slot at each step: the `contextSlots` lane slots -> enemy damage mix -> champion global. Each page's win rate is shrunk toward the same page's win rate in the next broader context. Rank by shrunk winrate, tie-break by pick share. Return top 3 pages + adaptation hints (shard choice by enemy damage mix). Never show a page win rate without its sample size.
+For chosen champion and context: aggregated rune pages from experts (§3 experts rule, experts defined in D-022). Context slots are the top `contextSlots` (config, default 3) champions of the lane context, ordered by `influence[myRole][*][*][lane]` (D-020) — for a support: ally ADC + enemy support + enemy ADC; nothing is hardcoded to the bot lane. Selection and back-off drop order: descending influence, ties by side (ally before enemy), then role order TOP, JUNGLE, MID, ADC, SUPPORT. Contexts use the D-021 back-off chain, most specific first, dropping the least-influential slot at each step: the `contextSlots` lane slots -> enemy damage mix -> champion global. Each page's win rate is shrunk toward the same page's win rate in the next broader context. Rank by shrunk winrate, tie-break by pick share. Return top 3 pages + adaptation hints (shard choice by enemy damage mix). Never show a page win rate without its sample size.
 
 ### 8.2 Items (UC4)
 ```

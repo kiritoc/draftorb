@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { spawn } from 'node:child_process';
-import { readdirSync, unlinkSync, existsSync } from 'node:fs';
+import { readdirSync, readFileSync, unlinkSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { migrate, getMigrationStatus, openDb } from './migrate';
@@ -113,6 +113,8 @@ describe('migration runner', () => {
     expect(tableNames).toContain('pair_enemy');
     expect(tableNames).toContain('rune_ctx');
     expect(tableNames).toContain('item_build');
+    expect(tableNames).toContain('lane_vs');
+    expect(tableNames).toContain('lane_full');
 
     db.close();
   });
@@ -134,8 +136,10 @@ describe('migration runner', () => {
     expect(indexNames).toContain('idx_players_rank_score');
     expect(indexNames).toContain('idx_role_prob_champion');
     expect(indexNames).toContain('idx_baseline_champion_role');
-    expect(indexNames).toContain('idx_pair_ally_support');
-    expect(indexNames).toContain('idx_pair_enemy_support');
+    expect(indexNames).toContain('idx_pair_ally_role');
+    expect(indexNames).toContain('idx_pair_enemy_role');
+    expect(indexNames).toContain('idx_lane_vs_role');
+    expect(indexNames).toContain('idx_lane_full_role');
     expect(indexNames).toContain('idx_rune_ctx_champion');
     expect(indexNames).toContain('idx_item_build_champion');
 
@@ -187,6 +191,113 @@ describe('migration runner', () => {
     db.close();
   });
 
+  it('upgrades a seeded 001-003 database without losing matches or participants', () => {
+    const db = openDb(':memory:');
+    db.exec(`
+      CREATE TABLE _migrations (
+        version TEXT PRIMARY KEY,
+        applied_at INTEGER NOT NULL
+      )
+    `);
+
+    for (const version of ['001_initial', '002_match_rejects', '003_matches_rank_known']) {
+      db.exec(readFileSync(join(MIGRATIONS_DIR, `${version}.sql`), 'utf8'));
+      db.prepare('INSERT INTO _migrations (version, applied_at) VALUES (?, ?)').run(version, 1);
+    }
+
+    db.prepare(
+      `INSERT INTO matches (
+        match_id, platform, patch, queue_id, duration, created_at, avg_rank_score, rank_known_count
+      ) VALUES ('legacy-match', 'euw1', '16.21', 420, 1800, 1, 6.5, 1)`,
+    ).run();
+    db.prepare(
+      `INSERT INTO participants (
+        match_id, puuid, team_id, champion_id, role, win, rank_score, champion_games,
+        keystone, primary_style, sub_style, perks_json, items_json, kills, deaths, assists
+      ) VALUES (
+        'legacy-match', 'legacy-player', 100, 412, 'SUPPORT', 1, 6.5, 0,
+        8439, 8400, 8300, '{}', '[]', 2, 3, 18
+      )`,
+    ).run();
+    db.prepare(
+      `INSERT INTO item_events (
+        match_id, puuid, ts, item_id, type, team_gold_diff, kills_diff
+      ) VALUES ('legacy-match', 'legacy-player', 1000, 3109, 'ITEM_PURCHASED', 0, 0)`,
+    ).run();
+
+    expect(migrate(db)).toEqual(['004_role_generic_aggregates']);
+    expect(migrate(db)).toEqual([]);
+
+    const match = db
+      .prepare('SELECT match_id FROM matches WHERE match_id = ?')
+      .get('legacy-match') as { match_id: string } | undefined;
+    const participant = db
+      .prepare(
+        `SELECT match_id, puuid, rank_score, mastery_points, is_expert
+         FROM participants WHERE match_id = ?`,
+      )
+      .get('legacy-match') as
+      | {
+          match_id: string;
+          puuid: string;
+          rank_score: number;
+          mastery_points: number | null;
+          is_expert: number | null;
+        }
+      | undefined;
+    const event = db
+      .prepare('SELECT item_slot FROM item_events WHERE match_id = ?')
+      .get('legacy-match') as { item_slot: number | null } | undefined;
+
+    expect(match?.match_id).toBe('legacy-match');
+    expect(participant).toEqual({
+      match_id: 'legacy-match',
+      puuid: 'legacy-player',
+      rank_score: 6.5,
+      mastery_points: null,
+      is_expert: null,
+    });
+    expect(event?.item_slot).toBeNull();
+    expect(db.prepare('SELECT COUNT(*) AS count FROM _migrations').get()).toMatchObject({
+      count: 4,
+    });
+    db.close();
+  });
+
+  it('cascades match deletes to participants and item events', () => {
+    const db = openDb(':memory:');
+    migrate(db);
+    db.prepare(
+      `INSERT INTO matches (
+        match_id, platform, patch, queue_id, duration, created_at, avg_rank_score
+      ) VALUES ('cascade-match', 'euw1', '16.21', 420, 1800, 1, 6.5)`,
+    ).run();
+    db.prepare(
+      `INSERT INTO participants (
+        match_id, puuid, team_id, champion_id, role, win, rank_score, champion_games,
+        keystone, primary_style, sub_style, perks_json, items_json, kills, deaths, assists
+      ) VALUES (
+        'cascade-match', 'cascade-player', 100, 412, 'SUPPORT', 1, 6.5, 0,
+        8439, 8400, 8300, '{}', '[]', 2, 3, 18
+      )`,
+    ).run();
+    db.prepare(
+      `INSERT INTO item_events (
+        match_id, puuid, ts, item_id, type, team_gold_diff, kills_diff, item_slot
+      ) VALUES ('cascade-match', 'cascade-player', 1000, 3109, 'ITEM_PURCHASED', 0, 0, 1)`,
+    ).run();
+
+    db.prepare('DELETE FROM matches WHERE match_id = ?').run('cascade-match');
+
+    expect(db.prepare('SELECT COUNT(*) AS count FROM participants').get()).toMatchObject({
+      count: 0,
+    });
+    expect(db.prepare('SELECT COUNT(*) AS count FROM item_events').get()).toMatchObject({
+      count: 0,
+    });
+    db.close();
+  });
+
   it('should support inserting into core tables', () => {
     const db = openDb(TEST_DB_PATH);
     migrate(db);
@@ -217,6 +328,11 @@ describe('migration runner', () => {
   it('should allow item events with different types at the same timestamp and item', () => {
     const db = openDb(TEST_DB_PATH);
     migrate(db);
+    db.prepare(
+      `INSERT INTO matches (
+        match_id, platform, patch, queue_id, duration, created_at, avg_rank_score
+      ) VALUES ('test-match', 'euw1', '16.21', 420, 1800, 1, 6.5)`,
+    ).run();
 
     const insert = db.prepare(`
       INSERT INTO item_events (match_id, puuid, ts, item_id, type, team_gold_diff, kills_diff)
@@ -281,6 +397,7 @@ describe('migration runner', () => {
     if (existsSync(dbPath)) {
       unlinkSync(dbPath);
     }
+    openDb(dbPath).close();
 
     const migrateModuleUrl = pathToFileURL(
       join(PROJECT_ROOT, 'packages/etl/src/db/migrate.ts'),
@@ -311,8 +428,8 @@ describe('migration runner', () => {
       collectProcessOutput(second),
     ]);
 
-    expect(firstResult.code).toBe(0);
-    expect(secondResult.code).toBe(0);
+    expect(firstResult.code, firstResult.stderr).toBe(0);
+    expect(secondResult.code, secondResult.stderr).toBe(0);
     expect(firstResult.stderr).toBe('');
     expect(secondResult.stderr).toBe('');
 

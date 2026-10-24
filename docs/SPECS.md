@@ -31,6 +31,7 @@ Rank buckets for weighting (distinct from persisted `rank_score` in DATA_MODEL.m
 - Recency: multiply by `decay^(currentPatchIndex - gamePatchIndex)` (decay=0.85).
 - Patch window: ingestion keeps every patch >= `--since-patch` (D-017); recency is applied here, at aggregation time, never by dropping games at ingestion.
 - Rank reliability: games with `matches.rank_known_count = 0` (rank taken from the seed player only, D-019) are multiplied by `unknownRankFactor` (default 0.5, config).
+- Known limitation (D-004/D-021): draft baselines and pairs are not expert-filtered, so one-trick players can inflate some picks; T-027.a includes an optional ablation that down-weights games by `champion_games` to measure it.
 - Effective sample size: every threshold on weighted counts (`minGames`, level `n >= 100`; `minChampGames` counts raw games and is unaffected) uses `n_eff = (sum w)^2 / sum w^2`, so a few heavily weighted games cannot pass a threshold. Aggregated tables store `games_w2 = sum w^2` for this.
 
 ## 4. Role inference (unknown roles)
@@ -126,9 +127,9 @@ Steps:
 2. **Threat score** per enemy: `threat = a*(K+0.5*A)/(D+1) + b*itemGold/avgItemGold(time) + c*scalingFactor(champion)` ; the top threat(s) = "fed". `threatShare(e) = threat(e) / sum threat`. Params in config.
 3. Enemy profile: damage mix (AP/AD), CC density, healing/shielding, burst vs sustained, weighted by each enemy's `mid`-phase influence (D-020: lane weight blended with threat share).
 4. Game state bucket: `ahead` / `even` / `behind` from goldDiff & kills (config thresholds).
-5. Phase: `lane` for starting items and the first completed item while `time < laneEndSeconds` (840 s); `mid` otherwise.
+5. Phase (one rule everywhere, D-020/D-022): `lane` = starting items (k = 0) and completed item k = 1 bought before `laneEndSeconds` (840 s, config); `mid` otherwise.
 6. Item scoring v1 (rules): `base(item) + profileFit(item) + stateFit(item, bucket) + counterFed(item, fedEnemy)` using item tags (`data/manual/item-tags.json`).
-7. Item scoring v2 (data, D-022): compare like for like — context = (champion, slot `k` with 0 = starting items, purchase time bucket of 5 min, state bucket at purchase, enemy profile bucket `AD|AP|mixed`, and in the `lane` phase the enemy bot lane + ally ADC). Score = shrunk win rate of the item minus the average shrunk win rate of all items bought in that context; back-off order when data is low: lane champions -> enemy profile -> state -> time bucket -> (champion, k). Replaces the rule score only where `n_eff >= minGames`. Observational: phrased as "players who bought X here won Y %", never as cause.
+7. Item scoring v2 (data, D-022): compare like for like — context = (champion, slot `k` with 0 = starting items, purchase time bucket of 5 min, state bucket at purchase, enemy profile bucket `AD|AP|mixed`, and in the `lane` phase the lane-context slots — top `contextSlots` by lane-phase influence, §8.1). Score = shrunk win rate of the item minus the average shrunk win rate of all items bought in that context; back-off order when data is low: lane champions -> enemy profile -> state -> time bucket -> (champion, k). Replaces the rule score only where `n_eff >= minGames`. Observational: phrased as "players who bought X here won Y %", never as cause.
 8. Output next 1-3 items with reasons ("enemy X is fed, AD heavy -> armor"), sample size, and what to skip.
 
 ## 9. Auto-detection (Phase 2 / Epic E6-E7)

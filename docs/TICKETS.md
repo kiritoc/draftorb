@@ -24,11 +24,11 @@ Format: `ID | Title | Deps | Status | Acceptance`. Status: TODO, DOING, REVIEW, 
 ## E2 Engine
 - **T-020 | Rank weighting module (S)** | T-002 | TODO | Kernel + experts weights + recency decay + `n_eff` + equivalent-count conversion + influence matrix `influence[myRole][side][otherRole][phase]` (D-020, zod-validated config incl. `s`, `contextSlots`). Acceptance: unit tests on boundary values; matrix validation rejects an incomplete row or a non-max opponent cell.
 - **T-021 | Role inference (M)** | T-002 | TODO | SPECS §4 with confidence. Acceptance: tests incl. flex champions, partially known roles.
-- **T-022 | Shrinkage + level mapping (S)** | T-002 | TODO | SPECS §5: shrinkage toward the previous layer in log-odds space (D-021). Acceptance: tests (low n_eff -> lowData; exact context with large n dominates, small n falls back to the pair estimate).
+- **T-022 | Shrinkage + level mapping (S)** | T-002 | TODO | SPECS §5: shrinkage toward the previous layer in log-odds space on equivalent counts (`games_e = n_eff`, `wins_e = wins_w * n_eff / games_w`, D-021), global pair scale `s`. Acceptance: toy-data test proves `k` is in raw-game units (a heavily weighted small sample shrinks like `n_eff` raw games); low n_eff -> lowData; exact context with large n dominates, small n falls back to the pair estimate.
 - **T-023 | Support recommendation + explanations (L)** | T-020..T-022,T-002.b | TODO | SPECS §5-7. Acceptance: golden tests pass (TESTING.md).
 - **T-024 | Blind pick mode (M)** | T-023 | TODO | blindSafety. Acceptance: with no enemies, ranking = safe picks; test.
 - **T-025 | Comp needs (M)** | T-004,T-023 | TODO | damage mix/engage/frontline needs. Acceptance: explained in reasons.
-- **T-026 | Golden test suite (M)** | T-023 | TODO | 20+ scenarios (blind, 1 champ known, full draft, unknown roles, low data).
+- **T-026 | Golden test suite (M)** | T-023 | TODO | 20+ scenarios (blind, 1 champ known, full draft, unknown roles, low data). Acceptance: golden test pins the reason order (pairs by descending influence, ties by championId, then `lane_vs`, `lane_full`, comp, blind) and the `lane` reason phrasing as a correction to the pair estimate (SPECS §5/§7).
 - **T-027.a | Backtest harness: draft (M)** | T-017,T-023 | TODO | `pnpm etl backtest draft` (D-023): frozen temporal holdout, rolling validation for tuning, paired-bootstrap gate (`bootstrapResamples`, `logLossTolerance`), log-loss/Brier/calibration vs 0.5 and baseline-only, masked drafts, layer coverage + per-layer/slot ablation for influence calibration, optional ablation down-weighting games by `champion_games` (one-trick check, D-004). Per `myRole`/phase. Acceptance: report JSON written; holdout never in aggregates (test); toy dataset with a planted matchup effect detected for at least TOP and SUPPORT.
 - **T-027.b | Backtest harness: runes/items (M)** | T-018,T-051 | TODO | `pnpm etl backtest items` (D-023): calibration of the shrunk context win rates on holdout purchases, per `myRole`/phase, paired bootstrap vs baseline. Acceptance: report JSON written; toy dataset.
 
@@ -46,7 +46,7 @@ Format: `ID | Title | Deps | Status | Acceptance`. Status: TODO, DOING, REVIEW, 
 
 ## E5 Items
 - **T-050 | Item tags catalog (M)** | T-003 | TODO | `item-tags.json` (armor/MR/antiheal/shield-breaker/burst/etc.).
-- **T-051 | Timeline ingestion + item builds aggregation (L)** | T-019,T-011.b | TODO | `item_events` (with `item_slot`, time and team gold diff per purchase), `item_build` by D-022 context.
+- **T-051 | Timeline ingestion + item builds aggregation (L)** | T-019,T-011.b | TODO | `item_events` (with `item_slot`, time and team gold diff per purchase), `item_build` by D-022 context. Specify: a "completed item" is a Data Dragon item with no `into` field (boots count; the support quest item line follows its own rule and is documented); ITEM_UNDO reverts the matching purchase, ITEM_SOLD removes the item from later states, destroyed items are ignored; the per-purchase threat-weighted enemy damage profile and `lane_key` are derived offline from the stored timeline; state-bucket thresholds come from config. Acceptance: fixture-based tests cover each rule.
 - **T-052 | GameState model (S)** | T-002 | TODO | Types + zod.
 - **T-053 | Threat score (M)** | T-052 | TODO | SPECS §8.2.2. Acceptance: tests with fed/not fed scenarios.
 - **T-054 | Item recommender v1 (rules) (L)** | T-050,T-053 | TODO | ahead/behind logic, fed counter-items, reasons.

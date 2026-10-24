@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { openDb, migrate } from './db';
 import { ingestMatches } from './matches';

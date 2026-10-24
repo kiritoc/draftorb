@@ -258,8 +258,7 @@ export async function ingestMatches(
 
         try {
           const storedMatch = getStoredMatch.get(matchId) as
-            | { participant_count: number }
-            | undefined;
+            { participant_count: number } | undefined;
           if (findRejection(db, matchId, sincePatch)) {
             outcome = 'filtered';
           } else if (storedMatch && storedMatch.participant_count >= 10) {
@@ -324,8 +323,8 @@ export async function ingestMatches(
                 cursor.stored = base.stored + run.stored + (outcome === 'stored' ? 1 : 0);
                 cursor.duplicates =
                   base.duplicates + run.duplicates + (outcome === 'duplicate' ? 1 : 0);
-                cursor.filtered = base.filtered + run.filtered + (outcome === 'filtered' ? 1 : 0);
-                cursor.invalid = base.invalid + run.invalid + (outcome === 'invalid' ? 1 : 0);
+                cursor.filtered = base.filtered + run.filtered;
+                cursor.invalid = base.invalid + run.invalid;
                 cursor.lastGameCreation = lastGameCreation;
                 cursor.updatedAt = Date.now();
                 writeCursor(db, key, cursor);

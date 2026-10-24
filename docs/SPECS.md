@@ -45,7 +45,7 @@ Candidate set: champions with `roleProb[c][SUPPORT] >= 0.05` (or user pool).
 
 All effects are combined on the log-odds scale (`logit(p) = ln(p / (1 - p))`, `sigmoid` = its inverse) and every context layer is shrunk toward the layer below it (D-021):
 ```
-p0       = baseline winrate of c (rank/recency weighted, §3)
+p0       = (wins_w + k0*0.5)/(games_w + k0)   // baseline winrate of c (rank/recency weighted, §3), shrunk toward 0.5, k0 = 20
 x        = logit(p0)
 for each known slot s (ally or enemy, any role):            // layer 1: pairs
   x += conf(s) * influence[SUPPORT][s.side][s.role][draft] * pairTerm(c, s)
@@ -57,6 +57,7 @@ x += W_comp  * compNeed(c, allies, enemies)
 x += W_blind * blindSafety(c)                               // only if blindPick or few enemies known
 P(c) = sigmoid(x);  score(c) = P(c)
 ```
+- Every probability passed to `logit` is clamped to `[eps, 1 - eps]` (eps = 1e-4), so a perfect or empty record can never produce an infinite or NaN score.
 - `pairTerm(c, s) = logit((wins_w + k*p0)/(games_w + k)) - logit(p0)`, k = prior strength (default 40 games).
 - `laneTerm(t, q) = logit((t.wins_w + k_lane*q)/(t.games_w + k_lane)) - logit(q)`, k_lane default 40: an exact lane context is shrunk toward the prediction already made from the pairs, not toward the baseline, so it only moves the score when it has enough games to disagree with the pairs.
 - `conf_lane` = product of the §4 confidences of the lane champions involved.
@@ -117,7 +118,7 @@ Steps:
 4. Game state bucket: `ahead` / `even` / `behind` from goldDiff & kills (config thresholds).
 5. Phase: `lane` for starting items and the first completed item while `time < laneEndSeconds` (840 s); `mid` otherwise.
 6. Item scoring v1 (rules): `base(item) + profileFit(item) + stateFit(item, bucket) + counterFed(item, fedEnemy)` using item tags (`data/manual/item-tags.json`).
-7. Item scoring v2 (data, D-022): compare like for like — context = (champion, slot `k`, purchase time bucket of 5 min, state bucket at purchase, enemy profile bucket `AD|AP|mixed`, and in the `lane` phase the enemy bot lane + ally ADC). Score = shrunk win rate of the item minus the average shrunk win rate of all items bought in that context; back-off order when data is low: lane champions -> enemy profile -> state -> time bucket -> (champion, k). Replaces the rule score only where `n_eff >= minGames`. Observational: phrased as "players who bought X here won Y %", never as cause.
+7. Item scoring v2 (data, D-022): compare like for like — context = (champion, slot `k` with 0 = starting items, purchase time bucket of 5 min, state bucket at purchase, enemy profile bucket `AD|AP|mixed`, and in the `lane` phase the enemy bot lane + ally ADC). Score = shrunk win rate of the item minus the average shrunk win rate of all items bought in that context; back-off order when data is low: lane champions -> enemy profile -> state -> time bucket -> (champion, k). Replaces the rule score only where `n_eff >= minGames`. Observational: phrased as "players who bought X here won Y %", never as cause.
 8. Output next 1-3 items with reasons ("enemy X is fed, AD heavy -> armor"), sample size, and what to skip.
 
 ## 9. Auto-detection (Phase 2 / Epic E6-E7)

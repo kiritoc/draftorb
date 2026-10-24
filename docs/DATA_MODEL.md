@@ -25,7 +25,7 @@ CREATE TABLE participants (
 CREATE TABLE item_events (    -- from timelines (epic E5)
   match_id TEXT, puuid TEXT, ts INTEGER, item_id INTEGER, type TEXT,
   team_gold_diff INTEGER, kills_diff INTEGER,
-  item_slot INTEGER           -- completed-item index at purchase (1 = first legendary), NULL for components (D-022)
+  item_slot INTEGER           -- 0 = starting purchase (before the first completed item and game time < 90 s), k >= 1 = k-th completed item, NULL for components/consumables bought later (D-022)
 );
 CREATE TABLE ingest_state (key TEXT PRIMARY KEY, value TEXT);  -- cursors for resumability
 CREATE TABLE match_rejects (  -- matches seen and rejected, deduped across players
@@ -45,7 +45,7 @@ Notes: `rank_score` = coarse tier/division score at collection time (approximati
 - `lane_vs(support_id, enemy_support_id, enemy_adc_id, rank_bucket, wins_w, games_w, games_w2)` (D-021)
 - `lane_2v2(support_id, ally_adc_id, enemy_support_id, enemy_adc_id, rank_bucket, wins_w, games_w, games_w2)` (D-021)
 - `rune_ctx(champion_id, context_key, perks_hash, perks_json, wins_w, games_w, games_w2, players)` (`context_key` = D-021 back-off level, SPECS §8.1)
-- `item_build(champion_id, slot_idx, time_bucket, state_bucket, profile_key, lane_key, item_id, wins_w, games_w, games_w2)` (D-022; `lane_key` empty outside the `lane` phase)
+- `item_build(champion_id, slot_idx, time_bucket, state_bucket, profile_key, lane_key, item_id, wins_w, games_w, games_w2)` (D-022; `slot_idx` = `item_events.item_slot`, 0 = starting items; `lane_key` empty outside the `lane` phase)
 
 ## Exported JSON (`data/public/<patch>/`)
 Validated by zod schemas in `packages/shared`. Keep each file < 5 MB gzip.
@@ -54,8 +54,8 @@ Validated by zod schemas in `packages/shared`. Keep each file < 5 MB gzip.
 | `manifest.json` | `{ patch, generatedAt, region, rankBuckets, files[], schemaVersion }` |
 | `champions.json` | id, name, icon, roles |
 | `role-prob.json` | `{ [championId]: { SUPPORT: 0.92, ... } }` |
-| `support-baseline.json` | per support + bucket: wins_w, games_w |
-| `support-ally-pairs.json` | compact arrays `[supportId, allyId, role, bucket, wins_w, games_w]` |
+| `support-baseline.json` | per support + bucket: wins_w, games_w, games_w2 |
+| `support-ally-pairs.json` | compact arrays `[supportId, allyId, role, bucket, wins_w, games_w, games_w2]` (`games_w2` lets the engine compute `n_eff`, SPECS §3) |
 | `support-enemy-pairs.json` | same layout |
 | `support-lane-vs.json` | `[supportId, enemySupportId, enemyAdcId, bucket, wins_w, games_w, games_w2]`, rows with `n_eff >= minGames` only |
 | `support-lane-2v2.json` | `[supportId, allyAdcId, enemySupportId, enemyAdcId, bucket, wins_w, games_w, games_w2]`, rows with `n_eff >= minGames` only |

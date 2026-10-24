@@ -1,19 +1,8 @@
-/**
- * T-013 — Match ingestion.
- *
- * For every discovered player, page through their ranked solo match ids,
- * fetch each match detail, filter (queue / duration / patch), and store the
- * surviving rows in `matches`. Rejected ids go to `match_rejects` so a match
- * shared by several players is fetched only once.
- *
- * Resumability: a per-player cursor in `ingest_state` holds the id snapshot
- * plus the number of ids already processed, so a kill/restart continues where
- * it stopped. Once a player is `done`, later runs only list ids newer than
- * the last seen `gameCreation` (incremental refresh).
- */
-
 import type Database from 'better-sqlite3';
 
+import { RiotClient, RiotApiError, RiotAuthError, RiotSchemaError, type Platform } from './riot';
+import { resolveDbPath } from './config/paths';
+import { openDb, migrate } from './db';
 import {
   clearIngestState,
   cursorKey,
@@ -27,7 +16,6 @@ import {
   writeCursor,
   type PlayerCursor,
 } from './matches-store';
-import { RiotClient, riotMatchDtoSchema, type Platform } from './riot';
 
 export const RANKED_SOLO_QUEUE_ID = 420;
 export const DEFAULT_MATCHES_PER_PLAYER = 20;
@@ -35,25 +23,20 @@ export const DEFAULT_MIN_DURATION_SECONDS = 15 * 60;
 
 export interface MatchIngestionOptions {
   platform?: Platform;
-  /** Lower-bound patch (e.g. "16.19"). Older matches are rejected. */
   sincePatch?: string;
-  /** Max match ids listed per player. */
   matchesPerPlayer?: number;
-  /** Max players processed this run. */
   playerLimit?: number;
   queueId?: number;
   minDurationSeconds?: number;
   db?: Database.Database;
   client?: RiotClient;
-  /** Ignore stored cursors and re-ingest from scratch. */
   reset?: boolean;
-  /** Progress log sink. */
   onProgress?: (message: string) => void;
 }
 
 export interface PlayerIngestionResult {
   puuid: string;
-  status: 'skipped' | 'done';
+  status: 'skipped' | 'done' | 'failed';
   listed: number;
   stored: number;
   duplicates: number;
@@ -66,6 +49,7 @@ export interface MatchIngestionResult {
   sincePatch?: string;
   playersProcessed: number;
   playersSkipped: number;
+  playersFailed: number;
   listed: number;
   stored: number;
   duplicates: number;
@@ -96,6 +80,17 @@ const newCursor = (
   updatedAt: 0,
 });
 
+function isTransientMatchError(error: unknown): boolean {
+  if (error instanceof RiotAuthError) return false;
+  if (error instanceof RiotSchemaError) return false;
+  if (error instanceof RiotApiError) {
+    if (error.status === 429) return true;
+    if (error.status >= 500) return true;
+    if (error.status === 0) return true;
+  }
+  return error instanceof Error && /network|timeout|fetch/i.test(error.message);
+}
+
 export async function ingestMatches(
   options: MatchIngestionOptions = {},
 ): Promise<MatchIngestionResult> {
@@ -107,11 +102,8 @@ export async function ingestMatches(
   const log = options.onProgress ?? (() => {});
 
   const client = options.client ?? new RiotClient({ autoLoadEnv: true });
-  const db =
-    options.db ??
-    (await import('./db')).openDb(process.env.DRAFTORB_DB_PATH ?? 'data/DraftOrb.sqlite');
-  const { migrate } = await import('./db');
-  migrate(db); // idempotent
+  const db = options.db ?? openDb(resolveDbPath());
+  migrate(db);
   if (options.reset) clearIngestState(db, platform);
 
   const allPlayers = db
@@ -120,8 +112,6 @@ export async function ingestMatches(
     )
     .all(platform) as PlayerRow[];
 
-  // Pending players (no cursor or partial) before done ones, so `--limit` walks
-  // the population in repeated batches instead of re-checking the same cohort.
   const done = new Set<string>();
   if (!options.reset) {
     for (const player of allPlayers) {
@@ -130,17 +120,19 @@ export async function ingestMatches(
       }
     }
   }
+
   const ordered = [...allPlayers].sort(
     (a, b) =>
       Number(done.has(a.puuid)) - Number(done.has(b.puuid)) ||
       b.rank_score - a.rank_score ||
       (a.puuid < b.puuid ? -1 : a.puuid > b.puuid ? 1 : 0),
   );
-  const players =
-    options.playerLimit !== undefined ? ordered.slice(0, options.playerLimit) : ordered;
+  const players = options.playerLimit !== undefined ? ordered.slice(0, options.playerLimit) : ordered;
 
   const playerResults: PlayerIngestionResult[] = [];
   let playersSkipped = 0;
+  let playersFailed = 0;
+  let consecutiveFailed = 0;
 
   const hasMatch = db.prepare('SELECT 1 AS one FROM matches WHERE match_id = ?');
   const insertMatch = db.prepare(
@@ -160,12 +152,9 @@ export async function ingestMatches(
     let cursor = options.reset ? null : readCursor(db, key);
 
     if (cursor && windowWidened(cursor.sincePatch, sincePatch)) {
-      // A wider window may include older patch-rejected matches outside the
-      // incremental listing, so relist the player's full history.
       const ids = await listMatchIds(client, platform, player.puuid, queueId, perPlayer);
       cursor = newCursor(ids, cursor.lastGameCreation, sincePatch);
     } else if (cursor?.status === 'done') {
-      // Incremental refresh: only ids newer than the last seen game creation.
       const newIds = await listMatchIds(
         client,
         platform,
@@ -193,7 +182,6 @@ export async function ingestMatches(
       cursor = newCursor(ids, 0, sincePatch);
     }
 
-    // `base` carries counts persisted by earlier runs; `run` counts this run only.
     const base = {
       stored: cursor.stored,
       duplicates: cursor.duplicates,
@@ -202,57 +190,98 @@ export async function ingestMatches(
     };
     const run = { stored: 0, duplicates: 0, filtered: 0, invalid: 0 };
     let lastGameCreation = cursor.lastGameCreation;
+    let playerFailed = false;
 
     for (let i = cursor.processed; i < cursor.snapshot.length; i += 1) {
       const matchId = cursor.snapshot[i] as string;
-      let outcome: 'stored' | 'duplicate' | 'filtered' | 'invalid';
+      let outcome: 'stored' | 'duplicate' | 'filtered' | 'invalid' = 'filtered';
 
-      if (findRejection(db, matchId, sincePatch)) {
-        outcome = 'filtered';
-      } else if ((hasMatch.get(matchId) as { one: number } | undefined) !== undefined) {
-        outcome = 'duplicate';
-      } else {
-        const raw = await client.getMatch(platform, matchId);
-        const parsed = riotMatchDtoSchema.safeParse(raw);
-        if (!parsed.success) {
-          // The client returns the raw payload on schema mismatch; revalidation
-          // here keeps malformed matches out of the database.
-          outcome = 'invalid';
-          insertReject.run({
-            match_id: matchId,
-            reason: 'invalid',
-            patch: null,
-            checked_at: Date.now(),
-          });
+      try {
+        if (findRejection(db, matchId, sincePatch)) {
+          outcome = 'filtered';
+        } else if ((hasMatch.get(matchId) as { one: number } | undefined) !== undefined) {
+          outcome = 'duplicate';
         } else {
-          const evaluated = evaluateMatch(parsed.data, queueId, minDuration, sincePatch);
+          const raw = await client.getMatch(platform, matchId);
+          const evaluated = evaluateMatch(raw, queueId, minDuration, sincePatch);
           outcome = evaluated.outcome;
           if (evaluated.reason === null) {
-            lastGameCreation = Math.max(lastGameCreation, parsed.data.info.gameCreation);
-            const rank = rankSummary(db, parsed.data.metadata.participants, player.rank_score);
-            const change = insertMatch.run({
-              match_id: matchId,
-              platform,
-              patch: patchFromGameVersion(parsed.data.info.gameVersion),
-              queue_id: parsed.data.info.queueId,
-              duration: parsed.data.info.gameDuration,
-              created_at: parsed.data.info.gameCreation,
-              avg_rank_score: rank.avg,
-              rank_known_count: rank.known,
+            lastGameCreation = Math.max(lastGameCreation, raw.info.gameCreation);
+            const rank = rankSummary(db, raw.metadata.participants, player.rank_score);
+            const persist = db.transaction(() => {
+              const change = insertMatch.run({
+                match_id: matchId,
+                platform,
+                patch: patchFromGameVersion(raw.info.gameVersion),
+                queue_id: raw.info.queueId,
+                duration: raw.info.gameDuration,
+                created_at: raw.info.gameCreation,
+                avg_rank_score: rank.avg,
+                rank_known_count: rank.known,
+              });
+              if (change.changes === 0) {
+                outcome = 'duplicate';
+              }
+              cursor.processed = i + 1;
+              cursor.stored = base.stored + run.stored + (outcome === 'stored' ? 1 : 0);
+              cursor.duplicates = base.duplicates + run.duplicates + (outcome === 'duplicate' ? 1 : 0);
+              cursor.filtered = base.filtered + run.filtered + (outcome === 'filtered' ? 1 : 0);
+              cursor.invalid = base.invalid + run.invalid + (outcome === 'invalid' ? 1 : 0);
+              cursor.lastGameCreation = lastGameCreation;
+              cursor.updatedAt = Date.now();
+              writeCursor(db, key, cursor);
             });
-            if (change.changes === 0) outcome = 'duplicate';
+            persist();
+            if (outcome === 'duplicate') {
+              run.duplicates += 1;
+            } else {
+              run.stored += 1;
+            }
           } else {
-            insertReject.run({
-              match_id: matchId,
-              reason: evaluated.reason,
-              patch:
-                evaluated.reason === 'patch'
-                  ? patchFromGameVersion(parsed.data.info.gameVersion)
-                  : null,
-              checked_at: Date.now(),
+            const persist = db.transaction(() => {
+              insertReject.run({
+                match_id: matchId,
+                reason: evaluated.reason,
+                patch: evaluated.reason === 'patch' ? patchFromGameVersion(raw.info.gameVersion) : null,
+                checked_at: Date.now(),
+              });
+              cursor.processed = i + 1;
+              cursor.filtered = base.filtered + run.filtered + 1;
+              cursor.invalid = base.invalid + run.invalid;
+              cursor.lastGameCreation = lastGameCreation;
+              cursor.updatedAt = Date.now();
+              writeCursor(db, key, cursor);
             });
+            persist();
+            run.filtered += 1;
           }
         }
+      } catch (error) {
+        if (error instanceof RiotAuthError) {
+          throw error;
+        }
+        if (error instanceof RiotSchemaError || (error instanceof RiotApiError && [400, 404].includes(error.status))) {
+          const persist = db.transaction(() => {
+            insertReject.run({
+              match_id: matchId,
+              reason: 'invalid',
+              patch: null,
+              checked_at: Date.now(),
+            });
+            cursor.processed = i + 1;
+            cursor.invalid = base.invalid + run.invalid + 1;
+            cursor.updatedAt = Date.now();
+            writeCursor(db, key, cursor);
+          });
+          persist();
+          run.invalid += 1;
+          continue;
+        }
+        if (isTransientMatchError(error)) {
+          playerFailed = true;
+          break;
+        }
+        throw error;
       }
 
       run[outcome === 'duplicate' ? 'duplicates' : outcome] += 1;
@@ -263,9 +292,32 @@ export async function ingestMatches(
       cursor.invalid = base.invalid + run.invalid;
       cursor.lastGameCreation = lastGameCreation;
       cursor.updatedAt = Date.now();
-      writeCursor(db, key, cursor);
+      const persistCursor = db.transaction(() => {
+        writeCursor(db, key, cursor);
+      });
+      persistCursor();
     }
 
+    if (playerFailed) {
+      playersFailed += 1;
+      consecutiveFailed += 1;
+      playerResults.push({
+        puuid: player.puuid,
+        status: 'failed',
+        listed: cursor.snapshot.length,
+        stored: run.stored,
+        duplicates: run.duplicates,
+        filtered: run.filtered,
+        invalid: run.invalid,
+      });
+      log(`[${index + 1}/${players.length}] ${player.puuid.slice(0, 12)}… transient failure (player failed)`);
+      if (consecutiveFailed >= 3) {
+        break;
+      }
+      continue;
+    }
+
+    consecutiveFailed = 0;
     cursor.status = 'done';
     cursor.updatedAt = Date.now();
     writeCursor(db, key, cursor);
@@ -300,7 +352,7 @@ export async function ingestMatches(
   log(
     `Ingestion complete: ${players.length - playersSkipped}/${players.length} players, ` +
       `${totals.stored} stored, ${totals.duplicates} duplicates, ${totals.filtered} filtered, ` +
-      `${totals.invalid} invalid.`,
+      `${totals.invalid} invalid; failed=${playersFailed}.`,
   );
 
   return {
@@ -308,6 +360,7 @@ export async function ingestMatches(
     sincePatch,
     playersProcessed: players.length - playersSkipped,
     playersSkipped,
+    playersFailed,
     ...totals,
     playerResults,
   };

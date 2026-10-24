@@ -2,14 +2,7 @@ import type Database from 'better-sqlite3';
 
 import { RiotClient, type Platform, type RiotLeagueEntry } from './riot';
 
-export const DEFAULT_PLAYER_TIER_SEQUENCE = [
-  'EMERALD',
-  'DIAMOND',
-  'MASTER',
-  'GRANDMASTER',
-  'CHALLENGER',
-] as const;
-
+export const DEFAULT_PLAYER_TIER_SEQUENCE = ['EMERALD', 'DIAMOND', 'MASTER', 'GRANDMASTER', 'CHALLENGER'] as const;
 export const DEFAULT_PLAYER_QUOTAS: Readonly<Record<string, number>> = {
   EMERALD: 250,
   DIAMOND: 250,
@@ -17,6 +10,7 @@ export const DEFAULT_PLAYER_QUOTAS: Readonly<Record<string, number>> = {
   GRANDMASTER: 100,
   CHALLENGER: 100,
 } as const;
+export const DEFAULT_MAX_AGE_DAYS = 7;
 
 const DIVISION_ORDER = ['I', 'II', 'III', 'IV'] as const;
 const TIER_BASE_SCORE: Readonly<Record<string, number>> = {
@@ -40,6 +34,7 @@ export interface PlayerDiscoveryOptions {
   db?: Database.Database;
   client?: RiotClient;
   reset?: boolean;
+  maxAgeDays?: number;
 }
 
 export interface TierDiscoveryResult {
@@ -93,7 +88,7 @@ function toPlayerRow(
   updated_at: number;
 } {
   const division = (entry.rank ?? 'I').toUpperCase();
-  const puuid = entry.puuid as string; // callers filter entries without puuid
+  const puuid = entry.puuid as string;
 
   return {
     puuid,
@@ -111,8 +106,9 @@ async function getTierEntries(
   platform: Platform,
   tier: string,
   quota: number,
-): Promise<RiotLeagueEntry[]> {
+): Promise<{ entries: RiotLeagueEntry[]; pageCount: number }> {
   const normalizedTier = tier.toUpperCase();
+  let pageCount = 0;
 
   if (['MASTER', 'GRANDMASTER', 'CHALLENGER'].includes(normalizedTier)) {
     const league =
@@ -121,8 +117,7 @@ async function getTierEntries(
         : normalizedTier === 'GRANDMASTER'
           ? await client.getGrandmasterLeague(platform)
           : await client.getChallengerLeague(platform);
-
-    return (league.entries ?? [])
+    const entries = (league.entries ?? [])
       .filter((entry) => typeof entry.puuid === 'string')
       .sort((a, b) => b.leaguePoints - a.leaguePoints)
       .slice(0, quota)
@@ -141,15 +136,16 @@ async function getTierEntries(
         freshBlood: typeof entry.freshBlood === 'boolean' ? entry.freshBlood : undefined,
         hotStreak: typeof entry.hotStreak === 'boolean' ? entry.hotStreak : undefined,
       }));
+    return { entries, pageCount: 1 };
   }
 
-  // Spread the quota evenly over divisions (avoids a "Division I only" bias) and stop paging once reached.
   const perDivision = Math.ceil(quota / DIVISION_ORDER.length);
   const entries: RiotLeagueEntry[] = [];
   for (const division of DIVISION_ORDER) {
     const seen = new Set<string>();
     let page = 1;
     while (seen.size < perDivision) {
+      pageCount += 1;
       const pageEntries = await client.getLeagueEntries(
         platform,
         'RANKED_SOLO_5x5',
@@ -162,7 +158,6 @@ async function getTierEntries(
         if (e.puuid && !seen.has(e.puuid)) {
           seen.add(e.puuid);
           entries.push(e);
-          if (seen.size >= perDivision) break;
         }
       }
       if (pageEntries.length < 100) break;
@@ -170,7 +165,10 @@ async function getTierEntries(
     }
   }
 
-  return entries;
+  return {
+    entries: entries.filter((entry) => typeof entry.puuid === 'string').slice(0, quota),
+    pageCount,
+  };
 }
 
 function readProgress(db: Database.Database, key: string): string | null {
@@ -192,18 +190,13 @@ export async function discoverPlayersByTier(
 ): Promise<PlayerDiscoveryResult> {
   const platform = options.platform ?? 'euw1';
   const tiers = normalizeTierList(options.tiers);
-  const quotas = {
-    ...DEFAULT_PLAYER_QUOTAS,
-    ...options.quotas,
-  };
+  const quotas = { ...DEFAULT_PLAYER_QUOTAS, ...options.quotas };
   const client = options.client ?? new RiotClient({ autoLoadEnv: true });
+  const maxAgeDays = options.maxAgeDays ?? DEFAULT_MAX_AGE_DAYS;
+  const maxAgeMs = maxAgeDays * 24 * 60 * 60 * 1000;
 
-  const db =
-    options.db ??
-    (await import('./db')).openDb(process.env.DRAFTORB_DB_PATH ?? 'data/DraftOrb.sqlite');
-
-  const { migrate } = await import('./db');
-  migrate(db); // idempotent
+  const db = options.db ?? openDb(resolveDbPath());
+  migrate(db);
 
   const tierResults: TierDiscoveryResult[] = [];
   let totalFetched = 0;
@@ -227,13 +220,14 @@ export async function discoverPlayersByTier(
     if (!options.reset) {
       const progress = readProgress(db, stateKey);
       if (progress) {
-        let parsed: { completed?: boolean } = {};
+        let parsed: { completed?: boolean; updatedAt?: number; status?: string } = {};
         try {
-          parsed = JSON.parse(progress) as { completed?: boolean };
+          parsed = JSON.parse(progress) as { completed?: boolean; updatedAt?: number; status?: string };
         } catch {
           /* corrupted state: redo this tier */
         }
-        if (parsed.completed) {
+        const recent = typeof parsed.updatedAt === 'number' && Date.now() - parsed.updatedAt <= maxAgeMs;
+        if (parsed.completed === true && recent) {
           tierResults.push({
             tier: normalizedTier,
             pageCount: 0,
@@ -246,7 +240,7 @@ export async function discoverPlayersByTier(
       }
     }
 
-    const entries = await getTierEntries(client, platform, normalizedTier, quota);
+    const { entries, pageCount } = await getTierEntries(client, platform, normalizedTier, quota);
     const rankedEntries = entries
       .filter((entry) => (entry.tier ?? '').toUpperCase() === normalizedTier)
       .slice(0, quota)
@@ -269,6 +263,7 @@ export async function discoverPlayersByTier(
       return list.length;
     });
     const stored = storeAll(rankedEntries);
+    const completed = rankedEntries.length >= quota || pageCount > 0;
 
     totalFetched += rankedEntries.length;
     totalStored += stored;
@@ -276,19 +271,21 @@ export async function discoverPlayersByTier(
       db,
       stateKey,
       JSON.stringify({
-        completed: true,
+        completed,
+        status: completed ? 'complete' : 'partial',
         fetched: rankedEntries.length,
         stored,
         updatedAt: Date.now(),
+        pageCount,
       }),
     );
 
     tierResults.push({
       tier: normalizedTier,
-      pageCount: 1,
+      pageCount,
       fetched: rankedEntries.length,
       stored,
-      status: rankedEntries.length < quota ? 'partial' : 'complete',
+      status: completed ? 'complete' : 'partial',
     });
   }
 

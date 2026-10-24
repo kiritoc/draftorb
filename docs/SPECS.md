@@ -107,7 +107,7 @@ DraftResult {
   insufficientData: { championId, nEff: number, rawGames: number }[]  // baseline n_eff < minGames (§5), unscored
 }
 ```
-Sorted desc. Always show why + sample sizes. Never show a % without sample size. `DraftResult.insufficientData` is a new shared schema to add with the scoring engine tickets; `recommendationSchema` itself is unchanged.
+Sorted desc. Always show why + sample sizes. Never show a % without sample size. Reason type `lane` and `DraftResult.insufficientData` are added to the shared schemas by T-002.b.
 
 ## 8. Runes & Items
 

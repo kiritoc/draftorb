@@ -8,8 +8,8 @@
 ## Epic status
 | Epic | Status | Notes |
 |---|---|---|
-| E0 Foundations | DONE | T-001..T-004 DONE |
-| E1 ETL | DONE | T-010..T-013 DONE; T-014 ready |
+| E0 Foundations | IN PROGRESS | T-001..T-004 DONE; T-002.b TODO |
+| E1 ETL | IN PROGRESS | T-010..T-013 DONE; T-011.b TODO, then T-014 ready |
 | E2 Engine | NOT STARTED | Ready to start T-020 |
 | E3 Web MVP | NOT STARTED | |
 | E4 Runes | NOT STARTED | |
@@ -23,7 +23,7 @@
 - Last aggregation: -
 
 ## Next recommended ticket
-T-014 (Participant extraction)
+T-011.b (Migration 004) and T-002.b (Shared schema parity for D-020..D-023), then T-014 (Participant extraction)
 
 ## Open questions for the owner
 - None.

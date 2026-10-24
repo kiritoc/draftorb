@@ -54,7 +54,7 @@ pairSum  = sum over known slots s of                                        // l
 x       += s * pairSum                                      // s = global pair scale (config, default 1.0, fit by T-027.a)
 if the enemy lane-group champions of laneGroup(myRole) are known:             // layer 2
   x += conf_lane * laneTerm(lane_vs[c, laneGroup(myRole).enemies], q = sigmoid(x))
-if the ally lane-group partners are also known:                               // layer 3
+if laneGroup(myRole).allies is non-empty and known:                           // layer 3 (skipped for 1v1 lane groups like TOP/MID, where lane_full would duplicate lane_vs)
   x += conf_lane * laneTerm(lane_full[c, laneGroup(myRole).allies, laneGroup(myRole).enemies], q = sigmoid(x))
 x += W_comp  * compNeed(c, allies, enemies)
 x += W_blind * blindSafety(c)                               // only if blindPick or few enemies known

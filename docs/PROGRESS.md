@@ -49,6 +49,19 @@ T-011.b (Migration 004) and T-002.b (Shared schema parity for D-020..D-023), the
 - Pitfalls / notes for next AI:
 ```
 
+### 2026-10-24 — Devin — PR A: tooling baseline
+
+- Done:
+  - Added `.prettierignore` (lockfile, `data/`, test fixtures, build output) and applied Prettier to the whole repo in a dedicated `style: apply prettier` commit.
+  - Added root script `pnpm check` (typecheck, lint, format check, tests).
+  - Added `.github/workflows/ci.yml`: push + pull_request, matrix `ubuntu-latest` / `windows-latest`, Node 22, pnpm from `packageManager`, `pnpm install --frozen-lockfile && pnpm check`. No secrets; tests never touch the network.
+- Files touched: `.prettierignore`, `package.json`, `.github/workflows/ci.yml`, `docs/SETUP.md`, `docs/PROGRESS.md` (+ formatting-only changes from Prettier).
+- Tests: `pnpm check` — all green (9 files, 83 tests).
+- State left: REVIEW
+- Next step: PR B (ETL robustness).
+- Pitfalls / notes for next AI:
+  - `pnpm format` is now safe repo-wide (the lockfile and generated data are ignored); `pnpm format:check` is enforced in CI.
+
 ### 2026-10-24 — Devin — Review fixes for D-020..D-023
 
 - Done: applied the owner review to the docs PR. Experts reworked (in-data games primary, mastery fallback only for the recommended role, one cached call per (puuid, champion) pair; `participants.mastery_points`/`is_expert`); contract-parity tickets T-002.b (role-keyed zod schemas, `DraftResult.insufficientData{nEff,rawGames}`, `lane` reason, schemaVersion) and T-011.b (migration 004) with dependency rewiring; D-023 gate replaced by a paired-bootstrap-by-match test on a frozen holdout with rolling validation, T-027 split into T-027.a/T-027.b; model made role-generic (`laneGroup`, validation rules, `contextSlots`); exports role-keyed (`roles/<ROLE>/...`, `exportMinGames`); scale `s`, equivalent counts, reason ordering, single item phase rule; glossary + limitations updated.

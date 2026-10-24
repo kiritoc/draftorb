@@ -14,6 +14,7 @@ git clone <repo> && cd DraftOrb
 pnpm install
 copy .env.example .env      # then edit RIOT_API_KEY
 pnpm test
+pnpm check                   # typecheck + lint + format check + tests (what CI runs)
 pnpm dev
 ```
 

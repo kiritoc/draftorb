@@ -8,16 +8,16 @@
 
 ## Epic status
 
-| Epic           | Status      | Notes                                            |
-| -------------- | ----------- | ------------------------------------------------ |
-| E0 Foundations | IN PROGRESS | T-001..T-004 DONE; T-002.b TODO                  |
+| Epic           | Status      | Notes                                                     |
+| -------------- | ----------- | --------------------------------------------------------- |
+| E0 Foundations | IN PROGRESS | T-001..T-004 DONE; T-002.b TODO                           |
 | E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-013.b, T-013.c DONE; T-014 ready |
-| E2 Engine      | NOT STARTED | Ready to start T-020                             |
-| E3 Web MVP     | NOT STARTED |                                                  |
-| E4 Runes       | NOT STARTED |                                                  |
-| E5 Items       | NOT STARTED |                                                  |
-| E6 Live        | NOT STARTED |                                                  |
-| E7 Vision      | NOT STARTED |                                                  |
+| E2 Engine      | NOT STARTED | Ready to start T-020                                      |
+| E3 Web MVP     | NOT STARTED |                                                           |
+| E4 Runes       | NOT STARTED |                                                           |
+| E5 Items       | NOT STARTED |                                                           |
+| E6 Live        | NOT STARTED |                                                           |
+| E7 Vision      | NOT STARTED |                                                           |
 
 ## Data collection status
 

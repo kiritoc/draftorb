@@ -1,305 +1,399 @@
 import type Database from 'better-sqlite3';
 
-import { RiotClient, type Platform, type RiotLeagueEntry } from './riot';
+import { RiotClient, RiotApiError, RiotAuthError, RiotSchemaError, type Platform } from './riot';
+import { resolveDbPath } from './config/paths';
+import { openDb, migrate } from './db';
+import {
+  clearIngestState,
+  cursorKey,
+  evaluateMatch,
+  findRejection,
+  listMatchIds,
+  patchFromGameVersion,
+  rankSummary,
+  readCursor,
+  windowWidened,
+  writeCursor,
+  type PlayerCursor,
+} from './matches-store';
 
-export const DEFAULT_PLAYER_TIER_SEQUENCE = ['EMERALD', 'DIAMOND', 'MASTER', 'GRANDMASTER', 'CHALLENGER'] as const;
-export const DEFAULT_PLAYER_QUOTAS: Readonly<Record<string, number>> = {
-  EMERALD: 250,
-  DIAMOND: 250,
-  MASTER: 150,
-  GRANDMASTER: 100,
-  CHALLENGER: 100,
-} as const;
-export const DEFAULT_MAX_AGE_DAYS = 7;
+export const RANKED_SOLO_QUEUE_ID = 420;
+export const DEFAULT_MATCHES_PER_PLAYER = 20;
+export const DEFAULT_MIN_DURATION_SECONDS = 15 * 60;
 
-const DIVISION_ORDER = ['I', 'II', 'III', 'IV'] as const;
-const TIER_BASE_SCORE: Readonly<Record<string, number>> = {
-  IRON: 0,
-  BRONZE: 1,
-  SILVER: 2,
-  GOLD: 3,
-  PLATINUM: 4,
-  EMERALD: 5,
-  DIAMOND: 6,
-  MASTER: 7,
-  GRANDMASTER: 8,
-  CHALLENGER: 9,
-};
-const APEX_TIERS = new Set(['MASTER', 'GRANDMASTER', 'CHALLENGER']);
-
-export interface PlayerDiscoveryOptions {
+export interface MatchIngestionOptions {
   platform?: Platform;
-  tiers?: readonly string[];
-  quotas?: Partial<Record<string, number>>;
+  sincePatch?: string;
+  matchesPerPlayer?: number;
+  playerLimit?: number;
+  queueId?: number;
+  minDurationSeconds?: number;
   db?: Database.Database;
   client?: RiotClient;
   reset?: boolean;
-  maxAgeDays?: number;
+  onProgress?: (message: string) => void;
 }
 
-export interface TierDiscoveryResult {
-  tier: string;
-  pageCount: number;
-  fetched: number;
-  stored: number;
-  status: 'skipped' | 'partial' | 'complete';
-}
-
-export interface PlayerDiscoveryResult {
-  platform: Platform;
-  tiers: string[];
-  totalFetched: number;
-  totalStored: number;
-  tierResults: TierDiscoveryResult[];
-}
-
-function normalizeTierList(tiers?: readonly string[]): string[] {
-  if (!tiers || tiers.length === 0) {
-    return [...DEFAULT_PLAYER_TIER_SEQUENCE];
-  }
-
-  return [...new Set(tiers.map((tier) => tier.toUpperCase()))];
-}
-
-export function playerRankScore(tier: string, division?: string): number {
-  const normalizedTier = tier.toUpperCase();
-  const base = TIER_BASE_SCORE[normalizedTier] ?? 0;
-  const normalizedDivision = division?.toUpperCase();
-  const divisionIndex = normalizedDivision
-    ? DIVISION_ORDER.findIndex((label) => label === normalizedDivision)
-    : -1;
-  const isApex = APEX_TIERS.has(normalizedTier);
-  const divisionBonus =
-    !isApex && divisionIndex >= 0 ? (DIVISION_ORDER.length - 1 - divisionIndex) * 0.25 : 0;
-  return base + divisionBonus;
-}
-
-function toPlayerRow(
-  entry: RiotLeagueEntry,
-  platform: Platform,
-  tier: string,
-): {
+export interface PlayerIngestionResult {
   puuid: string;
-  platform: string;
-  tier: string;
-  division: string;
-  lp: number;
+  status: 'skipped' | 'done' | 'failed';
+  listed: number;
+  stored: number;
+  duplicates: number;
+  filtered: number;
+  invalid: number;
+}
+
+export interface MatchIngestionResult {
+  platform: Platform;
+  sincePatch?: string;
+  playersProcessed: number;
+  playersSkipped: number;
+  playersFailed: number;
+  listed: number;
+  stored: number;
+  duplicates: number;
+  filtered: number;
+  invalid: number;
+  playerResults: PlayerIngestionResult[];
+}
+
+interface PlayerRow {
+  puuid: string;
   rank_score: number;
-  updated_at: number;
-} {
-  const division = (entry.rank ?? 'I').toUpperCase();
-  const puuid = entry.puuid as string;
-
-  return {
-    puuid,
-    platform,
-    tier: tier.toUpperCase(),
-    division,
-    lp: Number.isFinite(entry.leaguePoints) ? entry.leaguePoints : 0,
-    rank_score: playerRankScore(tier, division),
-    updated_at: Date.now(),
-  };
 }
 
-async function getTierEntries(
-  client: RiotClient,
-  platform: Platform,
-  tier: string,
-  quota: number,
-): Promise<{ entries: RiotLeagueEntry[]; pageCount: number }> {
-  const normalizedTier = tier.toUpperCase();
-  let pageCount = 0;
+const newCursor = (
+  snapshot: string[],
+  lastGameCreation = 0,
+  sincePatch?: string,
+): PlayerCursor => ({
+  status: 'partial',
+  snapshot,
+  processed: 0,
+  lastGameCreation,
+  sincePatch,
+  stored: 0,
+  duplicates: 0,
+  filtered: 0,
+  invalid: 0,
+  updatedAt: 0,
+});
 
-  if (['MASTER', 'GRANDMASTER', 'CHALLENGER'].includes(normalizedTier)) {
-    const league =
-      normalizedTier === 'MASTER'
-        ? await client.getMasterLeague(platform)
-        : normalizedTier === 'GRANDMASTER'
-          ? await client.getGrandmasterLeague(platform)
-          : await client.getChallengerLeague(platform);
-    const entries = (league.entries ?? [])
-      .filter((entry) => typeof entry.puuid === 'string')
-      .sort((a, b) => b.leaguePoints - a.leaguePoints)
-      .slice(0, quota)
-      .map((entry) => ({
-        queueType: 'RANKED_SOLO_5x5',
-        tier: normalizedTier,
-        rank: 'I',
-        leaguePoints: Number.isFinite(entry.leaguePoints) ? entry.leaguePoints : 0,
-        wins: Number.isFinite(entry.wins) ? entry.wins : 0,
-        losses: Number.isFinite(entry.losses) ? entry.losses : 0,
-        puuid: typeof entry.puuid === 'string' ? entry.puuid : undefined,
-        summonerId: typeof entry.summonerId === 'string' ? entry.summonerId : undefined,
-        leagueId: typeof entry.leagueId === 'string' ? entry.leagueId : undefined,
-        veteran: typeof entry.veteran === 'boolean' ? entry.veteran : undefined,
-        inactive: typeof entry.inactive === 'boolean' ? entry.inactive : undefined,
-        freshBlood: typeof entry.freshBlood === 'boolean' ? entry.freshBlood : undefined,
-        hotStreak: typeof entry.hotStreak === 'boolean' ? entry.hotStreak : undefined,
-      }));
-    return { entries, pageCount: 1 };
+function isTransientMatchError(error: unknown): boolean {
+  if (error instanceof RiotAuthError) return false;
+  if (error instanceof RiotSchemaError) return false;
+  if (error instanceof RiotApiError) {
+    if (error.status === 429) return true;
+    if (error.status >= 500) return true;
+    if (error.status === 0) return true;
   }
-
-  const perDivision = Math.ceil(quota / DIVISION_ORDER.length);
-  const entries: RiotLeagueEntry[] = [];
-  for (const division of DIVISION_ORDER) {
-    const seen = new Set<string>();
-    let page = 1;
-    while (seen.size < perDivision) {
-      pageCount += 1;
-      const pageEntries = await client.getLeagueEntries(
-        platform,
-        'RANKED_SOLO_5x5',
-        normalizedTier,
-        division,
-        page,
-      );
-      if (pageEntries.length === 0) break;
-      for (const e of pageEntries) {
-        if (e.puuid && !seen.has(e.puuid)) {
-          seen.add(e.puuid);
-          entries.push(e);
-        }
-      }
-      if (pageEntries.length < 100) break;
-      page += 1;
-    }
-  }
-
-  return {
-    entries: entries.filter((entry) => typeof entry.puuid === 'string').slice(0, quota),
-    pageCount,
-  };
+  return error instanceof Error && /network|timeout|fetch/i.test(error.message);
 }
 
-function readProgress(db: Database.Database, key: string): string | null {
-  const row = db.prepare('SELECT value FROM ingest_state WHERE key = ?').get(key) as
-    { value: string } | undefined;
-
-  return row?.value ?? null;
-}
-
-function writeProgress(db: Database.Database, key: string, value: string): void {
-  db.prepare(
-    `INSERT INTO ingest_state (key, value) VALUES (?, ?)
-     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-  ).run(key, value);
-}
-
-export async function discoverPlayersByTier(
-  options: PlayerDiscoveryOptions = {},
-): Promise<PlayerDiscoveryResult> {
+export async function ingestMatches(
+  options: MatchIngestionOptions = {},
+): Promise<MatchIngestionResult> {
   const platform = options.platform ?? 'euw1';
-  const tiers = normalizeTierList(options.tiers);
-  const quotas = { ...DEFAULT_PLAYER_QUOTAS, ...options.quotas };
-  const client = options.client ?? new RiotClient({ autoLoadEnv: true });
-  const maxAgeDays = options.maxAgeDays ?? DEFAULT_MAX_AGE_DAYS;
-  const maxAgeMs = maxAgeDays * 24 * 60 * 60 * 1000;
+  const queueId = options.queueId ?? RANKED_SOLO_QUEUE_ID;
+  const minDuration = options.minDurationSeconds ?? DEFAULT_MIN_DURATION_SECONDS;
+  const perPlayer = options.matchesPerPlayer ?? DEFAULT_MATCHES_PER_PLAYER;
+  const sincePatch = options.sincePatch;
+  const log = options.onProgress ?? (() => {});
 
+  const client = options.client ?? new RiotClient({ autoLoadEnv: true });
   const db = options.db ?? openDb(resolveDbPath());
   migrate(db);
+  if (options.reset) clearIngestState(db, platform);
 
-  const tierResults: TierDiscoveryResult[] = [];
-  let totalFetched = 0;
-  let totalStored = 0;
+  const allPlayers = db
+    .prepare(
+      'SELECT puuid, rank_score FROM players WHERE platform = ? ORDER BY rank_score DESC, puuid',
+    )
+    .all(platform) as PlayerRow[];
 
-  for (const tier of tiers) {
-    const normalizedTier = tier.toUpperCase();
-    const quota = Math.max(0, quotas[normalizedTier] ?? 0);
-    if (quota <= 0) {
-      tierResults.push({
-        tier: normalizedTier,
-        pageCount: 0,
-        fetched: 0,
-        stored: 0,
-        status: 'skipped',
-      });
-      continue;
+  const done = new Set<string>();
+  if (!options.reset) {
+    for (const player of allPlayers) {
+      if (readCursor(db, cursorKey(platform, player.puuid))?.status === 'done') {
+        done.add(player.puuid);
+      }
     }
+  }
 
-    const stateKey = `player-discovery:${platform}:${normalizedTier}`;
-    if (!options.reset) {
-      const progress = readProgress(db, stateKey);
-      if (progress) {
-        let parsed: { completed?: boolean; updatedAt?: number; status?: string } = {};
-        try {
-          parsed = JSON.parse(progress) as { completed?: boolean; updatedAt?: number; status?: string };
-        } catch {
-          /* corrupted state: redo this tier */
-        }
-        const recent = typeof parsed.updatedAt === 'number' && Date.now() - parsed.updatedAt <= maxAgeMs;
-        if (parsed.completed === true && recent) {
-          tierResults.push({
-            tier: normalizedTier,
-            pageCount: 0,
-            fetched: 0,
-            stored: 0,
+  const ordered = [...allPlayers].sort(
+    (a, b) =>
+      Number(done.has(a.puuid)) - Number(done.has(b.puuid)) ||
+      b.rank_score - a.rank_score ||
+      (a.puuid < b.puuid ? -1 : a.puuid > b.puuid ? 1 : 0),
+  );
+  const players = options.playerLimit !== undefined ? ordered.slice(0, options.playerLimit) : ordered;
+
+  const playerResults: PlayerIngestionResult[] = [];
+  let playersSkipped = 0;
+  let playersFailed = 0;
+  let consecutiveFailed = 0;
+
+  const hasMatch = db.prepare('SELECT 1 AS one FROM matches WHERE match_id = ?');
+  const insertMatch = db.prepare(
+    `INSERT OR IGNORE INTO matches
+       (match_id, platform, patch, queue_id, duration, created_at, avg_rank_score,
+        rank_known_count, fetched_timeline)
+     VALUES (@match_id, @platform, @patch, @queue_id, @duration, @created_at, @avg_rank_score,
+        @rank_known_count, 0)`,
+  );
+  const insertReject = db.prepare(
+    `INSERT OR REPLACE INTO match_rejects (match_id, reason, patch, checked_at)
+     VALUES (@match_id, @reason, @patch, @checked_at)`,
+  );
+
+  for (const [index, player] of players.entries()) {
+    const key = cursorKey(platform, player.puuid);
+    let cursor = options.reset ? null : readCursor(db, key);
+
+    try {
+      if (cursor && windowWidened(cursor.sincePatch, sincePatch)) {
+        const ids = await listMatchIds(client, platform, player.puuid, queueId, perPlayer);
+        cursor = newCursor(ids, cursor.lastGameCreation, sincePatch);
+      } else if (cursor?.status === 'done') {
+        const newIds = await listMatchIds(
+          client,
+          platform,
+          player.puuid,
+          queueId,
+          perPlayer,
+          cursor.lastGameCreation,
+        );
+        if (newIds.length === 0) {
+          playersSkipped += 1;
+          playerResults.push({
+            puuid: player.puuid,
             status: 'skipped',
+            listed: 0,
+            stored: 0,
+            duplicates: 0,
+            filtered: 0,
+            invalid: 0,
           });
           continue;
         }
+        cursor = newCursor(newIds, cursor.lastGameCreation, sincePatch);
+      } else if (!cursor) {
+        const ids = await listMatchIds(client, platform, player.puuid, queueId, perPlayer);
+        cursor = newCursor(ids, 0, sincePatch);
       }
+    } catch (error) {
+      if (error instanceof RiotAuthError) {
+        throw error;
+      }
+      if (isTransientMatchError(error)) {
+        playersFailed += 1;
+        consecutiveFailed += 1;
+        playerResults.push({
+          puuid: player.puuid,
+          status: 'failed',
+          listed: cursor?.snapshot.length ?? 0,
+          stored: 0,
+          duplicates: 0,
+          filtered: 0,
+          invalid: 0,
+        });
+        log(`[${index + 1}/${players.length}] ${player.puuid.slice(0, 12)}… transient failure while listing match ids`);
+        if (consecutiveFailed >= 3) {
+          break;
+        }
+        continue;
+      }
+      throw error;
     }
 
-    const { entries, pageCount } = await getTierEntries(client, platform, normalizedTier, quota);
-    const rankedEntries = entries
-      .filter((entry) => (entry.tier ?? '').toUpperCase() === normalizedTier)
-      .slice(0, quota)
-      .filter((entry) => typeof entry.puuid === 'string' && entry.puuid.length > 0);
+    const base = {
+      stored: cursor.stored,
+      duplicates: cursor.duplicates,
+      filtered: cursor.filtered,
+      invalid: cursor.invalid,
+    };
+    const run = { stored: 0, duplicates: 0, filtered: 0, invalid: 0 };
+    let lastGameCreation = cursor.lastGameCreation;
+    let playerFailed = false;
 
-    const upsert = db.prepare(`
-      INSERT INTO players (puuid, platform, tier, division, lp, rank_score, updated_at)
-      VALUES (@puuid, @platform, @tier, @division, @lp, @rank_score, @updated_at)
-      ON CONFLICT(puuid) DO UPDATE SET
-        platform = excluded.platform,
-        tier = excluded.tier,
-        division = excluded.division,
-        lp = excluded.lp,
-        rank_score = excluded.rank_score,
-        updated_at = excluded.updated_at
-    `);
+    for (let i = cursor.processed; i < cursor.snapshot.length; i += 1) {
+      const matchId = cursor.snapshot[i] as string;
+      let outcome: 'stored' | 'duplicate' | 'filtered' | 'invalid' = 'filtered';
+      let didCountOutcome = false;
 
-    const storeAll = db.transaction((list: RiotLeagueEntry[]) => {
-      for (const entry of list) upsert.run(toPlayerRow(entry, platform, normalizedTier));
-      return list.length;
+      try {
+        if (findRejection(db, matchId, sincePatch)) {
+          outcome = 'filtered';
+        } else if ((hasMatch.get(matchId) as { one: number } | undefined) !== undefined) {
+          outcome = 'duplicate';
+        } else {
+          const raw = await client.getMatch(platform, matchId);
+          const evaluated = evaluateMatch(raw, queueId, minDuration, sincePatch);
+          outcome = evaluated.outcome;
+          if (evaluated.reason === null) {
+            lastGameCreation = Math.max(lastGameCreation, raw.info.gameCreation);
+            const rank = rankSummary(db, raw.metadata.participants, player.rank_score);
+            const persist = db.transaction(() => {
+              const change = insertMatch.run({
+                match_id: matchId,
+                platform,
+                patch: patchFromGameVersion(raw.info.gameVersion),
+                queue_id: raw.info.queueId,
+                duration: raw.info.gameDuration,
+                created_at: raw.info.gameCreation,
+                avg_rank_score: rank.avg,
+                rank_known_count: rank.known,
+              });
+              if (change.changes === 0) {
+                outcome = 'duplicate';
+              }
+              cursor.processed = i + 1;
+              cursor.stored = base.stored + run.stored + (outcome === 'stored' ? 1 : 0);
+              cursor.duplicates = base.duplicates + run.duplicates + (outcome === 'duplicate' ? 1 : 0);
+              cursor.filtered = base.filtered + run.filtered + (outcome === 'filtered' ? 1 : 0);
+              cursor.invalid = base.invalid + run.invalid + (outcome === 'invalid' ? 1 : 0);
+              cursor.lastGameCreation = lastGameCreation;
+              cursor.updatedAt = Date.now();
+              writeCursor(db, key, cursor);
+            });
+            persist();
+            if (outcome === 'duplicate') {
+              run.duplicates += 1;
+            } else {
+              run.stored += 1;
+            }
+            didCountOutcome = true;
+          } else {
+            const persist = db.transaction(() => {
+              insertReject.run({
+                match_id: matchId,
+                reason: evaluated.reason,
+                patch: evaluated.reason === 'patch' ? patchFromGameVersion(raw.info.gameVersion) : null,
+                checked_at: Date.now(),
+              });
+              cursor.processed = i + 1;
+              cursor.filtered = base.filtered + run.filtered + 1;
+              cursor.invalid = base.invalid + run.invalid;
+              cursor.lastGameCreation = lastGameCreation;
+              cursor.updatedAt = Date.now();
+              writeCursor(db, key, cursor);
+            });
+            persist();
+            run.filtered += 1;
+            didCountOutcome = true;
+          }
+        }
+      } catch (error) {
+        if (error instanceof RiotAuthError) {
+          throw error;
+        }
+        if (error instanceof RiotSchemaError || (error instanceof RiotApiError && [400, 404].includes(error.status))) {
+          const persist = db.transaction(() => {
+            insertReject.run({
+              match_id: matchId,
+              reason: 'invalid',
+              patch: null,
+              checked_at: Date.now(),
+            });
+            cursor.processed = i + 1;
+            cursor.invalid = base.invalid + run.invalid + 1;
+            cursor.updatedAt = Date.now();
+            writeCursor(db, key, cursor);
+          });
+          persist();
+          run.invalid += 1;
+          didCountOutcome = true;
+          continue;
+        }
+        if (isTransientMatchError(error)) {
+          playerFailed = true;
+          break;
+        }
+        throw error;
+      }
+
+      if (!didCountOutcome) {
+        run[outcome === 'duplicate' ? 'duplicates' : outcome] += 1;
+      }
+
+      cursor.processed = i + 1;
+      cursor.stored = base.stored + run.stored;
+      cursor.duplicates = base.duplicates + run.duplicates;
+      cursor.filtered = base.filtered + run.filtered;
+      cursor.invalid = base.invalid + run.invalid;
+      cursor.lastGameCreation = lastGameCreation;
+      cursor.updatedAt = Date.now();
+      const persistCursor = db.transaction(() => {
+        writeCursor(db, key, cursor);
+      });
+      persistCursor();
+    }
+
+    if (playerFailed) {
+      playersFailed += 1;
+      consecutiveFailed += 1;
+      playerResults.push({
+        puuid: player.puuid,
+        status: 'failed',
+        listed: cursor.snapshot.length,
+        stored: run.stored,
+        duplicates: run.duplicates,
+        filtered: run.filtered,
+        invalid: run.invalid,
+      });
+      log(`[${index + 1}/${players.length}] ${player.puuid.slice(0, 12)}… transient failure (player failed)`);
+      if (consecutiveFailed >= 3) {
+        break;
+      }
+      continue;
+    }
+
+    consecutiveFailed = 0;
+    cursor.status = 'done';
+    cursor.updatedAt = Date.now();
+    writeCursor(db, key, cursor);
+
+    playerResults.push({
+      puuid: player.puuid,
+      status: 'done',
+      listed: cursor.snapshot.length,
+      stored: run.stored,
+      duplicates: run.duplicates,
+      filtered: run.filtered,
+      invalid: run.invalid,
     });
-    const stored = storeAll(rankedEntries);
-    const completed = rankedEntries.length >= quota || pageCount > 0;
-
-    totalFetched += rankedEntries.length;
-    totalStored += stored;
-    writeProgress(
-      db,
-      stateKey,
-      JSON.stringify({
-        completed,
-        status: completed ? 'complete' : 'partial',
-        fetched: rankedEntries.length,
-        stored,
-        updatedAt: Date.now(),
-        pageCount,
-      }),
+    log(
+      `[${index + 1}/${players.length}] ${player.puuid.slice(0, 12)}… ` +
+        `ids=${cursor.snapshot.length} stored=${run.stored} dup=${run.duplicates} ` +
+        `filtered=${run.filtered} invalid=${run.invalid}`,
     );
-
-    tierResults.push({
-      tier: normalizedTier,
-      pageCount,
-      fetched: rankedEntries.length,
-      stored,
-      status: completed ? 'complete' : 'partial',
-    });
   }
+
+  const totals = playerResults.reduce(
+    (acc, r) => ({
+      listed: acc.listed + r.listed,
+      stored: acc.stored + r.stored,
+      duplicates: acc.duplicates + r.duplicates,
+      filtered: acc.filtered + r.filtered,
+      invalid: acc.invalid + r.invalid,
+    }),
+    { listed: 0, stored: 0, duplicates: 0, filtered: 0, invalid: 0 },
+  );
+
+  log(
+    `Ingestion complete: ${players.length - playersSkipped}/${players.length} players, ` +
+      `${totals.stored} stored, ${totals.duplicates} duplicates, ${totals.filtered} filtered, ` +
+      `${totals.invalid} invalid; failed=${playersFailed}.`,
+  );
 
   return {
     platform,
-    tiers,
-    totalFetched,
-    totalStored,
-    tierResults,
+    sincePatch,
+    playersProcessed: players.length - playersSkipped,
+    playersSkipped,
+    playersFailed,
+    ...totals,
+    playerResults,
   };
-}
-
-export async function runPlayerDiscovery(
-  options: PlayerDiscoveryOptions = {},
-): Promise<PlayerDiscoveryResult> {
-  return discoverPlayersByTier(options);
 }

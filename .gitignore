@@ -5,6 +5,10 @@ node_modules
 coverage
 .vite
 .env
+.env.local
+.env.*
+!.env.example
+
 *.log
 
 **/data/*.sqlite*

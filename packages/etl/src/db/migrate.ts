@@ -85,9 +85,10 @@ export function openDb(dbPath: string): Database.Database {
 export function migrate(db: Database.Database): string[] {
   ensureMigrationsTable(db);
   const migrations = getMigrations();
-  const appliedRows = db
-    .prepare('SELECT version, checksum FROM _migrations')
-    .all() as { version: string; checksum: string | null }[];
+  const appliedRows = db.prepare('SELECT version, checksum FROM _migrations').all() as {
+    version: string;
+    checksum: string | null;
+  }[];
   const appliedByVersion = new Map(appliedRows.map((row) => [row.version, row]));
   const backfillChecksum = db.prepare(
     'UPDATE _migrations SET checksum = ? WHERE version = ? AND checksum IS NULL',
@@ -117,9 +118,7 @@ export function migrate(db: Database.Database): string[] {
     }
 
     db.exec(migration.sql);
-    db.prepare(
-      'INSERT INTO _migrations (version, applied_at, checksum) VALUES (?, ?, ?)',
-    ).run(
+    db.prepare('INSERT INTO _migrations (version, applied_at, checksum) VALUES (?, ?, ?)').run(
       migration.version,
       Date.now(),
       migration.checksum,

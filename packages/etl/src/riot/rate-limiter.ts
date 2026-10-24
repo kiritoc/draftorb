@@ -60,7 +60,8 @@ export class RiotRateLimiter {
   constructor(options: RateLimiterOptions = {}) {
     this.appLimits = options.appLimits ? [...options.appLimits] : [...DEFAULT_APP_LIMITS];
     this.now = options.now ?? (() => Date.now());
-    this.sleep = options.sleep ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
+    this.sleep =
+      options.sleep ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
   }
 
   /**
@@ -182,7 +183,10 @@ export class RiotRateLimiter {
       }
 
       // 2. Check app limits
-      waitMs = Math.max(waitMs, this.calculateWaitMs(this.appTimestamps, this.appLimits, currentTime));
+      waitMs = Math.max(
+        waitMs,
+        this.calculateWaitMs(this.appTimestamps, this.appLimits, currentTime),
+      );
 
       // 3. Check method limits
       if (methodKey) {
@@ -221,7 +225,11 @@ export class RiotRateLimiter {
     if (i > 0) list.splice(0, i);
   }
 
-  private calculateWaitMs(timestamps: number[], windows: RateLimitWindow[], currentTime: number): number {
+  private calculateWaitMs(
+    timestamps: number[],
+    windows: RateLimitWindow[],
+    currentTime: number,
+  ): number {
     let maxWait = 0;
 
     for (const win of windows) {

@@ -1,36 +1,44 @@
 # PROGRESS
 
 ## Current status
+
 - Phase: 1 (Support / Diamond)
 - Current milestone: M0 Foundations (Complete) -> M1 ETL (Complete) -> M2 Engine
 - Last updated: 2026-10-24 by Devin
 
 ## Epic status
-| Epic | Status | Notes |
-|---|---|---|
-| E0 Foundations | IN PROGRESS | T-001..T-004 DONE; T-002.b TODO |
-| E1 ETL | IN PROGRESS | T-010..T-013 DONE; T-011.b TODO, then T-014 ready |
-| E2 Engine | NOT STARTED | Ready to start T-020 |
-| E3 Web MVP | NOT STARTED | |
-| E4 Runes | NOT STARTED | |
-| E5 Items | NOT STARTED | |
-| E6 Live | NOT STARTED | |
-| E7 Vision | NOT STARTED | |
+
+| Epic           | Status      | Notes                                             |
+| -------------- | ----------- | ------------------------------------------------- |
+| E0 Foundations | IN PROGRESS | T-001..T-004 DONE; T-002.b TODO                   |
+| E1 ETL         | IN PROGRESS | T-010..T-013 DONE; T-011.b TODO, then T-014 ready |
+| E2 Engine      | NOT STARTED | Ready to start T-020                              |
+| E3 Web MVP     | NOT STARTED |                                                   |
+| E4 Runes       | NOT STARTED |                                                   |
+| E5 Items       | NOT STARTED |                                                   |
+| E6 Live        | NOT STARTED |                                                   |
+| E7 Vision      | NOT STARTED |                                                   |
 
 ## Data collection status
+
 - Riot key: (valid until ...)
 - Games collected: 0 | Diamond: 0 | Patch: 16.21 (static imported)
 - Last aggregation: -
 
 ## Next recommended ticket
+
 T-011.b (Migration 004) and T-002.b (Shared schema parity for D-020..D-023), then T-014 (Participant extraction)
 
 ## Open questions for the owner
+
 - None.
 
 ---
+
 ## Session log (newest first)
+
 ### Template
+
 ```
 ### YYYY-MM-DD — <AI name/model> — Ticket T-xxx
 - Done:
@@ -42,6 +50,7 @@ T-011.b (Migration 004) and T-002.b (Shared schema parity for D-020..D-023), the
 ```
 
 ### 2026-10-24 — Devin — Review fixes for D-020..D-023
+
 - Done: applied the owner review to the docs PR. Experts reworked (in-data games primary, mastery fallback only for the recommended role, one cached call per (puuid, champion) pair; `participants.mastery_points`/`is_expert`); contract-parity tickets T-002.b (role-keyed zod schemas, `DraftResult.insufficientData{nEff,rawGames}`, `lane` reason, schemaVersion) and T-011.b (migration 004) with dependency rewiring; D-023 gate replaced by a paired-bootstrap-by-match test on a frozen holdout with rolling validation, T-027 split into T-027.a/T-027.b; model made role-generic (`laneGroup`, validation rules, `contextSlots`); exports role-keyed (`roles/<ROLE>/...`, `exportMinGames`); scale `s`, equivalent counts, reason ordering, single item phase rule; glossary + limitations updated.
 - Files touched: `docs/DECISIONS.md`, `docs/SPECS.md`, `docs/DATA_MODEL.md`, `docs/TICKETS.md`, `docs/GLOSSARY.md`, `docs/PROGRESS.md`
 - Tests: none (docs only).
@@ -50,6 +59,7 @@ T-011.b (Migration 004) and T-002.b (Shared schema parity for D-020..D-023), the
 - Pitfalls / notes for next AI: model sections are role-generic on purpose; only SUPPORT is populated/exposed in Phase 1.
 
 ### 2026-10-24 — Devin — Design: ranking model (D-020..D-023)
+
 - Done: docs-only design for "best champion/runes/items from what other players do, weighted by win rate and by how close the game conditions are". Added PROPOSED ADRs D-020 (role-relative influence matrix by phase, all five roles incl. jungle), D-021 (layered back-off with shrinkage in log-odds space, bot-lane `lane_vs`/`lane_2v2` tables, `n_eff`), D-022 (like-for-like item/rune comparison, experts definition), D-023 (temporal-holdout backtest gate). Rewrote SPECS §5 and §8.1/§8.2, extended §3 and §7, updated DATA_MODEL aggregated tables/exports, GLOSSARY, and tickets T-014/16/17/18/20/22/51/56; added T-027 Backtest harness.
 - Files touched: `docs/DECISIONS.md`, `docs/SPECS.md`, `docs/DATA_MODEL.md`, `docs/TICKETS.md`, `docs/GLOSSARY.md`, `docs/PROGRESS.md`
 - Tests: none (docs only).
@@ -58,6 +68,7 @@ T-011.b (Migration 004) and T-002.b (Shared schema parity for D-020..D-023), the
 - Pitfalls / notes for next AI: influence values in SPECS §5 are priors; change them only with a T-027 backtest report.
 
 ### 2026-10-24 — Devin — Ticket T-013 (D-017/D-019 revisions)
+
 - Done:
   - Changed `--since-patch` to a numeric lower-bound window; patch rejects are re-evaluated when included, and cursors relist in full only when the window widens.
   - Stored `rank_known_count` alongside the mean known-participant `avg_rank_score`, with a fallback to the seed player's score when no participants are known.
@@ -81,6 +92,7 @@ T-011.b (Migration 004) and T-002.b (Shared schema parity for D-020..D-023), the
   - Use Node 22 for ETL tests on this VM; Node 20.19.0 segfaults while loading `better-sqlite3`.
 
 ### 2026-10-23 — Devin — Ticket T-013
+
 - Done:
   - Implemented match ingestion in `packages/etl/src/matches.ts` + `matches-store.ts`: per-player ranked solo id listing (queue 420, `type=ranked`, paged by 100), fetch + zod revalidation of every `getMatch` payload (client returns raw on schema mismatch -> counted `invalid`, recorded in `match_rejects`), filters (queue, duration < 15 min, `--since-patch` lower bound), storage in `matches` with `INSERT OR IGNORE`.
   - Resumability: per-player cursor in `ingest_state` (`match-ingest:<platform>:<puuid>`) persists the id snapshot + `processed` after every match, so kill/restart resumes mid-player; `done` cursors list only ids newer than `lastGameCreation` via Riot `startTime` (epoch seconds), and relist in full when the run widens the cursor's patch window (`--since-patch` lowered or removed). Raising the lower bound keeps the incremental `startTime` path. `--reset` wipes the platform's cursors and all `match_rejects`; `--limit` takes pending players before done ones.
@@ -111,6 +123,7 @@ T-011.b (Migration 004) and T-002.b (Shared schema parity for D-020..D-023), the
   - `pnpm format` reformats the whole repo including `pnpm-lock.yaml`; format only touched files instead.
 
 ### 2026-10-23 — Copilot SDK in VS Code — D-016 confirmation
+
 - Done:
   - Accepted the D-016 formula with `rank_score` limited to tier and division; raw LP remains available for exact rank ordering and is not capped or rounded into the score.
   - Updated player score calculation, tests, and the related data-model and specification notes.
@@ -128,6 +141,7 @@ T-011.b (Migration 004) and T-002.b (Shared schema parity for D-020..D-023), the
   - `rank_score` intentionally does not distinguish LP within a division or apex tier; use stored rank fields for exact comparisons.
 
 ### 2026-10-23 — Copilot SDK in VS Code — Review follow-up
+
 - Done:
   - Corrected the initial SQLite schema for optional mastery, item event uniqueness, valid participant roles, and player rank-score indexing.
   - Added regression coverage for item event types sharing a timestamp/item, Riot fetch rejection retries and exhaustion, and pruning expired rate-limit timestamps.
@@ -152,6 +166,7 @@ T-011.b (Migration 004) and T-002.b (Shared schema parity for D-020..D-023), the
   - D-016 is PROPOSED; confirm or revise the formula with the owner before relying on it as an accepted decision.
 
 ### 2026-10-22 — Copilot CLI — Ticket T-012
+
 - Done:
   - Implemented tier-based player discovery in `packages/etl/src/players.ts` with default tier sequence `EMERALD..CHALLENGER`, per-tier quotas, rank score conversion (`tier + division + LP`), resumable `ingest_state` progress, and SQLite upserts for player rows.
   - Exposed player discovery from `packages/etl/src/index.ts` and added CLI support in `packages/etl/src/cli.ts` (`pnpm etl players`, plus `--platform`, `--tiers`, `--quota`, `--reset`).
@@ -172,6 +187,7 @@ T-011.b (Migration 004) and T-002.b (Shared schema parity for D-020..D-023), the
   - The CLI uses quota entries in `EMERALD:250,...` format, but keep the default values in sync with `DEFAULT_PLAYER_QUOTAS`.
 
 ### 2026-10-22 — Antigravity (Gemini 3.8 Flash) — Ticket T-010
+
 - Done:
   - Implemented `RiotRateLimiter` (`packages/etl/src/riot/rate-limiter.ts`) supporting multi-window app limits (20 req/1s, 100 req/120s), method-specific limits, header synchronisation (`X-App-Rate-Limit`, `X-Method-Rate-Limit`, `Retry-After`), and serialized concurrency queue to eliminate race conditions.
   - Implemented `RiotClient` (`packages/etl/src/riot/client.ts`) with automatic 429 `Retry-After` retry, 5xx exponential backoff (max 5 tries), immediate 401/403 abort with explicit message `"key expired?"`, and non-crashing Zod response validation that logs unknown payload shapes.
@@ -211,6 +227,7 @@ T-011.b (Migration 004) and T-002.b (Shared schema parity for D-020..D-023), the
   - `RiotClient` accepts `autoLoadEnv: false` so tests expecting missing API keys do not accidentally re-read `.env` from disk when a local developer key is configured.
 
 ### 2026-10-22 — Gemini — Ticket T-004
+
 - Done:
   - Created `data/manual/champion-tags.json` with 70 champions: all 43 support champions from Data Dragon (100% coverage) plus 27 common and off-meta flex picks.
   - Exported `damageTypeSchema`, `DamageType`, `championRangeSchema`, and `ChampionRange` in `@draftorb/shared`.
@@ -239,6 +256,7 @@ T-011.b (Migration 004) and T-002.b (Shared schema parity for D-020..D-023), the
   - `pnpm validate:tags` enforces 100% coverage of champions tagged with `SUPPORT` in `champions.json`; if any support champion is missing in the future, the validation script exits with code 1.
 
 ### 2026-10-22 — Gemini — Ticket T-003
+
 - Done:
   - Added `championsMapSchema` and `runeTreesSchema` in `@draftorb/shared`.
   - Implemented Data Dragon importer in `packages/etl/src/ddragon.ts` with pure transformers, version patch extractor (`getPatchFromVersion`), tag-to-role mapper (`mapChampionTagsToRoles`), and fetch functions with optional injection for unit testing.
@@ -271,8 +289,8 @@ T-011.b (Migration 004) and T-002.b (Shared schema parity for D-020..D-023), the
   - Data Dragon `runesReforged.json` contains extra fields (`longDesc`); `transformRunes` maps only the fields defined in `runePerkSchema` to comply with `.strict()`.
   - `data/public/<patch>/*.json` files are committed as public assets according to `DATA_MODEL.md`.
 
-
 ### 2026-10-22 — Claude Opus 4.6 (Thinking) — Ticket T-001
+
 - Done: Full monorepo scaffold with pnpm workspaces (shared, engine, etl, web), TypeScript strict config, Vitest, ESLint (flat config), Prettier, Vite + React + Tailwind for web app
 - Files touched:
   - Root: `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `tsconfig.json`, `.gitignore`, `.env.example`, `.prettierrc`, `vitest.config.ts`, `eslint.config.mjs`
@@ -291,6 +309,7 @@ T-011.b (Migration 004) and T-002.b (Shared schema parity for D-020..D-023), the
   - Tailwind v3 is used (v4 was still beta-ish at time of scaffold)
 
 ### 2026-10-22 — Claude Opus 4.6 (Thinking) — Ticket T-002
+
 - Done: Implemented the shared Zod schemas and exported TypeScript types for rank, roles, champion IDs, draft inputs, recommendations, game state, manifest data, and static champion metadata. Added focused tests covering valid and invalid payloads.
 - Files touched:
   - `packages/shared/src/index.ts`
@@ -305,6 +324,7 @@ T-011.b (Migration 004) and T-002.b (Shared schema parity for D-020..D-023), the
   - `DraftInput`/`GameState` are intentionally strict but permissive on optional fields such as `role` and `pool`
 
 ### 2026-10-22 — Session note — Governance review / blocker
+
 - Done: Recorded the blocking semantic bug and the governance drift discovered after T-002.
 - Files touched:
   - `docs/BUGS.md`
@@ -320,6 +340,7 @@ T-011.b (Migration 004) and T-002.b (Shared schema parity for D-020..D-023), the
   - Project governance requires explicit parity checks and bug logs before ticket closure.
 
 ### 2026-10-22 — Gemini — Ticket T-002 remediation & completion
+
 - Done:
   - Fixed semantic bug in `PlayerState.items` (was using `championIdSchema`, now uses `itemIdSchema`).
   - Added missing shared models to achieve full parity with `DATA_MODEL.md`: `itemIdSchema`, `itemSchema`, `itemsMapSchema`, `itemTagsSchema`, `itemTagsMapSchema`, `runePerkSchema`, `runeTreeSchema`, `runePageSchema`, `supportBaselineEntrySchema`, `supportBaselineTableSchema`, `supportPairTableSchema`.
@@ -341,6 +362,7 @@ T-011.b (Migration 004) and T-002.b (Shared schema parity for D-020..D-023), the
   - File length for `packages/shared/src/index.ts` is 291 lines (< 300 lines rule). If adding more schemas, consider modularizing into domain files (e.g. `draft.ts`, `items.ts`, `runes.ts`).
 
 ### 2026-10-22 — Antigravity — Ticket T-011
+
 - Done:
   - Fixed `getMigrationStatus()` in `packages/etl/src/db/migrate.ts` to compute `pending` as the set difference between the migration files on disk and the versions already applied. This avoids negative or incorrect pending counts when a migration was deleted/renamed.
   - Added `missingVersions` reporting so applied migrations absent from the migration directory are surfaced as a deployment anomaly.
@@ -356,6 +378,7 @@ T-011.b (Migration 004) and T-002.b (Shared schema parity for D-020..D-023), the
   - `missingVersions` is intentionally explicit and should be treated as an operational warning, not a normal pending migration.
 
 ### 2026-10-22 — Antigravity — Ticket T-011
+
 - Done:
   - Fixed the SQLite connection setup in `packages/etl/src/db/migrate.ts` to enable `PRAGMA foreign_keys = ON` in `openDb()`, matching the default enforcement expected by SQLite-safe schema work.
   - Documented the review point that `PRAGMA foreign_keys` must be set outside a transaction; if a migration needs to temporarily disable it, that must happen before `BEGIN IMMEDIATE` because SQLite ignores the pragma once a transaction is active.
@@ -373,6 +396,7 @@ T-011.b (Migration 004) and T-002.b (Shared schema parity for D-020..D-023), the
   - A migration that needs to disable `foreign_keys` for table rebuilds must do it before `BEGIN IMMEDIATE`; once inside the transaction, SQLite will ignore the change.
 
 ### 2026-10-22 — GitHub Copilot — Ticket T-011
+
 - Done:
   - Fixed the SQLite migration runner in `packages/etl/src/db/migrate.ts` to avoid masking original errors, avoid unnecessary write locks on already-applied migrations, and centralize migration table creation.
   - Moved `busy_timeout` to `openDb()` so the connection setting is applied consistently.

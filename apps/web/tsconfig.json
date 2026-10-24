@@ -11,8 +11,5 @@
     "rootDir": "."
   },
   "include": ["src", "vite.config.ts", "tailwind.config.ts"],
-  "references": [
-    { "path": "../../packages/shared" },
-    { "path": "../../packages/engine" }
-  ]
+  "references": [{ "path": "../../packages/shared" }, { "path": "../../packages/engine" }]
 }

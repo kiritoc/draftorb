@@ -1,12 +1,14 @@
 # SETUP (Windows, minimal)
 
 ## Prerequisites
+
 1. **Node.js 20 LTS+** (https://nodejs.org) — includes npm.
 2. **pnpm**: in PowerShell `corepack enable` then `corepack prepare pnpm@latest --activate` (or `npm i -g pnpm`).
 3. **Git**.
 4. (Optional) VS Code. No Python, no Java, no Docker, no compiler needed.
 
 ## First run
+
 ```
 git clone <repo> && cd DraftOrb
 pnpm install
@@ -16,10 +18,12 @@ pnpm dev
 ```
 
 ## Riot key
+
 1. Sign in at https://developer.riotgames.com, copy the Development API Key (expires every 24h).
 2. Paste into `.env`. Re-paste daily until a production key is approved.
 
 ## ETL commands (target state — implemented by tickets)
+
 ```
 pnpm etl migrate            # create/upgrade SQLite
 pnpm etl static             # Data Dragon import
@@ -31,6 +35,7 @@ pnpm etl status             # counts and progress
 ```
 
 ## Troubleshooting
+
 - `better-sqlite3` install fails -> make sure Node 20 LTS (prebuilt binaries); log in BUGS.md.
 - 401/403 from Riot -> key expired.
 - 429 -> normal, the client waits; lower concurrency in config if frequent.

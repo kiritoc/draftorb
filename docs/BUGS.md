@@ -1,10 +1,12 @@
 # BUGS
+
 Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATING, FIXED, WONTFIX. Add newest on top of the open list.
 
 ## Open
-| ID | Sev | Area | Title | Status | Found by/date | Ticket |
-|---|---|---|---|---|---|---|
-| – | – | – | – | – | – | – |
+
+| ID  | Sev | Area | Title | Status | Found by/date | Ticket |
+| --- | --- | ---- | ----- | ------ | ------------- | ------ |
+| –   | –   | –    | –     | –      | –             | –      |
 
 No new bugs were identified during the D-016 formula confirmation; player discovery remains within the current ETL scope.
 
@@ -13,6 +15,7 @@ No new bugs were identified during T-013 (match ingestion); rejected match ids a
 No new bugs were identified while revising T-013 patch-window and rank-known-count behavior.
 
 ## Template (copy below the table when detailed)
+
 ```
 ### B-001 — Title
 - Severity / Area (engine|etl|web|desktop|vision|docs)
@@ -25,7 +28,9 @@ No new bugs were identified while revising T-013 patch-window and rank-known-cou
 ```
 
 ## Fixed
+
 ### B-004 — Migration transaction safety & lock hygiene — FIXED
+
 - Severity / Area (engine|etl|web|desktop|vision|docs): S2 / etl
 - Steps to reproduce:
   1. Run `migrate(db)` against a database with multiple migration files.
@@ -41,6 +46,7 @@ No new bugs were identified while revising T-013 patch-window and rank-known-cou
 - Fix (commit/ticket): T-011 — migrated the runner to a `db.transaction()` guard with a single re-check under lock, removed the useless `INSERT OR IGNORE` + `result.changes` pattern, centralized `_migrations` table creation, and moved `busy_timeout` to `openDb()`.
 
 ### B-003 — Migration status incorrectly counted pending versions — FIXED
+
 - Severity / Area (engine|etl|web|desktop|vision|docs): S2 / etl
 - Steps to reproduce:
   1. Apply a migration version to the SQLite `_migrations` table.
@@ -56,6 +62,7 @@ No new bugs were identified while revising T-013 patch-window and rank-known-cou
 - Fix (commit/ticket): T-011 — `getMigrationStatus()` now computes `pending` as the set difference between disk migrations and applied versions, and exposes `missingVersions` for database entries with no corresponding SQL file on disk.
 
 ### B-002 — Incomplete shared schemas vs DATA_MODEL.md contract — FIXED
+
 - Severity / Area (engine|etl|web|desktop|vision|docs): S1 / shared
 - Steps to reproduce:
   1. Compare the exported schemas in `packages/shared/src/index.ts` to the contract in `docs/DATA_MODEL.md`.
@@ -72,6 +79,7 @@ No new bugs were identified while revising T-013 patch-window and rank-known-cou
 - Fix (commit/ticket): T-002 — added schemas and types for `ItemId`, `Item`, `ItemsMap`, `ItemTags`, `ItemTagsMap`, `RuneTree`, `RunePerk`, `RunePage`, `SupportBaselineEntry`, `SupportBaselineTable`, `SupportPairTable`; fixed `PlayerState.items` to use `itemIdSchema`; removed loose `.rest()` from `supportPairEntrySchema`. All 12 unit tests passing.
 
 ### B-001 — Shared schema package validation dependency — FIXED
+
 - Severity / Area: docs|shared
 - Steps to reproduce: install the workspace and attempt to import `zod`-based shared schemas without a dependency declaration.
 - Expected / Actual: valid compile-time schemas and tests should run; actual issue was a missing `zod` dependency in the shared package.

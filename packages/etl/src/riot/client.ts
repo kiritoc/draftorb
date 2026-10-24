@@ -72,7 +72,9 @@ export class RiotClient {
 
     this.apiKey = key;
     this.sleepFn =
-      options.sleepFn ?? options.rateLimiter?.sleep ?? ((ms) => new Promise((res) => setTimeout(res, ms)));
+      options.sleepFn ??
+      options.rateLimiter?.sleep ??
+      ((ms) => new Promise((res) => setTimeout(res, ms)));
     this.rateLimiter =
       options.rateLimiter ??
       new RiotRateLimiter({
@@ -93,11 +95,7 @@ export class RiotClient {
   /**
    * Executes an HTTP request against the Riot API with rate limiting, retries, and schema validation.
    */
-  async request<T>(
-    url: string,
-    schema?: z.ZodType<T>,
-    methodKey?: string,
-  ): Promise<T> {
+  async request<T>(url: string, schema?: z.ZodType<T>, methodKey?: string): Promise<T> {
     let retries5xx = 0;
     let retries429 = 0;
 
@@ -169,7 +167,8 @@ export class RiotClient {
         }
 
         const waitSeconds = headerInfo.retryAfterSeconds ?? 1;
-        const waitMs = Math.max(waitSeconds * 1000, 500) * (headerInfo.retryAfterSeconds ? 1 : retries429); // no Retry-After: linear backoff
+        const waitMs =
+          Math.max(waitSeconds * 1000, 500) * (headerInfo.retryAfterSeconds ? 1 : retries429); // no Retry-After: linear backoff
         await this.sleepFn(waitMs);
         continue;
       }
@@ -232,10 +231,7 @@ export class RiotClient {
     return this.request(url, riotLeagueListSchema, 'league-v4.grandmaster');
   }
 
-  async getMasterLeague(
-    platform: Platform,
-    queue = 'RANKED_SOLO_5x5',
-  ): Promise<RiotLeagueList> {
+  async getMasterLeague(platform: Platform, queue = 'RANKED_SOLO_5x5'): Promise<RiotLeagueList> {
     const url = `https://${platform}.api.riotgames.com/lol/league/v4/masterleagues/by-queue/${queue}`;
     return this.request(url, riotLeagueListSchema, 'league-v4.master');
   }

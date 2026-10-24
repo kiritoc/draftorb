@@ -121,4 +121,3 @@ export class RiotRateLimitError extends RiotApiError {
     this.retryAfterSeconds = retryAfterSeconds;
   }
 }
-

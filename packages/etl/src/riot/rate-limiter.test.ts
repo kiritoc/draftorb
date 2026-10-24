@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  DEFAULT_APP_LIMITS,
-  RiotRateLimiter,
-  parseRateLimitHeader,
-} from './rate-limiter';
+import { DEFAULT_APP_LIMITS, RiotRateLimiter, parseRateLimitHeader } from './rate-limiter';
 
 describe('RiotRateLimiter', () => {
   describe('parseRateLimitHeader', () => {

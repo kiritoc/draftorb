@@ -29,6 +29,37 @@ No new bugs were identified while revising T-013 patch-window and rank-known-cou
 
 ## Fixed
 
+### B-006 — ETL review hardening gaps — FIXED
+
+- Severity / Area (engine|etl|web|desktop|vision|docs): S2 / etl
+- Steps to reproduce:
+  1. Return an error response that echoes a Riot API key.
+  2. Run an ingestion command with a misspelled option, malformed quota, or unsupported CLI platform.
+  3. Call match or player ingestion directly without supplying a database handle.
+- Expected / Actual:
+  - Expected: credentials are redacted, transient per-player listing failures do not block later players, invalid CLI input stops before ingestion, and internally owned SQLite connections close on every exit path.
+  - Actual: untrusted error bodies could retain credentials; CLI validation duplicated the platform list and accepted unknown flags/partial numeric quotas; direct ETL calls retained their database handles.
+- Environment (OS, Node version, patch): macOS, Node 22, review follow-up to T-013.
+- Logs / screenshot: `pnpm check` passed (10 files, 90 tests); CLI smoke tests returned usage exit code 2 for unknown flags, excess positionals, unsupported platforms, and malformed quotas.
+- Suspected cause:
+  - Error serialization, command argument validation, and database ownership were not consistently enforced at their boundaries.
+- Fix (commit/ticket): T-013.b — recursively redact Riot key patterns in error fields, reuse the shared platform list, make ingestion argument parsing strict, validate quotas completely, isolate transient ID-listing failures, and close only internally owned SQLite connections in `finally`. Updated the documented schema-error policy and ignore coverage for raw ETL data.
+
+### B-005 — ETL workspace build regression — FIXED
+
+- Severity / Area (engine|etl|web|desktop|vision|docs): S1 / etl
+- Steps to reproduce:
+  1. Run `pnpm typecheck` on branch B.
+  2. Observe unresolved ETL imports, missing exports, and a CLI import targeting absent `src/cli/main`.
+- Expected / Actual:
+  - Expected: the ETL package typechecks and the CLI starts.
+  - Actual: the Riot client, match ingestion, and player discovery implementations were in the wrong source modules, and the CLI entrypoint targeted a missing module.
+- Environment (OS, Node version, patch): macOS, branch B.
+- Logs / screenshot: `pnpm check` passes after the repair (9 files, 85 tests).
+- Suspected cause:
+  - ETL source files were displaced during the recent refactor; match payloads also needed to be revalidated after the Riot client returned an unrecognized raw payload.
+- Fix (commit/ticket): T-005 — restored the CLI and module placement, fixed relative imports, revalidated match payloads, and kept tier quotas distributed across divisions.
+
 ### B-004 — Migration transaction safety & lock hygiene — FIXED
 
 - Severity / Area (engine|etl|web|desktop|vision|docs): S2 / etl

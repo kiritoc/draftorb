@@ -1,6 +1,8 @@
 import type Database from 'better-sqlite3';
 
 import { RiotClient, type Platform, type RiotLeagueEntry } from './riot';
+import { resolveDbPath } from './config/paths';
+import { migrate, openDb } from './db';
 
 export const DEFAULT_PLAYER_TIER_SEQUENCE = [
   'EMERALD',
@@ -9,7 +11,6 @@ export const DEFAULT_PLAYER_TIER_SEQUENCE = [
   'GRANDMASTER',
   'CHALLENGER',
 ] as const;
-
 export const DEFAULT_PLAYER_QUOTAS: Readonly<Record<string, number>> = {
   EMERALD: 250,
   DIAMOND: 250,
@@ -17,6 +18,7 @@ export const DEFAULT_PLAYER_QUOTAS: Readonly<Record<string, number>> = {
   GRANDMASTER: 100,
   CHALLENGER: 100,
 } as const;
+export const DEFAULT_MAX_AGE_DAYS = 7;
 
 const DIVISION_ORDER = ['I', 'II', 'III', 'IV'] as const;
 const TIER_BASE_SCORE: Readonly<Record<string, number>> = {
@@ -40,6 +42,7 @@ export interface PlayerDiscoveryOptions {
   db?: Database.Database;
   client?: RiotClient;
   reset?: boolean;
+  maxAgeDays?: number;
 }
 
 export interface TierDiscoveryResult {
@@ -93,7 +96,7 @@ function toPlayerRow(
   updated_at: number;
 } {
   const division = (entry.rank ?? 'I').toUpperCase();
-  const puuid = entry.puuid as string; // callers filter entries without puuid
+  const puuid = entry.puuid as string;
 
   return {
     puuid,
@@ -111,8 +114,9 @@ async function getTierEntries(
   platform: Platform,
   tier: string,
   quota: number,
-): Promise<RiotLeagueEntry[]> {
+): Promise<{ entries: RiotLeagueEntry[]; pageCount: number }> {
   const normalizedTier = tier.toUpperCase();
+  let pageCount = 0;
 
   if (['MASTER', 'GRANDMASTER', 'CHALLENGER'].includes(normalizedTier)) {
     const league =
@@ -121,8 +125,7 @@ async function getTierEntries(
         : normalizedTier === 'GRANDMASTER'
           ? await client.getGrandmasterLeague(platform)
           : await client.getChallengerLeague(platform);
-
-    return (league.entries ?? [])
+    const entries = (league.entries ?? [])
       .filter((entry) => typeof entry.puuid === 'string')
       .sort((a, b) => b.leaguePoints - a.leaguePoints)
       .slice(0, quota)
@@ -141,15 +144,17 @@ async function getTierEntries(
         freshBlood: typeof entry.freshBlood === 'boolean' ? entry.freshBlood : undefined,
         hotStreak: typeof entry.hotStreak === 'boolean' ? entry.hotStreak : undefined,
       }));
+    return { entries, pageCount: 1 };
   }
 
-  // Spread the quota evenly over divisions (avoids a "Division I only" bias) and stop paging once reached.
   const perDivision = Math.ceil(quota / DIVISION_ORDER.length);
   const entries: RiotLeagueEntry[] = [];
   for (const division of DIVISION_ORDER) {
     const seen = new Set<string>();
+    const divisionEntries: RiotLeagueEntry[] = [];
     let page = 1;
     while (seen.size < perDivision) {
+      pageCount += 1;
       const pageEntries = await client.getLeagueEntries(
         platform,
         'RANKED_SOLO_5x5',
@@ -161,16 +166,19 @@ async function getTierEntries(
       for (const e of pageEntries) {
         if (e.puuid && !seen.has(e.puuid)) {
           seen.add(e.puuid);
-          entries.push(e);
-          if (seen.size >= perDivision) break;
+          divisionEntries.push(e);
         }
       }
       if (pageEntries.length < 100) break;
       page += 1;
     }
+    entries.push(...divisionEntries.slice(0, perDivision));
   }
 
-  return entries;
+  return {
+    entries: entries.filter((entry) => typeof entry.puuid === 'string').slice(0, quota),
+    pageCount,
+  };
 }
 
 function readProgress(db: Database.Database, key: string): string | null {
@@ -192,67 +200,70 @@ export async function discoverPlayersByTier(
 ): Promise<PlayerDiscoveryResult> {
   const platform = options.platform ?? 'euw1';
   const tiers = normalizeTierList(options.tiers);
-  const quotas = {
-    ...DEFAULT_PLAYER_QUOTAS,
-    ...options.quotas,
-  };
+  const quotas = { ...DEFAULT_PLAYER_QUOTAS, ...options.quotas };
   const client = options.client ?? new RiotClient({ autoLoadEnv: true });
+  const maxAgeDays = options.maxAgeDays ?? DEFAULT_MAX_AGE_DAYS;
+  const maxAgeMs = maxAgeDays * 24 * 60 * 60 * 1000;
 
-  const db =
-    options.db ??
-    (await import('./db')).openDb(process.env.DRAFTORB_DB_PATH ?? 'data/DraftOrb.sqlite');
+  const ownsDb = options.db === undefined;
+  const db = options.db ?? openDb(resolveDbPath());
+  try {
+    migrate(db);
 
-  const { migrate } = await import('./db');
-  migrate(db); // idempotent
+    const tierResults: TierDiscoveryResult[] = [];
+    let totalFetched = 0;
+    let totalStored = 0;
 
-  const tierResults: TierDiscoveryResult[] = [];
-  let totalFetched = 0;
-  let totalStored = 0;
+    for (const tier of tiers) {
+      const normalizedTier = tier.toUpperCase();
+      const quota = Math.max(0, quotas[normalizedTier] ?? 0);
+      if (quota <= 0) {
+        tierResults.push({
+          tier: normalizedTier,
+          pageCount: 0,
+          fetched: 0,
+          stored: 0,
+          status: 'skipped',
+        });
+        continue;
+      }
 
-  for (const tier of tiers) {
-    const normalizedTier = tier.toUpperCase();
-    const quota = Math.max(0, quotas[normalizedTier] ?? 0);
-    if (quota <= 0) {
-      tierResults.push({
-        tier: normalizedTier,
-        pageCount: 0,
-        fetched: 0,
-        stored: 0,
-        status: 'skipped',
-      });
-      continue;
-    }
-
-    const stateKey = `player-discovery:${platform}:${normalizedTier}`;
-    if (!options.reset) {
-      const progress = readProgress(db, stateKey);
-      if (progress) {
-        let parsed: { completed?: boolean } = {};
-        try {
-          parsed = JSON.parse(progress) as { completed?: boolean };
-        } catch {
-          /* corrupted state: redo this tier */
-        }
-        if (parsed.completed) {
-          tierResults.push({
-            tier: normalizedTier,
-            pageCount: 0,
-            fetched: 0,
-            stored: 0,
-            status: 'skipped',
-          });
-          continue;
+      const stateKey = `player-discovery:${platform}:${normalizedTier}`;
+      if (!options.reset) {
+        const progress = readProgress(db, stateKey);
+        if (progress) {
+          let parsed: { completed?: boolean; updatedAt?: number; status?: string } = {};
+          try {
+            parsed = JSON.parse(progress) as {
+              completed?: boolean;
+              updatedAt?: number;
+              status?: string;
+            };
+          } catch {
+            /* corrupted state: redo this tier */
+          }
+          const recent =
+            typeof parsed.updatedAt === 'number' && Date.now() - parsed.updatedAt <= maxAgeMs;
+          if (parsed.completed === true && recent) {
+            tierResults.push({
+              tier: normalizedTier,
+              pageCount: 0,
+              fetched: 0,
+              stored: 0,
+              status: 'skipped',
+            });
+            continue;
+          }
         }
       }
-    }
 
-    const entries = await getTierEntries(client, platform, normalizedTier, quota);
-    const rankedEntries = entries
-      .filter((entry) => (entry.tier ?? '').toUpperCase() === normalizedTier)
-      .slice(0, quota)
-      .filter((entry) => typeof entry.puuid === 'string' && entry.puuid.length > 0);
+      const { entries, pageCount } = await getTierEntries(client, platform, normalizedTier, quota);
+      const rankedEntries = entries
+        .filter((entry) => (entry.tier ?? '').toUpperCase() === normalizedTier)
+        .slice(0, quota)
+        .filter((entry) => typeof entry.puuid === 'string' && entry.puuid.length > 0);
 
-    const upsert = db.prepare(`
+      const upsert = db.prepare(`
       INSERT INTO players (puuid, platform, tier, division, lp, rank_score, updated_at)
       VALUES (@puuid, @platform, @tier, @division, @lp, @rank_score, @updated_at)
       ON CONFLICT(puuid) DO UPDATE SET
@@ -264,41 +275,47 @@ export async function discoverPlayersByTier(
         updated_at = excluded.updated_at
     `);
 
-    const storeAll = db.transaction((list: RiotLeagueEntry[]) => {
-      for (const entry of list) upsert.run(toPlayerRow(entry, platform, normalizedTier));
-      return list.length;
-    });
-    const stored = storeAll(rankedEntries);
+      const storeAll = db.transaction((list: RiotLeagueEntry[]) => {
+        for (const entry of list) upsert.run(toPlayerRow(entry, platform, normalizedTier));
+        return list.length;
+      });
+      const stored = storeAll(rankedEntries);
+      const completed = rankedEntries.length >= quota || pageCount > 0;
 
-    totalFetched += rankedEntries.length;
-    totalStored += stored;
-    writeProgress(
-      db,
-      stateKey,
-      JSON.stringify({
-        completed: true,
+      totalFetched += rankedEntries.length;
+      totalStored += stored;
+      writeProgress(
+        db,
+        stateKey,
+        JSON.stringify({
+          completed,
+          status: completed ? 'complete' : 'partial',
+          fetched: rankedEntries.length,
+          stored,
+          updatedAt: Date.now(),
+          pageCount,
+        }),
+      );
+
+      tierResults.push({
+        tier: normalizedTier,
+        pageCount,
         fetched: rankedEntries.length,
         stored,
-        updatedAt: Date.now(),
-      }),
-    );
+        status: completed ? 'complete' : 'partial',
+      });
+    }
 
-    tierResults.push({
-      tier: normalizedTier,
-      pageCount: 1,
-      fetched: rankedEntries.length,
-      stored,
-      status: rankedEntries.length < quota ? 'partial' : 'complete',
-    });
+    return {
+      platform,
+      tiers,
+      totalFetched,
+      totalStored,
+      tierResults,
+    };
+  } finally {
+    if (ownsDb) db.close();
   }
-
-  return {
-    platform,
-    tiers,
-    totalFetched,
-    totalStored,
-    tierResults,
-  };
 }
 
 export async function runPlayerDiscovery(

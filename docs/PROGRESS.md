@@ -8,16 +8,16 @@
 
 ## Epic status
 
-| Epic           | Status      | Notes                                             |
-| -------------- | ----------- | ------------------------------------------------- |
-| E0 Foundations | IN PROGRESS | T-001..T-004 DONE; T-002.b TODO                   |
-| E1 ETL         | IN PROGRESS | T-010..T-013 DONE; T-011.b TODO, then T-014 ready |
-| E2 Engine      | NOT STARTED | Ready to start T-020                              |
-| E3 Web MVP     | NOT STARTED |                                                   |
-| E4 Runes       | NOT STARTED |                                                   |
-| E5 Items       | NOT STARTED |                                                   |
-| E6 Live        | NOT STARTED |                                                   |
-| E7 Vision      | NOT STARTED |                                                   |
+| Epic           | Status      | Notes                                                         |
+| -------------- | ----------- | ------------------------------------------------------------- |
+| E0 Foundations | IN PROGRESS | T-001..T-004 DONE; T-002.b TODO                               |
+| E1 ETL         | IN PROGRESS | T-010..T-013 and T-013.b DONE; T-011.b TODO, then T-014 ready |
+| E2 Engine      | NOT STARTED | Ready to start T-020                                          |
+| E3 Web MVP     | NOT STARTED |                                                               |
+| E4 Runes       | NOT STARTED |                                                               |
+| E5 Items       | NOT STARTED |                                                               |
+| E6 Live        | NOT STARTED |                                                               |
+| E7 Vision      | NOT STARTED |                                                               |
 
 ## Data collection status
 
@@ -48,6 +48,33 @@ T-011.b (Migration 004) and T-002.b (Shared schema parity for D-020..D-023), the
 - Next step:
 - Pitfalls / notes for next AI:
 ```
+
+### 2026-10-24 — Copilot SDK in VS Code — Ticket T-013.b
+
+- Done:
+  - Redacted Riot API key patterns from error messages, URLs, and recursively serialized response bodies; retained the authentication recovery hint for nonempty 401/403 responses.
+  - Kept transient match-ID listing failures isolated per player and verified that failures leave existing cursors unchanged while sharing the consecutive-failure threshold with match-detail requests.
+  - Reused the shared platform list, made `players` and `matches` argument parsing strict, rejected excess positionals, and required fully valid nonnegative integer quotas.
+  - Closed internally owned SQLite connections in `finally` for direct match ingestion and player discovery calls.
+  - Extended `.gitignore` for raw ETL data, documented the explicit `RiotSchemaError` policy, and confirmed existing Riot client regression coverage for auth, retries, rate limiting, and endpoint fixtures remains in place.
+- Files touched: `.gitignore`, `docs/BUGS.md`, `docs/PROGRESS.md`, `docs/RIOT_API.md`, `docs/TICKETS.md`, `packages/etl/src/cli.ts`, `packages/etl/src/db-ownership.test.ts`, `packages/etl/src/matches.test.ts`, `packages/etl/src/matches.ts`, `packages/etl/src/players.ts`, `packages/etl/src/riot/client.test.ts`, `packages/etl/src/riot/types.ts`
+- Tests: `pnpm check` (10 files, 90 tests passed); CLI smoke tests returned usage exit code 2 for unknown options, extra positionals, unsupported platforms, and malformed quotas; `git check-ignore --no-index -v` confirmed secret, generated, database, and raw-data patterns.
+- State left: DONE
+- Next step: T-011.b and T-002.b, then T-014.
+- Pitfalls / notes for next AI: `.env`, `.env.local`, `.env.*`, `dist/`, and `*.tsbuildinfo` were already ignored on this branch; raw ETL data now has explicit ignore coverage as well.
+
+### 2026-10-24 — Copilot SDK in VS Code — Ticket T-005
+
+- Done:
+  - Restored the ETL CLI entrypoint and placed the Riot client, match ingestion, and player discovery implementations in their correct modules.
+  - Fixed ETL imports, revalidated match payloads before processing, and limited each division's contribution to the player quota.
+  - Restored the complete Riot client regression suite and aligned its schema-mismatch test with the explicit `RiotSchemaError` behavior.
+  - Excluded machine-local `.devin/` settings from repository-wide formatting checks.
+- Files touched: `.prettierignore`, `docs/BUGS.md`, `docs/PROGRESS.md`, `docs/TICKETS.md`, `packages/etl/src/cli.ts`, `packages/etl/src/matches.ts`, `packages/etl/src/players.test.ts`, `packages/etl/src/players.ts`, `packages/etl/src/riot/client.test.ts`, `packages/etl/src/riot/client.ts`
+- Tests: `pnpm check` (9 files, 85 tests passed), `pnpm --filter @draftorb/web build`, and `pnpm etl help` all passed.
+- State left: DONE
+- Next step: T-011.b and T-002.b (both unblocked), then T-014.
+- Pitfalls / notes for next AI: keep the ETL entrypoint and source modules at their current paths; tests import the Riot client and types relative to `src/riot/`.
 
 ### 2026-10-24 — Devin — PR A: tooling baseline
 

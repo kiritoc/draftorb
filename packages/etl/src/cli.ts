@@ -23,7 +23,7 @@ import { importStaticData } from './ddragon';
 import { openDb, migrate, getMigrationStatus } from './db';
 import { ingestMatches } from './matches';
 import { discoverPlayersByTier } from './players';
-import { RiotClient, RiotAuthError } from './riot';
+import { PLATFORMS, RiotClient, RiotAuthError, type Platform } from './riot';
 import { formatCoverageReport, validateChampionTagsFile } from './tags';
 
 // ---------------------------------------------------------------------------
@@ -37,25 +37,6 @@ const EXIT = {
   AUTH: 3,
 } as const;
 
-type Platform = Parameters<RiotClient['getChallengerLeague']>[0];
-
-/**
- * Known Riot platforms. Typed against the client's own `Platform` type, so a typo here
- * is a compile error. Ideally this list is exported by `./riot` and imported here instead.
- */
-const PLATFORMS: readonly Platform[] = [
-  'br1',
-  'eun1',
-  'euw1',
-  'jp1',
-  'kr',
-  'la1',
-  'la2',
-  'na1',
-  'oc1',
-  'tr1',
-  'ru',
-];
 const DEFAULT_PLATFORM: Platform = 'euw1';
 
 const DB_ENV_VAR = 'DRAFTORB_DB_PATH';
@@ -127,10 +108,11 @@ function parsePlatform(value: string | undefined): Platform {
   if (value === undefined) {
     return DEFAULT_PLATFORM;
   }
-  if (!(PLATFORMS as readonly string[]).includes(value)) {
+  const platform = PLATFORMS.find((candidate) => candidate === value);
+  if (!platform) {
     throw new UsageError(`Unknown platform "${value}". Expected one of: ${PLATFORMS.join(', ')}`);
   }
-  return value as Platform;
+  return platform;
 }
 
 function parseVersion(value: string | undefined): string | undefined {
@@ -237,17 +219,29 @@ async function runCheckKey(args: string[]): Promise<void> {
 }
 
 async function runPlayers(args: string[]): Promise<void> {
-  const { values, positionals } = parseArgs({
-    args,
-    allowPositionals: true,
-    strict: false,
-    options: {
-      platform: { type: 'string', short: 'p' },
-      tiers: { type: 'string' },
-      quota: { type: 'string' },
-      reset: { type: 'boolean', default: false },
-    },
-  });
+  let parsed: ReturnType<typeof parseArgs>;
+  try {
+    parsed = parseArgs({
+      args,
+      allowPositionals: true,
+      strict: true,
+      options: {
+        platform: { type: 'string', short: 'p' },
+        tiers: { type: 'string' },
+        quota: { type: 'string' },
+        reset: { type: 'boolean', default: false },
+      },
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new UsageError(
+      `${message}\nUsage: etl players [platform] [--tiers=EMERALD,DIAMOND,...] [--quota=EMERALD:250,...]`,
+    );
+  }
+  const { values, positionals } = parsed;
+  if (positionals.length > 1) {
+    throw new UsageError('Too many positional arguments.\nUsage: etl players [platform]');
+  }
 
   const [platformArg] = positionals;
   const platformValue = typeof values.platform === 'string' ? values.platform : undefined;
@@ -261,23 +255,29 @@ async function runPlayers(args: string[]): Promise<void> {
         .map((tier: string) => tier.trim())
         .filter((tier: string) => tier.length > 0)
     : undefined;
-  const quotas = quotaValue
-    ? Object.fromEntries(
-        quotaValue
-          .split(',')
-          .map((pair: string) => pair.trim())
-          .filter((pair: string) => pair.length > 0)
-          .map((pair: string) => {
-            const [tier, limit] = pair.split(':');
-            if (!tier || limit === undefined) {
-              throw new UsageError(
-                `Invalid quota entry "${pair}". Expected format like "EMERALD:200,DIAMOND:200".`,
-              );
-            }
-            return [tier.toUpperCase(), Number.parseInt(limit, 10)];
-          }),
-      )
-    : undefined;
+  const quotas =
+    quotaValue === undefined
+      ? undefined
+      : Object.fromEntries(
+          quotaValue
+            .split(',')
+            .map((rawPair) => rawPair.trim())
+            .map((pair) => {
+              const [tier, limit, extra] = pair.split(':');
+              if (!tier || limit === undefined || extra !== undefined || !/^\d+$/.test(limit)) {
+                throw new UsageError(
+                  `Invalid quota entry "${pair}". Expected a nonnegative integer in a format like "EMERALD:200,DIAMOND:200".`,
+                );
+              }
+              const quota = Number(limit);
+              if (!Number.isSafeInteger(quota)) {
+                throw new UsageError(
+                  `Invalid quota entry "${pair}". Quotas must be safe nonnegative integers.`,
+                );
+              }
+              return [tier.toUpperCase(), quota];
+            }),
+        );
 
   log.info(`Discovering players for platform "${platform}"...`);
   const dbPath = resolveDbPath();
@@ -303,20 +303,32 @@ async function runPlayers(args: string[]): Promise<void> {
 }
 
 async function runMatches(args: string[]): Promise<void> {
-  const { values, positionals } = parseArgs({
-    args,
-    allowPositionals: true,
-    strict: false,
-    options: {
-      platform: { type: 'string', short: 'p' },
-      'since-patch': { type: 'string' },
-      'per-player': { type: 'string' },
-      limit: { type: 'string' },
-      queue: { type: 'string' },
-      'min-duration': { type: 'string' },
-      reset: { type: 'boolean', default: false },
-    },
-  });
+  let parsed: ReturnType<typeof parseArgs>;
+  try {
+    parsed = parseArgs({
+      args,
+      allowPositionals: true,
+      strict: true,
+      options: {
+        platform: { type: 'string', short: 'p' },
+        'since-patch': { type: 'string' },
+        'per-player': { type: 'string' },
+        limit: { type: 'string' },
+        queue: { type: 'string' },
+        'min-duration': { type: 'string' },
+        reset: { type: 'boolean', default: false },
+      },
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new UsageError(
+      `${message}\nUsage: etl matches [platform] [--since-patch=16.19] [--per-player=20] [--limit=N] [--queue=420] [--min-duration=900] [--reset]`,
+    );
+  }
+  const { values, positionals } = parsed;
+  if (positionals.length > 1) {
+    throw new UsageError('Too many positional arguments.\nUsage: etl matches [platform]');
+  }
 
   const [platformArg] = positionals;
   const platform = parsePlatform(

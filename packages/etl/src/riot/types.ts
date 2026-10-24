@@ -1,7 +1,3 @@
-/**
- * Types and error classes for the Riot Games API client and rate limiter.
- */
-
 export const PLATFORMS = [
   'euw1',
   'eun1',
@@ -25,9 +21,32 @@ export type Platform = (typeof PLATFORMS)[number];
 export const REGIONAL_ROUTINGS = ['europe', 'americas', 'asia', 'sea'] as const;
 export type RegionalRouting = (typeof REGIONAL_ROUTINGS)[number];
 
-/**
- * Maps a platform routing value (e.g. 'euw1') to its corresponding regional routing ('europe').
- */
+export function redactPuuid(value: string): string {
+  return value.replace(/([0-9a-fA-F]{8,})(?=[^0-9a-fA-F]|$)/g, (match) => `${match.slice(0, 8)}…`);
+}
+
+function redactSensitiveText(value: string): string {
+  return redactPuuid(value).replace(/RGAPI-[A-Za-z0-9_-]+/g, '[REDACTED]');
+}
+
+function redactSensitiveValue(value: unknown): unknown {
+  if (typeof value === 'string') {
+    return redactSensitiveText(value);
+  }
+  if (Array.isArray(value)) {
+    return value.map(redactSensitiveValue);
+  }
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [
+        redactSensitiveText(key),
+        redactSensitiveValue(entry),
+      ]),
+    );
+  }
+  return value;
+}
+
 export function platformToRegion(platform: Platform): RegionalRouting {
   switch (platform) {
     case 'euw1':
@@ -56,17 +75,11 @@ export function platformToRegion(platform: Platform): RegionalRouting {
   }
 }
 
-/**
- * Rate limit window specification.
- */
 export interface RateLimitWindow {
   maxRequests: number;
   windowSeconds: number;
 }
 
-/**
- * Parsed rate limit state from Riot response headers.
- */
 export interface RateLimitHeaderInfo {
   appLimits: RateLimitWindow[];
   appCounts: RateLimitWindow[];
@@ -75,27 +88,31 @@ export interface RateLimitHeaderInfo {
   retryAfterSeconds?: number;
 }
 
-/**
- * Base class for all Riot API errors.
- */
 export class RiotApiError extends Error {
   readonly status: number;
   readonly url: string;
   readonly responseBody?: unknown;
 
   constructor(message: string, status: number, url: string, responseBody?: unknown) {
-    super(message);
+    super(redactSensitiveText(message));
     this.name = 'RiotApiError';
     this.status = status;
-    this.url = url;
-    this.responseBody = responseBody;
+    this.url = redactSensitiveText(url);
+    this.responseBody = redactSensitiveValue(responseBody);
   }
 }
 
-/**
- * Thrown when Riot API authentication fails (HTTP 401 or 403).
- * Represents an invalid, missing, or expired API key.
- */
+export class RiotSchemaError extends RiotApiError {
+  readonly issues: string;
+
+  constructor(url: string, issues: string) {
+    const summary = issues.length > 500 ? `${issues.slice(0, 500)}…` : issues;
+    super(`Riot API schema validation failed at ${url}: ${summary}`, 200, url, summary);
+    this.name = 'RiotSchemaError';
+    this.issues = summary;
+  }
+}
+
 export class RiotAuthError extends RiotApiError {
   constructor(message: string, status: number, url: string, responseBody?: unknown) {
     super(message, status, url, responseBody);
@@ -103,9 +120,6 @@ export class RiotAuthError extends RiotApiError {
   }
 }
 
-/**
- * Thrown when rate limits are exhausted and maximum retries exceeded.
- */
 export class RiotRateLimitError extends RiotApiError {
   readonly retryAfterSeconds?: number;
 

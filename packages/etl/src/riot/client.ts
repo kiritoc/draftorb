@@ -1,10 +1,3 @@
-/**
- * Riot Games API HTTP Client.
- *
- * Implements rate limiting, 429 retry-after waiting, 5xx exponential backoff,
- * immediate abort on 401/403 with "key expired?", and resilient Zod validation.
- */
-
 import { z } from '@draftorb/shared';
 import { loadEnv } from './env';
 import { RiotRateLimiter } from './rate-limiter';
@@ -23,7 +16,9 @@ import {
   RiotApiError,
   RiotAuthError,
   RiotRateLimitError,
+  RiotSchemaError,
   platformToRegion,
+  redactPuuid,
 } from './types';
 
 export interface MatchIdsOptions {
@@ -42,6 +37,7 @@ export interface RiotClientOptions {
   fetchFn?: typeof fetch;
   sleepFn?: (ms: number) => Promise<void>;
   nowFn?: () => number;
+  timeoutMs?: number;
   max5xxRetries?: number;
   initialBackoffMs?: number;
   max429Retries?: number;
@@ -53,6 +49,7 @@ export class RiotClient {
   private readonly rateLimiter: RiotRateLimiter;
   private readonly fetchFn: typeof fetch;
   private readonly sleepFn: (ms: number) => Promise<void>;
+  private readonly timeoutMs: number;
   private readonly max5xxRetries: number;
   private readonly initialBackoffMs: number;
   private readonly max429Retries: number;
@@ -82,6 +79,7 @@ export class RiotClient {
         now: options.nowFn,
       });
     this.fetchFn = options.fetchFn ?? globalThis.fetch;
+    this.timeoutMs = options.timeoutMs ?? 30_000;
     this.max5xxRetries = options.max5xxRetries ?? 5;
     this.initialBackoffMs = options.initialBackoffMs ?? 500;
     this.max429Retries = options.max429Retries ?? 5;
@@ -92,10 +90,29 @@ export class RiotClient {
     return this.rateLimiter;
   }
 
-  /**
-   * Executes an HTTP request against the Riot API with rate limiting, retries, and schema validation.
-   */
-  async request<T>(url: string, schema?: z.ZodType<T>, methodKey?: string): Promise<T> {
+  private async parseJsonBody(
+    response: Response,
+    url: string,
+    retries5xx: number,
+  ): Promise<unknown> {
+    const text = await response.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      if (retries5xx >= this.max5xxRetries) {
+        throw new RiotApiError(
+          `Riot API response body was not valid JSON at ${url}.`,
+          response.status,
+          url,
+          text,
+        );
+      }
+      throw new RiotApiError(`Riot API response was not valid JSON at ${url}.`, 200, url, text);
+    }
+  }
+
+  async request<T>(url: string, schema?: z.ZodType<T>, methodKey?: string): Promise<T>;
+  async request(url: string, schema?: z.ZodType<unknown>, methodKey?: string): Promise<unknown> {
     let retries5xx = 0;
     let retries429 = 0;
 
@@ -106,103 +123,109 @@ export class RiotClient {
           () =>
             this.fetchFn(url, {
               headers: { 'X-Riot-Token': this.apiKey, Accept: 'application/json' },
+              signal: AbortSignal.timeout(this.timeoutMs),
             }),
           methodKey,
         );
       } catch (error) {
-        // Network failure (ECONNRESET, DNS, timeout): same backoff policy as 5xx
-        retries5xx++;
+        const message = error instanceof Error ? error.message : String(error);
+        retries5xx += 1;
         if (retries5xx >= this.max5xxRetries) {
-          throw new RiotApiError(`Network error at ${url}: ${(error as Error).message}`, 0, url);
+          throw new RiotApiError(`Network error at ${url}: ${message}`, 0, url, message);
         }
-        await this.sleepFn(this.initialBackoffMs * Math.pow(2, retries5xx - 1));
+        await this.sleepFn(this.initialBackoffMs * 2 ** (retries5xx - 1));
         continue;
       }
 
-      // Update rate limiter limits from response headers
       const headerInfo = this.rateLimiter.updateFromHeaders(response.headers, methodKey);
+      const responseBodyText = await response.text();
 
-      // 1. Success (200-299)
       if (response.ok) {
-        const rawJson: unknown = await response.json();
-        if (!schema) {
-          return rawJson as T;
-        }
-
-        const parsed = schema.safeParse(rawJson);
-        if (!parsed.success) {
-          if (this.logWarnings) {
-            console.warn(
-              `[RiotClient] Response shape at ${url} did not match schema: ${parsed.error.message}`,
+        let payload: unknown;
+        try {
+          payload = JSON.parse(responseBodyText);
+        } catch {
+          retries5xx += 1;
+          if (retries5xx >= this.max5xxRetries) {
+            throw new RiotApiError(
+              `Riot API response body was not valid JSON at ${url}.`,
+              response.status,
+              url,
+              responseBodyText,
             );
           }
-          // Log unknown shape instead of crashing, return raw payload
-          return rawJson as T;
+          await this.sleepFn(this.initialBackoffMs * 2 ** (retries5xx - 1));
+          continue;
+        }
+
+        if (!schema) {
+          return payload;
+        }
+
+        const parsed = schema.safeParse(payload);
+        if (!parsed.success) {
+          const issues = parsed.error.issues
+            .slice(0, 8)
+            .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
+            .join('; ');
+          throw new RiotSchemaError(url, issues);
         }
 
         return parsed.data;
       }
 
-      // 2. Authentication failure (401 or 403): stop immediately with explicit message
       if (response.status === 401 || response.status === 403) {
-        const bodyText = await response.text().catch(() => '');
+        const bodyText = responseBodyText.trim();
+        const hint = 'key expired? Check RIOT_API_KEY in .env';
         throw new RiotAuthError(
-          `Riot API authentication failed (${response.status}): key expired? Check RIOT_API_KEY in .env`,
+          `Riot API authentication failed (${response.status}) at ${url}: ${hint}${bodyText ? `; ${redactPuuid(bodyText)}` : ''}`,
           response.status,
           url,
-          bodyText,
+          responseBodyText,
         );
       }
 
-      // 3. Rate limited (429)
       if (response.status === 429) {
-        retries429++;
+        retries429 += 1;
         if (retries429 > this.max429Retries) {
           throw new RiotRateLimitError(
             `Riot API rate limit exceeded (429) at ${url}. Maximum retries (${this.max429Retries}) exceeded.`,
             response.status,
             url,
             headerInfo.retryAfterSeconds,
+            responseBodyText,
           );
         }
 
         const waitSeconds = headerInfo.retryAfterSeconds ?? 1;
         const waitMs =
-          Math.max(waitSeconds * 1000, 500) * (headerInfo.retryAfterSeconds ? 1 : retries429); // no Retry-After: linear backoff
+          Math.max(waitSeconds * 1000, 500) * (headerInfo.retryAfterSeconds ? 1 : retries429);
         await this.sleepFn(waitMs);
         continue;
       }
 
-      // 4. Server errors (5xx): exponential backoff (max 5 tries)
       if (response.status >= 500 && response.status < 600) {
-        retries5xx++;
+        retries5xx += 1;
         if (retries5xx >= this.max5xxRetries) {
-          const bodyText = await response.text().catch(() => '');
           throw new RiotApiError(
             `Riot API server error (${response.status}) at ${url}. Max retries (${this.max5xxRetries}) exhausted.`,
             response.status,
             url,
-            bodyText,
+            responseBodyText,
           );
         }
-
-        const backoffMs = this.initialBackoffMs * Math.pow(2, retries5xx - 1);
-        await this.sleepFn(backoffMs);
+        await this.sleepFn(this.initialBackoffMs * 2 ** (retries5xx - 1));
         continue;
       }
 
-      // 5. Client errors (400, 404, etc.): do not retry
-      const errorBody = await response.text().catch(() => '');
       throw new RiotApiError(
-        `Riot API request failed with status ${response.status} at ${url}: ${errorBody}`,
+        `Riot API request failed with status ${response.status} at ${url}: ${responseBodyText}`,
         response.status,
         url,
-        errorBody,
+        responseBodyText,
       );
     }
   }
-
-  // --- League-v4 Endpoints ---
 
   async getLeagueEntries(
     platform: Platform,
@@ -235,8 +258,6 @@ export class RiotClient {
     const url = `https://${platform}.api.riotgames.com/lol/league/v4/masterleagues/by-queue/${queue}`;
     return this.request(url, riotLeagueListSchema, 'league-v4.master');
   }
-
-  // --- Match-v5 Endpoints ---
 
   async getMatchIdsByPuuid(
     regionOrPlatform: RegionalRouting | Platform,

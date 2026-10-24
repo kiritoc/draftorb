@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { z } from '@draftorb/shared';
 import { RiotClient } from './client';
 import { RiotRateLimiter } from './rate-limiter';
-import { RiotApiError, RiotAuthError, RiotRateLimitError } from './types';
+import { RiotApiError, RiotAuthError, RiotRateLimitError, RiotSchemaError } from './types';
 
 function createMockResponse(
   status: number,
@@ -117,7 +117,7 @@ describe('RiotClient', () => {
       let fetchCalls = 0;
       const mockFetch = vi.fn().mockImplementation(async () => {
         fetchCalls++;
-        return createMockResponse(403, 'Forbidden');
+        return createMockResponse(403, `Forbidden: ${dummyApiKey}`);
       });
 
       const client = new RiotClient({
@@ -125,10 +125,31 @@ describe('RiotClient', () => {
         fetchFn: mockFetch,
       });
 
-      await expect(client.request('https://euw1.api.riotgames.com/test')).rejects.toThrow(
-        /key expired\?/,
-      );
+      const error = await client
+        .request('https://euw1.api.riotgames.com/test')
+        .catch((reason: unknown) => reason);
+      expect(error).toBeInstanceOf(RiotAuthError);
+      if (!(error instanceof RiotAuthError)) throw new Error('Expected RiotAuthError');
+      expect(error.message).toMatch(/key expired\?/);
+      expect(error.responseBody).not.toContain(dummyApiKey);
+      expect(JSON.stringify(error)).not.toContain(dummyApiKey);
       expect(fetchCalls).toBe(1);
+    });
+
+    it('redacts Riot API keys echoed in other error bodies', async () => {
+      const client = new RiotClient({
+        apiKey: dummyApiKey,
+        fetchFn: vi.fn(async () => createMockResponse(400, `Invalid request: ${dummyApiKey}`)),
+      });
+
+      const error = await client
+        .request('https://euw1.api.riotgames.com/test')
+        .catch((reason: unknown) => reason);
+      expect(error).toBeInstanceOf(RiotApiError);
+      if (!(error instanceof RiotApiError)) throw new Error('Expected RiotApiError');
+      expect(error.message).not.toContain(dummyApiKey);
+      expect(error.responseBody).not.toContain(dummyApiKey);
+      expect(JSON.stringify(error)).not.toContain(dummyApiKey);
     });
 
     it('waits Retry-After and retries on 429 Rate Limit response', async () => {
@@ -292,9 +313,7 @@ describe('RiotClient', () => {
       expect(data).toEqual({ id: 412, name: 'Thresh' });
     });
 
-    it('logs unknown shapes instead of crashing when schema validation fails', async () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
+    it('throws RiotSchemaError when schema validation fails', async () => {
       const mockFetch = vi.fn().mockImplementation(async () => {
         // Unexpected shape missing required 'name'
         return createMockResponse(200, { id: 412, unexpectedField: true });
@@ -307,15 +326,9 @@ describe('RiotClient', () => {
       });
 
       const schema = z.object({ id: z.number(), name: z.string() });
-      const result = await client.request('https://euw1.api.riotgames.com/champ', schema);
-
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[RiotClient] Response shape at'),
-      );
-      // Must not crash; returns raw payload
-      expect(result).toEqual({ id: 412, unexpectedField: true });
-
-      warnSpy.mockRestore();
+      await expect(
+        client.request('https://euw1.api.riotgames.com/champ', schema),
+      ).rejects.toBeInstanceOf(RiotSchemaError);
     });
 
     it('passes methodKey and enforces rate limiting across multiple requests', async () => {

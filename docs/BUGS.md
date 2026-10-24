@@ -29,6 +29,21 @@ No new bugs were identified while revising T-013 patch-window and rank-known-cou
 
 ## Fixed
 
+### B-005 — ETL workspace build regression — FIXED
+
+- Severity / Area (engine|etl|web|desktop|vision|docs): S1 / etl
+- Steps to reproduce:
+  1. Run `pnpm typecheck` on branch B.
+  2. Observe unresolved ETL imports, missing exports, and a CLI import targeting absent `src/cli/main`.
+- Expected / Actual:
+  - Expected: the ETL package typechecks and the CLI starts.
+  - Actual: the Riot client, match ingestion, and player discovery implementations were in the wrong source modules, and the CLI entrypoint targeted a missing module.
+- Environment (OS, Node version, patch): macOS, branch B.
+- Logs / screenshot: `pnpm check` passes after the repair (9 files, 85 tests).
+- Suspected cause:
+  - ETL source files were displaced during the recent refactor; match payloads also needed to be revalidated after the Riot client returned an unrecognized raw payload.
+- Fix (commit/ticket): T-005 — restored the CLI and module placement, fixed relative imports, revalidated match payloads, and kept tier quotas distributed across divisions.
+
 ### B-004 — Migration transaction safety & lock hygiene — FIXED
 
 - Severity / Area (engine|etl|web|desktop|vision|docs): S2 / etl

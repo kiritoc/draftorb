@@ -1,299 +1,421 @@
-import { z } from '@draftorb/shared';
-import { loadEnv } from './env';
-import { RiotRateLimiter } from './rate-limiter';
+import type Database from 'better-sqlite3';
+
 import {
-  RiotLeagueEntries,
-  RiotLeagueList,
-  RiotMatchDto,
-  riotLeagueEntriesSchema,
-  riotLeagueListSchema,
-  riotMatchDtoSchema,
-  riotMatchIdsSchema,
-} from './schemas';
-import {
-  Platform,
-  RegionalRouting,
+  RiotClient,
   RiotApiError,
   RiotAuthError,
-  RiotRateLimitError,
   RiotSchemaError,
-  platformToRegion,
-  redactPuuid,
-} from './types';
+  riotMatchDtoSchema,
+  type Platform,
+} from './riot';
+import { resolveDbPath } from './config/paths';
+import { openDb, migrate } from './db';
+import {
+  clearIngestState,
+  cursorKey,
+  evaluateMatch,
+  findRejection,
+  listMatchIds,
+  patchFromGameVersion,
+  rankSummary,
+  readCursor,
+  windowWidened,
+  writeCursor,
+  type PlayerCursor,
+} from './matches-store';
 
-export interface MatchIdsOptions {
-  startTime?: number;
-  endTime?: number;
-  queue?: number;
-  type?: string;
-  start?: number;
-  count?: number;
+export const RANKED_SOLO_QUEUE_ID = 420;
+export const DEFAULT_MATCHES_PER_PLAYER = 20;
+export const DEFAULT_MIN_DURATION_SECONDS = 15 * 60;
+
+export interface MatchIngestionOptions {
+  platform?: Platform;
+  sincePatch?: string;
+  matchesPerPlayer?: number;
+  playerLimit?: number;
+  queueId?: number;
+  minDurationSeconds?: number;
+  db?: Database.Database;
+  client?: RiotClient;
+  reset?: boolean;
+  onProgress?: (message: string) => void;
 }
 
-export interface RiotClientOptions {
-  apiKey?: string;
-  autoLoadEnv?: boolean;
-  rateLimiter?: RiotRateLimiter;
-  fetchFn?: typeof fetch;
-  sleepFn?: (ms: number) => Promise<void>;
-  nowFn?: () => number;
-  timeoutMs?: number;
-  max5xxRetries?: number;
-  initialBackoffMs?: number;
-  max429Retries?: number;
-  logWarnings?: boolean;
+export interface PlayerIngestionResult {
+  puuid: string;
+  status: 'skipped' | 'done' | 'failed';
+  listed: number;
+  stored: number;
+  duplicates: number;
+  filtered: number;
+  invalid: number;
 }
 
-export class RiotClient {
-  private readonly apiKey: string;
-  private readonly rateLimiter: RiotRateLimiter;
-  private readonly fetchFn: typeof fetch;
-  private readonly sleepFn: (ms: number) => Promise<void>;
-  private readonly timeoutMs: number;
-  private readonly max5xxRetries: number;
-  private readonly initialBackoffMs: number;
-  private readonly max429Retries: number;
-  private readonly logWarnings: boolean;
+export interface MatchIngestionResult {
+  platform: Platform;
+  sincePatch?: string;
+  playersProcessed: number;
+  playersSkipped: number;
+  playersFailed: number;
+  listed: number;
+  stored: number;
+  duplicates: number;
+  filtered: number;
+  invalid: number;
+  playerResults: PlayerIngestionResult[];
+}
 
-  constructor(options: RiotClientOptions = {}) {
-    if (options.autoLoadEnv !== false && !process.env.RIOT_API_KEY && !options.apiKey) {
-      loadEnv();
+interface PlayerRow {
+  puuid: string;
+  rank_score: number;
+}
+
+const newCursor = (
+  snapshot: string[],
+  lastGameCreation = 0,
+  sincePatch?: string,
+): PlayerCursor => ({
+  status: 'partial',
+  snapshot,
+  processed: 0,
+  lastGameCreation,
+  sincePatch,
+  stored: 0,
+  duplicates: 0,
+  filtered: 0,
+  invalid: 0,
+  updatedAt: 0,
+});
+
+function isTransientMatchError(error: unknown): boolean {
+  if (error instanceof RiotAuthError) return false;
+  if (error instanceof RiotSchemaError) return false;
+  if (error instanceof RiotApiError) {
+    if (error.status === 429) return true;
+    if (error.status >= 500) return true;
+    if (error.status === 0) return true;
+  }
+  return error instanceof Error && /network|timeout|fetch/i.test(error.message);
+}
+
+export async function ingestMatches(
+  options: MatchIngestionOptions = {},
+): Promise<MatchIngestionResult> {
+  const platform = options.platform ?? 'euw1';
+  const queueId = options.queueId ?? RANKED_SOLO_QUEUE_ID;
+  const minDuration = options.minDurationSeconds ?? DEFAULT_MIN_DURATION_SECONDS;
+  const perPlayer = options.matchesPerPlayer ?? DEFAULT_MATCHES_PER_PLAYER;
+  const sincePatch = options.sincePatch;
+  const log = options.onProgress ?? (() => {});
+
+  const client = options.client ?? new RiotClient({ autoLoadEnv: true });
+  const db = options.db ?? openDb(resolveDbPath());
+  migrate(db);
+  if (options.reset) clearIngestState(db, platform);
+
+  const allPlayers = db
+    .prepare(
+      'SELECT puuid, rank_score FROM players WHERE platform = ? ORDER BY rank_score DESC, puuid',
+    )
+    .all(platform) as PlayerRow[];
+
+  const done = new Set<string>();
+  if (!options.reset) {
+    for (const player of allPlayers) {
+      if (readCursor(db, cursorKey(platform, player.puuid))?.status === 'done') {
+        done.add(player.puuid);
+      }
     }
-
-    const key = options.apiKey ?? process.env.RIOT_API_KEY;
-    if (!key) {
-      throw new Error(
-        'Riot API key is missing. Set RIOT_API_KEY in .env or pass apiKey to RiotClient options.',
-      );
-    }
-
-    this.apiKey = key;
-    this.sleepFn =
-      options.sleepFn ??
-      options.rateLimiter?.sleep ??
-      ((ms) => new Promise((res) => setTimeout(res, ms)));
-    this.rateLimiter =
-      options.rateLimiter ??
-      new RiotRateLimiter({
-        sleep: this.sleepFn,
-        now: options.nowFn,
-      });
-    this.fetchFn = options.fetchFn ?? globalThis.fetch;
-    this.timeoutMs = options.timeoutMs ?? 30_000;
-    this.max5xxRetries = options.max5xxRetries ?? 5;
-    this.initialBackoffMs = options.initialBackoffMs ?? 500;
-    this.max429Retries = options.max429Retries ?? 5;
-    this.logWarnings = options.logWarnings ?? true;
   }
 
-  getRateLimiter(): RiotRateLimiter {
-    return this.rateLimiter;
-  }
+  const ordered = [...allPlayers].sort(
+    (a, b) =>
+      Number(done.has(a.puuid)) - Number(done.has(b.puuid)) ||
+      b.rank_score - a.rank_score ||
+      (a.puuid < b.puuid ? -1 : a.puuid > b.puuid ? 1 : 0),
+  );
+  const players =
+    options.playerLimit !== undefined ? ordered.slice(0, options.playerLimit) : ordered;
 
-  private async parseJsonBody(response: Response, url: string, retries5xx: number): Promise<unknown> {
-    const text = await response.text();
+  const playerResults: PlayerIngestionResult[] = [];
+  let playersSkipped = 0;
+  let playersFailed = 0;
+  let consecutiveFailed = 0;
+
+  const hasMatch = db.prepare('SELECT 1 AS one FROM matches WHERE match_id = ?');
+  const insertMatch = db.prepare(
+    `INSERT OR IGNORE INTO matches
+       (match_id, platform, patch, queue_id, duration, created_at, avg_rank_score,
+        rank_known_count, fetched_timeline)
+     VALUES (@match_id, @platform, @patch, @queue_id, @duration, @created_at, @avg_rank_score,
+        @rank_known_count, 0)`,
+  );
+  const insertReject = db.prepare(
+    `INSERT OR REPLACE INTO match_rejects (match_id, reason, patch, checked_at)
+     VALUES (@match_id, @reason, @patch, @checked_at)`,
+  );
+
+  for (const [index, player] of players.entries()) {
+    const key = cursorKey(platform, player.puuid);
+    let cursor = options.reset ? null : readCursor(db, key);
+
     try {
-      return JSON.parse(text);
-    } catch {
-      if (retries5xx >= this.max5xxRetries) {
-        throw new RiotApiError(
-          `Riot API response body was not valid JSON at ${url}.`,
-          response.status,
-          url,
-          text,
+      if (cursor && windowWidened(cursor.sincePatch, sincePatch)) {
+        const ids = await listMatchIds(client, platform, player.puuid, queueId, perPlayer);
+        cursor = newCursor(ids, cursor.lastGameCreation, sincePatch);
+      } else if (cursor?.status === 'done') {
+        const newIds = await listMatchIds(
+          client,
+          platform,
+          player.puuid,
+          queueId,
+          perPlayer,
+          cursor.lastGameCreation,
         );
-      }
-      throw new RiotApiError(`Riot API response was not valid JSON at ${url}.`, 200, url, text);
-    }
-  }
-
-  async request<T>(url: string, schema?: z.ZodType<T>, methodKey?: string): Promise<T>;
-  async request(url: string, schema?: z.ZodType<unknown>, methodKey?: string): Promise<unknown> {
-    let retries5xx = 0;
-    let retries429 = 0;
-
-    while (true) {
-      let response: Response;
-      try {
-        response = await this.rateLimiter.execute(
-          () =>
-            this.fetchFn(url, {
-              headers: { 'X-Riot-Token': this.apiKey, Accept: 'application/json' },
-              signal: AbortSignal.timeout(this.timeoutMs),
-            }),
-          methodKey,
-        );
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        retries5xx += 1;
-        if (retries5xx >= this.max5xxRetries) {
-          throw new RiotApiError(`Network error at ${url}: ${message}`, 0, url, message);
-        }
-        await this.sleepFn(this.initialBackoffMs * 2 ** (retries5xx - 1));
-        continue;
-      }
-
-      const headerInfo = this.rateLimiter.updateFromHeaders(response.headers, methodKey);
-      const responseBodyText = await response.text();
-
-      if (response.ok) {
-        let payload: unknown;
-        try {
-          payload = JSON.parse(responseBodyText);
-        } catch {
-          retries5xx += 1;
-          if (retries5xx >= this.max5xxRetries) {
-            throw new RiotApiError(
-              `Riot API response body was not valid JSON at ${url}.`,
-              response.status,
-              url,
-              responseBodyText,
-            );
-          }
-          await this.sleepFn(this.initialBackoffMs * 2 ** (retries5xx - 1));
+        if (newIds.length === 0) {
+          playersSkipped += 1;
+          playerResults.push({
+            puuid: player.puuid,
+            status: 'skipped',
+            listed: 0,
+            stored: 0,
+            duplicates: 0,
+            filtered: 0,
+            invalid: 0,
+          });
           continue;
         }
-
-        if (!schema) {
-          return payload;
-        }
-
-        const parsed = schema.safeParse(payload);
-        if (!parsed.success) {
-          const issues = parsed.error.issues
-            .slice(0, 8)
-            .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
-            .join('; ');
-          throw new RiotSchemaError(url, issues);
-        }
-
-        return parsed.data;
+        cursor = newCursor(newIds, cursor.lastGameCreation, sincePatch);
+      } else if (!cursor) {
+        const ids = await listMatchIds(client, platform, player.puuid, queueId, perPlayer);
+        cursor = newCursor(ids, 0, sincePatch);
       }
-
-      if (response.status === 401 || response.status === 403) {
-        const bodyText = responseBodyText.trim();
-        const hint = 'key expired? Check RIOT_API_KEY in .env';
-        throw new RiotAuthError(
-          `Riot API authentication failed (${response.status}) at ${url}: ${hint}${bodyText ? `; ${redactPuuid(bodyText)}` : ''}`,
-          response.status,
-          url,
-          responseBodyText,
+    } catch (error) {
+      if (error instanceof RiotAuthError) {
+        throw error;
+      }
+      if (isTransientMatchError(error)) {
+        playersFailed += 1;
+        consecutiveFailed += 1;
+        playerResults.push({
+          puuid: player.puuid,
+          status: 'failed',
+          listed: cursor?.snapshot.length ?? 0,
+          stored: 0,
+          duplicates: 0,
+          filtered: 0,
+          invalid: 0,
+        });
+        log(
+          `[${index + 1}/${players.length}] ${player.puuid.slice(0, 12)}… transient failure while listing match ids`,
         );
-      }
-
-      if (response.status === 429) {
-        retries429 += 1;
-        if (retries429 > this.max429Retries) {
-          throw new RiotRateLimitError(
-            `Riot API rate limit exceeded (429) at ${url}. Maximum retries (${this.max429Retries}) exceeded.`,
-            response.status,
-            url,
-            headerInfo.retryAfterSeconds,
-            responseBodyText,
-          );
+        if (consecutiveFailed >= 3) {
+          break;
         }
-
-        const waitSeconds = headerInfo.retryAfterSeconds ?? 1;
-        const waitMs = Math.max(waitSeconds * 1000, 500) * (headerInfo.retryAfterSeconds ? 1 : retries429);
-        await this.sleepFn(waitMs);
         continue;
       }
+      throw error;
+    }
 
-      if (response.status >= 500 && response.status < 600) {
-        retries5xx += 1;
-        if (retries5xx >= this.max5xxRetries) {
-          throw new RiotApiError(
-            `Riot API server error (${response.status}) at ${url}. Max retries (${this.max5xxRetries}) exhausted.`,
-            response.status,
-            url,
-            responseBodyText,
-          );
+    const base = {
+      stored: cursor.stored,
+      duplicates: cursor.duplicates,
+      filtered: cursor.filtered,
+      invalid: cursor.invalid,
+    };
+    const run = { stored: 0, duplicates: 0, filtered: 0, invalid: 0 };
+    let lastGameCreation = cursor.lastGameCreation;
+    let playerFailed = false;
+
+    for (let i = cursor.processed; i < cursor.snapshot.length; i += 1) {
+      const matchId = cursor.snapshot[i] as string;
+      let outcome: 'stored' | 'duplicate' | 'filtered' | 'invalid' = 'filtered';
+      let didCountOutcome = false;
+
+      try {
+        if (findRejection(db, matchId, sincePatch)) {
+          outcome = 'filtered';
+        } else if ((hasMatch.get(matchId) as { one: number } | undefined) !== undefined) {
+          outcome = 'duplicate';
+        } else {
+          const raw = await client.getMatch(platform, matchId);
+          const parsed = riotMatchDtoSchema.safeParse(raw);
+          if (!parsed.success) {
+            throw new RiotSchemaError(matchId, parsed.error.message);
+          }
+          const match = parsed.data;
+          const evaluated = evaluateMatch(match, queueId, minDuration, sincePatch);
+          outcome = evaluated.outcome;
+          if (evaluated.reason === null) {
+            lastGameCreation = Math.max(lastGameCreation, match.info.gameCreation);
+            const rank = rankSummary(db, match.metadata.participants, player.rank_score);
+            const persist = db.transaction(() => {
+              const change = insertMatch.run({
+                match_id: matchId,
+                platform,
+                patch: patchFromGameVersion(match.info.gameVersion),
+                queue_id: match.info.queueId,
+                duration: match.info.gameDuration,
+                created_at: match.info.gameCreation,
+                avg_rank_score: rank.avg,
+                rank_known_count: rank.known,
+              });
+              if (change.changes === 0) {
+                outcome = 'duplicate';
+              }
+              cursor.processed = i + 1;
+              cursor.stored = base.stored + run.stored + (outcome === 'stored' ? 1 : 0);
+              cursor.duplicates =
+                base.duplicates + run.duplicates + (outcome === 'duplicate' ? 1 : 0);
+              cursor.filtered = base.filtered + run.filtered + (outcome === 'filtered' ? 1 : 0);
+              cursor.invalid = base.invalid + run.invalid + (outcome === 'invalid' ? 1 : 0);
+              cursor.lastGameCreation = lastGameCreation;
+              cursor.updatedAt = Date.now();
+              writeCursor(db, key, cursor);
+            });
+            persist();
+            if (outcome === 'duplicate') {
+              run.duplicates += 1;
+            } else {
+              run.stored += 1;
+            }
+            didCountOutcome = true;
+          } else {
+            const persist = db.transaction(() => {
+              insertReject.run({
+                match_id: matchId,
+                reason: evaluated.reason,
+                patch:
+                  evaluated.reason === 'patch' ? patchFromGameVersion(raw.info.gameVersion) : null,
+                checked_at: Date.now(),
+              });
+              cursor.processed = i + 1;
+              cursor.filtered = base.filtered + run.filtered + 1;
+              cursor.invalid = base.invalid + run.invalid;
+              cursor.lastGameCreation = lastGameCreation;
+              cursor.updatedAt = Date.now();
+              writeCursor(db, key, cursor);
+            });
+            persist();
+            run.filtered += 1;
+            didCountOutcome = true;
+          }
         }
-        await this.sleepFn(this.initialBackoffMs * 2 ** (retries5xx - 1));
-        continue;
+      } catch (error) {
+        if (error instanceof RiotAuthError) {
+          throw error;
+        }
+        if (
+          error instanceof RiotSchemaError ||
+          (error instanceof RiotApiError && [400, 404].includes(error.status))
+        ) {
+          const persist = db.transaction(() => {
+            insertReject.run({
+              match_id: matchId,
+              reason: 'invalid',
+              patch: null,
+              checked_at: Date.now(),
+            });
+            cursor.processed = i + 1;
+            cursor.invalid = base.invalid + run.invalid + 1;
+            cursor.updatedAt = Date.now();
+            writeCursor(db, key, cursor);
+          });
+          persist();
+          run.invalid += 1;
+          didCountOutcome = true;
+          continue;
+        }
+        if (isTransientMatchError(error)) {
+          playerFailed = true;
+          break;
+        }
+        throw error;
       }
 
-      throw new RiotApiError(
-        `Riot API request failed with status ${response.status} at ${url}: ${responseBodyText}`,
-        response.status,
-        url,
-        responseBodyText,
+      if (!didCountOutcome) {
+        run[outcome === 'duplicate' ? 'duplicates' : outcome] += 1;
+      }
+
+      cursor.processed = i + 1;
+      cursor.stored = base.stored + run.stored;
+      cursor.duplicates = base.duplicates + run.duplicates;
+      cursor.filtered = base.filtered + run.filtered;
+      cursor.invalid = base.invalid + run.invalid;
+      cursor.lastGameCreation = lastGameCreation;
+      cursor.updatedAt = Date.now();
+      const persistCursor = db.transaction(() => {
+        writeCursor(db, key, cursor);
+      });
+      persistCursor();
+    }
+
+    if (playerFailed) {
+      playersFailed += 1;
+      consecutiveFailed += 1;
+      playerResults.push({
+        puuid: player.puuid,
+        status: 'failed',
+        listed: cursor.snapshot.length,
+        stored: run.stored,
+        duplicates: run.duplicates,
+        filtered: run.filtered,
+        invalid: run.invalid,
+      });
+      log(
+        `[${index + 1}/${players.length}] ${player.puuid.slice(0, 12)}… transient failure (player failed)`,
       );
+      if (consecutiveFailed >= 3) {
+        break;
+      }
+      continue;
     }
+
+    consecutiveFailed = 0;
+    cursor.status = 'done';
+    cursor.updatedAt = Date.now();
+    writeCursor(db, key, cursor);
+
+    playerResults.push({
+      puuid: player.puuid,
+      status: 'done',
+      listed: cursor.snapshot.length,
+      stored: run.stored,
+      duplicates: run.duplicates,
+      filtered: run.filtered,
+      invalid: run.invalid,
+    });
+    log(
+      `[${index + 1}/${players.length}] ${player.puuid.slice(0, 12)}… ` +
+        `ids=${cursor.snapshot.length} stored=${run.stored} dup=${run.duplicates} ` +
+        `filtered=${run.filtered} invalid=${run.invalid}`,
+    );
   }
 
-  async getLeagueEntries(
-    platform: Platform,
-    queue: string,
-    tier: string,
-    division: string,
-    page = 1,
-  ): Promise<RiotLeagueEntries> {
-    const url = `https://${platform}.api.riotgames.com/lol/league/v4/entries/${queue}/${tier}/${division}?page=${page}`;
-    return this.request(url, riotLeagueEntriesSchema, 'league-v4.entries');
-  }
+  const totals = playerResults.reduce(
+    (acc, r) => ({
+      listed: acc.listed + r.listed,
+      stored: acc.stored + r.stored,
+      duplicates: acc.duplicates + r.duplicates,
+      filtered: acc.filtered + r.filtered,
+      invalid: acc.invalid + r.invalid,
+    }),
+    { listed: 0, stored: 0, duplicates: 0, filtered: 0, invalid: 0 },
+  );
 
-  async getChallengerLeague(
-    platform: Platform,
-    queue = 'RANKED_SOLO_5x5',
-  ): Promise<RiotLeagueList> {
-    const url = `https://${platform}.api.riotgames.com/lol/league/v4/challengerleagues/by-queue/${queue}`;
-    return this.request(url, riotLeagueListSchema, 'league-v4.challenger');
-  }
+  log(
+    `Ingestion complete: ${players.length - playersSkipped}/${players.length} players, ` +
+      `${totals.stored} stored, ${totals.duplicates} duplicates, ${totals.filtered} filtered, ` +
+      `${totals.invalid} invalid; failed=${playersFailed}.`,
+  );
 
-  async getGrandmasterLeague(
-    platform: Platform,
-    queue = 'RANKED_SOLO_5x5',
-  ): Promise<RiotLeagueList> {
-    const url = `https://${platform}.api.riotgames.com/lol/league/v4/grandmasterleagues/by-queue/${queue}`;
-    return this.request(url, riotLeagueListSchema, 'league-v4.grandmaster');
-  }
-
-  async getMasterLeague(platform: Platform, queue = 'RANKED_SOLO_5x5'): Promise<RiotLeagueList> {
-    const url = `https://${platform}.api.riotgames.com/lol/league/v4/masterleagues/by-queue/${queue}`;
-    return this.request(url, riotLeagueListSchema, 'league-v4.master');
-  }
-
-  async getMatchIdsByPuuid(
-    regionOrPlatform: RegionalRouting | Platform,
-    puuid: string,
-    options: MatchIdsOptions = {},
-  ): Promise<string[]> {
-    const region = this.resolveRegion(regionOrPlatform);
-    const query = new URLSearchParams();
-
-    if (options.startTime !== undefined) query.set('startTime', String(options.startTime));
-    if (options.endTime !== undefined) query.set('endTime', String(options.endTime));
-    if (options.queue !== undefined) query.set('queue', String(options.queue));
-    if (options.type !== undefined) query.set('type', options.type);
-    if (options.start !== undefined) query.set('start', String(options.start));
-    if (options.count !== undefined) query.set('count', String(options.count));
-
-    const qs = query.toString();
-    const url = `https://${region}.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids${qs ? `?${qs}` : ''}`;
-    return this.request(url, riotMatchIdsSchema, 'match-v5.matchIds');
-  }
-
-  async getMatch(regionOrPlatform: RegionalRouting | Platform, matchId: string): Promise<RiotMatchDto> {
-    const region = this.resolveRegion(regionOrPlatform);
-    const url = `https://${region}.api.riotgames.com/lol/match/v5/matches/${matchId}`;
-    return this.request(url, riotMatchDtoSchema, 'match-v5.match');
-  }
-
-  async getMatchTimeline(
-    regionOrPlatform: RegionalRouting | Platform,
-    matchId: string,
-  ): Promise<unknown> {
-    const region = this.resolveRegion(regionOrPlatform);
-    const url = `https://${region}.api.riotgames.com/lol/match/v5/matches/${matchId}/timeline`;
-    return this.request(url, undefined, 'match-v5.timeline');
-  }
-
-  private resolveRegion(regionOrPlatform: RegionalRouting | Platform): RegionalRouting {
-    const regionalList: readonly string[] = ['europe', 'americas', 'asia', 'sea'];
-    if (regionalList.includes(regionOrPlatform)) {
-      return regionOrPlatform as RegionalRouting;
-    }
-    return platformToRegion(regionOrPlatform as Platform);
-  }
+  return {
+    platform,
+    sincePatch,
+    playersProcessed: players.length - playersSkipped,
+    playersSkipped,
+    playersFailed,
+    ...totals,
+    playerResults,
+  };
 }

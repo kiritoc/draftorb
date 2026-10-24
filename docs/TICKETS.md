@@ -9,6 +9,7 @@ Format: `ID | Title | Deps | Status | Acceptance`. Status: TODO, DOING, REVIEW, 
 - **T-003 | Data Dragon importer (S)** | T-002 | DONE | Script downloads latest version champions/items/runes -> `data/public/<patch>/champions.json, items.json, runes.json`. Acceptance: runs with `pnpm etl static`, validated by zod.
 - **T-002.b | Shared schema parity for D-020..D-023 (M)** | T-002 | TODO | Zod schemas + types for the role-keyed exports `roles/<ROLE>/{baseline,ally-pairs,enemy-pairs,lane-vs,lane-full}.json`, `roles/<ROLE>/runes/<championId>.json`, `roles/<ROLE>/builds/<championId>.json` (DATA_MODEL.md); `games_w2` on every exported row; reason type `lane`; `DraftResult` with `insufficientData` (`{ championId, nEff, rawGames }`); manifest `roles` list and `schemaVersion` bump. Acceptance (D-011): schemas + tests that fail if a required schema or field is missing; no logic.
 - **T-004 | Support champion tags (M)** | T-003 | DONE | `data/manual/champion-tags.json` with all supports + common flex picks, schema in shared. Acceptance: validation script passes; coverage report lists missing champions.
+- **T-005 | Restore ETL workspace build (S)** | T-001 | DONE | Restore the CLI entrypoint and ETL module exports after source displacement. Acceptance: `pnpm check`, web production build, and `pnpm etl help` all pass.
 
 ## E1 ETL
 

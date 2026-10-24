@@ -98,7 +98,11 @@ describe('player discovery', () => {
       .get('player-discovery:euw1:EMERALD') as { value: string } | undefined;
     expect(progress).toBeDefined();
     if (typeof progress?.value !== 'string') throw new Error('No progress value');
-    expect(JSON.parse(progress.value)).toMatchObject({ completed: true, status: 'complete', stored: 2 });
+    expect(JSON.parse(progress.value)).toMatchObject({
+      completed: true,
+      status: 'complete',
+      stored: 2,
+    });
 
     db.close();
   });
@@ -128,7 +132,10 @@ describe('player discovery', () => {
       .get('player-discovery:euw1:DIAMOND') as { value: string };
     const parsed = JSON.parse(progress.value);
     parsed.updatedAt = Date.now() - 10 * 24 * 60 * 60 * 1000;
-    db.prepare('UPDATE ingest_state SET value = ? WHERE key = ?').run(JSON.stringify(parsed), 'player-discovery:euw1:DIAMOND');
+    db.prepare('UPDATE ingest_state SET value = ? WHERE key = ?').run(
+      JSON.stringify(parsed),
+      'player-discovery:euw1:DIAMOND',
+    );
 
     const second = await discoverPlayersByTier({
       platform: 'euw1',
@@ -139,7 +146,7 @@ describe('player discovery', () => {
       maxAgeDays: 7,
     });
     expect(second.tierResults[0]?.status).toBe('complete');
-    expect(getLeagueEntries).toHaveBeenCalledTimes(2 + 4);
+    expect(getLeagueEntries).toHaveBeenCalledTimes(4 * 2);
     db.close();
   });
 

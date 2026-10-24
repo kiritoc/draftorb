@@ -18,7 +18,8 @@ export function resolveRepoRoot(start = process.cwd()): string {
 }
 
 export function resolveDbPath(explicit?: string): string {
-  const chosen = explicit ?? process.env.DRAFTORB_DB_PATH ?? join(resolveRepoRoot(), 'data', 'DraftOrb.sqlite');
+  const chosen =
+    explicit ?? process.env.DRAFTORB_DB_PATH ?? join(resolveRepoRoot(), 'data', 'DraftOrb.sqlite');
   const resolved = resolve(chosen);
   mkdirSync(dirname(resolved), { recursive: true });
   return resolved;

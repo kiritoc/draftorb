@@ -49,6 +49,19 @@ T-011.b (Migration 004) and T-002.b (Shared schema parity for D-020..D-023), the
 - Pitfalls / notes for next AI:
 ```
 
+### 2026-10-24 — Copilot SDK in VS Code — Ticket T-005
+
+- Done:
+  - Restored the ETL CLI entrypoint and placed the Riot client, match ingestion, and player discovery implementations in their correct modules.
+  - Fixed ETL imports, revalidated match payloads before processing, and limited each division's contribution to the player quota.
+  - Restored the complete Riot client regression suite and aligned its schema-mismatch test with the explicit `RiotSchemaError` behavior.
+  - Excluded machine-local `.devin/` settings from repository-wide formatting checks.
+- Files touched: `.prettierignore`, `docs/BUGS.md`, `docs/PROGRESS.md`, `docs/TICKETS.md`, `packages/etl/src/cli.ts`, `packages/etl/src/matches.ts`, `packages/etl/src/players.test.ts`, `packages/etl/src/players.ts`, `packages/etl/src/riot/client.test.ts`, `packages/etl/src/riot/client.ts`
+- Tests: `pnpm check` (9 files, 85 tests passed), `pnpm --filter @draftorb/web build`, and `pnpm etl help` all passed.
+- State left: DONE
+- Next step: T-011.b and T-002.b (both unblocked), then T-014.
+- Pitfalls / notes for next AI: keep the ETL entrypoint and source modules at their current paths; tests import the Riot client and types relative to `src/riot/`.
+
 ### 2026-10-24 — Devin — PR A: tooling baseline
 
 - Done:

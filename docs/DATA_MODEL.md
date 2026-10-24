@@ -9,7 +9,8 @@ CREATE TABLE players (
 );
 CREATE TABLE matches (
   match_id TEXT PRIMARY KEY, platform TEXT, patch TEXT, queue_id INTEGER,
-  duration INTEGER, created_at INTEGER, avg_rank_score REAL, fetched_timeline INTEGER DEFAULT 0
+  duration INTEGER, created_at INTEGER, avg_rank_score REAL,
+  rank_known_count INTEGER DEFAULT 0, fetched_timeline INTEGER DEFAULT 0
 );
 CREATE TABLE participants (
   match_id TEXT, puuid TEXT, team_id INTEGER, champion_id INTEGER,
@@ -26,9 +27,14 @@ CREATE TABLE item_events (    -- from timelines (epic E5)
   team_gold_diff INTEGER, kills_diff INTEGER
 );
 CREATE TABLE ingest_state (key TEXT PRIMARY KEY, value TEXT);  -- cursors for resumability
+CREATE TABLE match_rejects (  -- matches seen and rejected, deduped across players
+  match_id TEXT PRIMARY KEY, reason TEXT NOT NULL,
+  patch TEXT,                 -- actual patch of the match (reason='patch' only)
+  checked_at INTEGER NOT NULL
+);
 CREATE INDEX idx_part_champ_role ON participants(champion_id, role);
 ```
-Notes: `rank_score` = coarse tier/division score at collection time (approximation, documented in RIOT_API.md). Exact rank ordering uses the stored `tier`, `division`, and `lp` fields separately. The score uses the D-016 tier base and division bonus formula; it excludes LP and is distinct from the SPECS §3 weighting buckets. Store only needed fields.
+Notes: `rank_score` = coarse tier/division score at collection time (approximation, documented in RIOT_API.md). Exact rank ordering uses the stored `tier`, `division`, and `lp` fields separately. The score uses the D-016 tier base and division bonus formula; it excludes LP and is distinct from the SPECS §3 weighting buckets. Store only needed fields. `match_rejects` records match ids already evaluated and rejected (wrong queue, too short, off-patch, invalid payload) so shared matches are not re-fetched per player; a `patch` reject keeps the match's actual patch so it is re-evaluated once a run's `--since-patch` window includes it (D-017).
 
 ## Aggregated tables (SQLite) — recomputed per patch
 - `role_prob(champion_id, role, games, prob)`

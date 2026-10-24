@@ -8,6 +8,10 @@ Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATI
 
 No new bugs were identified during the D-016 formula confirmation; player discovery remains within the current ETL scope.
 
+No new bugs were identified during T-013 (match ingestion); rejected match ids are tracked by design in `match_rejects`, not as bug candidates.
+
+No new bugs were identified while revising T-013 patch-window and rank-known-count behavior.
+
 ## Template (copy below the table when detailed)
 ```
 ### B-001 — Title

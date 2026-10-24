@@ -77,6 +77,25 @@ export {
 } from './riot';
 
 export {
+  DEFAULT_MATCHES_PER_PLAYER,
+  DEFAULT_MIN_DURATION_SECONDS,
+  RANKED_SOLO_QUEUE_ID,
+  ingestMatches,
+  type MatchIngestionOptions,
+  type MatchIngestionResult,
+  type PlayerIngestionResult,
+} from './matches';
+export {
+  comparePatches,
+  evaluateMatch,
+  patchFromGameVersion,
+  windowWidened,
+  type MatchOutcome,
+  type PlayerCursor,
+  type RejectReason,
+} from './matches-store';
+
+export {
   DEFAULT_PLAYER_QUOTAS,
   DEFAULT_PLAYER_TIER_SEQUENCE,
   discoverPlayersByTier,

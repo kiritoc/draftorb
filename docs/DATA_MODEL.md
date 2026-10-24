@@ -46,6 +46,8 @@ CREATE INDEX idx_part_champ_role ON participants(champion_id, role);
 
 Notes: match ingestion persists the match row and its 10 participant rows in one transaction. A match is accepted only when each of two teams has exactly one participant in each role; invalid layouts are rejected and have no stored participants. `rank_score` = coarse tier/division score at collection time (approximation, documented in RIOT_API.md). Exact rank ordering uses the stored `tier`, `division`, and `lp` fields separately. The score uses the D-016 tier base and division bonus formula; it excludes LP and is distinct from the SPECS §3 weighting buckets. Store only needed fields. `match_rejects` records match ids already evaluated and rejected (wrong queue, too short, off-patch, invalid payload) so shared matches are not re-fetched per player; a `patch` reject keeps the match's actual patch so it is re-evaluated once a run's `--since-patch` window includes it (D-017).
 
+`champions.json.roles` is a bootstrap hint derived from Data Dragon champion tags, not an authoritative role source. Observed `role_prob` data is authoritative; T-015.b will derive champion roles from `role-prob.json` and remove the bootstrap hint.
+
 ## Aggregated tables (SQLite) — recomputed per patch; role-generic (Phase 1 populates only `my_role = 'SUPPORT'`)
 
 - `role_prob(champion_id, role, games, prob)`

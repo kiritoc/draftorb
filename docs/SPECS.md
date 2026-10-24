@@ -26,7 +26,7 @@ Any subset can be empty. Engine must never crash on missing info.
 ## 3. Rank logic
 Rank buckets for weighting (distinct from persisted `rank_score` in DATA_MODEL.md): IRON=0, BRONZE=1, SILVER=2, GOLD=3, PLATINUM=4, EMERALD=5, DIAMOND=6, MASTER+(M/GM/C)=7 (config in `engine/config.ts`). Persisted player `rank_score` uses the accepted D-016 tier/division formula and is not an exact rank or a weighting bucket.
 - **Draft probabilities** (pairs, matchups, baselines): weight per game `w = exp(-|gameRank - userRank| / tau)`, tau=1.25 (config). Never use data below userRank-2 tiers.
-- **Runes & items**: use games with `gameRank >= userRank` (up to Challenger). Weight `w = min(1 + alpha*(gameRank-userRank), wMax)`, alpha=0.25, wMax=2.0. Only players with `championGames >= minChampGames` (default 30 on that champ). Show both winrate and pick share among those players.
+- **Runes & items**: use games with `gameRank >= userRank` (up to Challenger). Weight `w = min(1 + alpha*(gameRank-userRank), wMax)`, alpha=0.25, wMax=2.0. Only expert players (D-022): `champion_games >= minChampGames` (default 30) in our data, with the champion-mastery-v4 fallback applied only to participants of the user's role (`is_expert` flag). Show both winrate and pick share among those players.
 - Optional UI toggle: "Master+ only".
 - Recency: multiply by `decay^(currentPatchIndex - gamePatchIndex)` (decay=0.85).
 - Patch window: ingestion keeps every patch >= `--since-patch` (D-017); recency is applied here, at aggregation time, never by dropping games at ingestion.

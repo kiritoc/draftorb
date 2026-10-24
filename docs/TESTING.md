@@ -16,12 +16,16 @@
 - Roles unknown for all champions -> inference gives sensible assignment, lower confidence reduces weights.
 - Flex champion (e.g. plays mid/support) in enemy team -> confidence split.
 - Low data pair -> `lowData` flag, delta 0.
-- Pool filter -> only pool champions.
+- Empty pool -> only the overall list; non-empty pool -> `poolRecommendations` in overall order with `poolRank` (D-024).
+- Pool champion without data -> `poolUnavailable` + `insufficientData`; unknown pool id -> `poolUnavailable`.
+- Pool champion below the role threshold -> scored with the `offRole` warning.
+- Web pagination: page boundaries, exhaustion hides the button, reset on draft change, two lists independent.
 - Rank switch Emerald vs Diamond changes ordering only through data weights.
 - Same input twice -> identical output (determinism).
 
 ## Property checks
 
+- The pool never changes any score: same scores with and without a pool; `poolRecommendations` is a subsequence of `recommendations`.
 - Score never NaN; recommendations sorted desc; reasons reference only known slots; no crash with empty input.
 
 ## Rules

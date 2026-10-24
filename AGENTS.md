@@ -27,6 +27,12 @@ Project: **DraftOrb** — a free League of Legends tool that (1) recommends a ch
 9. **Spec unclear?** Do not guess silently: write the question + your assumption in `docs/DECISIONS.md` (status `PROPOSED`), then proceed with the assumption.
 10. **Before ending a session**: update `PROGRESS.md`, `TICKETS.md`, `BUGS.md` (see `docs/WORKFLOW.md` > End of session).
 
+## Product invariants (D-024, apply to every UI/engine change)
+
+- The recommendation screen **always shows a "Best overall" list**, even when the user has no pool.
+- The user can keep a **personal champion pool** (browser-only, per role). When it is non-empty a **"From your pool"** list is shown too. The pool only groups results: it **never changes scores or order** (SPECS §2.1, §7.1).
+- Both lists are **paginated with "Show more"**: first 5, then the next 5, until the list is exhausted. The engine always returns complete lists; the UI slices them.
+
 ## Commands (once T-001 is done)
 
 ```

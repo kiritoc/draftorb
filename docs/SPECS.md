@@ -9,6 +9,7 @@ Status of this doc: v0.2 (ranking model D-020..D-023) — edit via `DECISIONS.md
 - UC3 Runes: after choosing, get best rune page for this context.
 - UC4 Items in game: given game state -> next item(s) to buy, with reason.
 - UC5 (later) Auto-fill draft/state from client or screen.
+- UC6 Champion pool: the user keeps a personal pool of champions they play well and sees the best picks from that pool for the current draft AND the best picks overall (to learn a new champion), each list with a "Show more" button (D-024).
 
 ## 2. Inputs (Draft)
 
@@ -19,12 +20,19 @@ DraftInput {
   allies: Slot[]            // up to 4 others
   enemies: Slot[]           // up to 5
   blindPick: boolean
-  pool?: ChampionId[]       // optional filter
+  pool?: ChampionId[]       // pool of userRole (D-024): never changes scores, only fills poolRecommendations
 }
 Slot { championId: ChampionId, role?: Role }   // role optional
 ```
 
 Any subset can be empty. Engine must never crash on missing info.
+
+### 2.1 Champion pool (D-024)
+
+- A per-role list of champion ids owned by the user, stored only in the browser (`localStorage` key `draftorb.pool.v1`, versioned envelope `{ version: 1, pools: { <ROLE>: ChampionId[] } }`, zod-validated). No account, no server. Max `poolMaxSize` (UI config, default 40) per role. Phase 1 exposes SUPPORT only; storage is role-keyed.
+- Resilience: unavailable, full or corrupted storage gives an empty pool plus a visible notice, never a crash; ids absent from the current `champions.json` are dropped with a notice.
+- Export/import as JSON text (validated before it replaces the stored pool), to back up or move devices.
+- The pool never changes scores: it only selects and groups results (see §5 candidate set and §7.1).
 
 ## 3. Rank logic
 
@@ -49,7 +57,7 @@ Rank buckets for weighting (distinct from persisted `rank_score` in DATA_MODEL.m
 
 ## 5. Scoring a candidate `c` for `myRole` (Phase 1: `myRole` = SUPPORT)
 
-Candidate set: champions with `roleProb[c][myRole] >= 0.05` (or user pool).
+Candidate set: champions with `roleProb[c][myRole] >= 0.05`, plus every champion of the user pool (D-024). A pool champion below the threshold is still scored when it passes the baseline gate below and carries the warning `offRole`. The pool never changes any score.
 
 All effects are combined on the log-odds scale (`logit(p) = ln(p / (1 - p))`, `sigmoid` = its inverse) and every context layer is shrunk toward the layer below it (D-021). Weighted counts are converted to _equivalent counts_ before shrinkage (weights are <= 1, so `k` is in raw-game units): `games_e = n_eff`, `wins_e = wins_w * n_eff / games_w`.
 
@@ -109,18 +117,30 @@ Validation (T-020): every cell defined and in [0, 1]; the opponent cell is the r
 
 ```
 Recommendation {
-  championId, score, rank,
+  championId, score, rank,       // rank = overall rank (global), also inside poolRecommendations
+  poolRank?: number              // rank inside the user's pool (D-024); only set in poolRecommendations
   reasons: Reason[]    // {type:'synergy'|'counter'|'lane'|'comp'|'blind', with: ChampionId[]?, level:1|2|3|-1|-2|-3, deltaPp, n, lowData}
   reliability: { games: number, lowData: boolean }
-  warnings: string[]   // e.g. "countered by enemy support X"
+  warnings: string[]   // e.g. "countered by enemy support X", "offRole" (pool champion rarely played in this role)
 }
 DraftResult {
-  recommendations: Recommendation[]                    // ranked candidates only
+  recommendations: Recommendation[]                    // overall ranking: ALL scored candidates, never truncated by the engine (D-024)
   insufficientData: { championId, nEff: number, rawGames: number }[]  // baseline n_eff < minGames (§5), unscored
+  poolRecommendations?: Recommendation[]               // only when input.pool is non-empty: scored pool champions in overall order (`rank` = overall rank, `poolRank` = rank in the pool)
+  poolUnavailable?: { championId, reason: 'insufficientData' | 'unknownChampion' }[]  // pool champions without a score (numbers live in insufficientData)
 }
 ```
 
-Sorted desc. Always show why + sample sizes. Never show a % without sample size. Reason type `lane` and `DraftResult.insufficientData` are added to the shared schemas by T-002.b.
+Sorted desc. Always show why + sample sizes. Never show a % without sample size. Reason type `lane`, `DraftResult.insufficientData` and the pool fields (`poolRank`, `poolRecommendations`, `poolUnavailable`) are added to the shared schemas by T-002.b.
+
+## 7.1 Recommendation lists (D-024)
+
+- Two lists, one card component: **From your pool** (`poolRecommendations`, shown first when the pool is non-empty; with an empty pool a one-line call to action to add champions) and **Best overall** (`recommendations`, always shown, even with an empty pool).
+- Both lists are the engine's complete output, sliced client-side: the first `recommendationPageSize` items (default 5, `apps/web/src/config.ts`), then a "Show N more" button reveals the next N (N = page size) each time until the list is exhausted. A "Showing X of Y" label is always visible and the button disappears when nothing remains. The two lists are paginated independently.
+- The overall list also contains pool champions, tagged "In your pool". A UI-only toggle "Hide my pool" (default off) lets the user focus on champions to learn. Ranks always stay global, so gaps are expected when the toggle is on.
+- Pool cards show both ranks ("#2 in your pool · #14 overall"). Pool champions without a score are listed after the ranked ones with the reason and sample size ("not enough data (n_eff 12)"); they are never hidden.
+- Visible counts reset to the page size when the draft input changes (and the pool list when the pool changes). The "Show more" control is a real `<button>`, keyboard reachable, and the count label is an `aria-live="polite"` region.
+- Determinism: the same draft input gives the same lists in the same order; the pool changes grouping only, never scores or order.
 
 ## 8. Runes & Items
 
@@ -163,9 +183,10 @@ Order of preference:
 - Engine call < 50 ms for a full draft on a mid laptop.
 - Static hosting, JSON data files < 5 MB each (gzip), lazy loaded.
 - Works offline after first load (nice-to-have).
-- Accessible UI, keyboard champion search.
+- Accessible UI, keyboard champion search; the pool editor and the "Show more" buttons are keyboard accessible.
+- The pool stays in the browser (never sent anywhere).
 - Show current patch + data freshness.
 
 ## 11. Out of scope (Phase 1)
 
-Non-support roles, accounts/login, server-side code, paid anything, mobile app, replays. The engine and data model are role-generic (D-020/D-021); only the SUPPORT role is populated and exposed in Phase 1.
+Non-support roles, accounts/login, pool sync across devices or auto-import of the pool from a Riot account, server-side code, paid anything, mobile app, replays. The engine and data model are role-generic (D-020/D-021); only the SUPPORT role is populated and exposed in Phase 1.

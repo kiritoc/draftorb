@@ -82,7 +82,8 @@ P(c) = sigmoid(x);  score(c) = P(c)
 - Reported deltas: each reason's `deltaPp = 100 * (sigmoid(x_before + term) - sigmoid(x_before))`, in the order the terms are added; the total delta is `100 * (P(c) - p0)`.
 - **Levels 1-3** (like Karakal): from a reason's `deltaPp` — L1 >= +1.0pp, L2 >= +2.5pp, L3 >= +4.5pp (needs `n_eff >= 100`). Negative symmetric (counter-picked). Show badge in UI.
 - `compNeed`: from champion tags (see 6): reward filling missing needs (e.g. team has no engage, damage all AD...). Small weight in log-odds units, explained in UI.
-- `blindSafety(c)`: expected term against the distribution of likely enemy supports/ADCs weighted by pick rate: `sum_e pickShare(e) * pairTerm(c, e)`, plus penalty for worst-case matchup (min term). Used when blindPick = true or fewer than 2 lane enemies known.
+- `blindSafety(c)`: expected term against the distribution of likely enemy lane opponents weighted by pick rate: `sum_e pickShare(e) * pairTerm(c, e)`, plus penalty for worst-case matchup (min term). Used when blindPick = true or fewer than 2 lane enemies known.
+- Validation (D-023/T-027.a): every parameter in this section is a prior until a backtest passes — frozen temporal holdout, rolling validation for tuning, paired-bootstrap gate on log-loss vs the baseline-only model.
 
 ## 6. Manual data (tags)
 `data/manual/champion-tags.json` (validated by zod): per champion: `damageType` (AP/AD/mixed/none), `archetype` (enchanter/engage/poke/catch/tank/...), booleans `hardEngage`, `peel`, `poke`, `waveclear`, `scaling` (early/mid/late), `range`, `ccCount`. Used for compNeed, cold-start priors, and explanations.

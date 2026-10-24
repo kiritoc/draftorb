@@ -29,7 +29,8 @@ Format: `ID | Title | Deps | Status | Acceptance`. Status: TODO, DOING, REVIEW, 
 - **T-024 | Blind pick mode (M)** | T-023 | TODO | blindSafety. Acceptance: with no enemies, ranking = safe picks; test.
 - **T-025 | Comp needs (M)** | T-004,T-023 | TODO | damage mix/engage/frontline needs. Acceptance: explained in reasons.
 - **T-026 | Golden test suite (M)** | T-023 | TODO | 20+ scenarios (blind, 1 champ known, full draft, unknown roles, low data).
-- **T-027 | Backtest harness (M)** | T-017,T-023 | TODO | `pnpm etl backtest` (D-023): temporal holdout, log-loss/Brier/calibration vs 0.5 and baseline-only, masked drafts, slot ablation for influence calibration. Acceptance: report JSON written; holdout matches never used in aggregates (test); toy dataset with a planted matchup effect is detected.
+- **T-027.a | Backtest harness: draft (M)** | T-017,T-023 | TODO | `pnpm etl backtest draft` (D-023): frozen temporal holdout, rolling validation for tuning, paired-bootstrap gate (`bootstrapResamples`, `logLossTolerance`), log-loss/Brier/calibration vs 0.5 and baseline-only, masked drafts, layer coverage + per-layer/slot ablation for influence calibration, optional ablation down-weighting games by `champion_games` (one-trick check, D-004). Per `myRole`/phase. Acceptance: report JSON written; holdout never in aggregates (test); toy dataset with a planted matchup effect detected for at least TOP and SUPPORT.
+- **T-027.b | Backtest harness: runes/items (M)** | T-018,T-051 | TODO | `pnpm etl backtest items` (D-023): calibration of the shrunk context win rates on holdout purchases, per `myRole`/phase, paired bootstrap vs baseline. Acceptance: report JSON written; toy dataset.
 
 ## E3 Web MVP
 - **T-030 | Web scaffold + data loader (S)** | T-001,T-019 | TODO | Vite/React/Tailwind, loads manifest + JSON, shows patch. Acceptance: runs with sample data.
@@ -50,7 +51,7 @@ Format: `ID | Title | Deps | Status | Acceptance`. Status: TODO, DOING, REVIEW, 
 - **T-053 | Threat score (M)** | T-052 | TODO | SPECS §8.2.2. Acceptance: tests with fed/not fed scenarios.
 - **T-054 | Item recommender v1 (rules) (L)** | T-050,T-053 | TODO | ahead/behind logic, fed counter-items, reasons.
 - **T-055 | Items UI (manual input) (L)** | T-054 | TODO | Fast entry of scores+items per player.
-- **T-056 | Item recommender v2 (data-driven) (L)** | T-051,T-054 | TODO | Like-for-like context winrates (D-022) replace rules where `n_eff >= minGames`. Acceptance: back-off order tested; calibration checked by T-027 on holdout purchases.
+- **T-056 | Item recommender v2 (data-driven) (L)** | T-027.b,T-051,T-054 | TODO | Like-for-like context winrates (D-022) replace rules where `n_eff >= minGames`. Acceptance: back-off order tested; calibration checked by T-027.b on holdout purchases.
 
 ## E6 Live
 - **T-060 | LCU champ select adapter (M)** | T-031 | TODO | Reads session, emits DraftInput. Policy check recorded in DECISIONS.md.

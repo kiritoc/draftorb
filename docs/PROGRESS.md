@@ -3,7 +3,7 @@
 ## Current status
 - Phase: 1 (Support / Diamond)
 - Current milestone: M0 Foundations (Complete) -> M1 ETL (Complete) -> M2 Engine
-- Last updated: 2026-10-23 by Devin
+- Last updated: 2026-10-24 by Devin
 
 ## Epic status
 | Epic | Status | Notes |
@@ -41,12 +41,36 @@ T-014 (Participant extraction)
 - Pitfalls / notes for next AI:
 ```
 
+### 2026-10-24 — Devin — Ticket T-013 (D-017/D-019 revisions)
+- Done:
+  - Changed `--since-patch` to a numeric lower-bound window; patch rejects are re-evaluated when included, and cursors relist in full only when the window widens.
+  - Stored `rank_known_count` alongside the mean known-participant `avg_rank_score`, with a fallback to the seed player's score when no participants are known.
+  - Added migration `003_matches_rank_known.sql`, tests, and the approved D-017/D-019 documentation.
+- Files touched:
+  - `docs/BUGS.md`
+  - `docs/DATA_MODEL.md`
+  - `docs/DECISIONS.md`
+  - `docs/PROGRESS.md`
+  - `packages/etl/migrations/003_matches_rank_known.sql`
+  - `packages/etl/src/cli.ts`
+  - `packages/etl/src/db/migrate.test.ts`
+  - `packages/etl/src/index.ts`
+  - `packages/etl/src/matches-store.ts`
+  - `packages/etl/src/matches.test.ts`
+  - `packages/etl/src/matches.ts`
+- Tests: `pnpm test` (9 files, 83 tests passed), `pnpm typecheck`, `pnpm lint`, CLI invalid `--since-patch` usage smoke (exit 2 with the expected error), and `git diff --check` passed.
+- State left: REVIEW
+- Next step: Owner review; CI loop to be handled after re-brief.
+- Pitfalls / notes for next AI:
+  - Use Node 22 for ETL tests on this VM; Node 20.19.0 segfaults while loading `better-sqlite3`.
+
 ### 2026-10-23 — Devin — Ticket T-013
 - Done:
-  - Implemented match ingestion in `packages/etl/src/matches.ts` + `matches-store.ts`: per-player ranked solo id listing (queue 420, `type=ranked`, paged by 100), fetch + zod revalidation of every `getMatch` payload (client returns raw on schema mismatch -> counted `invalid`, recorded in `match_rejects`), filters (queue, duration < 15 min, `--patch`), storage in `matches` with `INSERT OR IGNORE`.
-  - Resumability: per-player cursor in `ingest_state` (`match-ingest:<platform>:<puuid>`) persists the id snapshot + `processed` after every match, so kill/restart resumes mid-player; `done` cursors list only ids newer than `lastGameCreation` via Riot `startTime` (epoch seconds), and relist in full when the run's `--patch` differs from the cursor's. `--reset` wipes the platform's cursors and all `match_rejects`; `--limit` takes pending players before done ones.
-  - Dedup: new `match_rejects` table (migration `002_match_rejects.sql`) remembers rejected ids across players; `patch` rejects keep the actual patch and are re-evaluated when a run targets it (D-017).
-  - CLI `pnpm etl matches [platform] [--patch=16.21] [--per-player=20] [--limit=N] [--queue=420] [--min-duration=900] [--reset]` with per-player progress log (`[i/n] puuid… ids=.. stored=.. dup=.. filtered=.. invalid=..`).
+  - Implemented match ingestion in `packages/etl/src/matches.ts` + `matches-store.ts`: per-player ranked solo id listing (queue 420, `type=ranked`, paged by 100), fetch + zod revalidation of every `getMatch` payload (client returns raw on schema mismatch -> counted `invalid`, recorded in `match_rejects`), filters (queue, duration < 15 min, `--since-patch` lower bound), storage in `matches` with `INSERT OR IGNORE`.
+  - Resumability: per-player cursor in `ingest_state` (`match-ingest:<platform>:<puuid>`) persists the id snapshot + `processed` after every match, so kill/restart resumes mid-player; `done` cursors list only ids newer than `lastGameCreation` via Riot `startTime` (epoch seconds), and relist in full when the run widens the cursor's patch window (`--since-patch` lowered or removed). Raising the lower bound keeps the incremental `startTime` path. `--reset` wipes the platform's cursors and all `match_rejects`; `--limit` takes pending players before done ones.
+  - Dedup: `match_rejects` (migration `002_match_rejects.sql`) remembers rejected ids across players; patch rejects keep the actual patch and are re-evaluated when the `--since-patch` window includes it (D-017).
+  - Match rows store `rank_known_count` with `avg_rank_score` (migration `003_matches_rank_known.sql`); unknown participants fall back to the seeding player's score.
+  - CLI `pnpm etl matches [platform] [--since-patch=16.19] [--per-player=20] [--limit=N] [--queue=420] [--min-duration=900] [--reset]` with per-player progress log (`[i/n] puuid… ids=.. stored=.. dup=.. filtered=.. invalid=..`).
   - Made `db/migrate.test.ts` assertions read the migration list from disk so adding migration files no longer breaks the suite.
   - Recorded ADRs D-017..D-019 (PROPOSED) in `docs/DECISIONS.md`.
 - Files touched:

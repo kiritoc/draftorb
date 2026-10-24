@@ -157,6 +157,35 @@ describe('migration runner', () => {
     db.close();
   });
 
+  it('should apply the rank-known migration once and default its count to zero', () => {
+    const db = openDb(':memory:');
+
+    expect(migrate(db)).toEqual(expectedVersions());
+    expect(migrate(db)).toEqual([]);
+
+    const columns = db.prepare('PRAGMA table_info(matches)').all() as {
+      name: string;
+      notnull: number;
+      dflt_value: string | null;
+    }[];
+    const rankKnownColumns = columns.filter((column) => column.name === 'rank_known_count');
+    expect(rankKnownColumns).toHaveLength(1);
+    expect(rankKnownColumns[0]?.notnull).toBe(1);
+    expect(rankKnownColumns[0]?.dflt_value).toBe('0');
+
+    db.prepare(
+      `INSERT INTO matches
+       (match_id, platform, patch, queue_id, duration, created_at, avg_rank_score)
+       VALUES ('test-match', 'euw1', '16.21', 420, 1800, 1, 6.5)`,
+    ).run();
+    const row = db
+      .prepare('SELECT rank_known_count FROM matches WHERE match_id = ?')
+      .get('test-match') as { rank_known_count: number } | undefined;
+    expect(row?.rank_known_count).toBe(0);
+
+    db.close();
+  });
+
   it('should support inserting into core tables', () => {
     const db = openDb(TEST_DB_PATH);
     migrate(db);

@@ -23,8 +23,8 @@ export interface PlayerCursor {
   snapshot: string[];
   processed: number;
   lastGameCreation: number;
-  /** Patch the cursor was written under; a run with a different patch relists in full. */
-  patch?: string;
+  /** Lower-bound patch window used by the cursor. */
+  sincePatch?: string;
   stored: number;
   duplicates: number;
   filtered: number;
@@ -50,7 +50,7 @@ export function readCursor(db: Database.Database, key: string): PlayerCursor | n
       snapshot: parsed.snapshot.filter((id): id is string => typeof id === 'string'),
       processed: Math.max(0, Math.min(parsed.processed, parsed.snapshot.length)),
       lastGameCreation: typeof parsed.lastGameCreation === 'number' ? parsed.lastGameCreation : 0,
-      patch: typeof parsed.patch === 'string' ? parsed.patch : undefined,
+      sincePatch: typeof parsed.sincePatch === 'string' ? parsed.sincePatch : undefined,
       stored: parsed.stored ?? 0,
       duplicates: parsed.duplicates ?? 0,
       filtered: parsed.filtered ?? 0,
@@ -71,40 +71,61 @@ export function writeCursor(db: Database.Database, key: string, cursor: PlayerCu
 
 /**
  * Returns the known rejection for a match id, `null` when it must be
- * (re-)evaluated. A 'patch' reject is only authoritative while the run's
- * target patch differs from the patch stored in the row; when the run targets
- * that patch (or no patch at all) the row is dropped and the match refetched.
+ * (re-)evaluated. A 'patch' reject is dropped when the run's window includes
+ * the match's actual patch, or when no lower bound is set.
  */
 export function findRejection(
   db: Database.Database,
   matchId: string,
-  targetPatch?: string,
+  sincePatch?: string,
 ): RejectRow | null {
   const row = db
     .prepare('SELECT reason, patch FROM match_rejects WHERE match_id = ?')
     .get(matchId) as RejectRow | undefined;
   if (!row) return null;
-  if (row.reason === 'patch' && (targetPatch === undefined || row.patch === targetPatch)) {
+  if (
+    row.reason === 'patch' &&
+    (sincePatch === undefined || (row.patch !== null && comparePatches(row.patch, sincePatch) >= 0))
+  ) {
     db.prepare('DELETE FROM match_rejects WHERE match_id = ?').run(matchId);
     return null;
   }
   return row;
 }
 
-/** Mean rank_score of the match's discovered participants; falls back to the seeding player. */
-export function meanRankScore(db: Database.Database, puuids: string[], fallback: number): number {
-  if (puuids.length === 0) return fallback;
+/** Mean rank_score of known participants and the number who contributed. */
+export function rankSummary(
+  db: Database.Database,
+  puuids: string[],
+  fallback: number,
+): { avg: number; known: number } {
+  if (puuids.length === 0) return { avg: fallback, known: 0 };
   const placeholders = puuids.map(() => '?').join(',');
   const rows = db
     .prepare(`SELECT rank_score FROM players WHERE puuid IN (${placeholders})`)
     .all(...puuids) as { rank_score: number }[];
-  if (rows.length === 0) return fallback;
-  return rows.reduce((sum, row) => sum + row.rank_score, 0) / rows.length;
+  if (rows.length === 0) return { avg: fallback, known: 0 };
+  return {
+    avg: rows.reduce((sum, row) => sum + row.rank_score, 0) / rows.length,
+    known: rows.length,
+  };
 }
 
 /** First two numbers of `gameVersion` (e.g. "14.21.628.9812" -> "14.21"). */
 export function patchFromGameVersion(gameVersion: string): string {
   return gameVersion.split('.').slice(0, 2).join('.');
+}
+
+/** Compare two major.minor patches numerically. */
+export function comparePatches(a: string, b: string): number {
+  const [aMajor = 0, aMinor = 0] = a.split('.').map(Number);
+  const [bMajor = 0, bMinor = 0] = b.split('.').map(Number);
+  return aMajor - bMajor || aMinor - bMinor;
+}
+
+/** Whether `next` expands the previously ingested lower-bound window. */
+export function windowWidened(previous?: string, next?: string): boolean {
+  return previous !== undefined && (next === undefined || comparePatches(next, previous) < 0);
 }
 
 /** Wipe match-ingestion cursors for a platform and every recorded rejection (`--reset`). */
@@ -118,11 +139,14 @@ export function evaluateMatch(
   match: RiotMatchDto,
   queueId: number,
   minDuration: number,
-  targetPatch?: string,
+  sincePatch?: string,
 ): { outcome: MatchOutcome; reason: RejectReason | null } {
   if (match.info.queueId !== queueId) return { outcome: 'filtered', reason: 'queue' };
   if (match.info.gameDuration <= minDuration) return { outcome: 'filtered', reason: 'short' };
-  if (targetPatch !== undefined && patchFromGameVersion(match.info.gameVersion) !== targetPatch) {
+  if (
+    sincePatch !== undefined &&
+    comparePatches(patchFromGameVersion(match.info.gameVersion), sincePatch) < 0
+  ) {
     return { outcome: 'filtered', reason: 'patch' };
   }
   return { outcome: 'stored', reason: null };

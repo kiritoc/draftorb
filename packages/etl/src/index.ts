@@ -86,8 +86,10 @@ export {
   type PlayerIngestionResult,
 } from './matches';
 export {
+  comparePatches,
   evaluateMatch,
   patchFromGameVersion,
+  windowWidened,
   type MatchOutcome,
   type PlayerCursor,
   type RejectReason,

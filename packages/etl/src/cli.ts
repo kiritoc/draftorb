@@ -307,7 +307,7 @@ async function runMatches(args: string[]): Promise<void> {
     strict: false,
     options: {
       platform: { type: 'string', short: 'p' },
-      patch: { type: 'string' },
+      'since-patch': { type: 'string' },
       'per-player': { type: 'string' },
       limit: { type: 'string' },
       queue: { type: 'string' },
@@ -320,9 +320,11 @@ async function runMatches(args: string[]): Promise<void> {
   const platform = parsePlatform(
     platformArg ?? (typeof values.platform === 'string' ? values.platform : undefined),
   );
-  const patch = typeof values.patch === 'string' ? values.patch : undefined;
-  if (patch !== undefined && !/^\d+\.\d+$/.test(patch)) {
-    throw new UsageError(`Invalid patch "${patch}". Expected a format like "16.21".`);
+  const sincePatch = typeof values['since-patch'] === 'string' ? values['since-patch'] : undefined;
+  if (sincePatch !== undefined && !/^\d+\.\d+$/.test(sincePatch)) {
+    throw new UsageError(
+      `Invalid --since-patch value "${sincePatch}". Expected a format like "16.19".`,
+    );
   }
   const parsePositiveInt = (value: unknown, flag: string): number | undefined => {
     if (value === undefined) return undefined;
@@ -339,14 +341,15 @@ async function runMatches(args: string[]): Promise<void> {
   const resetValue = values.reset === true;
 
   log.info(
-    `Ingesting ranked matches for platform "${platform}"${patch ? ` (patch ${patch})` : ''}...`,
+    `Ingesting ranked matches for platform "${platform}"` +
+      `${sincePatch ? ` (patches >= ${sincePatch})` : ''}...`,
   );
   const dbPath = resolveDbPath();
   const db = openDb(dbPath);
   try {
     const result = await ingestMatches({
       platform,
-      patch,
+      sincePatch,
       matchesPerPlayer,
       playerLimit,
       queueId,
@@ -424,7 +427,7 @@ const COMMANDS: readonly Command[] = [
   {
     name: 'matches',
     usage:
-      'matches [platform] [--patch=16.21] [--per-player=20] [--limit=N] [--queue=420] [--min-duration=900] [--reset]',
+      'matches [platform] [--since-patch=16.19] [--per-player=20] [--limit=N] [--queue=420] [--min-duration=900] [--reset]',
     description: 'Ingest ranked solo matches for discovered players (resumable, Ctrl+C safe)',
     run: runMatches,
   },

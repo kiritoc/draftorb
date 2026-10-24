@@ -20,9 +20,10 @@ import {
   evaluateMatch,
   findRejection,
   listMatchIds,
-  meanRankScore,
   patchFromGameVersion,
+  rankSummary,
   readCursor,
+  windowWidened,
   writeCursor,
   type PlayerCursor,
 } from './matches-store';
@@ -34,8 +35,8 @@ export const DEFAULT_MIN_DURATION_SECONDS = 15 * 60;
 
 export interface MatchIngestionOptions {
   platform?: Platform;
-  /** Target patch (e.g. "16.21"). When set, matches on other patches are rejected. */
-  patch?: string;
+  /** Lower-bound patch (e.g. "16.19"). Older matches are rejected. */
+  sincePatch?: string;
   /** Max match ids listed per player. */
   matchesPerPlayer?: number;
   /** Max players processed this run. */
@@ -62,7 +63,7 @@ export interface PlayerIngestionResult {
 
 export interface MatchIngestionResult {
   platform: Platform;
-  patch?: string;
+  sincePatch?: string;
   playersProcessed: number;
   playersSkipped: number;
   listed: number;
@@ -78,12 +79,16 @@ interface PlayerRow {
   rank_score: number;
 }
 
-const newCursor = (snapshot: string[], lastGameCreation = 0, patch?: string): PlayerCursor => ({
+const newCursor = (
+  snapshot: string[],
+  lastGameCreation = 0,
+  sincePatch?: string,
+): PlayerCursor => ({
   status: 'partial',
   snapshot,
   processed: 0,
   lastGameCreation,
-  patch,
+  sincePatch,
   stored: 0,
   duplicates: 0,
   filtered: 0,
@@ -98,7 +103,7 @@ export async function ingestMatches(
   const queueId = options.queueId ?? RANKED_SOLO_QUEUE_ID;
   const minDuration = options.minDurationSeconds ?? DEFAULT_MIN_DURATION_SECONDS;
   const perPlayer = options.matchesPerPlayer ?? DEFAULT_MATCHES_PER_PLAYER;
-  const targetPatch = options.patch;
+  const sincePatch = options.sincePatch;
   const log = options.onProgress ?? (() => {});
 
   const client = options.client ?? new RiotClient({ autoLoadEnv: true });
@@ -140,8 +145,10 @@ export async function ingestMatches(
   const hasMatch = db.prepare('SELECT 1 AS one FROM matches WHERE match_id = ?');
   const insertMatch = db.prepare(
     `INSERT OR IGNORE INTO matches
-       (match_id, platform, patch, queue_id, duration, created_at, avg_rank_score, fetched_timeline)
-     VALUES (@match_id, @platform, @patch, @queue_id, @duration, @created_at, @avg_rank_score, 0)`,
+       (match_id, platform, patch, queue_id, duration, created_at, avg_rank_score,
+        rank_known_count, fetched_timeline)
+     VALUES (@match_id, @platform, @patch, @queue_id, @duration, @created_at, @avg_rank_score,
+        @rank_known_count, 0)`,
   );
   const insertReject = db.prepare(
     `INSERT OR REPLACE INTO match_rejects (match_id, reason, patch, checked_at)
@@ -152,12 +159,11 @@ export async function ingestMatches(
     const key = cursorKey(platform, player.puuid);
     let cursor = options.reset ? null : readCursor(db, key);
 
-    if (cursor && cursor.patch !== targetPatch) {
-      // Patch changed since this cursor was written: relist in full so ids
-      // outside the incremental window (older patch-rejected games) are
-      // re-evaluated against the new target patch.
+    if (cursor && windowWidened(cursor.sincePatch, sincePatch)) {
+      // A wider window may include older patch-rejected matches outside the
+      // incremental listing, so relist the player's full history.
       const ids = await listMatchIds(client, platform, player.puuid, queueId, perPlayer);
-      cursor = newCursor(ids, cursor.lastGameCreation, targetPatch);
+      cursor = newCursor(ids, cursor.lastGameCreation, sincePatch);
     } else if (cursor?.status === 'done') {
       // Incremental refresh: only ids newer than the last seen game creation.
       const newIds = await listMatchIds(
@@ -181,10 +187,10 @@ export async function ingestMatches(
         });
         continue;
       }
-      cursor = newCursor(newIds, cursor.lastGameCreation, targetPatch);
+      cursor = newCursor(newIds, cursor.lastGameCreation, sincePatch);
     } else if (!cursor) {
       const ids = await listMatchIds(client, platform, player.puuid, queueId, perPlayer);
-      cursor = newCursor(ids, 0, targetPatch);
+      cursor = newCursor(ids, 0, sincePatch);
     }
 
     // `base` carries counts persisted by earlier runs; `run` counts this run only.
@@ -201,7 +207,7 @@ export async function ingestMatches(
       const matchId = cursor.snapshot[i] as string;
       let outcome: 'stored' | 'duplicate' | 'filtered' | 'invalid';
 
-      if (findRejection(db, matchId, targetPatch)) {
+      if (findRejection(db, matchId, sincePatch)) {
         outcome = 'filtered';
       } else if ((hasMatch.get(matchId) as { one: number } | undefined) !== undefined) {
         outcome = 'duplicate';
@@ -219,10 +225,11 @@ export async function ingestMatches(
             checked_at: Date.now(),
           });
         } else {
-          const evaluated = evaluateMatch(parsed.data, queueId, minDuration, targetPatch);
+          const evaluated = evaluateMatch(parsed.data, queueId, minDuration, sincePatch);
           outcome = evaluated.outcome;
           if (evaluated.reason === null) {
             lastGameCreation = Math.max(lastGameCreation, parsed.data.info.gameCreation);
+            const rank = rankSummary(db, parsed.data.metadata.participants, player.rank_score);
             const change = insertMatch.run({
               match_id: matchId,
               platform,
@@ -230,11 +237,8 @@ export async function ingestMatches(
               queue_id: parsed.data.info.queueId,
               duration: parsed.data.info.gameDuration,
               created_at: parsed.data.info.gameCreation,
-              avg_rank_score: meanRankScore(
-                db,
-                parsed.data.metadata.participants,
-                player.rank_score,
-              ),
+              avg_rank_score: rank.avg,
+              rank_known_count: rank.known,
             });
             if (change.changes === 0) outcome = 'duplicate';
           } else {
@@ -301,7 +305,7 @@ export async function ingestMatches(
 
   return {
     platform,
-    patch: targetPatch,
+    sincePatch,
     playersProcessed: players.length - playersSkipped,
     playersSkipped,
     ...totals,

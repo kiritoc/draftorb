@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { openDb, migrate } from './db';
 import { ingestMatches } from './matches';
-import { cursorKey, patchFromGameVersion } from './matches-store';
+import { comparePatches, cursorKey, patchFromGameVersion, windowWidened } from './matches-store';
 import type { Platform, RiotClient, RiotMatchDto } from './riot';
 
 const PLATFORM: Platform = 'euw1';
@@ -59,6 +59,16 @@ describe('match ingestion', () => {
     expect(patchFromGameVersion('16.21.1')).toBe('16.21');
   });
 
+  it('compares patches numerically and detects wider windows', () => {
+    expect(comparePatches('16.9', '16.10')).toBeLessThan(0);
+    expect(comparePatches('15.24', '16.1')).toBeLessThan(0);
+    expect(comparePatches('16.10', '16.10')).toBe(0);
+    expect(windowWidened('16.21', '16.19')).toBe(true);
+    expect(windowWidened('16.21', undefined)).toBe(true);
+    expect(windowWidened('16.19', '16.21')).toBe(false);
+    expect(windowWidened(undefined, '16.21')).toBe(false);
+  });
+
   it('stores valid matches with avg rank score from known participants', async () => {
     const db = openDb(':memory:');
     migrate(db);
@@ -81,6 +91,7 @@ describe('match ingestion', () => {
       duration: number;
       created_at: number;
       avg_rank_score: number;
+      rank_known_count: number;
     };
     expect(row.platform).toBe('euw1');
     expect(row.patch).toBe('16.21');
@@ -88,6 +99,29 @@ describe('match ingestion', () => {
     expect(row.duration).toBe(1800);
     expect(row.created_at).toBe(1_760_000_000_000);
     expect(row.avg_rank_score).toBeCloseTo(6.75); // mean of p-alpha (6.5) and p-beta (7)
+    expect(row.rank_known_count).toBe(2);
+    db.close();
+  });
+
+  it('falls back to the seed rank when no match participants are known', async () => {
+    const db = openDb(':memory:');
+    migrate(db);
+    seedPlayer(db, 'p-alpha', 6.5);
+
+    const match = makeMatch('EUW1_UNKNOWN', {
+      participants: [participant('unknown-a'), participant('unknown-b')],
+    });
+    match.metadata.participants = ['unknown-a', 'unknown-b'];
+    const client = mockClient({ 'p-alpha': ['EUW1_UNKNOWN'] }, { EUW1_UNKNOWN: match });
+
+    const result = await ingestMatches({ platform: PLATFORM, db, client });
+
+    expect(result.stored).toBe(1);
+    const row = db
+      .prepare('SELECT avg_rank_score, rank_known_count FROM matches WHERE match_id = ?')
+      .get('EUW1_UNKNOWN') as { avg_rank_score: number; rank_known_count: number };
+    expect(row.avg_rank_score).toBe(6.5);
+    expect(row.rank_known_count).toBe(0);
     db.close();
   });
 
@@ -112,25 +146,26 @@ describe('match ingestion', () => {
     db.close();
   });
 
-  it('filters off-queue, short and off-patch matches into match_rejects', async () => {
+  it('keeps equal and newer patches and rejects older patches into match_rejects', async () => {
     const db = openDb(':memory:');
     migrate(db);
     seedPlayer(db, 'p-alpha', 6.5);
 
     const client = mockClient(
-      { 'p-alpha': ['EUW1_Q', 'EUW1_S', 'EUW1_E', 'EUW1_P', 'EUW1_OK'] },
+      { 'p-alpha': ['EUW1_Q', 'EUW1_S', 'EUW1_E', 'EUW1_P', 'EUW1_OK', 'EUW1_NEWER'] },
       {
         EUW1_Q: makeMatch('EUW1_Q', { queueId: 440 }), // flex queue
         EUW1_S: makeMatch('EUW1_S', { gameDuration: 420 }), // remake
         EUW1_E: makeMatch('EUW1_E', { gameDuration: 900 }), // exactly 15 min: not > 15 min
         EUW1_P: makeMatch('EUW1_P', { gameVersion: '16.19.3.1' }), // old patch
         EUW1_OK: makeMatch('EUW1_OK'),
+        EUW1_NEWER: makeMatch('EUW1_NEWER', { gameVersion: '16.22.1.1' }),
       },
     );
 
-    const result = await ingestMatches({ platform: PLATFORM, patch: '16.21', db, client });
+    const result = await ingestMatches({ platform: PLATFORM, sincePatch: '16.21', db, client });
 
-    expect(result.stored).toBe(1);
+    expect(result.stored).toBe(2);
     expect(result.filtered).toBe(4);
     const rejects = db
       .prepare('SELECT match_id, reason, patch FROM match_rejects ORDER BY match_id')
@@ -218,7 +253,11 @@ describe('match ingestion', () => {
     seedPlayer(db, 'p-alpha', 6.5);
 
     const client = mockClient({ 'p-alpha': ['EUW1_1'] }, { EUW1_1: makeMatch('EUW1_1') });
-    await ingestMatches({ platform: PLATFORM, db, client });
+    await ingestMatches({ platform: PLATFORM, sincePatch: '16.19', db, client });
+    const firstCursor = db
+      .prepare('SELECT value FROM ingest_state WHERE key = ?')
+      .get(cursorKey(PLATFORM, 'p-alpha')) as { value: string };
+    expect((JSON.parse(firstCursor.value) as { sincePatch?: string }).sincePatch).toBe('16.19');
 
     // Second run: the player is done, so the client should be queried with
     // startTime ~ lastGameCreation/1000 and pick up only the new id.
@@ -226,7 +265,12 @@ describe('match ingestion', () => {
       { 'p-alpha': ['EUW1_2'] },
       { EUW1_2: makeMatch('EUW1_2', { gameCreation: 1_760_100_000_000 }) },
     );
-    const result = await ingestMatches({ platform: PLATFORM, db, client: client2 });
+    const result = await ingestMatches({
+      platform: PLATFORM,
+      sincePatch: '16.21',
+      db,
+      client: client2,
+    });
 
     expect(client2.getMatchIdsByPuuid).toHaveBeenCalledWith(
       'euw1',
@@ -234,6 +278,11 @@ describe('match ingestion', () => {
       expect.objectContaining({ startTime: Math.floor(1_760_000_000_000 / 1000) }),
     );
     expect(result.stored).toBe(1);
+    expect(result.sincePatch).toBe('16.21');
+    const secondCursor = db
+      .prepare('SELECT value FROM ingest_state WHERE key = ?')
+      .get(cursorKey(PLATFORM, 'p-alpha')) as { value: string };
+    expect((JSON.parse(secondCursor.value) as { sincePatch?: string }).sincePatch).toBe('16.21');
     const count = db.prepare('SELECT COUNT(*) AS n FROM matches').get() as { n: number };
     expect(count.n).toBe(2);
     db.close();
@@ -251,18 +300,17 @@ describe('match ingestion', () => {
       { EUW1_OLD: oldMatch },
     );
 
-    const r1 = await ingestMatches({ platform: PLATFORM, patch: '16.21', db, client });
+    const r1 = await ingestMatches({ platform: PLATFORM, sincePatch: '16.21', db, client });
     expect(r1.filtered).toBe(2); // rejected for alpha, known-reject for beta
     expect(client.getMatch).toHaveBeenCalledTimes(1);
 
     // Same target patch: still no fetch.
-    const r2 = await ingestMatches({ platform: PLATFORM, patch: '16.21', db, client });
+    const r2 = await ingestMatches({ platform: PLATFORM, sincePatch: '16.21', db, client });
     expect(client.getMatch).toHaveBeenCalledTimes(1);
     expect(r2.filtered).toBe(2);
 
-    // New target patch: cursors written under 16.21 relist in full (no
-    // startTime) so the patch-rejected id is re-evaluated and stored.
-    const r3 = await ingestMatches({ platform: PLATFORM, patch: '16.19', db, client });
+    // Lowering the lower bound relists in full so the rejected id is re-evaluated.
+    const r3 = await ingestMatches({ platform: PLATFORM, sincePatch: '16.19', db, client });
     expect(client.getMatch).toHaveBeenCalledTimes(2);
     expect(client.getMatchIdsByPuuid).toHaveBeenLastCalledWith(
       'euw1',
@@ -270,6 +318,36 @@ describe('match ingestion', () => {
       expect.objectContaining({ startTime: undefined }),
     );
     expect(r3.stored).toBe(1);
+    db.close();
+  });
+
+  it('removing sincePatch relists in full and recovers a patch-rejected match', async () => {
+    const db = openDb(':memory:');
+    migrate(db);
+    seedPlayer(db, 'p-alpha', 6.5);
+    const client = mockClient(
+      { 'p-alpha': ['EUW1_OLD'] },
+      { EUW1_OLD: makeMatch('EUW1_OLD', { gameVersion: '16.19.3.1' }) },
+    );
+
+    const first = await ingestMatches({
+      platform: PLATFORM,
+      sincePatch: '16.21',
+      db,
+      client,
+    });
+    expect(first.filtered).toBe(1);
+
+    const second = await ingestMatches({ platform: PLATFORM, db, client });
+
+    expect(client.getMatchIdsByPuuid).toHaveBeenLastCalledWith(
+      'euw1',
+      'p-alpha',
+      expect.objectContaining({ startTime: undefined }),
+    );
+    expect(client.getMatch).toHaveBeenCalledTimes(2);
+    expect(second.stored).toBe(1);
+    expect(second.sincePatch).toBeUndefined();
     db.close();
   });
 

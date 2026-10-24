@@ -39,15 +39,17 @@ CREATE INDEX idx_part_champ_role ON participants(champion_id, role);
 ```
 Notes: `rank_score` = coarse tier/division score at collection time (approximation, documented in RIOT_API.md). Exact rank ordering uses the stored `tier`, `division`, and `lp` fields separately. The score uses the D-016 tier base and division bonus formula; it excludes LP and is distinct from the SPECS §3 weighting buckets. Store only needed fields. `match_rejects` records match ids already evaluated and rejected (wrong queue, too short, off-patch, invalid payload) so shared matches are not re-fetched per player; a `patch` reject keeps the match's actual patch so it is re-evaluated once a run's `--since-patch` window includes it (D-017).
 
-## Aggregated tables (SQLite) — recomputed per patch
+## Aggregated tables (SQLite) — recomputed per patch; role-generic (Phase 1 populates only `my_role = 'SUPPORT'`)
 - `role_prob(champion_id, role, games, prob)`
 - `baseline(champion_id, role, rank_bucket, wins_w, games_w, games_w2)` (weighted; `games_w2` = sum of squared weights for `n_eff`, SPECS §3)
-- `pair_ally(support_id, ally_id, ally_role, rank_bucket, wins_w, games_w, games_w2)`
-- `pair_enemy(support_id, enemy_id, enemy_role, rank_bucket, wins_w, games_w, games_w2)`
-- `lane_vs(support_id, enemy_support_id, enemy_adc_id, rank_bucket, wins_w, games_w, games_w2)` (D-021)
-- `lane_2v2(support_id, ally_adc_id, enemy_support_id, enemy_adc_id, rank_bucket, wins_w, games_w, games_w2)` (D-021)
-- `rune_ctx(champion_id, context_key, perks_hash, perks_json, wins_w, games_w, games_w2, players)` (`context_key` = D-021 back-off level, SPECS §8.1)
-- `item_build(champion_id, slot_idx, time_bucket, state_bucket, profile_key, lane_key, item_id, wins_w, games_w, games_w2)` (D-022; `slot_idx` = `item_events.item_slot`, 0 = starting items; `lane_key` empty outside the `lane` phase)
+- `pair_ally(my_champion_id, my_role, other_champion_id, other_role, rank_bucket, wins_w, games_w, games_w2)`
+- `pair_enemy(my_champion_id, my_role, other_champion_id, other_role, rank_bucket, wins_w, games_w, games_w2)`
+- `lane_vs(my_champion_id, my_role, opp1_id, opp2_id, rank_bucket, wins_w, games_w, games_w2)` (D-021; `opp*_id` = enemy lane-group champions in role order, `opp2_id` NULL for 1v1 lane groups)
+- `lane_full(my_champion_id, my_role, partner_id, opp1_id, opp2_id, rank_bucket, wins_w, games_w, games_w2)` (D-021; `partner_id` = ally lane partner, NULL when `laneGroup(myRole)` has none)
+- `rune_ctx(champion_id, my_role, context_key, perks_hash, perks_json, wins_w, games_w, games_w2, players)` (`context_key` = D-021 back-off level, SPECS §8.1)
+- `item_build(champion_id, my_role, slot_idx, time_bucket, state_bucket, profile_key, lane_key, item_id, wins_w, games_w, games_w2)` (D-022; `slot_idx` = `item_events.item_slot`, 0 = starting items; `lane_key` empty outside the `lane` phase)
+
+Adding a role means data only: no schema or code change. Migration 004 (T-011.b) creates these tables.
 
 ## Exported JSON (`data/public/<patch>/`)
 Validated by zod schemas in `packages/shared`. Keep each file < 5 MB gzip.

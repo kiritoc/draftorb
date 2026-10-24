@@ -40,30 +40,32 @@ Rank buckets for weighting (distinct from persisted `rank_score` in DATA_MODEL.m
 - Output also the **confidence** of each assignment (probability mass of the best assignment vs alternatives). Confidence scales how much that champion's synergy/counter terms count.
 - UI lets the user override a role; override = confidence 1.
 
-## 5. Scoring a candidate support `c` (Phase 1)
-Candidate set: champions with `roleProb[c][SUPPORT] >= 0.05` (or user pool).
+## 5. Scoring a candidate `c` for `myRole` (Phase 1: `myRole` = SUPPORT)
+Candidate set: champions with `roleProb[c][myRole] >= 0.05` (or user pool).
 
-All effects are combined on the log-odds scale (`logit(p) = ln(p / (1 - p))`, `sigmoid` = its inverse) and every context layer is shrunk toward the layer below it (D-021):
+All effects are combined on the log-odds scale (`logit(p) = ln(p / (1 - p))`, `sigmoid` = its inverse) and every context layer is shrunk toward the layer below it (D-021). Weighted counts are converted to *equivalent counts* before shrinkage (weights are <= 1, so `k` is in raw-game units): `games_e = n_eff`, `wins_e = wins_w * n_eff / games_w`.
 ```
-p0       = (wins_w + k0*0.5)/(games_w + k0)   // baseline winrate of c (rank/recency weighted, §3), shrunk toward 0.5, k0 = 20
+p0       = (wins_e + k0*0.5)/(games_e + k0)   // baseline winrate of c (rank/recency weighted, §3), shrunk toward 0.5, k0 = 20
 x        = logit(p0)
-for each known slot s (ally or enemy, any role):            // layer 1: pairs
-  x += conf(s) * influence[SUPPORT][s.side][s.role][draft] * pairTerm(c, s)
-if enemy support and enemy ADC known:                       // layer 2: enemy bot lane
-  x += conf_lane * laneTerm(lane_vs[c, enemySup, enemyAdc], q = sigmoid(x))
-if ally ADC also known:                                     // layer 3: full bot lane
-  x += conf_lane * laneTerm(lane_2v2[c, allyAdc, enemySup, enemyAdc], q = sigmoid(x))
+pairSum  = sum over known slots s of                                        // layer 1: pairs
+           conf(s) * influence[myRole][s.side][s.role][draft] * pairTerm(c, s)
+           // slots processed by descending influence (ties by championId)
+x       += s * pairSum                                      // s = global pair scale (config, default 1.0, fit by T-027.a)
+if the enemy lane-group champions of laneGroup(myRole) are known:             // layer 2
+  x += conf_lane * laneTerm(lane_vs[c, laneGroup(myRole).enemies], q = sigmoid(x))
+if the ally lane-group partners are also known:                               // layer 3
+  x += conf_lane * laneTerm(lane_full[c, laneGroup(myRole).allies, laneGroup(myRole).enemies], q = sigmoid(x))
 x += W_comp  * compNeed(c, allies, enemies)
 x += W_blind * blindSafety(c)                               // only if blindPick or few enemies known
 P(c) = sigmoid(x);  score(c) = P(c)
 ```
-- Baseline gate: if the candidate's baseline `n_eff < minGames`, it gets no score and no rank: it goes to `insufficientData` (§7) with its sample size (golden rule 8), not to the ranked `recommendations`. The `k0` shrinkage only guards near-perfect records that already passed this gate.
+- `laneGroup(myRole)` (config, D-021): `SUPPORT`/`ADC` = the bot lane (me, ally lane partner, enemy support + enemy ADC); `TOP` = me vs enemy top; `MID` = me vs enemy mid; `JUNGLE` = me vs enemy jungle plus an optional configured lane partner. A layer is skipped when one of its champions is unknown. `conf_lane` = product of the §4 confidences of the lane-group champions. Phase 1 populates only `myRole = SUPPORT`.
+- Baseline gate: if the candidate's baseline `n_eff < minGames`, it gets no score and no rank: it goes to `insufficientData` (§7) with `nEff` and `rawGames` (golden rule 8), not to the ranked `recommendations`. The `k0` shrinkage only guards near-perfect records that already passed this gate.
 - Every probability passed to `logit` is clamped to `[eps, 1 - eps]` (eps = 1e-4), so a perfect or empty record can never produce an infinite or NaN score.
-- `pairTerm(c, s) = logit((wins_w + k*p0)/(games_w + k)) - logit(p0)`, k = prior strength (default 40 games).
-- `laneTerm(t, q) = logit((t.wins_w + k_lane*q)/(t.games_w + k_lane)) - logit(q)`, k_lane default 40: an exact lane context is shrunk toward the prediction already made from the pairs, not toward the baseline, so it only moves the score when it has enough games to disagree with the pairs.
-- `conf_lane` = product of the §4 confidences of the lane champions involved.
+- `pairTerm(c, s) = logit((wins_e + k*p0)/(games_e + k)) - logit(p0)`, k = prior strength (default 40 equivalent games). Pair terms are summed and correlated (several can describe the same matchups), so the global scale `s` absorbs systematic over-counting and is fit on the validation window (T-027.a).
+- `laneTerm(t, q) = logit((t.wins_e + k_lane*q)/(t.games_e + k_lane)) - logit(q)`, k_lane default 40 equivalent games: an exact lane context is shrunk toward the prediction already made from the pairs, not toward the baseline. A `lane` reason is therefore a *correction* to the pair estimate and may show a small deltaPp; UI phrasing: "in this exact lane, history suggests more/less than the pair terms imply".
 - Low data: a term whose `n_eff < minGames` (default 25) is 0 and its reason is flagged `lowData`.
-- Influence (`influence[myRole][side][otherRole][phase]`, D-020, `engine/config.ts`). Default values for the `draft` and `lane` phases (priors, recalibrated by the D-023 backtest):
+- Influence (`influence[myRole][side][otherRole][phase]`, D-020, `engine/config.ts`). Default values for the `draft` and `lane` phases (priors, recalibrated per role x phase by the D-023 backtest):
 
 | myRole | side | TOP | JUNGLE | MID | ADC | SUPPORT |
 |---|---|---|---|---|---|---|
@@ -78,8 +80,10 @@ P(c) = sigmoid(x);  score(c) = P(c)
 | TOP | ally | – | 0.6 | 0.2 | 0.1 | 0.1 |
 | TOP | enemy | 1.0 | 0.6 | 0.2 | 0.1 | 0.1 |
 
-  `mid` phase (items only, §8.2): enemy weight = `lambda * lane + (1 - lambda) * threatShare(e) * enemiesKnown`, lambda = 0.3; ally weights = `lane` row. Phase 1 uses only the SUPPORT rows; the other rows exist so later roles only need data, not code.
-- Reported deltas: each reason's `deltaPp = 100 * (sigmoid(x_before + term) - sigmoid(x_before))`, in the order the terms are added; the total delta is `100 * (P(c) - p0)`.
+  Rationale per row: support — bot lane (ally ADC, enemy support + ADC) first, then junglers, then mid, then top; top — the mirror (direct opponent first, then jungle, mid, bot); ADC — ally support and the enemy bot lane; mid — the enemy mid, then both junglers; jungle — the enemy jungle first, then mid, then top/support, then ADC. The enemy same-role cell (direct lane opponent) is the row maximum.
+  Validation (T-020): every cell defined and in [0, 1]; the opponent cell is the row max; the table is validated by zod; a unit test fails on an incomplete row.
+  `mid` phase (items only, §8.2), every role: enemy weight = `lambda * lane + (1 - lambda) * threatShare(e) * enemiesKnown`, lambda = 0.3; ally weights = the `lane` row. `draft` and `lane` rows share the defaults today and may diverge later; each role x phase is calibrated separately. Phase 1 uses only the SUPPORT rows; the other rows exist so later roles only need data, not code.
+- Reported deltas: each reason's `deltaPp = 100 * (sigmoid(x_before + term) - sigmoid(x_before))`, in the order the terms are added (pairs by descending influence, then `lane_vs`, `lane_full`, comp, blind); the total delta is `100 * (P(c) - p0)`.
 - **Levels 1-3** (like Karakal): from a reason's `deltaPp` — L1 >= +1.0pp, L2 >= +2.5pp, L3 >= +4.5pp (needs `n_eff >= 100`). Negative symmetric (counter-picked). Show badge in UI.
 - `compNeed`: from champion tags (see 6): reward filling missing needs (e.g. team has no engage, damage all AD...). Small weight in log-odds units, explained in UI.
 - `blindSafety(c)`: expected term against the distribution of likely enemy lane opponents weighted by pick rate: `sum_e pickShare(e) * pairTerm(c, e)`, plus penalty for worst-case matchup (min term). Used when blindPick = true or fewer than 2 lane enemies known.
@@ -107,7 +111,7 @@ Sorted desc. Always show why + sample sizes. Never show a % without sample size.
 ## 8. Runes & Items
 
 ### 8.1 Runes (UC3)
-For chosen champion and context: aggregated rune pages from experts (§3 experts rule, experts defined in D-022). Contexts use the D-021 back-off chain, most specific first: enemy bot lane + ally ADC -> enemy bot lane -> enemy damage mix -> champion global; slots are ordered by `influence[myRole][*][*][lane]` (D-020). Each page's win rate is shrunk toward the same page's win rate in the next broader context. Rank by shrunk winrate, tie-break by pick share. Return top 3 pages + adaptation hints (shard choice by enemy damage mix). Never show a page win rate without its sample size.
+For chosen champion and context: aggregated rune pages from experts (§3 experts rule, experts defined in D-022). Context slots are the top `contextSlots` (config, default 3) champions of the lane context, ordered by `influence[myRole][*][*][lane]` (D-020) — for a support: ally ADC + enemy support + enemy ADC; nothing is hardcoded to the bot lane. Contexts use the D-021 back-off chain, most specific first, dropping the least-influential slot at each step: the `contextSlots` lane slots -> enemy damage mix -> champion global. Each page's win rate is shrunk toward the same page's win rate in the next broader context. Rank by shrunk winrate, tie-break by pick share. Return top 3 pages + adaptation hints (shard choice by enemy damage mix). Never show a page win rate without its sample size.
 
 ### 8.2 Items (UC4)
 ```

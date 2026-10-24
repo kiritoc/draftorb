@@ -28,7 +28,7 @@ Always verify details at https://developer.riotgames.com (limits and endpoints m
 - Token-bucket rate limiter honoring both limits; reads `X-App-Rate-Limit` / `X-Method-Rate-Limit` headers.
 - On 429: wait `Retry-After`. On 5xx: exponential backoff (max 5 tries). On 401/403: stop with explicit message "key expired?".
 - Resumable: persist cursors in `ingest_state`. Idempotent: skip known `match_id`.
-- Zod-validate responses; log unknown shapes instead of crashing.
+- Zod-validate responses supplied with a schema. An unrecognized shape throws `RiotSchemaError`; callers must surface or explicitly handle it rather than treating it as transient. Endpoints fetched without a schema return raw payloads so ingestion can validate and record invalid match data.
 
 ## Data quality notes
 

@@ -25,6 +25,28 @@ export function redactPuuid(value: string): string {
   return value.replace(/([0-9a-fA-F]{8,})(?=[^0-9a-fA-F]|$)/g, (match) => `${match.slice(0, 8)}…`);
 }
 
+function redactSensitiveText(value: string): string {
+  return redactPuuid(value).replace(/RGAPI-[A-Za-z0-9_-]+/g, '[REDACTED]');
+}
+
+function redactSensitiveValue(value: unknown): unknown {
+  if (typeof value === 'string') {
+    return redactSensitiveText(value);
+  }
+  if (Array.isArray(value)) {
+    return value.map(redactSensitiveValue);
+  }
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [
+        redactSensitiveText(key),
+        redactSensitiveValue(entry),
+      ]),
+    );
+  }
+  return value;
+}
+
 export function platformToRegion(platform: Platform): RegionalRouting {
   switch (platform) {
     case 'euw1':
@@ -72,11 +94,11 @@ export class RiotApiError extends Error {
   readonly responseBody?: unknown;
 
   constructor(message: string, status: number, url: string, responseBody?: unknown) {
-    super(redactPuuid(message));
+    super(redactSensitiveText(message));
     this.name = 'RiotApiError';
     this.status = status;
-    this.url = redactPuuid(url);
-    this.responseBody = responseBody;
+    this.url = redactSensitiveText(url);
+    this.responseBody = redactSensitiveValue(responseBody);
   }
 }
 

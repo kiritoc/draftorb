@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { openDb, migrate } from './db';
 import { ingestMatches } from './matches';
 import { comparePatches, cursorKey, patchFromGameVersion, windowWidened } from './matches-store';
+import { RiotApiError, RiotRateLimitError } from './riot';
 import type { Platform, RiotClient, RiotMatchDto } from './riot';
 
 const PLATFORM: Platform = 'euw1';
@@ -143,6 +144,91 @@ describe('match ingestion', () => {
     const count = db.prepare('SELECT COUNT(*) AS n FROM matches').get() as { n: number };
     expect(count.n).toBe(1); // no duplicate rows
     expect(client.getMatch).toHaveBeenCalledTimes(1);
+    db.close();
+  });
+
+  it('continues to later players after transient match-ID listing failures', async () => {
+    const db = openDb(':memory:');
+    migrate(db);
+    seedPlayer(db, 'p-alpha', 8);
+    seedPlayer(db, 'p-beta', 7);
+    seedPlayer(db, 'p-gamma', 6);
+    const originalCursor = {
+      status: 'partial',
+      snapshot: ['EUW1_OLD'],
+      processed: 0,
+      lastGameCreation: 0,
+      sincePatch: '16.21',
+      stored: 0,
+      duplicates: 0,
+      filtered: 0,
+      invalid: 0,
+      updatedAt: 1,
+    };
+    db.prepare('INSERT INTO ingest_state (key, value) VALUES (?, ?)').run(
+      cursorKey(PLATFORM, 'p-alpha'),
+      JSON.stringify(originalCursor),
+    );
+
+    const client = {
+      getMatchIdsByPuuid: vi.fn(async (_platform: Platform, puuid: string) => {
+        if (puuid === 'p-alpha') {
+          throw new RiotRateLimitError('Rate limit exhausted', 429, 'url', 1);
+        }
+        if (puuid === 'p-beta') {
+          throw new RiotApiError('Network unavailable', 0, 'url');
+        }
+        return [];
+      }),
+      getMatch: vi.fn(),
+    } as unknown as RiotClient & {
+      getMatchIdsByPuuid: ReturnType<typeof vi.fn>;
+      getMatch: ReturnType<typeof vi.fn>;
+    };
+
+    const result = await ingestMatches({ platform: PLATFORM, sincePatch: '16.19', db, client });
+
+    expect(result.playersFailed).toBe(2);
+    expect(result.playerResults.map(({ puuid, status }) => [puuid, status])).toEqual([
+      ['p-alpha', 'failed'],
+      ['p-beta', 'failed'],
+      ['p-gamma', 'done'],
+    ]);
+    expect(client.getMatchIdsByPuuid).toHaveBeenCalledTimes(3);
+    const savedCursor = db
+      .prepare('SELECT value FROM ingest_state WHERE key = ?')
+      .get(cursorKey(PLATFORM, 'p-alpha')) as { value: string };
+    expect(JSON.parse(savedCursor.value)).toEqual(originalCursor);
+    db.close();
+  });
+
+  it('applies the consecutive transient-failure limit across listing and detail requests', async () => {
+    const db = openDb(':memory:');
+    migrate(db);
+    seedPlayer(db, 'p-alpha', 10);
+    seedPlayer(db, 'p-beta', 9);
+    seedPlayer(db, 'p-gamma', 8);
+    seedPlayer(db, 'p-delta', 7);
+
+    const client = {
+      getMatchIdsByPuuid: vi.fn(async (_platform: Platform, puuid: string) => {
+        if (puuid === 'p-beta') return ['EUW1_1'];
+        throw new RiotRateLimitError('Rate limit exhausted', 429, 'url', 1);
+      }),
+      getMatch: vi.fn(async () => {
+        throw new RiotApiError('Network unavailable', 0, 'url');
+      }),
+    } as unknown as RiotClient & {
+      getMatchIdsByPuuid: ReturnType<typeof vi.fn>;
+      getMatch: ReturnType<typeof vi.fn>;
+    };
+
+    const result = await ingestMatches({ platform: PLATFORM, db, client });
+
+    expect(result.playersFailed).toBe(3);
+    expect(result.playerResults).toHaveLength(3);
+    expect(client.getMatchIdsByPuuid).toHaveBeenCalledTimes(3);
+    expect(client.getMatchIdsByPuuid).not.toHaveBeenCalledWith(PLATFORM, 'p-delta');
     db.close();
   });
 

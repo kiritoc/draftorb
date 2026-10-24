@@ -15,3 +15,5 @@ dist/
 *.log
 
 **/data/*.sqlite*
+**/data/**/*.sqlite*
+data/raw/

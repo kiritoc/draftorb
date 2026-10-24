@@ -205,63 +205,65 @@ export async function discoverPlayersByTier(
   const maxAgeDays = options.maxAgeDays ?? DEFAULT_MAX_AGE_DAYS;
   const maxAgeMs = maxAgeDays * 24 * 60 * 60 * 1000;
 
+  const ownsDb = options.db === undefined;
   const db = options.db ?? openDb(resolveDbPath());
-  migrate(db);
+  try {
+    migrate(db);
 
-  const tierResults: TierDiscoveryResult[] = [];
-  let totalFetched = 0;
-  let totalStored = 0;
+    const tierResults: TierDiscoveryResult[] = [];
+    let totalFetched = 0;
+    let totalStored = 0;
 
-  for (const tier of tiers) {
-    const normalizedTier = tier.toUpperCase();
-    const quota = Math.max(0, quotas[normalizedTier] ?? 0);
-    if (quota <= 0) {
-      tierResults.push({
-        tier: normalizedTier,
-        pageCount: 0,
-        fetched: 0,
-        stored: 0,
-        status: 'skipped',
-      });
-      continue;
-    }
+    for (const tier of tiers) {
+      const normalizedTier = tier.toUpperCase();
+      const quota = Math.max(0, quotas[normalizedTier] ?? 0);
+      if (quota <= 0) {
+        tierResults.push({
+          tier: normalizedTier,
+          pageCount: 0,
+          fetched: 0,
+          stored: 0,
+          status: 'skipped',
+        });
+        continue;
+      }
 
-    const stateKey = `player-discovery:${platform}:${normalizedTier}`;
-    if (!options.reset) {
-      const progress = readProgress(db, stateKey);
-      if (progress) {
-        let parsed: { completed?: boolean; updatedAt?: number; status?: string } = {};
-        try {
-          parsed = JSON.parse(progress) as {
-            completed?: boolean;
-            updatedAt?: number;
-            status?: string;
-          };
-        } catch {
-          /* corrupted state: redo this tier */
-        }
-        const recent =
-          typeof parsed.updatedAt === 'number' && Date.now() - parsed.updatedAt <= maxAgeMs;
-        if (parsed.completed === true && recent) {
-          tierResults.push({
-            tier: normalizedTier,
-            pageCount: 0,
-            fetched: 0,
-            stored: 0,
-            status: 'skipped',
-          });
-          continue;
+      const stateKey = `player-discovery:${platform}:${normalizedTier}`;
+      if (!options.reset) {
+        const progress = readProgress(db, stateKey);
+        if (progress) {
+          let parsed: { completed?: boolean; updatedAt?: number; status?: string } = {};
+          try {
+            parsed = JSON.parse(progress) as {
+              completed?: boolean;
+              updatedAt?: number;
+              status?: string;
+            };
+          } catch {
+            /* corrupted state: redo this tier */
+          }
+          const recent =
+            typeof parsed.updatedAt === 'number' && Date.now() - parsed.updatedAt <= maxAgeMs;
+          if (parsed.completed === true && recent) {
+            tierResults.push({
+              tier: normalizedTier,
+              pageCount: 0,
+              fetched: 0,
+              stored: 0,
+              status: 'skipped',
+            });
+            continue;
+          }
         }
       }
-    }
 
-    const { entries, pageCount } = await getTierEntries(client, platform, normalizedTier, quota);
-    const rankedEntries = entries
-      .filter((entry) => (entry.tier ?? '').toUpperCase() === normalizedTier)
-      .slice(0, quota)
-      .filter((entry) => typeof entry.puuid === 'string' && entry.puuid.length > 0);
+      const { entries, pageCount } = await getTierEntries(client, platform, normalizedTier, quota);
+      const rankedEntries = entries
+        .filter((entry) => (entry.tier ?? '').toUpperCase() === normalizedTier)
+        .slice(0, quota)
+        .filter((entry) => typeof entry.puuid === 'string' && entry.puuid.length > 0);
 
-    const upsert = db.prepare(`
+      const upsert = db.prepare(`
       INSERT INTO players (puuid, platform, tier, division, lp, rank_score, updated_at)
       VALUES (@puuid, @platform, @tier, @division, @lp, @rank_score, @updated_at)
       ON CONFLICT(puuid) DO UPDATE SET
@@ -273,44 +275,47 @@ export async function discoverPlayersByTier(
         updated_at = excluded.updated_at
     `);
 
-    const storeAll = db.transaction((list: RiotLeagueEntry[]) => {
-      for (const entry of list) upsert.run(toPlayerRow(entry, platform, normalizedTier));
-      return list.length;
-    });
-    const stored = storeAll(rankedEntries);
-    const completed = rankedEntries.length >= quota || pageCount > 0;
+      const storeAll = db.transaction((list: RiotLeagueEntry[]) => {
+        for (const entry of list) upsert.run(toPlayerRow(entry, platform, normalizedTier));
+        return list.length;
+      });
+      const stored = storeAll(rankedEntries);
+      const completed = rankedEntries.length >= quota || pageCount > 0;
 
-    totalFetched += rankedEntries.length;
-    totalStored += stored;
-    writeProgress(
-      db,
-      stateKey,
-      JSON.stringify({
-        completed,
-        status: completed ? 'complete' : 'partial',
+      totalFetched += rankedEntries.length;
+      totalStored += stored;
+      writeProgress(
+        db,
+        stateKey,
+        JSON.stringify({
+          completed,
+          status: completed ? 'complete' : 'partial',
+          fetched: rankedEntries.length,
+          stored,
+          updatedAt: Date.now(),
+          pageCount,
+        }),
+      );
+
+      tierResults.push({
+        tier: normalizedTier,
+        pageCount,
         fetched: rankedEntries.length,
         stored,
-        updatedAt: Date.now(),
-        pageCount,
-      }),
-    );
+        status: completed ? 'complete' : 'partial',
+      });
+    }
 
-    tierResults.push({
-      tier: normalizedTier,
-      pageCount,
-      fetched: rankedEntries.length,
-      stored,
-      status: completed ? 'complete' : 'partial',
-    });
+    return {
+      platform,
+      tiers,
+      totalFetched,
+      totalStored,
+      tierResults,
+    };
+  } finally {
+    if (ownsDb) db.close();
   }
-
-  return {
-    platform,
-    tiers,
-    totalFetched,
-    totalStored,
-    tierResults,
-  };
 }
 
 export async function runPlayerDiscovery(

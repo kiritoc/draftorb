@@ -5,8 +5,12 @@
 - **Synergy**: how well two allied champions perform together.
 - **Counter**: matchup advantage vs an enemy champion. **Hard counter** = level 3.
 - **Level 1-3**: strength of a synergy/counter badge (SPECS §5).
-- **Delta (pp)**: winrate difference in percentage points vs baseline, after shrinkage.
+- **Delta (pp)**: winrate difference in percentage points vs baseline, after shrinkage (computed on the log-odds scale, SPECS §5).
 - **Shrinkage**: pulling an estimate toward the baseline when sample is small (Bayesian).
+- **Influence**: weight of another slot (ally/enemy role) for the user's role and game phase (D-020).
+- **Back-off**: falling back from an exact context (the lane group) to broader ones when data is low (D-021). Pair terms are summed (correlated, scaled by `s`); only lane layers chain toward the running prediction.
+- **Effective sample size (n_eff)**: `(sum w)^2 / sum w^2` of weighted games; used for every threshold.
+- **Backtest**: predicting held-out recent games with older data to validate parameters (D-023).
 - **Baseline**: a champion's average winrate in a role/rank bucket.
 - **WPA**: win probability added (Coachless metric).
 - **Rank bucket**: tier group used in data (Emerald, Diamond, Master+).
@@ -20,3 +24,9 @@
 - **PUUID**: Riot's global player id.
 - **Patch**: game version `major.minor` (e.g. 26.21).
 - **Golden test**: fixed scenario with expected output.
+- **Scale `s`**: global multiplier on summed pair terms, fit on the validation window (D-021, T-027.a).
+- **Equivalent counts**: weighted counts converted before shrinkage (`games_e = n_eff`, `wins_e = wins_w * n_eff / games_w`) so the prior `k` is in raw-game units.
+- **exportMinGames**: minimum `n_eff` for a row to be exported (default 10, always `<= minGames`).
+- **Expert fallback**: champion-mastery-v4 points used for the expert rule only for participants of the recommended role, once per (puuid, champion) pair (D-022).
+- **laneGroup**: per-role config naming the lane champions used by the `lane_vs`/`lane_full` layers (D-021).
+- **Role-generic**: model and tables keyed by `myRole`, Phase 1 populating only SUPPORT.

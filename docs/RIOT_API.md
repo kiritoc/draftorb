@@ -16,7 +16,7 @@ Always verify details at https://developer.riotgames.com (limits and endpoints m
 | Match ids per player | match-v5 `matches/by-puuid/{puuid}/ids` (filter queue=420 ranked solo, startTime) |
 | Match detail | match-v5 `matches/{matchId}` |
 | Timeline | match-v5 `matches/{matchId}/timeline` (E5 only — costs extra requests) |
-| Champion mastery (experience filter) | champion-mastery-v4 (optional) |
+| Champion mastery (experience filter) | champion-mastery-v4 `champion-masteries/by-puuid/{puuid}/by-champion/{championId}` — expert fallback (D-022), one call per (puuid, champion) pair, cached in `participants.mastery_points` (T-014) |
 | Static data | Data Dragon: `https://ddragon.leagueoflegends.com/` (versions.json, champion.json, item.json, runesReforged.json) — no key needed |
 
 ## Client requirements (T-010)

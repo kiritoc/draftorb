@@ -153,11 +153,13 @@ describe('migration runner', () => {
     const migrations = db.prepare('SELECT * FROM _migrations').all() as {
       version: string;
       applied_at: number;
+      checksum: string;
     }[];
 
     expect(migrations).toHaveLength(expectedVersions().length);
     expect(migrations[0]?.version).toBe('001_initial');
     expect(migrations[0]?.applied_at).toBeGreaterThan(0);
+    expect(migrations[0]?.checksum).toMatch(/^[a-f0-9]{64}$/);
 
     db.close();
   });
@@ -261,6 +263,25 @@ describe('migration runner', () => {
     expect(db.prepare('SELECT COUNT(*) AS count FROM _migrations').get()).toMatchObject({
       count: 4,
     });
+    db.close();
+  });
+
+  it('backfills NULL checksums and rejects an applied migration with a changed checksum', () => {
+    const db = openDb(':memory:');
+    migrate(db);
+    db.prepare('UPDATE _migrations SET checksum = NULL WHERE version = ?').run('002_match_rejects');
+
+    expect(migrate(db)).toEqual([]);
+    const backfilled = db
+      .prepare('SELECT checksum FROM _migrations WHERE version = ?')
+      .get('002_match_rejects') as { checksum: string | null };
+    expect(backfilled.checksum).toMatch(/^[a-f0-9]{64}$/);
+
+    db.prepare('UPDATE _migrations SET checksum = ? WHERE version = ?').run(
+      'changed',
+      '001_initial',
+    );
+    expect(() => migrate(db)).toThrow(/Migration 001_initial checksum mismatch/);
     db.close();
   });
 

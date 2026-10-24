@@ -13,6 +13,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test",
     "etl": "tsx packages/etl/src/cli.ts",
     "validate:tags": "tsx packages/etl/src/cli.ts validate-tags",
     "migrate": "tsx packages/etl/src/cli.ts migrate"

@@ -15,6 +15,7 @@
 - **Baseline**: a champion's average winrate in a role/rank bucket.
 - **WPA**: win probability added (Coachless metric).
 - **Rank bucket**: tier group used in data (Emerald, Diamond, Master+).
+- **rank_known_count**: number of match participants with known ranks, including the seed player; 1 means only the seed's rank is known (D-019).
 - **Experts rule**: runes/items use games from the user's rank and above.
 - **Fed**: enemy with disproportionate kills/gold/items (threat score).
 - **Threat score**: numeric estimate of how dangerous an enemy is now.

@@ -45,6 +45,22 @@ No new bugs were identified while revising T-013 patch-window and rank-known-cou
   - Error serialization, command argument validation, and database ownership were not consistently enforced at their boundaries.
 - Fix (commit/ticket): T-013.b — recursively redact Riot key patterns in error fields, reuse the shared platform list, make ingestion argument parsing strict, validate quotas completely, isolate transient ID-listing failures, and close only internally owned SQLite connections in `finally`. Updated the documented schema-error policy and ignore coverage for raw ETL data.
 
+### B-007 — Seed rank was excluded from rank reliability counts — FIXED
+
+- Severity / Area (engine|etl|web|desktop|vision|docs): S2 / etl
+- Steps to reproduce:
+  1. Ingest a match whose participant ranks are absent from `players`.
+  2. Inspect `matches.rank_known_count`.
+  3. Observe the seed player's rank is used for `avg_rank_score` but the count is zero.
+- Expected / Actual:
+  - Expected: the seed rank is included, so a stored match has `rank_known_count >= 1`; 1 means only the seed rank is known.
+  - Actual: the fallback rank was omitted from the count, making the `unknownRankFactor` rule unreachable under the documented meaning.
+- Environment (OS, Node version, patch): macOS, Node 20+, ETL ingestion.
+- Logs / screenshot: `pnpm exec vitest run packages/etl/src/matches.test.ts` passes.
+- Suspected cause:
+  - The rank summary counted only database rows returned for match participants and reported zero when the fallback seed rank was used.
+- Fix (commit/ticket): C3 — include the seed player's PUUID and fallback rank in `rankSummary`; regression coverage asserts every ingested match has at least one known rank.
+
 ### B-005 — ETL workspace build regression — FIXED
 
 - Severity / Area (engine|etl|web|desktop|vision|docs): S1 / etl

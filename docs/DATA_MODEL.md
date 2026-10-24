@@ -11,7 +11,8 @@ CREATE TABLE players (
 CREATE TABLE matches (
   match_id TEXT PRIMARY KEY, platform TEXT, patch TEXT, queue_id INTEGER,
   duration INTEGER, created_at INTEGER, avg_rank_score REAL,
-  rank_known_count INTEGER DEFAULT 0, fetched_timeline INTEGER DEFAULT 0
+  rank_known_count INTEGER DEFAULT 0, -- known participant ranks including the seed; ingested matches are >= 1
+  fetched_timeline INTEGER DEFAULT 0
 );
 CREATE TABLE participants (
   match_id TEXT, puuid TEXT, team_id INTEGER, champion_id INTEGER,

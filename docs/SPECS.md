@@ -35,7 +35,7 @@ Rank buckets for weighting (distinct from persisted `rank_score` in DATA_MODEL.m
 - Optional UI toggle: "Master+ only".
 - Recency: multiply by `decay^(currentPatchIndex - gamePatchIndex)` (decay=0.85).
 - Patch window: ingestion keeps every patch >= `--since-patch` (D-017); recency is applied here, at aggregation time, never by dropping games at ingestion.
-- Rank reliability: games with `matches.rank_known_count = 0` (rank taken from the seed player only, D-019) are multiplied by `unknownRankFactor` (default 0.5, config).
+- Rank reliability: games with `matches.rank_known_count = 1` (only the seed player's rank is known, D-019) are multiplied by `unknownRankFactor` (default 0.5, config).
 - Known limitation (D-004/D-021): draft baselines and pairs are not expert-filtered, so one-trick players can inflate some picks; T-027.a includes an optional ablation that down-weights games by `champion_games` to measure it.
 - Effective sample size: every threshold on weighted counts (`minGames`, level `n >= 100`; `minChampGames` counts raw games and is unaffected) uses `n_eff = (sum w)^2 / sum w^2`, so a few heavily weighted games cannot pass a threshold. Aggregated tables store `games_w2 = sum w^2` for this.
 

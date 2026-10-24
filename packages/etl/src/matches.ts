@@ -251,7 +251,12 @@ export async function ingestMatches(
             outcome = evaluated.outcome;
             if (evaluated.reason === null) {
               lastGameCreation = Math.max(lastGameCreation, match.info.gameCreation);
-              const rank = rankSummary(db, match.metadata.participants, player.rank_score);
+              const rank = rankSummary(
+                db,
+                match.metadata.participants,
+                player.puuid,
+                player.rank_score,
+              );
               const persist = db.transaction(() => {
                 const change = insertMatch.run({
                   match_id: matchId,

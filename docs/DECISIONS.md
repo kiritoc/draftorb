@@ -114,12 +114,12 @@ Consequences:
 - Alternatives: (a) always re-list the full history — rejected, wasteful and slow; (b) store the last-seen match id and page until it — rejected, paging backwards through thousands of ids costs more than a `startTime` filter.
 - Consequences: repeats of a stored game cost one extra `getMatch` call each (they dedupe on `match_id` only after fetch); `lastGameCreation` only advances on stored matches so filtered games never shrink the window.
 
-### D-019 — `matches.avg_rank_score` = mean `rank_score` of known participants, plus `rank_known_count` — PROPOSED
+### D-019 — `matches.avg_rank_score` = mean `rank_score` of known participants, plus `rank_known_count` — ACCEPTED
 
-- Context: `matches.avg_rank_score` exists in DATA_MODEL.md but its computation is unspecified. Every rank weight in SPECS §3 depends on the game's rank, so the reliability of that estimate must be visible. At ingestion time only discovered players have a `rank_score`.
-- Decision: `avg_rank_score` is the mean of `players.rank_score` over the match's participant puuids found in `players`; if none are known it falls back to the seed player's `rank_score`. New column `matches.rank_known_count` (migration `003_matches_rank_known`) stores how many participants contributed (0 = fallback). T-014 enriches the ranks of the four bot-lane participants (league-v4 by puuid, cached in `players` so each player costs one call overall) and recomputes both columns.
+- Context: `matches.avg_rank_score` exists in DATA_MODEL.md but its computation is unspecified. Every rank weight in SPECS §3 depends on the game's rank, so the reliability of that estimate must be visible. At ingestion time only discovered players have a `rank_score`; the player whose match triggered ingestion is always known.
+- Decision: `avg_rank_score` is the mean of known participant `players.rank_score` values, including the seed player's rank. If no other participants are known, it falls back to the seed player's `rank_score`. `matches.rank_known_count` stores the number of known ranks including the seed, so its minimum is 1; a value of 1 means only the seed's rank is known. T-014 enriches the ranks of the four bot-lane participants (league-v4 by puuid, cached in `players` so each player costs one call overall) and recomputes both columns.
 - Alternatives: (a) seed player's score only — rejected, ignores other known participants; (b) leave NULL — rejected, downstream buckets need a number; (c) fetch all 10 ranks during T-013 — rejected, ~10x API cost per match; T-014 does a targeted, cached version.
-- Consequences: approximate by construction (documented approximation like D-008); aggregation can down-weight or exclude games with a low `rank_known_count` (threshold in config).
+- Consequences: approximate by construction (documented approximation like D-008). Since only discovered Emerald+ players count as known, `avg_rank_score` is biased upward; T-014's bot-lane rank enrichment mitigates this. Aggregation can down-weight games with `rank_known_count = 1` using `unknownRankFactor`.
 
 ### D-020 — Role-relative influence matrix by game phase — PROPOSED
 

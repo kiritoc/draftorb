@@ -104,25 +104,38 @@ describe('match ingestion', () => {
     db.close();
   });
 
-  it('falls back to the seed rank when no match participants are known', async () => {
+  it('includes the seed rank in every stored match rank summary', async () => {
     const db = openDb(':memory:');
     migrate(db);
     seedPlayer(db, 'p-alpha', 6.5);
+    seedPlayer(db, 'p-beta', 7);
 
-    const match = makeMatch('EUW1_UNKNOWN', {
+    const unknownMatch = makeMatch('EUW1_UNKNOWN', {
       participants: [participant('unknown-a'), participant('unknown-b')],
     });
-    match.metadata.participants = ['unknown-a', 'unknown-b'];
-    const client = mockClient({ 'p-alpha': ['EUW1_UNKNOWN'] }, { EUW1_UNKNOWN: match });
+    unknownMatch.metadata.participants = ['unknown-a', 'unknown-b'];
+    const knownMatch = makeMatch('EUW1_KNOWN', {
+      participants: [participant('p-beta')],
+    });
+    knownMatch.metadata.participants = ['p-beta'];
+    const client = mockClient(
+      { 'p-alpha': ['EUW1_UNKNOWN', 'EUW1_KNOWN'] },
+      { EUW1_UNKNOWN: unknownMatch, EUW1_KNOWN: knownMatch },
+    );
 
     const result = await ingestMatches({ platform: PLATFORM, db, client });
 
-    expect(result.stored).toBe(1);
-    const row = db
+    expect(result.stored).toBe(2);
+    const unknownRow = db
       .prepare('SELECT avg_rank_score, rank_known_count FROM matches WHERE match_id = ?')
       .get('EUW1_UNKNOWN') as { avg_rank_score: number; rank_known_count: number };
-    expect(row.avg_rank_score).toBe(6.5);
-    expect(row.rank_known_count).toBe(0);
+    expect(unknownRow.avg_rank_score).toBe(6.5);
+    expect(unknownRow.rank_known_count).toBe(1);
+    const rankCounts = db
+      .prepare('SELECT rank_known_count FROM matches ORDER BY match_id')
+      .all() as { rank_known_count: number }[];
+    expect(rankCounts).toHaveLength(result.stored);
+    expect(rankCounts.every(({ rank_known_count }) => rank_known_count >= 1)).toBe(true);
     db.close();
   });
 

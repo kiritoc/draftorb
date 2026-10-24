@@ -93,21 +93,26 @@ export function findRejection(
   return row;
 }
 
-/** Mean rank_score of known participants and the number who contributed. */
+/** Mean known participant rank, including the seed player's rank. */
 export function rankSummary(
   db: Database.Database,
   puuids: string[],
+  seedPuuid: string,
   fallback: number,
 ): { avg: number; known: number } {
-  if (puuids.length === 0) return { avg: fallback, known: 0 };
-  const placeholders = puuids.map(() => '?').join(',');
+  const participantIds = [...new Set([...puuids, seedPuuid])];
+  const placeholders = participantIds.map(() => '?').join(',');
   const rows = db
-    .prepare(`SELECT rank_score FROM players WHERE puuid IN (${placeholders})`)
-    .all(...puuids) as { rank_score: number }[];
-  if (rows.length === 0) return { avg: fallback, known: 0 };
+    .prepare(`SELECT puuid, rank_score FROM players WHERE puuid IN (${placeholders})`)
+    .all(...participantIds) as { puuid: string; rank_score: number }[];
+  const ranks = new Map(rows.map((row) => [row.puuid, row.rank_score]));
+  if (!ranks.has(seedPuuid)) {
+    ranks.set(seedPuuid, fallback);
+  }
+  const knownRanks = [...ranks.values()];
   return {
-    avg: rows.reduce((sum, row) => sum + row.rank_score, 0) / rows.length,
-    known: rows.length,
+    avg: knownRanks.reduce((sum, rank) => sum + rank, 0) / knownRanks.length,
+    known: knownRanks.length,
   };
 }
 

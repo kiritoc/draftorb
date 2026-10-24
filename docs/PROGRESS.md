@@ -41,6 +41,14 @@ T-014 (Participant extraction)
 - Pitfalls / notes for next AI:
 ```
 
+### 2026-10-24 — Devin — Design: ranking model (D-020..D-023)
+- Done: docs-only design for "best champion/runes/items from what other players do, weighted by win rate and by how close the game conditions are". Added PROPOSED ADRs D-020 (role-relative influence matrix by phase, all five roles incl. jungle), D-021 (layered back-off with shrinkage in log-odds space, bot-lane `lane_vs`/`lane_2v2` tables, `n_eff`), D-022 (like-for-like item/rune comparison, experts definition), D-023 (temporal-holdout backtest gate). Rewrote SPECS §5 and §8.1/§8.2, extended §3 and §7, updated DATA_MODEL aggregated tables/exports, GLOSSARY, and tickets T-014/16/17/18/20/22/51/56; added T-027 Backtest harness.
+- Files touched: `docs/DECISIONS.md`, `docs/SPECS.md`, `docs/DATA_MODEL.md`, `docs/TICKETS.md`, `docs/GLOSSARY.md`, `docs/PROGRESS.md`
+- Tests: none (docs only).
+- State left: REVIEW (owner to accept/revise D-020..D-023).
+- Next step: T-014 once PR #1 is merged.
+- Pitfalls / notes for next AI: influence values in SPECS §5 are priors; change them only with a T-027 backtest report.
+
 ### 2026-10-24 — Devin — Ticket T-013 (D-017/D-019 revisions)
 - Done:
   - Changed `--since-patch` to a numeric lower-bound window; patch rejects are re-evaluated when included, and cursors relist in full only when the window widens.

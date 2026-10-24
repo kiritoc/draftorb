@@ -24,7 +24,8 @@ CREATE TABLE participants (
 );
 CREATE TABLE item_events (    -- from timelines (epic E5)
   match_id TEXT, puuid TEXT, ts INTEGER, item_id INTEGER, type TEXT,
-  team_gold_diff INTEGER, kills_diff INTEGER
+  team_gold_diff INTEGER, kills_diff INTEGER,
+  item_slot INTEGER           -- completed-item index at purchase (1 = first legendary), NULL for components (D-022)
 );
 CREATE TABLE ingest_state (key TEXT PRIMARY KEY, value TEXT);  -- cursors for resumability
 CREATE TABLE match_rejects (  -- matches seen and rejected, deduped across players
@@ -38,11 +39,13 @@ Notes: `rank_score` = coarse tier/division score at collection time (approximati
 
 ## Aggregated tables (SQLite) — recomputed per patch
 - `role_prob(champion_id, role, games, prob)`
-- `baseline(champion_id, role, rank_bucket, wins_w, games_w)` (weighted)
-- `pair_ally(support_id, ally_id, ally_role, rank_bucket, wins_w, games_w)`
-- `pair_enemy(support_id, enemy_id, enemy_role, rank_bucket, wins_w, games_w)`
-- `rune_ctx(champion_id, context_key, perks_hash, perks_json, wins_w, games_w, players)`
-- `item_build(champion_id, context_key, item_id, order_idx, wins_w, games_w)`
+- `baseline(champion_id, role, rank_bucket, wins_w, games_w, games_w2)` (weighted; `games_w2` = sum of squared weights for `n_eff`, SPECS §3)
+- `pair_ally(support_id, ally_id, ally_role, rank_bucket, wins_w, games_w, games_w2)`
+- `pair_enemy(support_id, enemy_id, enemy_role, rank_bucket, wins_w, games_w, games_w2)`
+- `lane_vs(support_id, enemy_support_id, enemy_adc_id, rank_bucket, wins_w, games_w, games_w2)` (D-021)
+- `lane_2v2(support_id, ally_adc_id, enemy_support_id, enemy_adc_id, rank_bucket, wins_w, games_w, games_w2)` (D-021)
+- `rune_ctx(champion_id, context_key, perks_hash, perks_json, wins_w, games_w, games_w2, players)` (`context_key` = D-021 back-off level, SPECS §8.1)
+- `item_build(champion_id, slot_idx, time_bucket, state_bucket, profile_key, lane_key, item_id, wins_w, games_w, games_w2)` (D-022; `lane_key` empty outside the `lane` phase)
 
 ## Exported JSON (`data/public/<patch>/`)
 Validated by zod schemas in `packages/shared`. Keep each file < 5 MB gzip.
@@ -54,6 +57,8 @@ Validated by zod schemas in `packages/shared`. Keep each file < 5 MB gzip.
 | `support-baseline.json` | per support + bucket: wins_w, games_w |
 | `support-ally-pairs.json` | compact arrays `[supportId, allyId, role, bucket, wins_w, games_w]` |
 | `support-enemy-pairs.json` | same layout |
+| `support-lane-vs.json` | `[supportId, enemySupportId, enemyAdcId, bucket, wins_w, games_w, games_w2]`, rows with `n_eff >= minGames` only |
+| `support-lane-2v2.json` | `[supportId, allyAdcId, enemySupportId, enemyAdcId, bucket, wins_w, games_w, games_w2]`, rows with `n_eff >= minGames` only |
 | `runes/<championId>.json` | contexts -> top pages |
 | `items.json` | item catalog (from Data Dragon) |
 | `builds/<championId>.json` | item build stats |

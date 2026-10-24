@@ -12,21 +12,22 @@ Format: `ID | Title | Deps | Status | Acceptance`. Status: TODO, DOING, REVIEW, 
 - **T-011 | SQLite schema + migrations (S)** | T-001 | DONE | DATA_MODEL.md tables, migration runner. Acceptance: `pnpm etl migrate` idempotent; `getMigrationStatus()` reports pending from disk and flags applied versions missing from the migration directory without negative counts; SQLite connection enables `foreign_keys` and any temporary disable happens before `BEGIN IMMEDIATE`.
 - **T-012 | Player discovery by tier (M)** | T-010,T-011 | DONE | Collect players Emerald..Challenger (config), store rank_score. Acceptance: resumable per tier (completed marker in `ingest_state`), per-tier quotas.
 - **T-013 | Match ingestion (L)** | T-012 | DONE | Fetch ranked solo matches per player, dedupe, patch filter, store. Acceptance: kill/restart resumes; progress log; no duplicate rows; revalidate Riot payloads with zod before use (client returns raw on schema mismatch).
-- **T-014 | Participant extraction (M)** | T-013 | TODO | Roles, champion, runes, items, result, rank snapshot, champion_games (optional mastery). Acceptance: fixtures from real match JSON in tests.
+- **T-014 | Participant extraction (M)** | T-013 | TODO | Roles, champion, runes, items, result, rank snapshot, champion_games (D-022: count in our data, mastery points fallback). Enrich ranks of the 4 bot-lane participants (league-v4, cached in `players`) and recompute `avg_rank_score`/`rank_known_count` (D-019). Acceptance: fixtures from real match JSON in tests; each puuid's rank fetched at most once.
 - **T-015 | Aggregate role probabilities (S)** | T-014 | TODO | `role_prob`. Acceptance: probs sum to 1 per champion; test.
-- **T-016 | Aggregate baselines (support, rank-weighted) (S)** | T-014,T-020 | TODO | Uses engine rank kernel. Acceptance: weighted counts verified on toy data.
-- **T-017 | Aggregate pair tables (M)** | T-016 | TODO | ally (ADC/jungle/mid/top) + enemy (all roles) for supports. Acceptance: toy dataset gives expected counts; both team perspectives handled.
-- **T-018 | Aggregate runes by context (M)** | T-014,T-020 | TODO | Experts rule SPECS §3. Acceptance: min-games filter works.
+- **T-016 | Aggregate baselines (support, rank-weighted) (S)** | T-014,T-020 | TODO | Uses engine rank kernel. Stores `games_w2` (SPECS §3). Acceptance: weighted counts and `n_eff` verified on toy data.
+- **T-017 | Aggregate pair tables (M)** | T-016 | TODO | ally (ADC/jungle/mid/top) + enemy (all roles) for supports, plus bot-lane `lane_vs` and `lane_2v2` (D-021). Acceptance: toy dataset gives expected counts; both team perspectives handled.
+- **T-018 | Aggregate runes by context (M)** | T-014,T-020 | TODO | Experts rule SPECS §3, back-off contexts SPECS §8.1 (D-021/D-022). Acceptance: min-games filter works; every context level present for back-off.
 - **T-019 | Export versioned JSON + manifest (S)** | T-015..T-018 | TODO | Files in DATA_MODEL.md, size checks. Acceptance: web can load them; schemaVersion present.
 
 ## E2 Engine
-- **T-020 | Rank weighting module (S)** | T-002 | TODO | Kernel + experts weights + recency decay, config-driven. Acceptance: unit tests on boundary values.
+- **T-020 | Rank weighting module (S)** | T-002 | TODO | Kernel + experts weights + recency decay + `n_eff` + influence matrix (D-020), config-driven. Acceptance: unit tests on boundary values.
 - **T-021 | Role inference (M)** | T-002 | TODO | SPECS §4 with confidence. Acceptance: tests incl. flex champions, partially known roles.
-- **T-022 | Shrinkage + level mapping (S)** | T-002 | TODO | SPECS §5. Acceptance: tests (low n -> lowData).
+- **T-022 | Shrinkage + level mapping (S)** | T-002 | TODO | SPECS §5: shrinkage toward the previous layer in log-odds space (D-021). Acceptance: tests (low n_eff -> lowData; exact context with large n dominates, small n falls back to the pair estimate).
 - **T-023 | Support recommendation + explanations (L)** | T-020..T-022 | TODO | SPECS §5-7. Acceptance: golden tests pass (TESTING.md).
 - **T-024 | Blind pick mode (M)** | T-023 | TODO | blindSafety. Acceptance: with no enemies, ranking = safe picks; test.
 - **T-025 | Comp needs (M)** | T-004,T-023 | TODO | damage mix/engage/frontline needs. Acceptance: explained in reasons.
 - **T-026 | Golden test suite (M)** | T-023 | TODO | 20+ scenarios (blind, 1 champ known, full draft, unknown roles, low data).
+- **T-027 | Backtest harness (M)** | T-017,T-023 | TODO | `pnpm etl backtest` (D-023): temporal holdout, log-loss/Brier/calibration vs 0.5 and baseline-only, masked drafts, slot ablation for influence calibration. Acceptance: report JSON written; holdout matches never used in aggregates (test); toy dataset with a planted matchup effect is detected.
 
 ## E3 Web MVP
 - **T-030 | Web scaffold + data loader (S)** | T-001,T-019 | TODO | Vite/React/Tailwind, loads manifest + JSON, shows patch. Acceptance: runs with sample data.
@@ -42,12 +43,12 @@ Format: `ID | Title | Deps | Status | Acceptance`. Status: TODO, DOING, REVIEW, 
 
 ## E5 Items
 - **T-050 | Item tags catalog (M)** | T-003 | TODO | `item-tags.json` (armor/MR/antiheal/shield-breaker/burst/etc.).
-- **T-051 | Timeline ingestion + item builds aggregation (L)** | T-019 | TODO | `item_events`, `item_build`.
+- **T-051 | Timeline ingestion + item builds aggregation (L)** | T-019 | TODO | `item_events` (with `item_slot`, time and team gold diff per purchase), `item_build` by D-022 context.
 - **T-052 | GameState model (S)** | T-002 | TODO | Types + zod.
 - **T-053 | Threat score (M)** | T-052 | TODO | SPECS §8.2.2. Acceptance: tests with fed/not fed scenarios.
 - **T-054 | Item recommender v1 (rules) (L)** | T-050,T-053 | TODO | ahead/behind logic, fed counter-items, reasons.
 - **T-055 | Items UI (manual input) (L)** | T-054 | TODO | Fast entry of scores+items per player.
-- **T-056 | Item recommender v2 (data-driven) (L)** | T-051,T-054 | TODO | Context winrates replace rules where data is sufficient.
+- **T-056 | Item recommender v2 (data-driven) (L)** | T-051,T-054 | TODO | Like-for-like context winrates (D-022) replace rules where `n_eff >= minGames`. Acceptance: back-off order tested; calibration checked by T-027 on holdout purchases.
 
 ## E6 Live
 - **T-060 | LCU champ select adapter (M)** | T-031 | TODO | Reads session, emits DraftInput. Policy check recorded in DECISIONS.md.

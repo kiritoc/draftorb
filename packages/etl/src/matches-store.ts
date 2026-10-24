@@ -23,6 +23,8 @@ export interface PlayerCursor {
   snapshot: string[];
   processed: number;
   lastGameCreation: number;
+  /** Patch the cursor was written under; a run with a different patch relists in full. */
+  patch?: string;
   stored: number;
   duplicates: number;
   filtered: number;
@@ -48,6 +50,7 @@ export function readCursor(db: Database.Database, key: string): PlayerCursor | n
       snapshot: parsed.snapshot.filter((id): id is string => typeof id === 'string'),
       processed: Math.max(0, Math.min(parsed.processed, parsed.snapshot.length)),
       lastGameCreation: typeof parsed.lastGameCreation === 'number' ? parsed.lastGameCreation : 0,
+      patch: typeof parsed.patch === 'string' ? parsed.patch : undefined,
       stored: parsed.stored ?? 0,
       duplicates: parsed.duplicates ?? 0,
       filtered: parsed.filtered ?? 0,
@@ -104,6 +107,12 @@ export function patchFromGameVersion(gameVersion: string): string {
   return gameVersion.split('.').slice(0, 2).join('.');
 }
 
+/** Wipe match-ingestion cursors for a platform and every recorded rejection (`--reset`). */
+export function clearIngestState(db: Database.Database, platform: string): void {
+  db.prepare("DELETE FROM ingest_state WHERE key LIKE 'match-ingest:' || ? || ':%'").run(platform);
+  db.prepare('DELETE FROM match_rejects').run();
+}
+
 /** Classify a validated match against this run's filters. */
 export function evaluateMatch(
   match: RiotMatchDto,
@@ -112,7 +121,7 @@ export function evaluateMatch(
   targetPatch?: string,
 ): { outcome: MatchOutcome; reason: RejectReason | null } {
   if (match.info.queueId !== queueId) return { outcome: 'filtered', reason: 'queue' };
-  if (match.info.gameDuration < minDuration) return { outcome: 'filtered', reason: 'short' };
+  if (match.info.gameDuration <= minDuration) return { outcome: 'filtered', reason: 'short' };
   if (targetPatch !== undefined && patchFromGameVersion(match.info.gameVersion) !== targetPatch) {
     return { outcome: 'filtered', reason: 'patch' };
   }

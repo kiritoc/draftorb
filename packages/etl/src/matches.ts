@@ -15,6 +15,7 @@
 import type Database from 'better-sqlite3';
 
 import {
+  clearIngestState,
   cursorKey,
   evaluateMatch,
   findRejection,
@@ -77,11 +78,12 @@ interface PlayerRow {
   rank_score: number;
 }
 
-const newCursor = (snapshot: string[], lastGameCreation = 0): PlayerCursor => ({
+const newCursor = (snapshot: string[], lastGameCreation = 0, patch?: string): PlayerCursor => ({
   status: 'partial',
   snapshot,
   processed: 0,
   lastGameCreation,
+  patch,
   stored: 0,
   duplicates: 0,
   filtered: 0,
@@ -105,13 +107,32 @@ export async function ingestMatches(
     (await import('./db')).openDb(process.env.DRAFTORB_DB_PATH ?? 'data/DraftOrb.sqlite');
   const { migrate } = await import('./db');
   migrate(db); // idempotent
+  if (options.reset) clearIngestState(db, platform);
 
-  const playersQuery =
-    'SELECT puuid, rank_score FROM players WHERE platform = ? ORDER BY rank_score DESC, puuid';
+  const allPlayers = db
+    .prepare(
+      'SELECT puuid, rank_score FROM players WHERE platform = ? ORDER BY rank_score DESC, puuid',
+    )
+    .all(platform) as PlayerRow[];
+
+  // Pending players (no cursor or partial) before done ones, so `--limit` walks
+  // the population in repeated batches instead of re-checking the same cohort.
+  const done = new Set<string>();
+  if (!options.reset) {
+    for (const player of allPlayers) {
+      if (readCursor(db, cursorKey(platform, player.puuid))?.status === 'done') {
+        done.add(player.puuid);
+      }
+    }
+  }
+  const ordered = [...allPlayers].sort(
+    (a, b) =>
+      Number(done.has(a.puuid)) - Number(done.has(b.puuid)) ||
+      b.rank_score - a.rank_score ||
+      (a.puuid < b.puuid ? -1 : a.puuid > b.puuid ? 1 : 0),
+  );
   const players =
-    options.playerLimit !== undefined
-      ? (db.prepare(`${playersQuery} LIMIT ?`).all(platform, options.playerLimit) as PlayerRow[])
-      : (db.prepare(playersQuery).all(platform) as PlayerRow[]);
+    options.playerLimit !== undefined ? ordered.slice(0, options.playerLimit) : ordered;
 
   const playerResults: PlayerIngestionResult[] = [];
   let playersSkipped = 0;
@@ -131,7 +152,13 @@ export async function ingestMatches(
     const key = cursorKey(platform, player.puuid);
     let cursor = options.reset ? null : readCursor(db, key);
 
-    if (cursor?.status === 'done') {
+    if (cursor && cursor.patch !== targetPatch) {
+      // Patch changed since this cursor was written: relist in full so ids
+      // outside the incremental window (older patch-rejected games) are
+      // re-evaluated against the new target patch.
+      const ids = await listMatchIds(client, platform, player.puuid, queueId, perPlayer);
+      cursor = newCursor(ids, cursor.lastGameCreation, targetPatch);
+    } else if (cursor?.status === 'done') {
       // Incremental refresh: only ids newer than the last seen game creation.
       const newIds = await listMatchIds(
         client,
@@ -154,10 +181,10 @@ export async function ingestMatches(
         });
         continue;
       }
-      cursor = newCursor(newIds, cursor.lastGameCreation);
+      cursor = newCursor(newIds, cursor.lastGameCreation, targetPatch);
     } else if (!cursor) {
       const ids = await listMatchIds(client, platform, player.puuid, queueId, perPlayer);
-      cursor = newCursor(ids);
+      cursor = newCursor(ids, 0, targetPatch);
     }
 
     // `base` carries counts persisted by earlier runs; `run` counts this run only.

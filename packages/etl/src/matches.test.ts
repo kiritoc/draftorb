@@ -118,10 +118,11 @@ describe('match ingestion', () => {
     seedPlayer(db, 'p-alpha', 6.5);
 
     const client = mockClient(
-      { 'p-alpha': ['EUW1_Q', 'EUW1_S', 'EUW1_P', 'EUW1_OK'] },
+      { 'p-alpha': ['EUW1_Q', 'EUW1_S', 'EUW1_E', 'EUW1_P', 'EUW1_OK'] },
       {
         EUW1_Q: makeMatch('EUW1_Q', { queueId: 440 }), // flex queue
         EUW1_S: makeMatch('EUW1_S', { gameDuration: 420 }), // remake
+        EUW1_E: makeMatch('EUW1_E', { gameDuration: 900 }), // exactly 15 min: not > 15 min
         EUW1_P: makeMatch('EUW1_P', { gameVersion: '16.19.3.1' }), // old patch
         EUW1_OK: makeMatch('EUW1_OK'),
       },
@@ -130,11 +131,12 @@ describe('match ingestion', () => {
     const result = await ingestMatches({ platform: PLATFORM, patch: '16.21', db, client });
 
     expect(result.stored).toBe(1);
-    expect(result.filtered).toBe(3);
+    expect(result.filtered).toBe(4);
     const rejects = db
       .prepare('SELECT match_id, reason, patch FROM match_rejects ORDER BY match_id')
       .all() as { match_id: string; reason: string; patch: string | null }[];
     expect(rejects).toEqual([
+      { match_id: 'EUW1_E', reason: 'short', patch: null },
       { match_id: 'EUW1_P', reason: 'patch', patch: '16.19' },
       { match_id: 'EUW1_Q', reason: 'queue', patch: null },
       { match_id: 'EUW1_S', reason: 'short', patch: null },
@@ -254,14 +256,70 @@ describe('match ingestion', () => {
     expect(client.getMatch).toHaveBeenCalledTimes(1);
 
     // Same target patch: still no fetch.
-    const r2 = await ingestMatches({ platform: PLATFORM, patch: '16.21', db, client, reset: true });
+    const r2 = await ingestMatches({ platform: PLATFORM, patch: '16.21', db, client });
     expect(client.getMatch).toHaveBeenCalledTimes(1);
     expect(r2.filtered).toBe(2);
 
-    // New target patch matching the stored reject: the match is refetched and stored.
-    const r3 = await ingestMatches({ platform: PLATFORM, patch: '16.19', db, client, reset: true });
+    // New target patch: cursors written under 16.21 relist in full (no
+    // startTime) so the patch-rejected id is re-evaluated and stored.
+    const r3 = await ingestMatches({ platform: PLATFORM, patch: '16.19', db, client });
     expect(client.getMatch).toHaveBeenCalledTimes(2);
+    expect(client.getMatchIdsByPuuid).toHaveBeenLastCalledWith(
+      'euw1',
+      'p-alpha',
+      expect.objectContaining({ startTime: undefined }),
+    );
     expect(r3.stored).toBe(1);
+    db.close();
+  });
+
+  it('reset clears rejections so newly eligible matches are re-evaluated', async () => {
+    const db = openDb(':memory:');
+    migrate(db);
+    seedPlayer(db, 'p-alpha', 6.5);
+
+    const client = mockClient(
+      { 'p-alpha': ['EUW1_S'] },
+      { EUW1_S: makeMatch('EUW1_S', { gameDuration: 600 }) },
+    );
+
+    const r1 = await ingestMatches({ platform: PLATFORM, db, client });
+    expect(r1.filtered).toBe(1);
+    expect(client.getMatch).toHaveBeenCalledTimes(1);
+
+    // Lower the duration floor and reset: the old 'short' reject must not be
+    // authoritative anymore — the match is refetched and stored.
+    const r2 = await ingestMatches({
+      platform: PLATFORM,
+      minDurationSeconds: 300,
+      db,
+      client,
+      reset: true,
+    });
+    expect(client.getMatch).toHaveBeenCalledTimes(2);
+    expect(r2.stored).toBe(1);
+    const rejects = db.prepare('SELECT COUNT(*) AS n FROM match_rejects').get() as { n: number };
+    expect(rejects.n).toBe(0);
+    db.close();
+  });
+
+  it('limit processes pending players before players already done', async () => {
+    const db = openDb(':memory:');
+    migrate(db);
+    seedPlayer(db, 'p-alpha', 7);
+    seedPlayer(db, 'p-beta', 6.5);
+
+    // First batch: only the top-ranked player is ingested.
+    const c1 = mockClient({ 'p-alpha': ['EUW1_1'] }, { EUW1_1: makeMatch('EUW1_1') });
+    const r1 = await ingestMatches({ platform: PLATFORM, playerLimit: 1, db, client: c1 });
+    expect(r1.playerResults[0]?.puuid).toBe('p-alpha');
+
+    // Second batch: the pending player goes first, even though it ranks lower.
+    const c2 = mockClient({ 'p-beta': ['EUW1_2'] }, { EUW1_2: makeMatch('EUW1_2') });
+    const r2 = await ingestMatches({ platform: PLATFORM, playerLimit: 1, db, client: c2 });
+    expect(r2.playerResults[0]?.puuid).toBe('p-beta');
+    expect(c2.getMatchIdsByPuuid).toHaveBeenCalledTimes(1);
+    expect(c2.getMatchIdsByPuuid).toHaveBeenCalledWith('euw1', 'p-beta', expect.anything());
     db.close();
   });
 

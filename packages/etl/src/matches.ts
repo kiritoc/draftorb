@@ -8,6 +8,7 @@ import {
   riotMatchDtoSchema,
   type Platform,
 } from './riot';
+import { extractParticipants, InvalidMatchParticipantsError } from './participants';
 import { resolveDbPath } from './config/paths';
 import { openDb, migrate } from './db';
 import {
@@ -144,13 +145,32 @@ export async function ingestMatches(
     let playersFailed = 0;
     let consecutiveFailed = 0;
 
-    const hasMatch = db.prepare('SELECT 1 AS one FROM matches WHERE match_id = ?');
+    const getStoredMatch = db.prepare(
+      `SELECT COUNT(p.puuid) AS participant_count
+       FROM matches m
+       LEFT JOIN participants p ON p.match_id = m.match_id
+       WHERE m.match_id = ?
+       GROUP BY m.match_id`,
+    );
+    const deleteMatch = db.prepare('DELETE FROM matches WHERE match_id = ?');
+    const deleteParticipants = db.prepare('DELETE FROM participants WHERE match_id = ?');
     const insertMatch = db.prepare(
       `INSERT OR IGNORE INTO matches
        (match_id, platform, patch, queue_id, duration, created_at, avg_rank_score,
         rank_known_count, fetched_timeline)
      VALUES (@match_id, @platform, @patch, @queue_id, @duration, @created_at, @avg_rank_score,
         @rank_known_count, 0)`,
+    );
+    const insertParticipant = db.prepare(
+      `INSERT INTO participants (
+         match_id, puuid, team_id, champion_id, role, win, rank_score, champion_games,
+         mastery_points, is_expert, keystone, primary_style, sub_style, perks_json,
+         items_json, kills, deaths, assists
+       ) VALUES (
+         @match_id, @puuid, @team_id, @champion_id, @role, @win, @rank_score, @champion_games,
+         @mastery_points, @is_expert, @keystone, @primary_style, @sub_style, @perks_json,
+         @items_json, @kills, @deaths, @assists
+       )`,
     );
     const insertReject = db.prepare(
       `INSERT OR REPLACE INTO match_rejects (match_id, reason, patch, checked_at)
@@ -234,13 +254,18 @@ export async function ingestMatches(
         const matchId = cursor.snapshot[i] as string;
         let outcome: 'stored' | 'duplicate' | 'filtered' | 'invalid' = 'filtered';
         let didCountOutcome = false;
+        let repairingIncompleteMatch = false;
 
         try {
+          const storedMatch = getStoredMatch.get(matchId) as
+            | { participant_count: number }
+            | undefined;
           if (findRejection(db, matchId, sincePatch)) {
             outcome = 'filtered';
-          } else if ((hasMatch.get(matchId) as { one: number } | undefined) !== undefined) {
+          } else if (storedMatch && storedMatch.participant_count >= 10) {
             outcome = 'duplicate';
           } else {
+            repairingIncompleteMatch = storedMatch !== undefined;
             const raw = await client.getMatch(platform, matchId);
             const parsed = riotMatchDtoSchema.safeParse(raw);
             if (!parsed.success) {
@@ -251,6 +276,22 @@ export async function ingestMatches(
             outcome = evaluated.outcome;
             if (evaluated.reason === null) {
               lastGameCreation = Math.max(lastGameCreation, match.info.gameCreation);
+              const participantIds = [
+                ...new Set(match.info.participants.map((participant) => participant.puuid)),
+              ];
+              const placeholders = participantIds.map(() => '?').join(',');
+              const rankRows =
+                participantIds.length === 0
+                  ? []
+                  : (db
+                      .prepare(
+                        `SELECT puuid, rank_score FROM players WHERE puuid IN (${placeholders})`,
+                      )
+                      .all(...participantIds) as { puuid: string; rank_score: number }[]);
+              const ranksByPuuid = new Map(
+                rankRows.map(({ puuid, rank_score }) => [puuid, rank_score]),
+              );
+              const participants = extractParticipants(match, ranksByPuuid);
               const rank = rankSummary(
                 db,
                 match.metadata.participants,
@@ -268,8 +309,16 @@ export async function ingestMatches(
                   avg_rank_score: rank.avg,
                   rank_known_count: rank.known,
                 });
-                if (change.changes === 0) {
+                if (change.changes === 0 && !repairingIncompleteMatch) {
                   outcome = 'duplicate';
+                } else {
+                  if (repairingIncompleteMatch) {
+                    deleteParticipants.run(matchId);
+                  }
+                  for (const participant of participants) {
+                    insertParticipant.run(participant);
+                  }
+                  outcome = 'stored';
                 }
                 cursor.processed = i + 1;
                 cursor.stored = base.stored + run.stored + (outcome === 'stored' ? 1 : 0);
@@ -295,10 +344,13 @@ export async function ingestMatches(
                   reason: evaluated.reason,
                   patch:
                     evaluated.reason === 'patch'
-                      ? patchFromGameVersion(raw.info.gameVersion)
+                      ? patchFromGameVersion(match.info.gameVersion)
                       : null,
                   checked_at: Date.now(),
                 });
+                if (repairingIncompleteMatch) {
+                  deleteMatch.run(matchId);
+                }
                 cursor.processed = i + 1;
                 cursor.filtered = base.filtered + run.filtered + 1;
                 cursor.invalid = base.invalid + run.invalid;
@@ -317,9 +369,13 @@ export async function ingestMatches(
           }
           if (
             error instanceof RiotSchemaError ||
+            error instanceof InvalidMatchParticipantsError ||
             (error instanceof RiotApiError && [400, 404].includes(error.status))
           ) {
             const persist = db.transaction(() => {
+              if (repairingIncompleteMatch) {
+                deleteMatch.run(matchId);
+              }
               insertReject.run({
                 match_id: matchId,
                 reason: 'invalid',

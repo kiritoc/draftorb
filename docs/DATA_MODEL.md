@@ -15,10 +15,12 @@ CREATE TABLE matches (
   fetched_timeline INTEGER DEFAULT 0
 );
 CREATE TABLE participants (
-  match_id TEXT, puuid TEXT, team_id INTEGER, champion_id INTEGER,
-  role TEXT,                  -- TOP|JUNGLE|MID|ADC|SUPPORT (from teamPosition)
-  win INTEGER, rank_score REAL, champion_games INTEGER, -- pure count of games on the champion in our data (D-022)
-  mastery_points INTEGER,     -- champion-mastery-v4 points for THIS champion at last fetch; NULL = never fetched (at most one call per (puuid, champion) pair)
+  match_id TEXT NOT NULL REFERENCES matches(match_id) ON DELETE CASCADE,
+  puuid TEXT NOT NULL, team_id INTEGER NOT NULL, champion_id INTEGER NOT NULL,
+  role TEXT NOT NULL,          -- TOP|JUNGLE|MID|ADC|SUPPORT; MIDDLE->MID, BOTTOM->ADC, UTILITY->SUPPORT
+  win INTEGER NOT NULL CHECK (win IN (0, 1)),
+  rank_score REAL, champion_games INTEGER NOT NULL DEFAULT 0, -- pure count of games on the champion in our data (D-022)
+  mastery_points INTEGER,      -- champion-mastery-v4 points for THIS champion at last fetch; NULL = never fetched (at most one call per (puuid, champion) pair)
   is_expert INTEGER,          -- derived: recomputed each aggregation run from champion_games/mastery_points (D-022), not written at extraction
   keystone INTEGER, primary_style INTEGER, sub_style INTEGER,
   perks_json TEXT,            -- full rune selection + shards
@@ -27,9 +29,11 @@ CREATE TABLE participants (
   PRIMARY KEY (match_id, puuid)
 );
 CREATE TABLE item_events (    -- from timelines (epic E5)
-  match_id TEXT, puuid TEXT, ts INTEGER, item_id INTEGER, type TEXT,
-  team_gold_diff INTEGER, kills_diff INTEGER,
-  item_slot INTEGER           -- 0 = starting purchase (before the first completed item and game time < 90 s), k >= 1 = k-th completed item, NULL for components/consumables bought later (D-022)
+  match_id TEXT NOT NULL REFERENCES matches(match_id) ON DELETE CASCADE,
+  puuid TEXT NOT NULL, ts INTEGER NOT NULL, item_id INTEGER NOT NULL, type TEXT NOT NULL,
+  team_gold_diff INTEGER NOT NULL, kills_diff INTEGER NOT NULL,
+  item_slot INTEGER,          -- 0 = starting purchase (before the first completed item and game time < 90 s), k >= 1 = k-th completed item, NULL for components/consumables bought later (D-022)
+  PRIMARY KEY (match_id, puuid, ts, item_id, type)
 );
 CREATE TABLE ingest_state (key TEXT PRIMARY KEY, value TEXT);  -- cursors for resumability
 CREATE TABLE match_rejects (  -- matches seen and rejected, deduped across players
@@ -40,12 +44,12 @@ CREATE TABLE match_rejects (  -- matches seen and rejected, deduped across playe
 CREATE INDEX idx_part_champ_role ON participants(champion_id, role);
 ```
 
-Notes: `rank_score` = coarse tier/division score at collection time (approximation, documented in RIOT_API.md). Exact rank ordering uses the stored `tier`, `division`, and `lp` fields separately. The score uses the D-016 tier base and division bonus formula; it excludes LP and is distinct from the SPECS §3 weighting buckets. Store only needed fields. `match_rejects` records match ids already evaluated and rejected (wrong queue, too short, off-patch, invalid payload) so shared matches are not re-fetched per player; a `patch` reject keeps the match's actual patch so it is re-evaluated once a run's `--since-patch` window includes it (D-017).
+Notes: match ingestion persists the match row and its 10 participant rows in one transaction. A match is accepted only when each of two teams has exactly one participant in each role; invalid layouts are rejected and have no stored participants. `rank_score` = coarse tier/division score at collection time (approximation, documented in RIOT_API.md). Exact rank ordering uses the stored `tier`, `division`, and `lp` fields separately. The score uses the D-016 tier base and division bonus formula; it excludes LP and is distinct from the SPECS §3 weighting buckets. Store only needed fields. `match_rejects` records match ids already evaluated and rejected (wrong queue, too short, off-patch, invalid payload) so shared matches are not re-fetched per player; a `patch` reject keeps the match's actual patch so it is re-evaluated once a run's `--since-patch` window includes it (D-017).
 
 ## Aggregated tables (SQLite) — recomputed per patch; role-generic (Phase 1 populates only `my_role = 'SUPPORT'`)
 
 - `role_prob(champion_id, role, games, prob)`
-- `baseline(champion_id, role, rank_bucket, wins_w, games_w, games_w2)` (weighted; `games_w2` = sum of squared weights for `n_eff`, SPECS §3)
+- `baseline(champion_id, my_role, rank_bucket, wins_w, games_w, games_w2)` (weighted; `games_w2` = sum of squared weights for `n_eff`, SPECS §3)
 - `pair_ally(my_champion_id, my_role, other_champion_id, other_role, rank_bucket, wins_w, games_w, games_w2)`
 - `pair_enemy(my_champion_id, my_role, other_champion_id, other_role, rank_bucket, wins_w, games_w, games_w2)`
 - `lane_vs(my_champion_id, my_role, opp1_id, opp2_id, rank_bucket, wins_w, games_w, games_w2)` (D-021; `opp*_id` = enemy lane-group champions in role order, `opp2_id` NULL for 1v1 lane groups)

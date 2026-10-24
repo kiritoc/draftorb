@@ -133,7 +133,7 @@ export function windowWidened(previous?: string, next?: string): boolean {
   return previous !== undefined && (next === undefined || comparePatches(next, previous) < 0);
 }
 
-/** Wipe match-ingestion cursors for a platform and every recorded rejection (`--reset`). */
+/** Wipe a platform's cursors and every shared rejection (`--reset`). */
 export function clearIngestState(db: Database.Database, platform: string): void {
   db.prepare("DELETE FROM ingest_state WHERE key LIKE 'match-ingest:' || ? || ':%'").run(platform);
   db.prepare('DELETE FROM match_rejects').run();

@@ -70,8 +70,196 @@
             }
           ]
         }
+      },
+      {
+        "puuid": "puuid-ally-top",
+        "participantId": 1,
+        "teamId": 100,
+        "championId": 266,
+        "teamPosition": "TOP",
+        "win": true,
+        "kills": 4,
+        "deaths": 2,
+        "assists": 7,
+        "item0": 1055,
+        "item1": 6632,
+        "item2": 3047,
+        "perks": {
+          "statPerks": { "defense": 5001, "flex": 5008, "offense": 5008 },
+          "styles": [
+            { "description": "primaryStyle", "style": 8000, "selections": [{ "perk": 8005 }] },
+            { "description": "subStyle", "style": 8400, "selections": [{ "perk": 8433 }] }
+          ]
+        }
+      },
+      {
+        "puuid": "puuid-ally-jungle",
+        "participantId": 2,
+        "teamId": 100,
+        "championId": 64,
+        "teamPosition": "JUNGLE",
+        "win": true,
+        "kills": 8,
+        "deaths": 3,
+        "assists": 10,
+        "item0": 1102,
+        "item1": 6692,
+        "item2": 3047,
+        "perks": {
+          "statPerks": { "defense": 5001, "flex": 5008, "offense": 5008 },
+          "styles": [
+            { "description": "primaryStyle", "style": 8100, "selections": [{ "perk": 8112 }] },
+            { "description": "subStyle", "style": 8300, "selections": [{ "perk": 8304 }] }
+          ]
+        }
+      },
+      {
+        "puuid": "puuid-ally-mid",
+        "participantId": 3,
+        "teamId": 100,
+        "championId": 103,
+        "teamPosition": "MIDDLE",
+        "win": true,
+        "kills": 7,
+        "deaths": 4,
+        "assists": 9,
+        "item0": 1056,
+        "item1": 6655,
+        "item2": 3020,
+        "perks": {
+          "statPerks": { "defense": 5001, "flex": 5008, "offense": 5008 },
+          "styles": [
+            { "description": "primaryStyle", "style": 8100, "selections": [{ "perk": 8112 }] },
+            { "description": "subStyle", "style": 8300, "selections": [{ "perk": 8304 }] }
+          ]
+        }
+      },
+      {
+        "puuid": "puuid-ally-adc",
+        "participantId": 4,
+        "teamId": 100,
+        "championId": 51,
+        "teamPosition": "BOTTOM",
+        "win": true,
+        "kills": 10,
+        "deaths": 2,
+        "assists": 6,
+        "item0": 1055,
+        "item1": 3031,
+        "item2": 3006,
+        "perks": {
+          "statPerks": { "defense": 5001, "flex": 5008, "offense": 5008 },
+          "styles": [
+            { "description": "primaryStyle", "style": 8000, "selections": [{ "perk": 8005 }] },
+            { "description": "subStyle", "style": 8300, "selections": [{ "perk": 8304 }] }
+          ]
+        }
+      },
+      {
+        "puuid": "puuid-enemy-top",
+        "participantId": 6,
+        "teamId": 200,
+        "championId": 10,
+        "teamPosition": "TOP",
+        "win": false,
+        "kills": 2,
+        "deaths": 6,
+        "assists": 2,
+        "item0": 1055,
+        "item1": 6632,
+        "item2": 3047,
+        "perks": {
+          "statPerks": { "defense": 5001, "flex": 5008, "offense": 5008 },
+          "styles": [
+            { "description": "primaryStyle", "style": 8000, "selections": [{ "perk": 8005 }] },
+            { "description": "subStyle", "style": 8400, "selections": [{ "perk": 8433 }] }
+          ]
+        }
+      },
+      {
+        "puuid": "puuid-enemy-jungle",
+        "participantId": 7,
+        "teamId": 200,
+        "championId": 121,
+        "teamPosition": "JUNGLE",
+        "win": false,
+        "kills": 3,
+        "deaths": 8,
+        "assists": 4,
+        "item0": 1102,
+        "item1": 6692,
+        "item2": 3047,
+        "perks": {
+          "statPerks": { "defense": 5001, "flex": 5008, "offense": 5008 },
+          "styles": [
+            { "description": "primaryStyle", "style": 8100, "selections": [{ "perk": 8112 }] },
+            { "description": "subStyle", "style": 8300, "selections": [{ "perk": 8304 }] }
+          ]
+        }
+      },
+      {
+        "puuid": "puuid-enemy-mid",
+        "participantId": 8,
+        "teamId": 200,
+        "championId": 7,
+        "teamPosition": "MIDDLE",
+        "win": false,
+        "kills": 4,
+        "deaths": 7,
+        "assists": 3,
+        "item0": 1056,
+        "item1": 6655,
+        "item2": 3020,
+        "perks": {
+          "statPerks": { "defense": 5001, "flex": 5008, "offense": 5008 },
+          "styles": [
+            { "description": "primaryStyle", "style": 8100, "selections": [{ "perk": 8112 }] },
+            { "description": "subStyle", "style": 8300, "selections": [{ "perk": 8304 }] }
+          ]
+        }
+      },
+      {
+        "puuid": "puuid-enemy-adc",
+        "participantId": 9,
+        "teamId": 200,
+        "championId": 222,
+        "teamPosition": "BOTTOM",
+        "win": false,
+        "kills": 5,
+        "deaths": 5,
+        "assists": 2,
+        "item0": 1055,
+        "item1": 3031,
+        "item2": 3006,
+        "perks": {
+          "statPerks": { "defense": 5001, "flex": 5008, "offense": 5008 },
+          "styles": [
+            { "description": "primaryStyle", "style": 8000, "selections": [{ "perk": 8005 }] },
+            { "description": "subStyle", "style": 8300, "selections": [{ "perk": 8304 }] }
+          ]
+        }
+      },
+      {
+        "puuid": "puuid-enemy-support",
+        "participantId": 10,
+        "teamId": 200,
+        "championId": 89,
+        "teamPosition": "UTILITY",
+        "win": false,
+        "kills": 1,
+        "deaths": 6,
+        "assists": 6,
+        "item0": 3850,
+        "item1": 3109,
+        "item2": 3117,
+        "perks": {
+          "statPerks": { "defense": 5001, "flex": 5008, "offense": 5008 },
+          "styles": [
+            { "description": "primaryStyle", "style": 8400, "selections": [{ "perk": 8439 }] },
+            { "description": "subStyle", "style": 8300, "selections": [{ "perk": 8304 }] }
+          ]
+        }
       }
     ]
   }
 }
-

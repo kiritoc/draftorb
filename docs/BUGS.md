@@ -61,6 +61,51 @@ No new bugs were identified while revising T-013 patch-window and rank-known-cou
   - The rank summary counted only database rows returned for match participants and reported zero when the fallback seed rank was used.
 - Fix (commit/ticket): C3 — include the seed player's PUUID and fallback rank in `rankSummary`; regression coverage asserts every ingested match has at least one known rank.
 
+### B-007 — Invalid match responses left the ingestion cursor stuck — FIXED
+
+- Severity / Area (engine|etl|web|desktop|vision|docs): S2 / etl
+- Steps to reproduce:
+  1. Return a persistent HTTP 404 for a match id in a player's snapshot.
+  2. Rerun ingestion and inspect the player's cursor.
+- Expected / Actual:
+  - Expected: record the missing match as invalid, advance the cursor, and continue to later ids.
+  - Actual: the failed id could remain at the cursor and block subsequent matches on every rerun.
+- Environment (OS, Node version, patch): macOS, Node 20+, match ingestion.
+- Logs / screenshot: `packages/etl/src/matches.test.ts` — “rejects persistent 404 match responses and continues to the next match”.
+- Suspected cause:
+  - Match fetch exceptions were not handled as permanent invalid responses in the cursor transaction.
+- Fix (commit/ticket): B2 — classify HTTP 400/404 as invalid and transactionally persist the rejection with cursor advancement.
+
+### B-008 — Riot schema failures returned untyped raw payloads — FIXED
+
+- Severity / Area (engine|etl|web|desktop|vision|docs): S2 / etl
+- Steps to reproduce:
+  1. Provide a successful HTTP response with a payload that fails the supplied Zod schema.
+  2. Call `RiotClient.request()` with that schema.
+- Expected / Actual:
+  - Expected: throw `RiotSchemaError` with the response URL and bounded issue details.
+  - Actual: return the unvalidated payload through a generic type assertion.
+- Environment (OS, Node version, patch): macOS, Node 20+, Riot client.
+- Logs / screenshot: `packages/etl/src/riot/client.test.ts` — “throws RiotSchemaError when schema validation fails”.
+- Suspected cause:
+  - The response parser treated schema validation failure as a reason to return the original payload.
+- Fix (commit/ticket): B1 — remove the raw-payload fallback and throw `RiotSchemaError` for schema mismatches.
+
+### B-009 — Match participant payloads were discarded after ingestion — FIXED
+
+- Severity / Area (engine|etl|web|desktop|vision|docs): S2 / etl
+- Steps to reproduce:
+  1. Ingest a valid ranked match.
+  2. Inspect `participants` for that match.
+- Expected / Actual:
+  - Expected: persist all ten role-valid participant rows with the match.
+  - Actual: the match row was stored but the participant payload was discarded.
+- Environment (OS, Node version, patch): macOS, Node 20+, match ingestion.
+- Logs / screenshot: `packages/etl/src/participants.test.ts` and `packages/etl/src/matches.test.ts` cover extracted rows, wins, transaction rollback, incomplete-match repair, and invalid layouts.
+- Suspected cause:
+  - Match ingestion stored summary metadata without extracting participant details.
+- Fix (commit/ticket): C4 — extract participants and insert them atomically with the match.
+
 ### B-005 — ETL workspace build regression — FIXED
 
 - Severity / Area (engine|etl|web|desktop|vision|docs): S1 / etl

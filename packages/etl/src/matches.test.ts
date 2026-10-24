@@ -3,56 +3,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { openDb, migrate } from './db';
 import { ingestMatches } from './matches';
 import { comparePatches, cursorKey, patchFromGameVersion, windowWidened } from './matches-store';
-import { RiotApiError, RiotRateLimitError } from './riot';
-import type { Platform, RiotClient, RiotMatchDto } from './riot';
-
-const PLATFORM: Platform = 'euw1';
-
-function seedPlayer(db: ReturnType<typeof openDb>, puuid: string, rankScore: number): void {
-  db.prepare(
-    `INSERT INTO players (puuid, platform, tier, division, lp, rank_score, updated_at)
-     VALUES (?, 'euw1', 'DIAMOND', 'II', 50, ?, 0)`,
-  ).run(puuid, rankScore);
-}
-
-function participant(puuid: string): Record<string, unknown> {
-  return {
-    puuid,
-    teamId: 100,
-    championId: 412,
-    teamPosition: 'UTILITY',
-    win: true,
-    kills: 1,
-    deaths: 2,
-    assists: 10,
-  };
-}
-
-function makeMatch(matchId: string, over: Record<string, unknown> = {}): RiotMatchDto {
-  return {
-    metadata: { matchId, participants: ['seed-player'] },
-    info: {
-      gameCreation: 1_760_000_000_000,
-      gameDuration: 1800,
-      gameId: 1,
-      gameMode: 'CLASSIC',
-      gameVersion: '16.21.1.42',
-      queueId: 420,
-      participants: [participant('seed-player')],
-      ...over,
-    },
-  } as unknown as RiotMatchDto;
-}
-
-function mockClient(ids: Record<string, string[]>, matches: Record<string, unknown>) {
-  return {
-    getMatchIdsByPuuid: vi.fn(async (_platform: Platform, puuid: string) => ids[puuid] ?? []),
-    getMatch: vi.fn(async (_platform: Platform, matchId: string) => matches[matchId]),
-  } as unknown as RiotClient & {
-    getMatchIdsByPuuid: ReturnType<typeof vi.fn>;
-    getMatch: ReturnType<typeof vi.fn>;
-  };
-}
+import { participant, makeMatch, mockClient, PLATFORM, seedPlayer } from './matches.test-helpers';
+import { RiotApiError, RiotRateLimitError, RiotSchemaError } from './riot';
+import type { Platform, RiotClient } from './riot';
 
 describe('match ingestion', () => {
   it('extracts the patch from a game version', () => {
@@ -278,14 +231,17 @@ describe('match ingestion', () => {
     db.close();
   });
 
-  it('revalidates payloads and marks schema mismatches invalid', async () => {
+  it('marks client schema failures as invalid matches', async () => {
     const db = openDb(':memory:');
     migrate(db);
     seedPlayer(db, 'p-alpha', 6.5);
 
-    const client = mockClient(
-      { 'p-alpha': ['EUW1_BAD'] },
-      { EUW1_BAD: { unexpected: 'shape' } }, // client returns raw on schema mismatch
+    const client = mockClient({ 'p-alpha': ['EUW1_BAD'] }, {});
+    client.getMatch.mockRejectedValueOnce(
+      new RiotSchemaError(
+        'https://europe.api.riotgames.com/lol/match/v5/matches/EUW1_BAD',
+        'missing info',
+      ),
     );
 
     const result = await ingestMatches({ platform: PLATFORM, db, client });

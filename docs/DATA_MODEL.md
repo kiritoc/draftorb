@@ -17,7 +17,7 @@ CREATE TABLE participants (
   role TEXT,                  -- TOP|JUNGLE|MID|ADC|SUPPORT (from teamPosition)
   win INTEGER, rank_score REAL, champion_games INTEGER, -- pure count of games on the champion in our data (D-022)
   mastery_points INTEGER,     -- champion-mastery-v4 points for THIS champion at last fetch; NULL = never fetched (at most one call per (puuid, champion) pair)
-  is_expert INTEGER,          -- 1 = expert for the recommended role: champion_games >= minChampGames, else mastery fallback (D-022)
+  is_expert INTEGER,          -- derived: recomputed each aggregation run from champion_games/mastery_points (D-022), not written at extraction
   keystone INTEGER, primary_style INTEGER, sub_style INTEGER,
   perks_json TEXT,            -- full rune selection + shards
   items_json TEXT,            -- final items

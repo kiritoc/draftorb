@@ -56,7 +56,7 @@ Validated by zod schemas in `packages/shared`. Keep each file < 5 MB gzip.
 | `role-prob.json` | `{ [championId]: { SUPPORT: 0.92, ... } }` |
 | `support-baseline.json` | per support + bucket: wins_w, games_w, games_w2 |
 | `support-ally-pairs.json` | compact arrays `[supportId, allyId, role, bucket, wins_w, games_w, games_w2]` (`games_w2` lets the engine compute `n_eff`, SPECS §3) |
-| `support-enemy-pairs.json` | same layout |
+| `support-enemy-pairs.json` | `[supportId, enemyId, role, bucket, wins_w, games_w, games_w2]` |
 | `support-lane-vs.json` | `[supportId, enemySupportId, enemyAdcId, bucket, wins_w, games_w, games_w2]`, rows with `n_eff >= minGames` only |
 | `support-lane-2v2.json` | `[supportId, allyAdcId, enemySupportId, enemyAdcId, bucket, wins_w, games_w, games_w2]`, rows with `n_eff >= minGames` only |
 | `runes/<championId>.json` | contexts -> top pages |

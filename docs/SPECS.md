@@ -57,6 +57,7 @@ x += W_comp  * compNeed(c, allies, enemies)
 x += W_blind * blindSafety(c)                               // only if blindPick or few enemies known
 P(c) = sigmoid(x);  score(c) = P(c)
 ```
+- Baseline gate: if the candidate's baseline `n_eff < minGames`, it gets no score: it is listed as "insufficient data" with its sample size (golden rule 8) and is not ranked. The `k0` shrinkage only guards near-perfect records that already passed this gate.
 - Every probability passed to `logit` is clamped to `[eps, 1 - eps]` (eps = 1e-4), so a perfect or empty record can never produce an infinite or NaN score.
 - `pairTerm(c, s) = logit((wins_w + k*p0)/(games_w + k)) - logit(p0)`, k = prior strength (default 40 games).
 - `laneTerm(t, q) = logit((t.wins_w + k_lane*q)/(t.games_w + k_lane)) - logit(q)`, k_lane default 40: an exact lane context is shrunk toward the prediction already made from the pairs, not toward the baseline, so it only moves the score when it has enough games to disagree with the pairs.

@@ -1,6 +1,6 @@
 # SPECS
 
-Status of this doc: v0.2 (ranking model D-020..D-023) — edit via `DECISIONS.md` when changing behavior.
+Status of this doc: v0.2 (ranking model D-020..D-023) — edit via `DECISIONS.md` when changing behavior. Sections tied to ADRs D-020..D-023 are normative only once those ADRs are accepted.
 
 ## 1. Users & use cases
 - UC1 Draft: user (Diamond default) enters known champions (allies/enemies, roles optional) -> gets ranked champion picks for their slot with explanations. Phase 1: user is Support.
@@ -104,7 +104,7 @@ Recommendation {
 }
 DraftResult {
   recommendations: Recommendation[]                    // ranked candidates only
-  insufficientData: { championId, games: number }[]    // baseline n_eff < minGames (§5), unscored
+  insufficientData: { championId, nEff: number, rawGames: number }[]  // baseline n_eff < minGames (§5), unscored
 }
 ```
 Sorted desc. Always show why + sample sizes. Never show a % without sample size. `DraftResult.insufficientData` is a new shared schema to add with the scoring engine tickets; `recommendationSchema` itself is unchanged.
@@ -147,4 +147,4 @@ Read Riot's third-party policy before shipping E6/E7; log result in DECISIONS.md
 - Show current patch + data freshness.
 
 ## 11. Out of scope (Phase 1)
-Non-support roles, accounts/login, server-side code, paid anything, mobile app, replays.
+Non-support roles, accounts/login, server-side code, paid anything, mobile app, replays. The engine and data model are role-generic (D-020/D-021); only the SUPPORT role is populated and exposed in Phase 1.

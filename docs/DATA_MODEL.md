@@ -51,22 +51,23 @@ Notes: `rank_score` = coarse tier/division score at collection time (approximati
 
 Adding a role means data only: no schema or code change. Migration 004 (T-011.b) creates these tables.
 
-## Exported JSON (`data/public/<patch>/`)
-Validated by zod schemas in `packages/shared`. Keep each file < 5 MB gzip.
-| File | Content |
-|---|---|
-| `manifest.json` | `{ patch, generatedAt, region, rankBuckets, files[], schemaVersion }` |
-| `champions.json` | id, name, icon, roles |
-| `role-prob.json` | `{ [championId]: { SUPPORT: 0.92, ... } }` |
-| `support-baseline.json` | per support + bucket: wins_w, games_w, games_w2 |
-| `support-ally-pairs.json` | compact arrays `[supportId, allyId, role, bucket, wins_w, games_w, games_w2]` (`games_w2` lets the engine compute `n_eff`, SPECS §3) |
-| `support-enemy-pairs.json` | `[supportId, enemyId, role, bucket, wins_w, games_w, games_w2]` |
-| `support-lane-vs.json` | `[supportId, enemySupportId, enemyAdcId, bucket, wins_w, games_w, games_w2]`, rows with `n_eff >= minGames` only |
-| `support-lane-2v2.json` | `[supportId, allyAdcId, enemySupportId, enemyAdcId, bucket, wins_w, games_w, games_w2]`, rows with `n_eff >= minGames` only |
-| `runes/<championId>.json` | contexts -> top pages |
-| `items.json` | item catalog (from Data Dragon) |
-| `builds/<championId>.json` | item build stats |
+## Exported JSON (`data/public/<patch>/`) — role-keyed from day one
+Validated by one zod schema family parameterized by role (`packages/shared`, T-002.b). The role is carried by the file path, not by a column in the rows (the SQLite tables keep `my_role`). The web app loads only the roles listed in `manifest.json`. Keep each file < 5 MB gzip.
+```
+manifest.json          // { patch, generatedAt, region, rankBuckets, roles: ["SUPPORT"], files[], schemaVersion }
+champions.json         // id, name, icon, roles
+items.json             // item catalog (from Data Dragon)
+role-prob.json         // { [championId]: { SUPPORT: 0.92, ... } }
+roles/<ROLE>/baseline.json    // [championId, bucket, wins_w, games_w, games_w2]
+roles/<ROLE>/ally-pairs.json  // [championId, allyId, role, bucket, wins_w, games_w, games_w2]
+roles/<ROLE>/enemy-pairs.json // [championId, enemyId, role, bucket, wins_w, games_w, games_w2]
+roles/<ROLE>/lane-vs.json     // [championId, opp1Id, opp2Id, bucket, wins_w, games_w, games_w2]
+roles/<ROLE>/lane-full.json   // [championId, partnerId, opp1Id, opp2Id, bucket, wins_w, games_w, games_w2]
+roles/<ROLE>/runes/<championId>.json  // contexts -> top pages
+roles/<ROLE>/builds/<championId>.json // item build stats
+```
+Every exported row carries `games_w2` so the engine can compute `n_eff` (SPECS §3). Rows are exported only when `n_eff >= exportMinGames` (config, default 10), and `exportMinGames <= minGames` so tightening `minGames` never needs a re-export. Size budget: `lane-*` and `*-pairs` files are the largest; if a file would exceed 5 MB, raise `exportMinGames` for that file and record it in the manifest.
 
 Manual files (committed, hand-written, zod-validated): `data/manual/champion-tags.json`, `data/manual/item-tags.json`, `data/manual/gameplans/*.md`.
 
-`schemaVersion` must be bumped when a JSON format changes; the web app checks it and shows a clear error on mismatch.
+`schemaVersion` is bumped once for this role-keyed layout, and again whenever a JSON format changes; the web app checks it and shows a clear error on mismatch.

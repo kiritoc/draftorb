@@ -19,7 +19,7 @@ Format: `ID | Title | Deps | Status | Acceptance`. Status: TODO, DOING, REVIEW, 
 - **T-016 | Aggregate baselines (rank-weighted, role-generic) (S)** | T-014,T-011.b,T-020 | TODO | Uses engine rank kernel. Stores `games_w2` (SPECS §3). Acceptance: weighted counts and `n_eff` verified on toy data.
 - **T-017 | Aggregate pair tables (M)** | T-016,T-011.b | TODO | role-generic `pair_ally`/`pair_enemy` for `my_role`, plus `lane_vs` and `lane_full` (D-021); Phase 1 populates `my_role = SUPPORT`. Acceptance: toy dataset gives expected counts; both team perspectives handled.
 - **T-018 | Aggregate runes by context (M)** | T-014,T-020 | TODO | Experts rule SPECS §3, back-off contexts SPECS §8.1 driven by `contextSlots` + `influence[myRole][*][*][lane]` (D-021/D-022). Acceptance: min-games filter works; every context level present for back-off.
-- **T-019 | Export versioned JSON + manifest (S)** | T-015..T-018,T-002.b | TODO | Files in DATA_MODEL.md, size checks. Acceptance: web can load them; schemaVersion present.
+- **T-019 | Export versioned JSON + manifest (S)** | T-015..T-018,T-002.b | TODO | Role-keyed layout in DATA_MODEL.md (`roles/<ROLE>/...`, manifest `roles` list, `schemaVersion`), `exportMinGames` filter, size checks. Acceptance: web can load them; schemaVersion present.
 
 ## E2 Engine
 - **T-020 | Rank weighting module (S)** | T-002 | TODO | Kernel + experts weights + recency decay + `n_eff` + equivalent-count conversion + influence matrix `influence[myRole][side][otherRole][phase]` (D-020, zod-validated config incl. `s`, `contextSlots`). Acceptance: unit tests on boundary values; matrix validation rejects an incomplete row or a non-max opponent cell.
@@ -33,7 +33,7 @@ Format: `ID | Title | Deps | Status | Acceptance`. Status: TODO, DOING, REVIEW, 
 - **T-027.b | Backtest harness: runes/items (M)** | T-018,T-051 | TODO | `pnpm etl backtest items` (D-023): calibration of the shrunk context win rates on holdout purchases, per `myRole`/phase, paired bootstrap vs baseline. Acceptance: report JSON written; toy dataset.
 
 ## E3 Web MVP
-- **T-030 | Web scaffold + data loader (S)** | T-001,T-019 | TODO | Vite/React/Tailwind, loads manifest + JSON, shows patch. Acceptance: runs with sample data.
+- **T-030 | Web scaffold + data loader (S)** | T-001,T-019 | TODO | Vite/React/Tailwind, loads manifest + the JSON of roles listed in `manifest.roles`, shows patch. Acceptance: runs with sample data.
 - **T-031 | Draft screen (L)** | T-030 | TODO | 10 slots, searchable champion picker, optional role per slot, blind toggle, rank selector (Diamond default). Acceptance: any subset of inputs OK.
 - **T-032 | Recommendations list (M)** | T-023,T-031,T-002.b | TODO | Cards with reasons, level badges, sample sizes, lowData warning.
 - **T-033 | Pool filter (S)** | T-032 | TODO | Manual champion pool in localStorage; second list "from my pool".

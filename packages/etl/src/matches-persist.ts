@@ -13,6 +13,11 @@ export interface MatchPersistStatements {
   insertReject: Database.Statement;
 }
 
+/**
+ * Prepares all SQLite statements for match persistence operations.
+ * Returns an object containing prepared statements for querying, inserting,
+ * updating, and deleting matches and their participants.
+ */
 export function prepareMatchPersist(db: Database.Database): MatchPersistStatements {
   return {
     getStoredMatch: db.prepare(
@@ -60,6 +65,10 @@ export function prepareMatchPersist(db: Database.Database): MatchPersistStatemen
   };
 }
 
+/**
+ * Retrieves the number of participants stored for a given match.
+ * Returns undefined if the match does not exist in the database.
+ */
 export function storedParticipantCount(
   stmts: MatchPersistStatements,
   matchId: string,
@@ -69,6 +78,11 @@ export function storedParticipantCount(
   return storedMatch?.participant_count;
 }
 
+/**
+ * Checks if a stored match has the required minimum number of participants.
+ * Returns true only if the participant count is defined and meets or exceeds
+ * the threshold defined by MATCH_PARTICIPANT_COUNT.
+ */
 export function isCompleteStoredMatch(participantCount: number | undefined): boolean {
   return participantCount !== undefined && participantCount >= MATCH_PARTICIPANT_COUNT;
 }
@@ -84,6 +98,12 @@ export interface StoredMatchRow {
   rank_known_count: number;
 }
 
+/**
+ * Persists a match and its participants to the database in an atomic transaction.
+ * Handles duplicate detection and supports repairing incomplete matches by
+ * updating match metadata and replacing all participants when repairingIncompleteMatch is true.
+ * Updates the processing cursor based on whether the match was stored or detected as a duplicate.
+ */
 export function persistAcceptedMatch(
   db: Database.Database,
   stmts: MatchPersistStatements,

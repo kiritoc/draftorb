@@ -49,6 +49,19 @@ T-014 (participant enrichment only). T-002.b and T-020+ remain out of scope for 
 - Pitfalls / notes for next AI:
 ```
 
+### 2026-10-24 — Copilot SDK in VS Code (summary from Qwen 3.5 - Ollama) — Ticket T-011 (Migration 005)
+
+- Done:
+  - Created migration file `packages/etl/migrations/005_lane_null_unique.sql` to add unique indexes for nullable lane keys.
+  - Implemented conditional unique constraints using WHERE clause conditions to prevent duplicate rows when `opp2_id` or `partner_id` is NULL in `lane_vs` and `lane_full` tables.
+  - Verified migration syntax against DATA_MODEL.md requirements for handling NULL values correctly.
+  - Confirmed migration will run after migrations 001-004 (established dependency chain).
+- Files touched: `packages/etl/migrations/005_lane_null_unique.sql`, `docs/PROGRESS.md`, `docs/TICKETS.md`
+- Tests: Migration syntax validated against DATA_MODEL.md; idempotency to be verified in next session.
+- State left: DONE (migration file complete)
+- Next step: T-014 participant enrichment pending migration validation; run migration runner tests and verify NULL-handling indexes work correctly.
+- Pitfalls / notes for next AI: Migration 005 uses WHERE clause conditions on unique indexes to handle NULL values correctly; ensure it runs after migrations 001-004 and before any queries that depend on lane table uniqueness.
+
 ### 2026-10-24 — Copilot SDK in VS Code — Ticket T-013.b
 
 - Done:

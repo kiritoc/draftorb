@@ -24,6 +24,7 @@ Our approach = **hybrid**: stats-driven engine + thin manual layer (champion tag
 - Rank logic: **draft probabilities** use games near the player's rank (kernel around Diamond). **Runes/items** use the player's rank and above up to Challenger (experts), with experience filters. See SPECS §3.
 - Partial info: role inference with probabilities; unknown roles handled by weighted assignment. See SPECS §4.
 - Auto-detection: Live Client Data API + LCU first (desktop); image recognition is plan B. See SPECS §9.
+- Personal champion pool (D-024): the user can keep a pool of champions they play well. The screen always shows "Best overall" (to learn a new champion) and, when a pool exists, "From your pool" above it; both lists start with 5 picks and a "Show more" button reveals the next 5 until the list is exhausted. The pool is stored in the browser only and never changes scores.
 
 ## Roadmap (epics)
 
@@ -32,7 +33,7 @@ Our approach = **hybrid**: stats-driven engine + thin manual layer (champion tag
 | E0 Foundations | monorepo, types, Data Dragon, champion tags                       | M0           |
 | E1 ETL         | Riot client, SQLite, ingestion, aggregation, JSON export          | M1           |
 | E2 Engine      | rank weighting, role inference, scoring, blind pick, golden tests | M2           |
-| E3 Web MVP     | draft screen, recommendations, deploy                             | **M3 = MVP** |
+| E3 Web MVP     | draft screen, recommendations (overall + from your pool), deploy  | **M3 = MVP** |
 | E4 Runes       | rune recommendation + gameplan notes                              | M4           |
 | E5 Items       | item catalog/tags, threat score, recommender                      | M5           |
 | E6 Live        | LCU + Live Client API, Electron overlay                           | M6           |

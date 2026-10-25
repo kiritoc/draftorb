@@ -32,3 +32,7 @@
 - **Expert fallback**: champion-mastery-v4 points used for the expert rule only for participants of the recommended role, once per (puuid, champion) pair (D-022).
 - **laneGroup**: per-role config naming the lane champions used by the `lane_vs`/`lane_full` layers (D-021).
 - **Role-generic**: model and tables keyed by `myRole`, Phase 1 populating only SUPPORT.
+- **Champion pool**: the user's personal per-role list of champions they play well, stored only in the browser; it groups results but never changes scores (D-024).
+- **Overall list**: the complete ranking of all scored candidates (`DraftResult.recommendations`), always shown.
+- **Pool list**: the pool champions of the overall ranking (`poolRecommendations`), shown above the overall list when the pool is non-empty.
+- **recommendationPageSize**: number of items shown first and added by each "Show more" click (default 5, UI config).

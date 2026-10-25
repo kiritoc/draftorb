@@ -63,6 +63,15 @@ T-014 (participant enrichment only). T-002.b and T-020+ remain out of scope for 
 - Next step: T-014 participant enrichment; T-002.b remains unblocked.
 - Pitfalls / notes for next AI: `.env`, `.env.local`, `.env.*`, `dist/`, and `*.tsbuildinfo` were already ignored on this branch; raw ETL data now has explicit ignore coverage as well.
 
+### 2026-10-24 — Copilot SDK in VS Code — D-024 champion pool contract
+
+- Done: applied the D-024 product decision and documented the browser-only per-role pool, score-preserving engine contract, and independently paginated "From your pool" and "Best overall" lists.
+- Files touched: `AGENTS.md`, `docs/CONVENTIONS.md`, `docs/DATA_MODEL.md`, `docs/DECISIONS.md`, `docs/GLOSSARY.md`, `docs/PLAN_SUMMARY.md`, `docs/PROGRESS.md`, `docs/SPECS.md`, `docs/TESTING.md`, `docs/TICKETS.md`
+- Tests: none (documentation and product-contract changes only).
+- State left: REVIEW (branch `d-024-champion-pool`, rebased onto `pr-c-data-model-alignment`).
+- Next step: implement shared pool schemas in T-002.b before the engine and UI pool work.
+- Pitfalls / notes for next AI: the pool must never change scoring, candidate scores, or global order; the engine returns complete lists, and pagination is UI-only.
+
 ### 2026-10-24 — Copilot SDK in VS Code — PR C: data model alignment
 
 - Done:

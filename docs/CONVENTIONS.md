@@ -11,7 +11,7 @@ All code, comments, docs, commit messages, tickets, bug reports, logs, error mes
 - Types live in `packages/shared`; never duplicate them.
 - Naming: files `kebab-case.ts`, types `PascalCase`, functions/vars `camelCase`, constants `UPPER_SNAKE`, enums as string literal unions (`'SUPPORT'`).
 - Percentages: store as fractions (0.53) internally; deltas in percentage points named `...Pp`.
-- Config numbers (weights, thresholds) live in `packages/engine/src/config.ts` — no magic numbers in logic.
+- Config numbers (weights, thresholds) live in `packages/engine/src/config.ts` — no magic numbers in logic. UI-only constants (page size, pool limits) live in `apps/web/src/config.ts`.
 
 ## Engine rules
 
@@ -27,6 +27,7 @@ All code, comments, docs, commit messages, tickets, bug reports, logs, error mes
 - Function components + hooks, Tailwind utility classes, no business logic in components (call engine).
 - State: React state/Zustand if needed. Keep champion pickers keyboard accessible.
 - Dark theme by default (gaming context), responsive.
+- Browser storage: keys prefixed `draftorb.` and versioned (`.v1`), every access in try/catch, every read validated with a shared zod schema, never trust stored data (D-024).
 
 ## ETL
 

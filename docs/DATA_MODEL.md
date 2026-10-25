@@ -84,3 +84,11 @@ Every exported row carries `games_w2` so the engine can compute `n_eff` (SPECS Â
 Manual files (committed, hand-written, zod-validated): `data/manual/champion-tags.json`, `data/manual/item-tags.json`, `data/manual/gameplans/*.md`.
 
 `schemaVersion` is bumped once for this role-keyed layout, and again whenever a JSON format changes; the web app checks it and shows a clear error on mismatch.
+
+## Browser storage (apps/web, not exported, D-024)
+
+| Key                | Content                                                       | Notes                                                                                                                                                                      |
+| ------------------ | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `draftorb.pool.v1` | `{ "version": 1, "pools": { "SUPPORT": [championId, ...] } }` | Per-role champion pool. Unique ids, at most `poolMaxSize` (default 40) per role. Validated with the shared zod `championPoolSchema` (T-002.b) on every read and on import. |
+
+Every storage access is wrapped in try/catch; unavailable, full or corrupted storage means an empty in-memory pool plus a visible notice. Ids not present in the current `champions.json` are dropped on load. Bumping the key suffix (`v2`) requires a migration function; never reuse a key with a different shape.

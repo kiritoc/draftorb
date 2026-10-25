@@ -34,8 +34,7 @@ export function makeMatch(matchId: string, over: Record<string, unknown> = {}): 
   const participants = matchFixture.info.participants.map((matchParticipant, index) => {
     const override = overrides[index];
     if (!override) return { ...matchParticipant };
-    const puuid =
-      typeof override.puuid === 'string' ? override.puuid : matchParticipant.puuid;
+    const puuid = typeof override.puuid === 'string' ? override.puuid : matchParticipant.puuid;
     return { ...matchParticipant, ...override, puuid };
   });
 

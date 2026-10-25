@@ -64,7 +64,8 @@ export function storedParticipantCount(
   stmts: MatchPersistStatements,
   matchId: string,
 ): number | undefined {
-  const storedMatch = stmts.getStoredMatch.get(matchId) as { participant_count: number } | undefined;
+  const storedMatch = stmts.getStoredMatch.get(matchId) as
+    { participant_count: number } | undefined;
   return storedMatch?.participant_count;
 }
 

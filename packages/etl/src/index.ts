@@ -86,6 +86,11 @@ export {
   type PlayerIngestionResult,
 } from './matches';
 export {
+  extractParticipants,
+  InvalidMatchParticipantsError,
+  type ParticipantRow,
+} from './participants';
+export {
   comparePatches,
   evaluateMatch,
   patchFromGameVersion,

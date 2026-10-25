@@ -3,21 +3,21 @@
 ## Current status
 
 - Phase: 1 (Support / Diamond)
-- Current milestone: M0 Foundations (Complete) -> M1 ETL (Complete) -> M2 Engine
-- Last updated: 2026-10-24 by Devin
+- Current milestone: M0 Foundations (Complete) -> M1 ETL (in review) -> M2 Engine
+- Last updated: 2026-10-24 by Copilot SDK in VS Code
 
 ## Epic status
 
-| Epic           | Status      | Notes                                                         |
-| -------------- | ----------- | ------------------------------------------------------------- |
-| E0 Foundations | IN PROGRESS | T-001..T-004 DONE; T-002.b TODO                               |
-| E1 ETL         | IN PROGRESS | T-010..T-013 and T-013.b DONE; T-011.b TODO, then T-014 ready |
-| E2 Engine      | NOT STARTED | Ready to start T-020                                          |
-| E3 Web MVP     | NOT STARTED |                                                               |
-| E4 Runes       | NOT STARTED |                                                               |
-| E5 Items       | NOT STARTED |                                                               |
-| E6 Live        | NOT STARTED |                                                               |
-| E7 Vision      | NOT STARTED |                                                               |
+| Epic           | Status      | Notes                                                     |
+| -------------- | ----------- | --------------------------------------------------------- |
+| E0 Foundations | IN PROGRESS | T-001..T-004 DONE; T-002.b TODO                           |
+| E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-013.b, T-013.c DONE; T-014 ready |
+| E2 Engine      | NOT STARTED | Ready to start T-020                                      |
+| E3 Web MVP     | NOT STARTED |                                                           |
+| E4 Runes       | NOT STARTED |                                                           |
+| E5 Items       | NOT STARTED |                                                           |
+| E6 Live        | NOT STARTED |                                                           |
+| E7 Vision      | NOT STARTED |                                                           |
 
 ## Data collection status
 
@@ -27,7 +27,7 @@
 
 ## Next recommended ticket
 
-T-011.b (Migration 004) and T-002.b (Shared schema parity for D-020..D-023), then T-014 (Participant extraction)
+T-014 (participant enrichment only). T-002.b and T-020+ remain out of scope for this PR.
 
 ## Open questions for the owner
 
@@ -60,8 +60,29 @@ T-011.b (Migration 004) and T-002.b (Shared schema parity for D-020..D-023), the
 - Files touched: `.gitignore`, `docs/BUGS.md`, `docs/PROGRESS.md`, `docs/RIOT_API.md`, `docs/TICKETS.md`, `packages/etl/src/cli.ts`, `packages/etl/src/db-ownership.test.ts`, `packages/etl/src/matches.test.ts`, `packages/etl/src/matches.ts`, `packages/etl/src/players.ts`, `packages/etl/src/riot/client.test.ts`, `packages/etl/src/riot/types.ts`
 - Tests: `pnpm check` (10 files, 90 tests passed); CLI smoke tests returned usage exit code 2 for unknown options, extra positionals, unsupported platforms, and malformed quotas; `git check-ignore --no-index -v` confirmed secret, generated, database, and raw-data patterns.
 - State left: DONE
-- Next step: T-011.b and T-002.b, then T-014.
+- Next step: T-014 participant enrichment; T-002.b remains unblocked.
 - Pitfalls / notes for next AI: `.env`, `.env.local`, `.env.*`, `dist/`, and `*.tsbuildinfo` were already ignored on this branch; raw ETL data now has explicit ignore coverage as well.
+
+### 2026-10-24 — Copilot SDK in VS Code — PR C: data model alignment
+
+- Done:
+  - Implemented T-011.b migration 004 and migration checksums; corrected D-019 rank-known semantics.
+  - Implemented T-013.c participant extraction and atomic persistence, and recorded the T-015.b role-hint limitation.
+  - Reviewed PR B and recorded the remaining acceptance gaps in the review handoff.
+- Files touched: `packages/etl/migrations/004_role_generic_aggregates.sql`, `packages/etl/src/db/migrate.ts`, `packages/etl/src/matches.ts`, `packages/etl/src/participants.ts`, relevant ETL tests and fixtures, `docs/BUGS.md`, `docs/DATA_MODEL.md`, `docs/DECISIONS.md`, `docs/GLOSSARY.md`, `docs/SPECS.md`, `docs/TICKETS.md`, `docs/PROGRESS.md`
+- Tests: `pnpm install --frozen-lockfile && pnpm typecheck && pnpm lint && pnpm format:check && pnpm test` passed (11 files, 96 tests).
+- State left: REVIEW (branch `pr-c-data-model-alignment`, rebased onto `main`).
+- Next step: review the rebased PR C branch; then continue with T-014 participant enrichment.
+- Pitfalls / notes for next AI: migration 004 drops and recreates derived aggregate tables because their old support-specific schema is obsolete; `champions.json.roles` remains a bootstrap hint and has no JUNGLE entries in patch 16.21.
+
+### 2026-10-24 — Copilot SDK in VS Code — PR B review
+
+- Done: reviewed PR B against the requested B1-B5 acceptance criteria. The frozen-install/typecheck/lint/format/test gate passed on B (9 test files, 85 tests).
+- Files touched: none for this review; C4 separately removes the redundant participant-schema re-parse while implementing PR C.
+- Tests: `pnpm install --frozen-lockfile && pnpm typecheck && pnpm lint && pnpm format:check && pnpm test` passed on B.
+- State left: REVIEW (acceptance gaps remain: player-discovery completion is marked after any page; CLI path/platform logic remains duplicated and CLI is not split; no-schema Riot requests retain an arbitrary generic result type; timeout/bad-JSON/redaction regression coverage is missing; `.gitignore` dropped prior ignore rules).
+- Next step: address the listed PR B gaps before merging.
+- Pitfalls / notes for next AI: the task requested review only for PR B; keep any corrections to that branch separate from PR C.
 
 ### 2026-10-24 — Copilot SDK in VS Code — Ticket T-005
 

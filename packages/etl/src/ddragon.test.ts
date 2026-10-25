@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -32,6 +33,18 @@ describe('ddragon ETL utilities', () => {
     expect(mapChampionTagsToRoles([])).toEqual(['MID']);
     expect(mapChampionTagsToRoles(undefined)).toEqual(['MID']);
     expect(mapChampionTagsToRoles(['UnknownRole'])).toEqual(['MID']);
+  });
+
+  it('documents that the patch 16.21 champion role hint has no jungle entries', () => {
+    const champions = championsMapSchema.parse(
+      JSON.parse(
+        readFileSync(new URL('../../../data/public/16.21/champions.json', import.meta.url), 'utf8'),
+      ) as unknown,
+    );
+    const entries = Object.values(champions);
+
+    expect(entries).toHaveLength(173);
+    expect(entries.filter((champion) => champion.roles.includes('JUNGLE'))).toHaveLength(0);
   });
 
   it('transforms raw champion payloads and passes zod validation', () => {

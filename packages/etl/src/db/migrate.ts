@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,15 +13,31 @@ const MIGRATIONS_DIR = join(__dirname, '../../migrations');
 interface Migration {
   version: string;
   sql: string;
+  checksum: string;
+}
+
+function hasChecksumColumn(db: Database.Database): boolean {
+  const columns = db.pragma('table_info(_migrations)') as { name: string }[];
+  return columns.some((column) => column.name === 'checksum');
 }
 
 function ensureMigrationsTable(db: Database.Database): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS _migrations (
       version TEXT PRIMARY KEY,
-      applied_at INTEGER NOT NULL
+      applied_at INTEGER NOT NULL,
+      checksum TEXT
     )
   `);
+
+  if (!hasChecksumColumn(db)) {
+    const addChecksumColumn = db.transaction(() => {
+      if (!hasChecksumColumn(db)) {
+        db.exec('ALTER TABLE _migrations ADD COLUMN checksum TEXT');
+      }
+    });
+    addChecksumColumn.immediate();
+  }
 }
 
 /**
@@ -40,7 +57,8 @@ function getMigrations(): Migration[] {
 
     const version = file.replace('.sql', '');
     const sql = readFileSync(join(MIGRATIONS_DIR, file), 'utf-8');
-    migrations.push({ version, sql });
+    const checksum = createHash('sha256').update(sql).digest('hex');
+    migrations.push({ version, sql, checksum });
   }
 
   return migrations;
@@ -53,9 +71,9 @@ function getMigrations(): Migration[] {
  */
 export function openDb(dbPath: string): Database.Database {
   const db = new Database(dbPath);
+  db.pragma('busy_timeout = 30000');
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
-  db.pragma('busy_timeout = 30000');
   return db;
 }
 
@@ -66,6 +84,29 @@ export function openDb(dbPath: string): Database.Database {
  */
 export function migrate(db: Database.Database): string[] {
   ensureMigrationsTable(db);
+  const migrations = getMigrations();
+  const appliedRows = db.prepare('SELECT version, checksum FROM _migrations').all() as {
+    version: string;
+    checksum: string | null;
+  }[];
+  const appliedByVersion = new Map(appliedRows.map((row) => [row.version, row]));
+  const backfillChecksum = db.prepare(
+    'UPDATE _migrations SET checksum = ? WHERE version = ? AND checksum IS NULL',
+  );
+
+  for (const migration of migrations) {
+    const applied = appliedByVersion.get(migration.version);
+    if (!applied) {
+      continue;
+    }
+    if (applied.checksum === null) {
+      backfillChecksum.run(migration.checksum, migration.version);
+    } else if (applied.checksum !== migration.checksum) {
+      throw new Error(
+        `Migration ${migration.version} checksum mismatch: the applied migration file has changed.`,
+      );
+    }
+  }
 
   const applyMigration = db.transaction((migration: Migration): boolean => {
     const already = db
@@ -77,9 +118,10 @@ export function migrate(db: Database.Database): string[] {
     }
 
     db.exec(migration.sql);
-    db.prepare('INSERT INTO _migrations (version, applied_at) VALUES (?, ?)').run(
+    db.prepare('INSERT INTO _migrations (version, applied_at, checksum) VALUES (?, ?, ?)').run(
       migration.version,
       Date.now(),
+      migration.checksum,
     );
     return true;
   });
@@ -90,7 +132,6 @@ export function migrate(db: Database.Database): string[] {
     ),
   );
 
-  const migrations = getMigrations();
   const appliedNow: string[] = [];
 
   for (const migration of migrations) {

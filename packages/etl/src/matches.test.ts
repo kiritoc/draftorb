@@ -3,56 +3,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { openDb, migrate } from './db';
 import { ingestMatches } from './matches';
 import { comparePatches, cursorKey, patchFromGameVersion, windowWidened } from './matches-store';
-import { RiotApiError, RiotRateLimitError } from './riot';
-import type { Platform, RiotClient, RiotMatchDto } from './riot';
-
-const PLATFORM: Platform = 'euw1';
-
-function seedPlayer(db: ReturnType<typeof openDb>, puuid: string, rankScore: number): void {
-  db.prepare(
-    `INSERT INTO players (puuid, platform, tier, division, lp, rank_score, updated_at)
-     VALUES (?, 'euw1', 'DIAMOND', 'II', 50, ?, 0)`,
-  ).run(puuid, rankScore);
-}
-
-function participant(puuid: string): Record<string, unknown> {
-  return {
-    puuid,
-    teamId: 100,
-    championId: 412,
-    teamPosition: 'UTILITY',
-    win: true,
-    kills: 1,
-    deaths: 2,
-    assists: 10,
-  };
-}
-
-function makeMatch(matchId: string, over: Record<string, unknown> = {}): RiotMatchDto {
-  return {
-    metadata: { matchId, participants: ['seed-player'] },
-    info: {
-      gameCreation: 1_760_000_000_000,
-      gameDuration: 1800,
-      gameId: 1,
-      gameMode: 'CLASSIC',
-      gameVersion: '16.21.1.42',
-      queueId: 420,
-      participants: [participant('seed-player')],
-      ...over,
-    },
-  } as unknown as RiotMatchDto;
-}
-
-function mockClient(ids: Record<string, string[]>, matches: Record<string, unknown>) {
-  return {
-    getMatchIdsByPuuid: vi.fn(async (_platform: Platform, puuid: string) => ids[puuid] ?? []),
-    getMatch: vi.fn(async (_platform: Platform, matchId: string) => matches[matchId]),
-  } as unknown as RiotClient & {
-    getMatchIdsByPuuid: ReturnType<typeof vi.fn>;
-    getMatch: ReturnType<typeof vi.fn>;
-  };
-}
+import { participant, makeMatch, mockClient, PLATFORM, seedPlayer } from './matches.test-helpers';
+import { RiotApiError, RiotRateLimitError, RiotSchemaError } from './riot';
+import type { Platform, RiotClient } from './riot';
 
 describe('match ingestion', () => {
   it('extracts the patch from a game version', () => {
@@ -104,25 +57,38 @@ describe('match ingestion', () => {
     db.close();
   });
 
-  it('falls back to the seed rank when no match participants are known', async () => {
+  it('includes the seed rank in every stored match rank summary', async () => {
     const db = openDb(':memory:');
     migrate(db);
     seedPlayer(db, 'p-alpha', 6.5);
+    seedPlayer(db, 'p-beta', 7);
 
-    const match = makeMatch('EUW1_UNKNOWN', {
+    const unknownMatch = makeMatch('EUW1_UNKNOWN', {
       participants: [participant('unknown-a'), participant('unknown-b')],
     });
-    match.metadata.participants = ['unknown-a', 'unknown-b'];
-    const client = mockClient({ 'p-alpha': ['EUW1_UNKNOWN'] }, { EUW1_UNKNOWN: match });
+    unknownMatch.metadata.participants = ['unknown-a', 'unknown-b'];
+    const knownMatch = makeMatch('EUW1_KNOWN', {
+      participants: [participant('p-beta')],
+    });
+    knownMatch.metadata.participants = ['p-beta'];
+    const client = mockClient(
+      { 'p-alpha': ['EUW1_UNKNOWN', 'EUW1_KNOWN'] },
+      { EUW1_UNKNOWN: unknownMatch, EUW1_KNOWN: knownMatch },
+    );
 
     const result = await ingestMatches({ platform: PLATFORM, db, client });
 
-    expect(result.stored).toBe(1);
-    const row = db
+    expect(result.stored).toBe(2);
+    const unknownRow = db
       .prepare('SELECT avg_rank_score, rank_known_count FROM matches WHERE match_id = ?')
       .get('EUW1_UNKNOWN') as { avg_rank_score: number; rank_known_count: number };
-    expect(row.avg_rank_score).toBe(6.5);
-    expect(row.rank_known_count).toBe(0);
+    expect(unknownRow.avg_rank_score).toBe(6.5);
+    expect(unknownRow.rank_known_count).toBe(1);
+    const rankCounts = db
+      .prepare('SELECT rank_known_count FROM matches ORDER BY match_id')
+      .all() as { rank_known_count: number }[];
+    expect(rankCounts).toHaveLength(result.stored);
+    expect(rankCounts.every(({ rank_known_count }) => rank_known_count >= 1)).toBe(true);
     db.close();
   });
 
@@ -265,14 +231,17 @@ describe('match ingestion', () => {
     db.close();
   });
 
-  it('revalidates payloads and marks schema mismatches invalid', async () => {
+  it('marks client schema failures as invalid matches', async () => {
     const db = openDb(':memory:');
     migrate(db);
     seedPlayer(db, 'p-alpha', 6.5);
 
-    const client = mockClient(
-      { 'p-alpha': ['EUW1_BAD'] },
-      { EUW1_BAD: { unexpected: 'shape' } }, // client returns raw on schema mismatch
+    const client = mockClient({ 'p-alpha': ['EUW1_BAD'] }, {});
+    client.getMatch.mockRejectedValueOnce(
+      new RiotSchemaError(
+        'https://europe.api.riotgames.com/lol/match/v5/matches/EUW1_BAD',
+        'missing info',
+      ),
     );
 
     const result = await ingestMatches({ platform: PLATFORM, db, client });

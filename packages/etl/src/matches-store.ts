@@ -93,21 +93,38 @@ export function findRejection(
   return row;
 }
 
-/** Mean known participant rank, including the seed player's rank. */
-export function rankSummary(
+/** Prepared lookup for `players.rank_score` (one parameterized get, reused per run). */
+export function createRankLoader(
   db: Database.Database,
-  puuids: string[],
+): (puuids: readonly string[]) => Map<string, number> {
+  const stmt = db.prepare('SELECT puuid, rank_score FROM players WHERE puuid = ?');
+  return (puuids) => {
+    const ranks = new Map<string, number>();
+    for (const puuid of new Set(puuids)) {
+      const row = stmt.get(puuid) as { puuid: string; rank_score: number } | undefined;
+      if (row) ranks.set(row.puuid, row.rank_score);
+    }
+    return ranks;
+  };
+}
+
+/**
+ * Mean known rank among the persisted match participants, including the seed
+ * (D-019). Only `participantPuuids` (the stored 10) contribute besides the seed.
+ */
+export function rankSummary(
+  ranksByPuuid: ReadonlyMap<string, number>,
+  participantPuuids: readonly string[],
   seedPuuid: string,
   fallback: number,
 ): { avg: number; known: number } {
-  const participantIds = [...new Set([...puuids, seedPuuid])];
-  const placeholders = participantIds.map(() => '?').join(',');
-  const rows = db
-    .prepare(`SELECT puuid, rank_score FROM players WHERE puuid IN (${placeholders})`)
-    .all(...participantIds) as { puuid: string; rank_score: number }[];
-  const ranks = new Map(rows.map((row) => [row.puuid, row.rank_score]));
+  const ranks = new Map<string, number>();
+  for (const puuid of new Set(participantPuuids)) {
+    const rank = ranksByPuuid.get(puuid);
+    if (rank !== undefined) ranks.set(puuid, rank);
+  }
   if (!ranks.has(seedPuuid)) {
-    ranks.set(seedPuuid, fallback);
+    ranks.set(seedPuuid, ranksByPuuid.get(seedPuuid) ?? fallback);
   }
   const knownRanks = [...ranks.values()];
   return {

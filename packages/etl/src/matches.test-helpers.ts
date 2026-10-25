@@ -20,31 +20,24 @@ export function seedPlayer(db: ReturnType<typeof openDb>, puuid: string, rankSco
   ).run(puuid, rankScore);
 }
 
-export function participant(puuid: string): Record<string, unknown> {
-  return {
-    puuid,
-    teamId: 100,
-    championId: 412,
-    teamPosition: 'UTILITY',
-    win: true,
-    kills: 1,
-    deaths: 2,
-    assists: 10,
-  };
+function asParticipantOverride(value: unknown): Record<string, unknown> | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  return value as Record<string, unknown>;
 }
 
+/** Clone the ranked fixture and overlay info fields; `participants` merge by index. */
 export function makeMatch(matchId: string, over: Record<string, unknown> = {}): RiotMatchDto {
   const { participants: participantOverrides, ...infoOverrides } = over;
-  const overridePuuids = Array.isArray(participantOverrides)
-    ? participantOverrides.map((value) => {
-        if (typeof value !== 'object' || value === null || !('puuid' in value)) return undefined;
-        return typeof value.puuid === 'string' ? value.puuid : undefined;
-      })
+  const overrides = Array.isArray(participantOverrides)
+    ? participantOverrides.map(asParticipantOverride)
     : [];
-  const participants = matchFixture.info.participants.map((matchParticipant, index) => ({
-    ...matchParticipant,
-    puuid: overridePuuids[index] ?? matchParticipant.puuid,
-  }));
+  const participants = matchFixture.info.participants.map((matchParticipant, index) => {
+    const override = overrides[index];
+    if (!override) return { ...matchParticipant };
+    const puuid =
+      typeof override.puuid === 'string' ? override.puuid : matchParticipant.puuid;
+    return { ...matchParticipant, ...override, puuid };
+  });
 
   return {
     metadata: {

@@ -34,10 +34,11 @@ describe('participant match ingestion', () => {
     const db = openDb(':memory:');
     migrate(db);
     seedPlayer(db, 'p-alpha', 6.5);
+    seedPlayer(db, 'p-beta', 7);
     db.prepare(
       `INSERT INTO matches (
         match_id, platform, patch, queue_id, duration, created_at, avg_rank_score, rank_known_count
-      ) VALUES ('EUW1_INCOMPLETE', 'euw1', '16.21', 420, 1800, 1, 6.5, 1)`,
+      ) VALUES ('EUW1_INCOMPLETE', 'euw1', '16.21', 420, 1800, 1, 9, 1)`,
     ).run();
     db.prepare(
       `INSERT INTO participants (
@@ -49,7 +50,9 @@ describe('participant match ingestion', () => {
       )`,
     ).run();
 
-    const match = makeMatch('EUW1_INCOMPLETE');
+    const match = makeMatch('EUW1_INCOMPLETE', {
+      participants: [{ puuid: 'p-beta' }],
+    });
     const client = mockClient({ 'p-alpha': ['EUW1_INCOMPLETE'] }, { EUW1_INCOMPLETE: match });
     const result = await ingestMatches({ platform: PLATFORM, db, client });
 
@@ -60,6 +63,31 @@ describe('participant match ingestion', () => {
         .prepare('SELECT COUNT(*) AS count FROM participants WHERE match_id = ?')
         .get('EUW1_INCOMPLETE'),
     ).toMatchObject({ count: 10 });
+    const repaired = db
+      .prepare('SELECT avg_rank_score, rank_known_count FROM matches WHERE match_id = ?')
+      .get('EUW1_INCOMPLETE') as { avg_rank_score: number; rank_known_count: number };
+    expect(repaired.avg_rank_score).toBeCloseTo(6.75);
+    expect(repaired.rank_known_count).toBe(2);
+    db.close();
+  });
+
+  it('does not count metadata-only puuids in the stored rank summary', async () => {
+    const db = openDb(':memory:');
+    migrate(db);
+    seedPlayer(db, 'p-alpha', 6.5);
+    seedPlayer(db, 'p-beta', 9);
+    const match = makeMatch('EUW1_META');
+    match.metadata.participants = [...match.metadata.participants, 'p-beta'];
+    const client = mockClient({ 'p-alpha': ['EUW1_META'] }, { EUW1_META: match });
+
+    const result = await ingestMatches({ platform: PLATFORM, db, client });
+
+    expect(result.stored).toBe(1);
+    const row = db
+      .prepare('SELECT avg_rank_score, rank_known_count FROM matches WHERE match_id = ?')
+      .get('EUW1_META') as { avg_rank_score: number; rank_known_count: number };
+    expect(row.avg_rank_score).toBe(6.5);
+    expect(row.rank_known_count).toBe(1);
     db.close();
   });
 

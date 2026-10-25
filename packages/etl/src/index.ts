@@ -88,6 +88,9 @@ export {
 export {
   extractParticipants,
   InvalidMatchParticipantsError,
+  MATCH_PARTICIPANT_COUNT,
+  MATCH_ROLES_PER_TEAM,
+  MATCH_TEAM_COUNT,
   type ParticipantRow,
 } from './participants';
 export {

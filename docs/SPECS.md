@@ -32,7 +32,7 @@ Any subset can be empty. Engine must never crash on missing info.
 - A per-role list of champion ids owned by the user, stored only in the browser (`localStorage` key `draftorb.pool.v1`, versioned envelope `{ version: 1, pools: { <ROLE>: ChampionId[] } }`, zod-validated). No account, no server. Max `poolMaxSize` (UI config, default 40) per role. Phase 1 exposes SUPPORT only; storage is role-keyed.
 - Resilience: unavailable, full or corrupted storage gives an empty pool plus a visible notice, never a crash; ids absent from the current `champions.json` are dropped with a notice.
 - Export/import as JSON text (validated before it replaces the stored pool), to back up or move devices.
-- The pool never changes scores: it only selects and groups results (see §5 candidate set and §7.1).
+- The pool never changes scores: `score(c)` is identical with or without a pool. It is not a boost and not a hard filter. Pool champions join the §5 candidate set, so `recommendations` may gain extra rows (and global ranks may shift) without reordering the original roleProb subsequence. See §7.1.
 
 ## 3. Rank logic
 
@@ -140,7 +140,7 @@ Sorted desc. Always show why + sample sizes. Never show a % without sample size.
 - The overall list also contains pool champions, tagged "In your pool". A UI-only toggle "Hide my pool" (default off) lets the user focus on champions to learn. Ranks always stay global, so gaps are expected when the toggle is on.
 - Pool cards show both ranks ("#2 in your pool · #14 overall"). Pool champions without a score are listed after the ranked ones with the reason and sample size ("not enough data (n_eff 12)"); they are never hidden.
 - Visible counts reset to the page size when the draft input changes (and the pool list when the pool changes). The "Show more" control is a real `<button>`, keyboard reachable, and the count label is an `aria-live="polite"` region.
-- Determinism: the same draft input gives the same lists in the same order; the pool changes grouping only, never scores or order.
+- Determinism: the same draft input gives the same lists in the same order. The pool never changes `score(c)` or reasons. Pool-only candidates can appear in `recommendations` (SPECS §5), which may insert extra rows and shift global `rank` numbers; the relative order of champions that were already in the roleProb set stays the same. `poolRecommendations` is the subsequence of scored pool champions.
 
 ## 8. Runes & Items
 

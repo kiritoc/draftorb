@@ -12,7 +12,14 @@ import { extractParticipants, InvalidMatchParticipantsError } from './participan
 import { resolveDbPath } from './config/paths';
 import { openDb, migrate } from './db';
 import {
+  isCompleteStoredMatch,
+  persistAcceptedMatch,
+  prepareMatchPersist,
+  storedParticipantCount,
+} from './matches-persist';
+import {
   clearIngestState,
+  createRankLoader,
   cursorKey,
   evaluateMatch,
   findRejection,
@@ -145,37 +152,8 @@ export async function ingestMatches(
     let playersFailed = 0;
     let consecutiveFailed = 0;
 
-    const getStoredMatch = db.prepare(
-      `SELECT COUNT(p.puuid) AS participant_count
-       FROM matches m
-       LEFT JOIN participants p ON p.match_id = m.match_id
-       WHERE m.match_id = ?
-       GROUP BY m.match_id`,
-    );
-    const deleteMatch = db.prepare('DELETE FROM matches WHERE match_id = ?');
-    const deleteParticipants = db.prepare('DELETE FROM participants WHERE match_id = ?');
-    const insertMatch = db.prepare(
-      `INSERT OR IGNORE INTO matches
-       (match_id, platform, patch, queue_id, duration, created_at, avg_rank_score,
-        rank_known_count, fetched_timeline)
-     VALUES (@match_id, @platform, @patch, @queue_id, @duration, @created_at, @avg_rank_score,
-        @rank_known_count, 0)`,
-    );
-    const insertParticipant = db.prepare(
-      `INSERT INTO participants (
-         match_id, puuid, team_id, champion_id, role, win, rank_score, champion_games,
-         mastery_points, is_expert, keystone, primary_style, sub_style, perks_json,
-         items_json, kills, deaths, assists
-       ) VALUES (
-         @match_id, @puuid, @team_id, @champion_id, @role, @win, @rank_score, @champion_games,
-         @mastery_points, @is_expert, @keystone, @primary_style, @sub_style, @perks_json,
-         @items_json, @kills, @deaths, @assists
-       )`,
-    );
-    const insertReject = db.prepare(
-      `INSERT OR REPLACE INTO match_rejects (match_id, reason, patch, checked_at)
-     VALUES (@match_id, @reason, @patch, @checked_at)`,
-    );
+    const stmts = prepareMatchPersist(db);
+    const loadRanks = createRankLoader(db);
 
     for (const [index, player] of players.entries()) {
       const key = cursorKey(platform, player.puuid);
@@ -257,14 +235,13 @@ export async function ingestMatches(
         let repairingIncompleteMatch = false;
 
         try {
-          const storedMatch = getStoredMatch.get(matchId) as
-            { participant_count: number } | undefined;
+          const participantCount = storedParticipantCount(stmts, matchId);
           if (findRejection(db, matchId, sincePatch)) {
             outcome = 'filtered';
-          } else if (storedMatch && storedMatch.participant_count >= 10) {
+          } else if (isCompleteStoredMatch(participantCount)) {
             outcome = 'duplicate';
           } else {
-            repairingIncompleteMatch = storedMatch !== undefined;
+            repairingIncompleteMatch = participantCount !== undefined;
             const raw = await client.getMatch(platform, matchId);
             const parsed = riotMatchDtoSchema.safeParse(raw);
             if (!parsed.success) {
@@ -275,61 +252,44 @@ export async function ingestMatches(
             outcome = evaluated.outcome;
             if (evaluated.reason === null) {
               lastGameCreation = Math.max(lastGameCreation, match.info.gameCreation);
-              const participantIds = [
-                ...new Set(match.info.participants.map((participant) => participant.puuid)),
-              ];
-              const placeholders = participantIds.map(() => '?').join(',');
-              const rankRows =
-                participantIds.length === 0
-                  ? []
-                  : (db
-                      .prepare(
-                        `SELECT puuid, rank_score FROM players WHERE puuid IN (${placeholders})`,
-                      )
-                      .all(...participantIds) as { puuid: string; rank_score: number }[]);
-              const ranksByPuuid = new Map(
-                rankRows.map(({ puuid, rank_score }) => [puuid, rank_score]),
+              const participantIds = match.info.participants.map(
+                (matchParticipant) => matchParticipant.puuid,
               );
+              const ranksByPuuid = loadRanks(participantIds);
               const participants = extractParticipants(match, ranksByPuuid);
               const rank = rankSummary(
-                db,
-                match.metadata.participants,
+                ranksByPuuid,
+                participants.map((row) => row.puuid),
                 player.puuid,
                 player.rank_score,
               );
-              const persist = db.transaction(() => {
-                const change = insertMatch.run({
-                  match_id: matchId,
-                  platform,
-                  patch: patchFromGameVersion(match.info.gameVersion),
-                  queue_id: match.info.queueId,
-                  duration: match.info.gameDuration,
-                  created_at: match.info.gameCreation,
-                  avg_rank_score: rank.avg,
-                  rank_known_count: rank.known,
-                });
-                if (change.changes === 0 && !repairingIncompleteMatch) {
-                  outcome = 'duplicate';
-                } else {
-                  if (repairingIncompleteMatch) {
-                    deleteParticipants.run(matchId);
-                  }
-                  for (const participant of participants) {
-                    insertParticipant.run(participant);
-                  }
-                  outcome = 'stored';
-                }
-                cursor.processed = i + 1;
-                cursor.stored = base.stored + run.stored + (outcome === 'stored' ? 1 : 0);
-                cursor.duplicates =
-                  base.duplicates + run.duplicates + (outcome === 'duplicate' ? 1 : 0);
-                cursor.filtered = base.filtered + run.filtered;
-                cursor.invalid = base.invalid + run.invalid;
-                cursor.lastGameCreation = lastGameCreation;
-                cursor.updatedAt = Date.now();
-                writeCursor(db, key, cursor);
+              const matchRow = {
+                match_id: matchId,
+                platform,
+                patch: patchFromGameVersion(match.info.gameVersion),
+                queue_id: match.info.queueId,
+                duration: match.info.gameDuration,
+                created_at: match.info.gameCreation,
+                avg_rank_score: rank.avg,
+                rank_known_count: rank.known,
+              };
+              outcome = persistAcceptedMatch(db, stmts, {
+                match: matchRow,
+                participants,
+                repairingIncompleteMatch,
+                cursorKey: key,
+                applyOutcome: (persisted) => {
+                  cursor.processed = i + 1;
+                  cursor.stored = base.stored + run.stored + (persisted === 'stored' ? 1 : 0);
+                  cursor.duplicates =
+                    base.duplicates + run.duplicates + (persisted === 'duplicate' ? 1 : 0);
+                  cursor.filtered = base.filtered + run.filtered;
+                  cursor.invalid = base.invalid + run.invalid;
+                  cursor.lastGameCreation = lastGameCreation;
+                  cursor.updatedAt = Date.now();
+                  return cursor;
+                },
               });
-              persist();
               if (outcome === 'duplicate') {
                 run.duplicates += 1;
               } else {
@@ -338,7 +298,7 @@ export async function ingestMatches(
               didCountOutcome = true;
             } else {
               const persist = db.transaction(() => {
-                insertReject.run({
+                stmts.insertReject.run({
                   match_id: matchId,
                   reason: evaluated.reason,
                   patch:
@@ -348,7 +308,7 @@ export async function ingestMatches(
                   checked_at: Date.now(),
                 });
                 if (repairingIncompleteMatch) {
-                  deleteMatch.run(matchId);
+                  stmts.deleteMatch.run(matchId);
                 }
                 cursor.processed = i + 1;
                 cursor.filtered = base.filtered + run.filtered + 1;
@@ -373,9 +333,9 @@ export async function ingestMatches(
           ) {
             const persist = db.transaction(() => {
               if (repairingIncompleteMatch) {
-                deleteMatch.run(matchId);
+                stmts.deleteMatch.run(matchId);
               }
-              insertReject.run({
+              stmts.insertReject.run({
                 match_id: matchId,
                 reason: 'invalid',
                 patch: null,

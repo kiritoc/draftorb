@@ -1,5 +1,7 @@
 # ARCHITECTURE
 
+Status (2026-10-26): `packages/shared` and the ETL ingestion part of `packages/etl` exist; aggregation and export, `packages/engine` (placeholder only), `apps/web` (scaffold only) and `apps/desktop` (not created) are target state.
+
 ## Overview
 
 ```
@@ -30,13 +32,13 @@
 
 ## Stack
 
-Node 20+, pnpm, TypeScript strict, Vite, React, Tailwind, Zod, Vitest, ESLint+Prettier, better-sqlite3, Electron (phase 2), opencv.js / tesseract.js / onnxruntime (vision, phase 2).
+Node 22 (CI; Node 20 is the declared minimum, see B-015), pnpm, TypeScript strict, Vite, React, Tailwind, Zod, Vitest, ESLint+Prettier, better-sqlite3, Electron (phase 2), opencv.js / tesseract.js / onnxruntime (vision, phase 2).
 
 ## Data flow (draft)
 
 1. Web loads `manifest.json` (patch, files, generatedAt).
-2. Loads static data (champions, tags) + support tables for selected rank bucket.
-3. User input -> `engine.recommend(draftInput, dataBundle)` -> `Recommendation[]` -> UI cards.
+2. Loads static data (champions, tags) + the role tables listed in `manifest.roles` (`roles/<ROLE>/...`, DATA_MODEL.md).
+3. User input -> `engine.recommend(draftInput, dataBundle)` -> `DraftResult` (SPECS §7) -> UI lists.
 
 ## Data versioning
 

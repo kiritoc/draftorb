@@ -23,12 +23,14 @@ Always verify details at https://developer.riotgames.com (limits and endpoints m
 | Champion mastery (experience filter) | champion-mastery-v4 `champion-masteries/by-puuid/{puuid}/by-champion/{championId}` — expert fallback (D-022), one call per (puuid, champion) pair, cached in `participants.mastery_points` (T-014) |
 | Static data                          | Data Dragon: `https://ddragon.leagueoflegends.com/` (versions.json, champion.json, item.json, runesReforged.json) — no key needed                                                                  |
 
+Not implemented in `RiotClient` yet: champion-mastery-v4 (T-014). `getMatchTimeline` exists but is not used yet and returns an unvalidated payload (T-051).
+
 ## Client requirements (T-010)
 
 - Token-bucket rate limiter honoring both limits; reads `X-App-Rate-Limit` / `X-Method-Rate-Limit` headers.
-- On 429: wait `Retry-After`. On 5xx: exponential backoff (max 5 tries). On 401/403: stop with explicit message "key expired?".
+- On 429: wait `Retry-After`. On 5xx: exponential backoff (max 5 tries). On 401/403: stop with explicit message "key expired?". Network errors and non-JSON 2xx bodies are retried with the same backoff budget as 5xx.
 - Resumable: persist cursors in `ingest_state`. Idempotent: skip known `match_id`.
-- Zod-validate responses supplied with a schema. An unrecognized shape throws `RiotSchemaError`; callers must surface or explicitly handle it rather than treating it as transient. Endpoints fetched without a schema return raw payloads so ingestion can validate and record invalid match data.
+- Zod-validate responses supplied with a schema. An unrecognized shape throws `RiotSchemaError`; callers must surface or explicitly handle it rather than treating it as transient. Every endpoint used by ingestion (league entries and leagues, match ids, match detail) passes a schema, and match ingestion records a `RiotSchemaError` as an `invalid` reject. Only `getMatchTimeline` is fetched without a schema and returns the raw payload.
 
 ## Data quality notes
 

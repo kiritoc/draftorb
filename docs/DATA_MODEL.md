@@ -1,6 +1,6 @@
 # DATA MODEL
 
-## SQLite (local, `data/DraftOrb.sqlite`, gitignored)
+## SQLite (local, `data/DraftOrb.sqlite`, override with `DRAFTORB_DB_PATH`, gitignored)
 
 ```sql
 CREATE TABLE players (
@@ -11,7 +11,7 @@ CREATE TABLE players (
 CREATE TABLE matches (
   match_id TEXT PRIMARY KEY, platform TEXT, patch TEXT, queue_id INTEGER,
   duration INTEGER, created_at INTEGER, avg_rank_score REAL,
-  rank_known_count INTEGER DEFAULT 0, -- known participant ranks including the seed; ingested matches are >= 1
+  rank_known_count INTEGER NOT NULL DEFAULT 0, -- known participant ranks including the seed; ingested matches are >= 1
   fetched_timeline INTEGER DEFAULT 0
 );
 CREATE TABLE participants (
@@ -54,8 +54,8 @@ Notes: match ingestion persists the match row and its 10 participant rows in one
 - `baseline(champion_id, my_role, rank_bucket, wins_w, games_w, games_w2)` (weighted; `games_w2` = sum of squared weights for `n_eff`, SPECS §3)
 - `pair_ally(my_champion_id, my_role, other_champion_id, other_role, rank_bucket, wins_w, games_w, games_w2)`
 - `pair_enemy(my_champion_id, my_role, other_champion_id, other_role, rank_bucket, wins_w, games_w, games_w2)`
-- `lane_vs(my_champion_id, my_role, opp1_id, opp2_id, rank_bucket, wins_w, games_w, games_w2)` (D-021; `opp*_id` = enemy lane-group champions in role order, `opp2_id` NULL for 1v1 lane groups). SQLite PRIMARY KEY treats NULLs as distinct; uniqueness is enforced by `idx_lane_vs_unique` (migration 005), which uses a partial index to treat `(champion_id, opp1_id, NULL)` and `(champion_id, opp1_id, -1)` as the same logical key for deduplication.
-- `lane_full(my_champion_id, my_role, partner_id, opp1_id, opp2_id, rank_bucket, wins_w, games_w, games_w2)` (D-021; `partner_id` = ally lane partner, NULL for 1v1 lane groups (TOP, MID, JUNGLE)). Uniqueness is enforced by `idx_lane_full_unique` (migration 005), using a partial index to handle the same NULL/empty logic as above.
+- `lane_vs(my_champion_id, my_role, opp1_id, opp2_id, rank_bucket, wins_w, games_w, games_w2)` (D-021; `opp*_id` = enemy lane-group champions in role order, `opp2_id` NULL for 1v1 lane groups). SQLite PRIMARY KEY treats NULLs as distinct; uniqueness is enforced by the unique expression index `idx_lane_vs_unique` (migration 005) on `COALESCE(opp2_id, -1)`, so two rows with the same key and a NULL `opp2_id` conflict (-1 is never a valid champion id).
+- `lane_full(my_champion_id, my_role, partner_id, opp1_id, opp2_id, rank_bucket, wins_w, games_w, games_w2)` (D-021; `partner_id` = ally lane partner, NULL for 1v1 lane groups (TOP, MID, JUNGLE)). Uniqueness is enforced by the unique expression index `idx_lane_full_unique` (migration 005) on `COALESCE(partner_id, -1)` and `COALESCE(opp2_id, -1)`, with the same NULL handling.
 - `rune_ctx(champion_id, my_role, context_key, perks_hash, perks_json, wins_w, games_w, games_w2, players)` (`context_key` = D-021 back-off level, SPECS §8.1)
 - `item_build(champion_id, my_role, slot_idx, time_bucket, state_bucket, profile_key, lane_key, item_id, wins_w, games_w, games_w2)` (D-022; `slot_idx` = `item_events.item_slot`, 0 = starting items; `lane_key` empty outside the `lane` phase)
 

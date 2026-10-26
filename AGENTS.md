@@ -33,7 +33,7 @@ Project: **DraftOrb** — a free League of Legends tool that (1) recommends a ch
 - The user can keep a **personal champion pool** (browser-only, per role). When it is non-empty a **"From your pool"** list is shown too. The pool **never changes `score(c)`**; pool champions join the candidate set (`offRole` below the roleProb threshold). Overall `rank` numbers can shift only because extra pool-only candidates appear; the relative order of the original roleProb set is unchanged (SPECS §2.1, §5, §7.1).
 - Both lists are **paginated with "Show more"**: first 5, then the next 5, until the list is exhausted. The engine always returns complete lists; the UI slices them.
 
-## Commands (once T-001 is done)
+## Commands
 
 ```
 pnpm install
@@ -41,7 +41,8 @@ pnpm dev            # web app
 pnpm test           # all unit tests (vitest)
 pnpm typecheck
 pnpm lint
-pnpm etl <command>  # data pipeline (see docs/SETUP.md)
+pnpm check          # typecheck + lint + format check + tests (what CI runs)
+pnpm etl <command>  # data pipeline, run from the repo root (see docs/SETUP.md)
 ```
 
 ## Repo layout
@@ -51,7 +52,7 @@ packages/shared   types + zod schemas (single source of truth)
 packages/engine   pure scoring/recommendation logic
 packages/etl      Riot API client, SQLite, aggregation, JSON export
 apps/web          Vite + React + Tailwind (static site)
-apps/desktop      Electron shell (phase 2)
-data/             generated JSON (public) + raw/sqlite (gitignored)
+apps/desktop      Electron shell (phase 2, not created yet)
+data/             generated JSON (public), hand-written tags (manual) + raw/sqlite (gitignored)
 docs/             all project docs
 ```

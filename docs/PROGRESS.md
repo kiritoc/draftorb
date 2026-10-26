@@ -32,7 +32,6 @@ Fix B-010 (S2, API key redaction) and B-012 (cwd-dependent ETL paths) before the
 ## Open questions for the owner
 
 - Accept or revise the PROPOSED decisions D-008, D-011, D-017, D-018, D-020, D-021, D-022, D-023 and D-025. SPECS §5/§8 and T-016..T-018, T-020..T-023, T-027.a/T-027.b follow D-020..D-023.
-- Confirm the merge state of PR A, PR C (`pr-c-data-model-alignment`) and D-024 (`d-024-champion-pool`), still logged as REVIEW. This workspace has no `.git` directory, so it cannot be checked here; their changes are all present in the working tree.
 - Review T-011.c (migration 005, closed without running tests) and T-013.b (two acceptance criteria fail: B-010, B-014).
 - Node version policy (B-015): make Node 20 work or require Node 22.
 

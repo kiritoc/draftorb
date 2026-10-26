@@ -3,39 +3,44 @@
 ## Current status
 
 - Phase: 1 (Support / Diamond)
-- Current milestone: M0 Foundations (Complete) -> M1 ETL (in review) -> M2 Engine
-- Last updated: 2026-10-24 by Copilot SDK in VS Code
+- Current milestone: M0 Foundations (in progress, T-002.b TODO) and M1 ETL (in progress: ingestion done; enrichment, aggregation and export TODO) -> M2 Engine
+- Last updated: 2026-10-26 by GitHub Copilot (Claude Opus 5.5)
 
 ## Epic status
 
-| Epic           | Status      | Notes                                                     |
-| -------------- | ----------- | --------------------------------------------------------- |
-| E0 Foundations | IN PROGRESS | T-001..T-004 DONE; T-002.b TODO                           |
-| E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-013.b, T-013.c DONE; T-014 ready |
-| E2 Engine      | NOT STARTED | Ready to start T-020                                      |
-| E3 Web MVP     | NOT STARTED |                                                           |
-| E4 Runes       | NOT STARTED |                                                           |
-| E5 Items       | NOT STARTED |                                                           |
-| E6 Live        | NOT STARTED |                                                           |
-| E7 Vision      | NOT STARTED |                                                           |
+| Epic           | Status      | Notes                                                                     |
+| -------------- | ----------- | ------------------------------------------------------------------------- |
+| E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b TODO                                           |
+| E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-013.c DONE; T-011.c, T-013.b REVIEW; T-014 ready |
+| E2 Engine      | NOT STARTED | T-020 dependency-ready; needs D-020 accepted                              |
+| E3 Web MVP     | NOT STARTED |                                                                           |
+| E4 Runes       | NOT STARTED |                                                                           |
+| E5 Items       | NOT STARTED |                                                                           |
+| E6 Live        | NOT STARTED |                                                                           |
+| E7 Vision      | NOT STARTED |                                                                           |
 
 ## Data collection status
 
-- Riot key: (valid until ...)
-- Games collected: 0 | Diamond: 0 | Patch: 16.21 (static imported)
-- Last aggregation: -
+- Riot key: not recorded (development keys expire every 24 h).
+- Games collected: 0 (no SQLite database exists under `data/` in this workspace) | Patch: 16.21 (static data imported: champions, items, runes).
+- Last aggregation: never (aggregation is not implemented yet, T-015..T-018).
 
 ## Next recommended ticket
 
-T-014 (participant enrichment only). T-002.b and T-020+ remain out of scope for this PR.
+Fix B-010 (S2, API key redaction) and B-012 (cwd-dependent ETL paths) before the next real ETL run, then T-014 (participant enrichment, dependency-ready). T-002.b is unblocked (see B-011 for scope it does not list yet). T-020 is dependency-ready but implements PROPOSED D-020: start it after the owner accepts D-020..D-023.
 
 ## Open questions for the owner
 
-- None.
+- Accept or revise the PROPOSED decisions D-008, D-011, D-017, D-018, D-020, D-021, D-022, D-023 and D-025. SPECS §5/§8 and T-016..T-018, T-020..T-023, T-027.a/T-027.b follow D-020..D-023.
+- Confirm the merge state of PR A, PR C (`pr-c-data-model-alignment`) and D-024 (`d-024-champion-pool`), still logged as REVIEW. This workspace has no `.git` directory, so it cannot be checked here; their changes are all present in the working tree.
+- Review T-011.c (migration 005, closed without running tests) and T-013.b (two acceptance criteria fail: B-010, B-014).
+- Node version policy (B-015): make Node 20 work or require Node 22.
 
 ---
 
 ## Session log (newest first)
+
+The 2026-10-22 entries had no timestamps; their order was reconstructed from ticket dependencies on 2026-10-26.
 
 ### Template
 
@@ -49,30 +54,43 @@ T-014 (participant enrichment only). T-002.b and T-020+ remain out of scope for 
 - Pitfalls / notes for next AI:
 ```
 
-### 2026-10-24 — Copilot SDK in VS Code (summary from Qwen 3.5 - Ollama) — Ticket T-011 (Migration 005)
+### 2026-10-26 — GitHub Copilot (Claude Opus 5.5) — Project review and docs/code alignment
+
+- Done:
+  - Reviewed the whole project against AGENTS.md, SPECS.md and CONVENTIONS.md and logged B-010..B-017 in BUGS.md. No bug was fixed and no behavior changed.
+  - Aligned the docs with the code: corrected false or stale statements in this file (milestone, open questions, Migration 005 entry, superseded notes, order of the 2026-10-22 entries) and in TICKETS.md (migration 005 split into T-011.c, T-013.b reopened to REVIEW, new T-013.d/T-013.e, cross-references to open bugs), DATA_MODEL.md (migration 005 uses expression indexes), RIOT_API.md (schema policy, mastery endpoint not implemented yet), SETUP.md (implemented vs planned ETL commands, Node 22, run from the repo root), DECISIONS.md (D-014 and D-018 corrections, new D-025), ARCHITECTURE.md and AGENTS.md; added follow-up notes to B-006; fixed the `.gitignore` header and the `DRAFTORB_DB_PATH` comment in `cli.ts`.
+- Files touched: `.gitignore`, `AGENTS.md`, `docs/ARCHITECTURE.md`, `docs/BUGS.md`, `docs/DATA_MODEL.md`, `docs/DECISIONS.md`, `docs/PROGRESS.md`, `docs/RIOT_API.md`, `docs/SETUP.md`, `docs/TICKETS.md`, `packages/etl/src/cli.ts` (header comment only)
+- Tests: none run (owner request; docs and comments only). Static count of the current tree: 13 test files, 104 test cases.
+- State left: REVIEW (owner to confirm the corrections and answer the open questions).
+- Next step: fix B-010 and B-012, then T-014.
+- Pitfalls / notes for next AI:
+  - This workspace has no `.git` directory, so branch and merge claims in older entries cannot be verified here.
+  - Never edit an applied migration file (the runner rejects changed checksums); documentation fixes for migration 005 went to DATA_MODEL.md only.
+
+### 2026-10-24 — Copilot SDK in VS Code (summary from Qwen 3.5 - Ollama) — Ticket T-011.c (Migration 005, originally logged as T-011)
 
 - Done:
   - Created migration file `packages/etl/migrations/005_lane_null_unique.sql` to add unique indexes for nullable lane keys.
-  - Implemented conditional unique constraints using WHERE clause conditions to prevent duplicate rows when `opp2_id` or `partner_id` is NULL in `lane_vs` and `lane_full` tables.
-  - Verified migration syntax against DATA_MODEL.md requirements for handling NULL values correctly.
+  - Added unique expression indexes on `COALESCE(opp2_id, -1)` (`lane_vs`) and on `COALESCE(partner_id, -1)` and `COALESCE(opp2_id, -1)` (`lane_full`) so rows with NULL lane keys cannot duplicate. Corrected 2026-10-26: this entry originally said "WHERE clause conditions"; the migration has no WHERE clause.
+  - Verified migration syntax against DATA_MODEL.md (whose "partial index" wording was itself wrong and was corrected on 2026-10-26).
   - Confirmed migration will run after migrations 001-004 (established dependency chain).
-- Files touched: `packages/etl/migrations/005_lane_null_unique.sql`, `docs/PROGRESS.md`, `docs/TICKETS.md`
-- Tests: Migration syntax validated against DATA_MODEL.md; idempotency to be verified in next session.
-- State left: DONE (migration file complete)
-- Next step: T-014 participant enrichment pending migration validation; run migration runner tests and verify NULL-handling indexes work correctly.
-- Pitfalls / notes for next AI: Migration 005 uses WHERE clause conditions on unique indexes to handle NULL values correctly; ensure it runs after migrations 001-004 and before any queries that depend on lane table uniqueness.
+- Files touched: `packages/etl/migrations/005_lane_null_unique.sql`, `docs/PROGRESS.md`, `docs/TICKETS.md`. Corrected 2026-10-26: `packages/etl/src/db/migrate.test.ts` (migration 005 assertions and a NULL `opp2_id` duplicate test) and `docs/DATA_MODEL.md` (migration 005 notes) were also changed for this migration but not logged.
+- Tests: none run in this session ("idempotency to be verified in next session"). `migrate.test.ts` now covers idempotency and the `lane_vs` NULL case; the `lane_full` NULL case is not covered.
+- State left: REVIEW (corrected 2026-10-26: originally logged as DONE without running tests).
+- Next step: run `pnpm check`, add a `lane_full` NULL-partner duplicate test, then T-014.
+- Pitfalls / notes for next AI: migration 005 relies on COALESCE expression indexes with the sentinel -1 (never a valid champion id); ensure it runs after migrations 001-004.
 
 ### 2026-10-24 — Copilot SDK in VS Code — Ticket T-013.b
 
 - Done:
-  - Redacted Riot API key patterns from error messages, URLs, and recursively serialized response bodies; retained the authentication recovery hint for nonempty 401/403 responses.
+  - Redacted Riot API key patterns from error messages, URLs, and recursively serialized response bodies; retained the authentication recovery hint for nonempty 401/403 responses. Update 2026-10-26: redaction is incomplete for real UUID-shaped keys (B-010).
   - Kept transient match-ID listing failures isolated per player and verified that failures leave existing cursors unchanged while sharing the consecutive-failure threshold with match-detail requests.
-  - Reused the shared platform list, made `players` and `matches` argument parsing strict, rejected excess positionals, and required fully valid nonnegative integer quotas.
+  - Reused the shared platform list, made `players` and `matches` argument parsing strict, rejected excess positionals, and required fully valid nonnegative integer quotas. Update 2026-10-26: `matches` numeric flags and tier names are still not fully validated (B-014).
   - Closed internally owned SQLite connections in `finally` for direct match ingestion and player discovery calls.
   - Extended `.gitignore` for raw ETL data, documented the explicit `RiotSchemaError` policy, and confirmed existing Riot client regression coverage for auth, retries, rate limiting, and endpoint fixtures remains in place.
 - Files touched: `.gitignore`, `docs/BUGS.md`, `docs/PROGRESS.md`, `docs/RIOT_API.md`, `docs/TICKETS.md`, `packages/etl/src/cli.ts`, `packages/etl/src/db-ownership.test.ts`, `packages/etl/src/matches.test.ts`, `packages/etl/src/matches.ts`, `packages/etl/src/players.ts`, `packages/etl/src/riot/client.test.ts`, `packages/etl/src/riot/types.ts`
 - Tests: `pnpm check` (10 files, 90 tests passed); CLI smoke tests returned usage exit code 2 for unknown options, extra positionals, unsupported platforms, and malformed quotas; `git check-ignore --no-index -v` confirmed secret, generated, database, and raw-data patterns.
-- State left: DONE
+- State left: DONE (reopened to REVIEW on 2026-10-26: the key-redaction and malformed-options criteria still fail, see B-010 and B-014)
 - Next step: T-014 participant enrichment; T-002.b remains unblocked.
 - Pitfalls / notes for next AI: `.env`, `.env.local`, `.env.*`, `dist/`, and `*.tsbuildinfo` were already ignored on this branch; raw ETL data now has explicit ignore coverage as well.
 
@@ -105,6 +123,7 @@ T-014 (participant enrichment only). T-002.b and T-020+ remain out of scope for 
 - State left: REVIEW (acceptance gaps remain: player-discovery completion is marked after any page; CLI path/platform logic remains duplicated and CLI is not split; no-schema Riot requests retain an arbitrary generic result type; timeout/bad-JSON/redaction regression coverage is missing; `.gitignore` dropped prior ignore rules).
 - Next step: address the listed PR B gaps before merging.
 - Pitfalls / notes for next AI: the task requested review only for PR B; keep any corrections to that branch separate from PR C.
+- Status 2026-10-26: the `.gitignore` rules and the shared platform list were restored in T-013.b, which also added redaction tests (redaction is still incomplete, B-010). Still open: CLI path duplication (B-012), completion marker (B-013), typed schema-less requests, timeout/bad-JSON tests and the CLI split (T-013.e).
 
 ### 2026-10-24 — Copilot SDK in VS Code — Ticket T-005
 
@@ -177,8 +196,8 @@ T-014 (participant enrichment only). T-002.b and T-020+ remain out of scope for 
 ### 2026-10-23 — Devin — Ticket T-013
 
 - Done:
-  - Implemented match ingestion in `packages/etl/src/matches.ts` + `matches-store.ts`: per-player ranked solo id listing (queue 420, `type=ranked`, paged by 100), fetch + zod revalidation of every `getMatch` payload (client returns raw on schema mismatch -> counted `invalid`, recorded in `match_rejects`), filters (queue, duration < 15 min, `--since-patch` lower bound), storage in `matches` with `INSERT OR IGNORE`.
-  - Resumability: per-player cursor in `ingest_state` (`match-ingest:<platform>:<puuid>`) persists the id snapshot + `processed` after every match, so kill/restart resumes mid-player; `done` cursors list only ids newer than `lastGameCreation` via Riot `startTime` (epoch seconds), and relist in full when the run widens the cursor's patch window (`--since-patch` lowered or removed). Raising the lower bound keeps the incremental `startTime` path. `--reset` wipes the platform's cursors and all `match_rejects`; `--limit` takes pending players before done ones.
+  - Implemented match ingestion in `packages/etl/src/matches.ts` + `matches-store.ts`: per-player ranked solo id listing (queue 420, `type=ranked`, paged by 100), fetch + zod revalidation of every `getMatch` payload (client returns raw on schema mismatch -> counted `invalid`, recorded in `match_rejects`; superseded by B-008: the client now throws `RiotSchemaError`, still counted `invalid`), filters (queue, duration < 15 min, `--since-patch` lower bound), storage in `matches` with `INSERT OR IGNORE`.
+  - Resumability: per-player cursor in `ingest_state` (`match-ingest:<platform>:<puuid>`) persists the id snapshot + `processed` after every match, so kill/restart resumes mid-player; `done` cursors list only ids from `lastGameCreation` on via Riot `startTime` (epoch seconds; inclusive, so already stored games are relisted and skipped by dedup), and relist in full when the run widens the cursor's patch window (`--since-patch` lowered or removed). Raising the lower bound keeps the incremental `startTime` path. `--reset` wipes the platform's cursors and all `match_rejects`; `--limit` takes pending players before done ones.
   - Dedup: `match_rejects` (migration `002_match_rejects.sql`) remembers rejected ids across players; patch rejects keep the actual patch and are re-evaluated when the `--since-patch` window includes it (D-017).
   - Match rows store `rank_known_count` with `avg_rank_score` (migration `003_matches_rank_known.sql`); unknown participants fall back to the seeding player's score.
   - CLI `pnpm etl matches [platform] [--since-patch=16.19] [--per-player=20] [--limit=N] [--queue=420] [--min-duration=900] [--reset]` with per-player progress log (`[i/n] puuid… ids=.. stored=.. dup=.. filtered=.. invalid=..`).
@@ -246,12 +265,12 @@ T-014 (participant enrichment only). T-002.b and T-020+ remain out of scope for 
 - State left: DONE (review follow-up resolved; all requested checks pass).
 - Next step: T-013 (Match ingestion).
 - Pitfalls / notes for next AI:
-  - D-016 is PROPOSED; confirm or revise the formula with the owner before relying on it as an accepted decision.
+  - D-016 is PROPOSED; confirm or revise the formula with the owner before relying on it as an accepted decision. Resolved: D-016 was accepted on 2026-10-23 (entry above).
 
 ### 2026-10-22 — Copilot CLI — Ticket T-012
 
 - Done:
-  - Implemented tier-based player discovery in `packages/etl/src/players.ts` with default tier sequence `EMERALD..CHALLENGER`, per-tier quotas, rank score conversion (`tier + division + LP`), resumable `ingest_state` progress, and SQLite upserts for player rows.
+  - Implemented tier-based player discovery in `packages/etl/src/players.ts` with default tier sequence `EMERALD..CHALLENGER`, per-tier quotas, rank score conversion (`tier + division + LP`; LP removed by D-016 on 2026-10-23), resumable `ingest_state` progress, and SQLite upserts for player rows.
   - Exposed player discovery from `packages/etl/src/index.ts` and added CLI support in `packages/etl/src/cli.ts` (`pnpm etl players`, plus `--platform`, `--tiers`, `--quota`, `--reset`).
   - Added unit coverage in `packages/etl/src/players.test.ts` for rank score calculation and quota/resume logic.
 - Files touched:
@@ -265,15 +284,66 @@ T-014 (participant enrichment only). T-002.b and T-020+ remain out of scope for 
 - State left: DONE
 - Next step: T-013 (Match ingestion)
 - Pitfalls / notes for next AI:
-  - `playerRankScore()` intentionally uses a tier base + division ladder + capped LP bonus; it is deterministic and suitable for persisted rank_score values.
-  - Discovery is resumable per platform/tier via the `ingest_state` table; the state is currently treated as a completion marker after a successful fetch for that tier.
+  - `playerRankScore()` intentionally uses a tier base + division ladder + capped LP bonus; it is deterministic and suitable for persisted rank_score values. Superseded by D-016 (2026-10-23): LP is no longer part of `rank_score`.
+  - Discovery is resumable per platform/tier via the `ingest_state` table; the state is currently treated as a completion marker after a successful fetch for that tier. The marker is always set (B-013).
   - The CLI uses quota entries in `EMERALD:250,...` format, but keep the default values in sync with `DEFAULT_PLAYER_QUOTAS`.
+
+### 2026-10-22 — GitHub Copilot — Ticket T-011
+
+- Done:
+  - Fixed the SQLite migration runner in `packages/etl/src/db/migrate.ts` to avoid masking original errors, avoid unnecessary write locks on already-applied migrations, and centralize migration table creation.
+  - Moved `busy_timeout` to `openDb()` so the connection setting is applied consistently.
+  - Added filename validation to reject malformed migration names and kept `getMigrationStatus()` behavior correct for applied-but-missing versions.
+  - Added a transaction-based re-check under write lock for pending migrations and contextualized failure messages on migration errors.
+- Files touched:
+  - `packages/etl/src/db/migrate.ts`
+  - `packages/etl/src/db/migrate.test.ts`
+- Tests: `pnpm vitest run packages/etl/src/db/migrate.test.ts` and `pnpm test -- --run && pnpm typecheck && pnpm lint` — all green.
+- State left: DONE
+- Next step: T-012 (Player discovery by tier) or continue with the next ETL ingestion ticket.
+- Pitfalls / notes for next AI:
+  - The migration transaction is now wrapped in `db.transaction()` with a re-check under the write lock and a contextualized error message.
+  - `getMigrationStatus()` still treats `missingVersions` as applied entries without a matching SQL file on disk, which is useful for migration hygiene and debugging.
+
+### 2026-10-22 — Antigravity — Ticket T-011
+
+- Done:
+  - Fixed the SQLite connection setup in `packages/etl/src/db/migrate.ts` to enable `PRAGMA foreign_keys = ON` in `openDb()`, matching the default enforcement expected by SQLite-safe schema work.
+  - Documented the review point that `PRAGMA foreign_keys` must be set outside a transaction; if a migration needs to temporarily disable it, that must happen before `BEGIN IMMEDIATE` because SQLite ignores the pragma once a transaction is active.
+  - Added regression coverage in `packages/etl/src/db/migrate.test.ts` to assert the opened database has WAL + foreign keys enabled.
+- Files touched:
+  - `packages/etl/src/db/migrate.ts`
+  - `packages/etl/src/db/migrate.test.ts`
+  - `docs/TICKETS.md`
+  - `docs/PROGRESS.md`
+- Tests: `pnpm exec vitest run packages/etl/src/db/migrate.test.ts` (12/12 passed).
+- State left: DONE
+- Next step: T-012 (Player discovery by tier)
+- Pitfalls / notes for next AI:
+  - SQLite’s `foreign_keys` pragma is connection-scoped and must be configured on the DB handle before any migration transaction begins.
+  - A migration that needs to disable `foreign_keys` for table rebuilds must do it before `BEGIN IMMEDIATE`; once inside the transaction, SQLite will ignore the change.
+
+### 2026-10-22 — Antigravity — Ticket T-011
+
+- Done:
+  - Fixed `getMigrationStatus()` in `packages/etl/src/db/migrate.ts` to compute `pending` as the set difference between the migration files on disk and the versions already applied. This avoids negative or incorrect pending counts when a migration was deleted/renamed.
+  - Added `missingVersions` reporting so applied migrations absent from the migration directory are surfaced as a deployment anomaly.
+  - Added a regression test in `packages/etl/src/db/migrate.test.ts` covering the missing-disk-file case.
+- Files touched:
+  - `packages/etl/src/db/migrate.ts`
+  - `packages/etl/src/db/migrate.test.ts`
+- Tests: `pnpm vitest run packages/etl/src/db/migrate.test.ts` (9 tests passed)
+- State left: REVIEW
+- Next step: continue T-011 and complete the migration runner acceptance checks with the rest of the ETL suite.
+- Pitfalls / notes for next AI:
+  - `pending` now reflects the difference of sets, not arithmetic on counts.
+  - `missingVersions` is intentionally explicit and should be treated as an operational warning, not a normal pending migration.
 
 ### 2026-10-22 — Antigravity (Gemini 3.8 Flash) — Ticket T-010
 
 - Done:
   - Implemented `RiotRateLimiter` (`packages/etl/src/riot/rate-limiter.ts`) supporting multi-window app limits (20 req/1s, 100 req/120s), method-specific limits, header synchronisation (`X-App-Rate-Limit`, `X-Method-Rate-Limit`, `Retry-After`), and serialized concurrency queue to eliminate race conditions.
-  - Implemented `RiotClient` (`packages/etl/src/riot/client.ts`) with automatic 429 `Retry-After` retry, 5xx exponential backoff (max 5 tries), immediate 401/403 abort with explicit message `"key expired?"`, and non-crashing Zod response validation that logs unknown payload shapes.
+  - Implemented `RiotClient` (`packages/etl/src/riot/client.ts`) with automatic 429 `Retry-After` retry, 5xx exponential backoff (max 5 tries), immediate 401/403 abort with explicit message `"key expired?"`, and non-crashing Zod response validation that logs unknown payload shapes (superseded by B-008: schema mismatches now throw `RiotSchemaError`).
   - Added types and error hierarchy in `packages/etl/src/riot/types.ts` (`RiotApiError`, `RiotAuthError`, `RiotRateLimitError`), platform/regional routing definitions (`PLATFORMS`, `REGIONAL_ROUTINGS`, `platformToRegion`).
   - Added Zod schemas for Riot API responses in `packages/etl/src/riot/schemas.ts` (`riotLeagueEntriesSchema`, `riotLeagueListSchema`, `riotMatchDtoSchema`, `riotMatchIdsSchema`).
   - Added lightweight `.env` parser helper in `packages/etl/src/riot/env.ts` to load `RIOT_API_KEY` seamlessly without heavy dependencies.
@@ -372,56 +442,6 @@ T-014 (participant enrichment only). T-002.b and T-020+ remain out of scope for 
   - Data Dragon `runesReforged.json` contains extra fields (`longDesc`); `transformRunes` maps only the fields defined in `runePerkSchema` to comply with `.strict()`.
   - `data/public/<patch>/*.json` files are committed as public assets according to `DATA_MODEL.md`.
 
-### 2026-10-22 — Claude Opus 4.6 (Thinking) — Ticket T-001
-
-- Done: Full monorepo scaffold with pnpm workspaces (shared, engine, etl, web), TypeScript strict config, Vitest, ESLint (flat config), Prettier, Vite + React + Tailwind for web app
-- Files touched:
-  - Root: `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `tsconfig.json`, `.gitignore`, `.env.example`, `.prettierrc`, `vitest.config.ts`, `eslint.config.mjs`
-  - `packages/shared/`: `package.json`, `tsconfig.json`, `src/index.ts`
-  - `packages/engine/`: `package.json`, `tsconfig.json`, `src/index.ts`, `src/hello.ts`, `src/hello.test.ts`
-  - `packages/etl/`: `package.json`, `tsconfig.json`, `src/index.ts`
-  - `apps/web/`: `package.json`, `tsconfig.json`, `vite.config.ts`, `tailwind.config.ts`, `postcss.config.mjs`, `index.html`, `src/main.tsx`, `src/App.tsx`, `src/index.css`
-- Tests: `pnpm install && pnpm test && pnpm typecheck && pnpm lint` — all green (3/3 tests pass)
-- State left: DONE
-- Next step: T-002 (Shared types + zod schemas)
-- Pitfalls / notes for next AI:
-  - Web tsconfig uses `rootDir: "."` and `noEmit: true` (no composite) to include config files at project root
-  - ESLint uses flat config (`eslint.config.mjs`) with `allowDefaultProject` for root config files
-  - `postcss.config.mjs` (ESM, not CJS) to avoid lint errors in ESM project
-  - Engine has a placeholder `add()` function + test — replace with real code in T-020+
-  - Tailwind v3 is used (v4 was still beta-ish at time of scaffold)
-
-### 2026-10-22 — Claude Opus 4.6 (Thinking) — Ticket T-002
-
-- Done: Implemented the shared Zod schemas and exported TypeScript types for rank, roles, champion IDs, draft inputs, recommendations, game state, manifest data, and static champion metadata. Added focused tests covering valid and invalid payloads.
-- Files touched:
-  - `packages/shared/src/index.ts`
-  - `packages/shared/src/index.test.ts`
-  - `packages/shared/package.json`
-- Tests: `pnpm test && pnpm typecheck && pnpm lint` — all green (2 test files, 9 tests passed)
-- State left: DONE
-- Next step: T-003 (Data Dragon importer)
-- Pitfalls / notes for next AI:
-  - `zod` is the single validation dependency in the shared package
-  - Keep runtime logic out of shared package; this ticket is schema-only
-  - `DraftInput`/`GameState` are intentionally strict but permissive on optional fields such as `role` and `pool`
-
-### 2026-10-22 — Session note — Governance review / blocker
-
-- Done: Recorded the blocking semantic bug and the governance drift discovered after T-002.
-- Files touched:
-  - `docs/BUGS.md`
-  - `docs/DECISIONS.md`
-- State left: REVIEW / BLOCKED
-- Next step:
-  - Re-open the T-002 acceptance gate and compare `packages/shared/src/index.ts` against every contract in `docs/DATA_MODEL.md` before declaring any future ticket done.
-  - Add the missing schemas required by the data model before continuing to `T-003`.
-  - Require schema parity tests that fail if an exported model is absent from the public API.
-- Pitfalls / notes for next AI:
-  - Green tests do not equal contract coverage.
-  - Acceptance must be checked against the canonical docs, not only against the narrow happy path used in the first tests.
-  - Project governance requires explicit parity checks and bug logs before ticket closure.
-
 ### 2026-10-22 — Gemini — Ticket T-002 remediation & completion
 
 - Done:
@@ -441,56 +461,55 @@ T-014 (participant enrichment only). T-002.b and T-020+ remain out of scope for 
 - State left: DONE
 - Next step: T-003 (Data Dragon importer)
 - Pitfalls / notes for next AI:
-  - All static and aggregated formats needed for T-003 and E1 now have validation schemas in `@draftorb/shared`.
-  - File length for `packages/shared/src/index.ts` is 291 lines (< 300 lines rule). If adding more schemas, consider modularizing into domain files (e.g. `draft.ts`, `items.ts`, `runes.ts`).
+  - All static and aggregated formats needed for T-003 and E1 now have validation schemas in `@draftorb/shared`. Superseded: the role-keyed exports, `games_w2` and the D-024 pool fields are T-002.b; see also B-011.
+  - File length for `packages/shared/src/index.ts` is 291 lines (< 300 lines rule). If adding more schemas, consider modularizing into domain files (e.g. `draft.ts`, `items.ts`, `runes.ts`). Update 2026-10-26: the file is now 312 lines, above the 300-line convention.
 
-### 2026-10-22 — Antigravity — Ticket T-011
+### 2026-10-22 — Session note — Governance review / blocker
 
-- Done:
-  - Fixed `getMigrationStatus()` in `packages/etl/src/db/migrate.ts` to compute `pending` as the set difference between the migration files on disk and the versions already applied. This avoids negative or incorrect pending counts when a migration was deleted/renamed.
-  - Added `missingVersions` reporting so applied migrations absent from the migration directory are surfaced as a deployment anomaly.
-  - Added a regression test in `packages/etl/src/db/migrate.test.ts` covering the missing-disk-file case.
+- Done: Recorded the blocking semantic bug and the governance drift discovered after T-002.
 - Files touched:
-  - `packages/etl/src/db/migrate.ts`
-  - `packages/etl/src/db/migrate.test.ts`
-- Tests: `pnpm vitest run packages/etl/src/db/migrate.test.ts` (9 tests passed)
-- State left: REVIEW
-- Next step: continue T-011 and complete the migration runner acceptance checks with the rest of the ETL suite.
+  - `docs/BUGS.md`
+  - `docs/DECISIONS.md`
+- State left: REVIEW / BLOCKED
+- Next step:
+  - Re-open the T-002 acceptance gate and compare `packages/shared/src/index.ts` against every contract in `docs/DATA_MODEL.md` before declaring any future ticket done.
+  - Add the missing schemas required by the data model before continuing to `T-003`.
+  - Require schema parity tests that fail if an exported model is absent from the public API.
 - Pitfalls / notes for next AI:
-  - `pending` now reflects the difference of sets, not arithmetic on counts.
-  - `missingVersions` is intentionally explicit and should be treated as an operational warning, not a normal pending migration.
+  - Green tests do not equal contract coverage.
+  - Acceptance must be checked against the canonical docs, not only against the narrow happy path used in the first tests.
+  - Project governance requires explicit parity checks and bug logs before ticket closure.
 
-### 2026-10-22 — Antigravity — Ticket T-011
+### 2026-10-22 — Claude Opus 4.6 (Thinking) — Ticket T-002
 
-- Done:
-  - Fixed the SQLite connection setup in `packages/etl/src/db/migrate.ts` to enable `PRAGMA foreign_keys = ON` in `openDb()`, matching the default enforcement expected by SQLite-safe schema work.
-  - Documented the review point that `PRAGMA foreign_keys` must be set outside a transaction; if a migration needs to temporarily disable it, that must happen before `BEGIN IMMEDIATE` because SQLite ignores the pragma once a transaction is active.
-  - Added regression coverage in `packages/etl/src/db/migrate.test.ts` to assert the opened database has WAL + foreign keys enabled.
+- Done: Implemented the shared Zod schemas and exported TypeScript types for rank, roles, champion IDs, draft inputs, recommendations, game state, manifest data, and static champion metadata. Added focused tests covering valid and invalid payloads.
 - Files touched:
-  - `packages/etl/src/db/migrate.ts`
-  - `packages/etl/src/db/migrate.test.ts`
-  - `docs/TICKETS.md`
-  - `docs/PROGRESS.md`
-- Tests: `pnpm exec vitest run packages/etl/src/db/migrate.test.ts` (12/12 passed).
+  - `packages/shared/src/index.ts`
+  - `packages/shared/src/index.test.ts`
+  - `packages/shared/package.json`
+- Tests: `pnpm test && pnpm typecheck && pnpm lint` — all green (2 test files, 9 tests passed)
 - State left: DONE
-- Next step: T-012 (Player discovery by tier)
+- Next step: T-003 (Data Dragon importer)
 - Pitfalls / notes for next AI:
-  - SQLite’s `foreign_keys` pragma is connection-scoped and must be configured on the DB handle before any migration transaction begins.
-  - A migration that needs to disable `foreign_keys` for table rebuilds must do it before `BEGIN IMMEDIATE`; once inside the transaction, SQLite will ignore the change.
+  - `zod` is the single validation dependency in the shared package
+  - Keep runtime logic out of shared package; this ticket is schema-only
+  - `DraftInput`/`GameState` are intentionally strict but permissive on optional fields such as `role` and `pool`
 
-### 2026-10-22 — GitHub Copilot — Ticket T-011
+### 2026-10-22 — Claude Opus 4.6 (Thinking) — Ticket T-001
 
-- Done:
-  - Fixed the SQLite migration runner in `packages/etl/src/db/migrate.ts` to avoid masking original errors, avoid unnecessary write locks on already-applied migrations, and centralize migration table creation.
-  - Moved `busy_timeout` to `openDb()` so the connection setting is applied consistently.
-  - Added filename validation to reject malformed migration names and kept `getMigrationStatus()` behavior correct for applied-but-missing versions.
-  - Added a transaction-based re-check under write lock for pending migrations and contextualized failure messages on migration errors.
+- Done: Full monorepo scaffold with pnpm workspaces (shared, engine, etl, web), TypeScript strict config, Vitest, ESLint (flat config), Prettier, Vite + React + Tailwind for web app
 - Files touched:
-  - `packages/etl/src/db/migrate.ts`
-  - `packages/etl/src/db/migrate.test.ts`
-- Tests: `pnpm vitest run packages/etl/src/db/migrate.test.ts` and `pnpm test -- --run && pnpm typecheck && pnpm lint` — all green.
+  - Root: `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `tsconfig.json`, `.gitignore`, `.env.example`, `.prettierrc`, `vitest.config.ts`, `eslint.config.mjs`
+  - `packages/shared/`: `package.json`, `tsconfig.json`, `src/index.ts`
+  - `packages/engine/`: `package.json`, `tsconfig.json`, `src/index.ts`, `src/hello.ts`, `src/hello.test.ts`
+  - `packages/etl/`: `package.json`, `tsconfig.json`, `src/index.ts`
+  - `apps/web/`: `package.json`, `tsconfig.json`, `vite.config.ts`, `tailwind.config.ts`, `postcss.config.mjs`, `index.html`, `src/main.tsx`, `src/App.tsx`, `src/index.css`
+- Tests: `pnpm install && pnpm test && pnpm typecheck && pnpm lint` — all green (3/3 tests pass)
 - State left: DONE
-- Next step: T-012 (Player discovery by tier) or continue with the next ETL ingestion ticket.
+- Next step: T-002 (Shared types + zod schemas)
 - Pitfalls / notes for next AI:
-  - The migration transaction is now wrapped in `db.transaction()` with a re-check under the write lock and a contextualized error message.
-  - `getMigrationStatus()` still treats `missingVersions` as applied entries without a matching SQL file on disk, which is useful for migration hygiene and debugging.
+  - Web tsconfig uses `rootDir: "."` and `noEmit: true` (no composite) to include config files at project root
+  - ESLint uses flat config (`eslint.config.mjs`) with `allowDefaultProject` for root config files
+  - `postcss.config.mjs` (ESM, not CJS) to avoid lint errors in ESM project
+  - Engine has a placeholder `add()` function + test — replace with real code in T-020+
+  - Tailwind v3 is used (v4 was still beta-ish at time of scaffold)

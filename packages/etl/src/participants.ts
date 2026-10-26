@@ -23,6 +23,11 @@ export interface ParticipantRow {
   assists: number;
 }
 
+/** Ranked solo/duo: five roles per team, two teams. */
+export const MATCH_TEAM_COUNT = 2;
+export const MATCH_ROLES_PER_TEAM = 5;
+export const MATCH_PARTICIPANT_COUNT = MATCH_TEAM_COUNT * MATCH_ROLES_PER_TEAM;
+
 export class InvalidMatchParticipantsError extends Error {
   constructor(message: string) {
     super(message);
@@ -115,9 +120,9 @@ export function extractParticipants(
   ranksByPuuid: ReadonlyMap<string, number>,
 ): ParticipantRow[] {
   const participants = match.info.participants;
-  if (participants.length !== 10) {
+  if (participants.length !== MATCH_PARTICIPANT_COUNT) {
     throw new InvalidMatchParticipantsError(
-      `Expected 10 participants, received ${participants.length}.`,
+      `Expected ${MATCH_PARTICIPANT_COUNT} participants, received ${participants.length}.`,
     );
   }
 
@@ -145,7 +150,10 @@ export function extractParticipants(
     teams.set(participant.teamId, teamRoles);
   }
 
-  if (teams.size !== 2 || [...teams.values()].some((roles) => roles.size !== 5)) {
+  if (
+    teams.size !== MATCH_TEAM_COUNT ||
+    [...teams.values()].some((roles) => roles.size !== MATCH_ROLES_PER_TEAM)
+  ) {
     throw new InvalidMatchParticipantsError(
       'Expected two teams with exactly one participant in each role.',
     );

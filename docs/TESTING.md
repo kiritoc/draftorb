@@ -25,7 +25,7 @@
 
 ## Property checks
 
-- The pool never changes any score: same scores with and without a pool; `poolRecommendations` is a subsequence of `recommendations`.
+- The pool never changes any score: same scores with and without a pool for shared champions; `poolRecommendations` is a subsequence of `recommendations`; the roleProb-set subsequence keeps its relative order when pool-only candidates are inserted.
 - Score never NaN; recommendations sorted desc; reasons reference only known slots; no crash with empty input.
 
 ## Rules

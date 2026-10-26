@@ -140,6 +140,8 @@ describe('migration runner', () => {
     expect(indexNames).toContain('idx_pair_enemy_role');
     expect(indexNames).toContain('idx_lane_vs_role');
     expect(indexNames).toContain('idx_lane_full_role');
+    expect(indexNames).toContain('idx_lane_vs_unique');
+    expect(indexNames).toContain('idx_lane_full_unique');
     expect(indexNames).toContain('idx_rune_ctx_champion');
     expect(indexNames).toContain('idx_item_build_champion');
 
@@ -227,7 +229,7 @@ describe('migration runner', () => {
       ) VALUES ('legacy-match', 'legacy-player', 1000, 3109, 'ITEM_PURCHASED', 0, 0)`,
     ).run();
 
-    expect(migrate(db)).toEqual(['004_role_generic_aggregates']);
+    expect(migrate(db)).toEqual(['004_role_generic_aggregates', '005_lane_null_unique']);
     expect(migrate(db)).toEqual([]);
 
     const match = db
@@ -260,8 +262,22 @@ describe('migration runner', () => {
       is_expert: null,
     });
     expect(event?.item_slot).toBeNull();
+    db.prepare(
+      `INSERT INTO lane_vs (
+        my_champion_id, my_role, opp1_id, opp2_id, rank_bucket, wins_w, games_w, games_w2
+      ) VALUES (1, 'TOP', 10, NULL, 'DIAMOND', 1, 1, 1)`,
+    ).run();
+    expect(() =>
+      db
+        .prepare(
+          `INSERT INTO lane_vs (
+            my_champion_id, my_role, opp1_id, opp2_id, rank_bucket, wins_w, games_w, games_w2
+          ) VALUES (1, 'TOP', 10, NULL, 'DIAMOND', 2, 2, 2)`,
+        )
+        .run(),
+    ).toThrow(/UNIQUE/);
     expect(db.prepare('SELECT COUNT(*) AS count FROM _migrations').get()).toMatchObject({
-      count: 4,
+      count: 5,
     });
     db.close();
   });

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { openDb, migrate } from './db';
 import { ingestMatches } from './matches';
 import { comparePatches, cursorKey, patchFromGameVersion, windowWidened } from './matches-store';
-import { participant, makeMatch, mockClient, PLATFORM, seedPlayer } from './matches.test-helpers';
+import { makeMatch, mockClient, PLATFORM, seedPlayer } from './matches.test-helpers';
 import { RiotApiError, RiotRateLimitError, RiotSchemaError } from './riot';
 import type { Platform, RiotClient } from './riot';
 
@@ -30,9 +30,8 @@ describe('match ingestion', () => {
     seedPlayer(db, 'p-beta', 7);
 
     const match = makeMatch('EUW1_1', {
-      participants: [participant('p-alpha'), participant('p-beta'), participant('unknown')],
+      participants: [{ puuid: 'p-alpha' }, { puuid: 'p-beta' }],
     });
-    match.metadata.participants = ['p-alpha', 'p-beta', 'unknown'];
     const client = mockClient({ 'p-alpha': ['EUW1_1'], 'p-beta': [] }, { EUW1_1: match });
 
     const result = await ingestMatches({ platform: PLATFORM, db, client });
@@ -63,14 +62,10 @@ describe('match ingestion', () => {
     seedPlayer(db, 'p-alpha', 6.5);
     seedPlayer(db, 'p-beta', 7);
 
-    const unknownMatch = makeMatch('EUW1_UNKNOWN', {
-      participants: [participant('unknown-a'), participant('unknown-b')],
-    });
-    unknownMatch.metadata.participants = ['unknown-a', 'unknown-b'];
+    const unknownMatch = makeMatch('EUW1_UNKNOWN');
     const knownMatch = makeMatch('EUW1_KNOWN', {
-      participants: [participant('p-beta')],
+      participants: [{ puuid: 'p-beta' }],
     });
-    knownMatch.metadata.participants = ['p-beta'];
     const client = mockClient(
       { 'p-alpha': ['EUW1_UNKNOWN', 'EUW1_KNOWN'] },
       { EUW1_UNKNOWN: unknownMatch, EUW1_KNOWN: knownMatch },
@@ -84,6 +79,11 @@ describe('match ingestion', () => {
       .get('EUW1_UNKNOWN') as { avg_rank_score: number; rank_known_count: number };
     expect(unknownRow.avg_rank_score).toBe(6.5);
     expect(unknownRow.rank_known_count).toBe(1);
+    const knownRow = db
+      .prepare('SELECT avg_rank_score, rank_known_count FROM matches WHERE match_id = ?')
+      .get('EUW1_KNOWN') as { avg_rank_score: number; rank_known_count: number };
+    expect(knownRow.avg_rank_score).toBeCloseTo(6.75);
+    expect(knownRow.rank_known_count).toBe(2);
     const rankCounts = db
       .prepare('SELECT rank_known_count FROM matches ORDER BY match_id')
       .all() as { rank_known_count: number }[];

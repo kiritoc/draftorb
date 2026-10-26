@@ -5,6 +5,7 @@ node_modules
 coverage
 .vite
 dist/
+.vscode
 *.tsbuildinfo
 .DS_Store
 .env

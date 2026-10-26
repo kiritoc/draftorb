@@ -30,7 +30,7 @@ Project: **DraftOrb** — a free League of Legends tool that (1) recommends a ch
 ## Product invariants (D-024, apply to every UI/engine change)
 
 - The recommendation screen **always shows a "Best overall" list**, even when the user has no pool.
-- The user can keep a **personal champion pool** (browser-only, per role). When it is non-empty a **"From your pool"** list is shown too. The pool only groups results: it **never changes scores or order** (SPECS §2.1, §7.1).
+- The user can keep a **personal champion pool** (browser-only, per role). When it is non-empty a **"From your pool"** list is shown too. The pool **never changes `score(c)`**; pool champions join the candidate set (`offRole` below the roleProb threshold). Overall `rank` numbers can shift only because extra pool-only candidates appear; the relative order of the original roleProb set is unchanged (SPECS §2.1, §5, §7.1).
 - Both lists are **paginated with "Show more"**: first 5, then the next 5, until the list is exhausted. The engine always returns complete lists; the UI slices them.
 
 ## Commands (once T-001 is done)

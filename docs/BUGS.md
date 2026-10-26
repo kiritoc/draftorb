@@ -4,15 +4,114 @@ Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATI
 
 ## Open
 
-| ID  | Sev | Area | Title | Status | Found by/date | Ticket |
-| --- | --- | ---- | ----- | ------ | ------------- | ------ |
-| –   | –   | –    | –     | –      | –             | –      |
+| ID    | Sev | Area   | Title                                                                                    | Status | Found by/date                            | Ticket  |
+| ----- | --- | ------ | ---------------------------------------------------------------------------------------- | ------ | ---------------------------------------- | ------- |
+| B-017 | S3  | engine | Node type definitions are visible to the pure engine and shared packages                 | OPEN   | GitHub Copilot project review 2026-10-26 | T-020   |
+| B-016 | S4  | docs   | Bug ID B-007 is used for two different fixed bugs                                        | OPEN   | GitHub Copilot project review 2026-10-26 | –       |
+| B-015 | S3  | etl    | Node 20 is documented as supported but better-sqlite3 segfaults on Node 20.19.0          | OPEN   | GitHub Copilot project review 2026-10-26 | T-001   |
+| B-014 | S3  | etl    | CLI accepts malformed numeric options and unknown tier names                             | OPEN   | GitHub Copilot project review 2026-10-26 | T-013.b |
+| B-013 | S4  | etl    | Player discovery marks every fetched tier as completed                                   | OPEN   | GitHub Copilot project review 2026-10-26 | T-012   |
+| B-012 | S3  | etl    | ETL file paths depend on the current working directory                                   | OPEN   | GitHub Copilot project review 2026-10-26 | T-005   |
+| B-011 | S2  | shared | Shared reason and rank-bucket schemas diverge from SPECS §3/§7 outside the T-002.b scope | OPEN   | GitHub Copilot project review 2026-10-26 | T-002.b |
+| B-010 | S2  | etl    | API key redaction leaks most of a real `RGAPI-<uuid>` key                                | OPEN   | GitHub Copilot project review 2026-10-26 | T-013.b |
 
 No new bugs were identified during the D-016 formula confirmation; player discovery remains within the current ETL scope.
 
 No new bugs were identified during T-013 (match ingestion); rejected match ids are tracked by design in `match_rejects`, not as bug candidates.
 
 No new bugs were identified while revising T-013 patch-window and rank-known-count behavior.
+
+### B-017 — Node type definitions are visible to the pure engine and shared packages — OPEN
+
+- Severity / Area: S3 / engine
+- Steps to reproduce: add `process.cwd()` or `Buffer.from('x')` to a file in `packages/engine/src`, then run `pnpm typecheck` and `pnpm lint`.
+- Expected / Actual: AGENTS.md rule 3 (no Node APIs in the engine) is enforced by tooling / the root devDependency `@types/node` is visible to every package because `packages/engine/tsconfig.json` and `packages/shared/tsconfig.json` do not set `"types": []`, and `eslint.config.mjs` has no `no-restricted-imports`, `no-restricted-globals` or `no-restricted-properties` rules for the engine (`node:*`, `Date.now`, `Math.random`). Such code is expected to type-check and lint cleanly (not run).
+- Environment (OS, Node version, patch): any.
+- Logs / screenshot: `node_modules/@types/node` exists at the repository root.
+- Suspected cause: D-014 assumed that `"types": ["node"]` in `packages/etl` keeps Node types out of the engine; TypeScript loads every visible `@types` package when `types` is not set.
+- Fix (commit/ticket): pending — set `"types": []` in the engine and shared tsconfigs and add ESLint restrictions for `packages/engine/**` before T-020.
+
+### B-016 — Bug ID B-007 is used for two different fixed bugs — OPEN
+
+- Severity / Area: S4 / docs
+- Steps to reproduce: search `docs/BUGS.md` for `### B-007`.
+- Expected / Actual: every bug has a unique ID / "Seed rank was excluded from rank reliability counts" and "Invalid match responses left the ingestion cursor stuck" both use B-007.
+- Environment (OS, Node version, patch): n/a.
+- Logs / screenshot: n/a.
+- Suspected cause: two parallel branches (PR B and PR C) each picked the next free ID.
+- Fix (commit/ticket): pending — renumber one entry and update any commit or PROGRESS references.
+
+### B-015 — Node 20 is documented as supported but better-sqlite3 segfaults on Node 20.19.0 — OPEN
+
+- Severity / Area: S3 / etl
+- Steps to reproduce: on Node 20.19.0, run `pnpm test` (any test that opens SQLite).
+- Expected / Actual: AGENTS.md ("Node.js 20+"), SETUP.md ("Node.js 20 LTS+") and root `engines` (`>=20.0.0`) promise Node 20 support / PROGRESS (T-013 pitfalls) reports a segfault in `napi_module_register_by_symbol` while loading `better-sqlite3` on Node 20.19.0; Node 22 works. CI only runs Node 22, so the regression is invisible.
+- Environment (OS, Node version, patch): Devin VM, Node 20.19.0, `better-sqlite3` 13.0.3. Not yet reproduced on Windows.
+- Logs / screenshot: see the T-013 session log in PROGRESS.md.
+- Suspected cause: `better-sqlite3` prebuilt binary / N-API mismatch for this Node 20 build. AGENTS.md rule 4 requires this to be logged here; it was only recorded as a PROGRESS pitfall.
+- Fix (commit/ticket): pending — reproduce on Windows + Node 20 LTS; then either add Node 20 to the CI matrix and fix, or raise `engines` and the docs to Node 22 (DECISIONS.md entry).
+
+### B-014 — CLI accepts malformed numeric options and unknown tier names — OPEN
+
+- Severity / Area: S3 / etl
+- Steps to reproduce:
+  1. `pnpm etl matches --per-player=20abc --limit=1.5 --queue=420x`
+  2. `pnpm etl players --tiers=DIAMND --quota=DIAMND:100`
+- Expected / Actual: T-013.b acceptance says malformed ingestion options fail as usage errors (exit 2) / `matches` parses numbers with `Number.parseInt`, so `20abc` becomes 20, `1.5` becomes 1 and `1e3` becomes 1; `players` accepts unknown tier names, gives them quota 0 and reports them as `skipped`, and silently ignores quota entries for unknown tiers.
+- Environment (OS, Node version, patch): any.
+- Logs / screenshot: `packages/etl/src/cli.ts` (`parsePositiveInt` in `runMatches`, tier/quota parsing in `runPlayers`).
+- Suspected cause: only `--quota` values got strict validation in T-013.b; the `matches` numeric flags and the tier names were not covered.
+- Fix (commit/ticket): pending — validate with `/^\d+$/` + `Number.isSafeInteger`, validate tier names against the rank enum, and add CLI usage-error tests.
+
+### B-013 — Player discovery marks every fetched tier as completed — OPEN
+
+- Severity / Area: S4 / etl
+- Steps to reproduce: call `discoverPlayersByTier` for a tier whose pages return fewer players than its quota (for example an early empty page) and inspect `ingest_state`.
+- Expected / Actual: `completed` reflects whether the quota was reached or the league was exhausted, and `status: 'partial'` is reachable / `completed = rankedEntries.length >= quota || pageCount > 0` is always true because `pageCount` is at least 1 after any fetch (apex tiers always return 1), so `partial` is dead code and the tier is skipped for `maxAgeDays` (7) whatever was collected.
+- Environment (OS, Node version, patch): any.
+- Logs / screenshot: `packages/etl/src/players.ts` (`const completed = ...`).
+- Suspected cause: tautological condition; reported in the PR B review ("player-discovery completion is marked after any page") but never logged here.
+- Fix (commit/ticket): pending — define completion explicitly (quota reached or last page shorter than the page size) and test the partial path.
+
+### B-012 — ETL file paths depend on the current working directory — OPEN
+
+- Severity / Area: S3 / etl
+- Steps to reproduce:
+  1. `pnpm --filter @draftorb/etl migrate` (pnpm runs package scripts with cwd = `packages/etl`).
+  2. `pnpm --filter @draftorb/etl static`, then `pnpm --filter @draftorb/etl validate-tags`.
+- Expected / Actual: every ETL path resolves from the workspace root, regardless of cwd, and `.env` lookup never leaves the repository / four different strategies coexist:
+  - CLI `resolveDbPath()` walks up to the nearest `package.json`, so it uses `packages/etl/data/DraftOrb.sqlite` from `packages/etl` and `data/DraftOrb.sqlite` from the root, while library defaults (`config/paths.ts`) always use the workspace root. Players and matches can end up in different databases.
+  - `importStaticData()` writes to `<cwd>/data/public/<patch>/`, creating `packages/etl/data/public/...`, which is not gitignored.
+  - `validateChampionTagsFile()` reads `<cwd>/data/manual` and `<cwd>/data/public`, so it fails from `packages/etl`.
+  - `loadEnv()` reads `<cwd>/.env` then `<cwd>/../../.env`; from the repo root the second candidate is two directories above the repository.
+- Environment (OS, Node version, patch): any.
+- Logs / screenshot: `packages/etl/src/cli.ts` (`findPackageRoot`, `resolveDbPath`), `ddragon.ts` (`baseDir`), `tags.ts` (`repoRoot`), `riot/env.ts` (`candidatePaths`). `players.test.ts` only checks `config/paths.ts`, not the CLI resolver.
+- Suspected cause: the CLI duplicates path logic (flagged in the PR B review, never logged) and other modules default to `process.cwd()`.
+- Fix (commit/ticket): pending — route every default path through `config/paths.ts` (`resolveRepoRoot()`), remove the CLI copy, and add a cwd-independence test per command.
+
+### B-011 — Shared reason and rank-bucket schemas diverge from SPECS §3/§7 outside the T-002.b scope — OPEN
+
+- Severity / Area: S2 / shared
+- Steps to reproduce: compare `reasonSchema`, `manifestSchema.rankBuckets` and `supportPairEntrySchema` in `packages/shared/src/index.ts` with SPECS §3 and §7, then with the T-002.b scope in TICKETS.md.
+- Expected / Actual:
+  - SPECS §7: `Reason.with: ChampionId[]` (a `lane` reason references the lane-group champions, two for `lane_vs` and three for `lane_full`) and `Reason.lowData: boolean` / the schema has a single optional `with: ChampionId` and no `lowData`.
+  - SPECS §3: rank buckets merge MASTER, GRANDMASTER and CHALLENGER into one bucket / `rankBuckets` and the pair-entry bucket use the 10-value `rankSchema`.
+  - T-002.b adds the `lane` reason type, `games_w2`, `insufficientData` and the pool fields, but none of the above, so the engine (T-023) cannot emit a valid `lane` reason even after T-002.b.
+  - To clarify in SPECS: `Reason.n` and `reliability.games` are integers in the schema, while every threshold uses a real-valued `n_eff`; state whether these fields carry raw games or `n_eff`.
+- Environment (OS, Node version, patch): n/a (contract).
+- Logs / screenshot: n/a.
+- Suspected cause: T-002 predates D-021; the T-002.b parity list (D-011) was written from the new export layout, not from SPECS §7.
+- Fix (commit/ticket): pending — extend the T-002.b acceptance with `with: ChampionId[]`, `lowData`, a `rankBucketSchema` that follows SPECS §3, and the `n` semantics.
+
+### B-010 — API key redaction leaks most of a real `RGAPI-<uuid>` key — OPEN
+
+- Severity / Area: S2 / etl (security)
+- Steps to reproduce: `new RiotApiError('x', 400, 'https://euw1.api.riotgames.com/x', 'Invalid request: RGAPI-1a2b3c4d-1234-5678-9abc-def012345678')`, then inspect `message` and `responseBody`.
+- Expected / Actual: the whole key is replaced by `[REDACTED]` / `redactSensitiveText()` first runs `redactPuuid()`, which truncates every run of 8+ hex characters and appends `…`. The key regex `/RGAPI-[A-Za-z0-9_-]+/` then stops at the inserted `…`, so the result is `[REDACTED]…-1234-5678-9abc-def01234…`: 20 of the 32 hex characters of the key leak. The 401/403 path (`redactPuuid(bodyText)` in `client.ts`) has the same problem.
+- Environment (OS, Node version, patch): any; key format as in `.env.example` (`RGAPI-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`).
+- Logs / screenshot: `packages/etl/src/riot/types.ts` (`redactSensitiveText`). The regression tests use `RGAPI-test-api-key-12345`, which has no 8-character hex run, so they cannot detect this.
+- Suspected cause: the redaction order. Also, `redactPuuid()` only matches hex runs, while Riot PUUIDs are base64url-like strings, so it does not redact PUUIDs and mangles unrelated hex values.
+- Fix (commit/ticket): pending — redact key patterns before any other transformation, add a regression test with a UUID-shaped key, and rename or fix `redactPuuid`.
 
 ## Template (copy below the table when detailed)
 
@@ -44,6 +143,7 @@ No new bugs were identified while revising T-013 patch-window and rank-known-cou
 - Suspected cause:
   - Error serialization, command argument validation, and database ownership were not consistently enforced at their boundaries.
 - Fix (commit/ticket): T-013.b — recursively redact Riot key patterns in error fields, reuse the shared platform list, make ingestion argument parsing strict, validate quotas completely, isolate transient ID-listing failures, and close only internally owned SQLite connections in `finally`. Updated the documented schema-error policy and ignore coverage for raw ETL data.
+- Follow-up (2026-10-26): redaction is incomplete for real UUID-shaped keys (B-010), and some malformed `matches` and `players` options are still accepted (B-014).
 
 ### B-007 — Seed rank was excluded from rank reliability counts — FIXED
 

@@ -5,6 +5,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
+import { defaultPublicDataDir } from './config/paths';
 import {
   type ChampionsMap,
   championsMapSchema,
@@ -261,7 +262,7 @@ export async function importStaticData(options: ImportOptions = {}): Promise<Imp
   const version = await fetchLatestVersion(options.version, fetchFn);
   const patch = getPatchFromVersion(version);
 
-  const baseDir = options.outputDir ?? path.join(process.cwd(), 'data', 'public');
+  const baseDir = options.outputDir ?? defaultPublicDataDir();
   const patchDir = path.join(baseDir, patch);
 
   const [champions, items, runes] = await Promise.all([

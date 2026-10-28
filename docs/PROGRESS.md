@@ -27,7 +27,7 @@
 
 ## Next recommended ticket
 
-Fix B-012 (cwd-dependent ETL paths) before the next real ETL run, then T-014 (participant enrichment, dependency-ready). T-002.b is unblocked (see B-011 for scope it does not list yet). T-020 is dependency-ready but implements PROPOSED D-020: start it after the owner accepts D-020..D-023.
+Fix B-012 done. Next: T-014 (participant enrichment, dependency-ready). T-002.b is unblocked (see B-011 for scope it does not list yet). T-020 is dependency-ready but implements PROPOSED D-020: start it after the owner accepts D-020..D-023.
 
 ## Open questions for the owner
 
@@ -40,6 +40,22 @@ Fix B-012 (cwd-dependent ETL paths) before the next real ETL run, then T-014 (pa
 ## Session log (newest first)
 
 The 2026-10-22 entries had no timestamps; their order was reconstructed from ticket dependencies on 2026-10-26.
+
+### 2026-10-28 — Devin — Bug B-012 (cwd-dependent ETL paths)
+
+- Done:
+  - Routed default paths through `config/paths.ts`: added `defaultDataDir()`, `defaultPublicDataDir()`, `defaultManualDataDir()`.
+  - Removed CLI `findPackageRoot` and local `resolveDbPath`; imported from `config/paths`.
+  - `importStaticData()` defaults outputDir to `defaultPublicDataDir()`.
+  - `validateChampionTagsFile()` defaults repoRoot to `resolveRepoRoot()`.
+  - `loadEnv()` uses `defaultEnvPaths()` (falls back to cwd on throw).
+  - Updated `players.test.ts` to use `join(root, 'packages', 'etl')`.
+  - Ran `pnpm check` — all green (13 test files, 108 tests passed).
+- Files touched: `packages/etl/src/config/paths.ts`, `packages/etl/src/cli.ts`, `packages/etl/src/ddragon.ts`, `packages/etl/src/tags.ts`, `packages/etl/src/riot/env.ts`, `packages/etl/src/players.test.ts`, `docs/BUGS.md`, `docs/PROGRESS.md`, `docs/SETUP.md`, `AGENTS.md`
+- Tests: `pnpm check` — all green (13 test files, 108 tests passed)
+- State left: FIXED
+- Next step: T-014.
+- Pitfalls / notes for next AI: none
 
 ### 2026-10-28 — Devin — Bug B-010 (API key redaction)
 

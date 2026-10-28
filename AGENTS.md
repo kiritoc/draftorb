@@ -42,7 +42,7 @@ pnpm test           # all unit tests (vitest)
 pnpm typecheck
 pnpm lint
 pnpm check          # typecheck + lint + format check + tests (what CI runs)
-pnpm etl <command>  # data pipeline, run from the repo root (see docs/SETUP.md)
+pnpm etl <command>  # data pipeline (see docs/SETUP.md)
 ```
 
 ## Repo layout

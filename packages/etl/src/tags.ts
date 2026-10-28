@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 import { championTagsMapSchema, type ChampionsMap, type ChampionTagsMap } from '@draftorb/shared';
+import { resolveRepoRoot } from './config/paths';
 
 export interface ChampionCoverageItem {
   id: number;
@@ -188,7 +189,10 @@ export async function findLatestChampionsPath(repoRoot: string): Promise<string>
 export async function validateChampionTagsFile(
   options: ValidateTagsOptions = {},
 ): Promise<ValidateTagsResult> {
-  const repoRoot = options.repoRoot ?? process.cwd();
+  const needsRepoRoot =
+    options.repoRoot === undefined &&
+    (options.tagsFilePath === undefined || options.championsFilePath === undefined);
+  const repoRoot = options.repoRoot ?? (needsRepoRoot ? resolveRepoRoot() : process.cwd());
   const tagsFilePath =
     options.tagsFilePath ?? path.join(repoRoot, 'data', 'manual', 'champion-tags.json');
   const championsFilePath = options.championsFilePath ?? (await findLatestChampionsPath(repoRoot));

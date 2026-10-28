@@ -25,7 +25,7 @@ pnpm dev
 
 ## ETL commands
 
-Run them from the repository root: some paths are still resolved from the current directory (B-012). The database is `data/DraftOrb.sqlite` unless `DRAFTORB_DB_PATH` is set. `pnpm etl help` lists the commands and exit codes.
+The database is `data/DraftOrb.sqlite` unless `DRAFTORB_DB_PATH` is set. `pnpm etl help` lists the commands and exit codes.
 
 Implemented:
 

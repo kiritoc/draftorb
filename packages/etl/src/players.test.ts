@@ -1,3 +1,5 @@
+import { join } from 'node:path';
+
 import { describe, expect, it, vi } from 'vitest';
 
 import { openDb, migrate } from './db';
@@ -155,7 +157,7 @@ describe('player discovery', () => {
     const root = resolveRepoRoot();
     const fromRoot = resolveDbPath();
 
-    process.chdir(root + '/packages/etl');
+    process.chdir(join(root, 'packages', 'etl'));
     try {
       const fromEtl = resolveDbPath();
       expect(fromEtl).toBe(fromRoot);

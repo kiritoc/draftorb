@@ -11,7 +11,6 @@ Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATI
 | B-015 | S3  | etl    | Node 20 is documented as supported but better-sqlite3 segfaults on Node 20.19.0          | OPEN   | GitHub Copilot project review 2026-10-26 | T-001   |
 | B-014 | S3  | etl    | CLI accepts malformed numeric options and unknown tier names                             | OPEN   | GitHub Copilot project review 2026-10-26 | T-013.b |
 | B-013 | S4  | etl    | Player discovery marks every fetched tier as completed                                   | OPEN   | GitHub Copilot project review 2026-10-26 | T-012   |
-| B-012 | S3  | etl    | ETL file paths depend on the current working directory                                   | OPEN   | GitHub Copilot project review 2026-10-26 | T-005   |
 | B-011 | S2  | shared | Shared reason and rank-bucket schemas diverge from SPECS §3/§7 outside the T-002.b scope | OPEN   | GitHub Copilot project review 2026-10-26 | T-002.b |
 
 No new bugs were identified during the D-016 formula confirmation; player discovery remains within the current ETL scope.
@@ -72,22 +71,6 @@ No new bugs were identified while revising T-013 patch-window and rank-known-cou
 - Suspected cause: tautological condition; reported in the PR B review ("player-discovery completion is marked after any page") but never logged here.
 - Fix (commit/ticket): pending — define completion explicitly (quota reached or last page shorter than the page size) and test the partial path.
 
-### B-012 — ETL file paths depend on the current working directory — OPEN
-
-- Severity / Area: S3 / etl
-- Steps to reproduce:
-  1. `pnpm --filter @draftorb/etl migrate` (pnpm runs package scripts with cwd = `packages/etl`).
-  2. `pnpm --filter @draftorb/etl static`, then `pnpm --filter @draftorb/etl validate-tags`.
-- Expected / Actual: every ETL path resolves from the workspace root, regardless of cwd, and `.env` lookup never leaves the repository / four different strategies coexist:
-  - CLI `resolveDbPath()` walks up to the nearest `package.json`, so it uses `packages/etl/data/DraftOrb.sqlite` from `packages/etl` and `data/DraftOrb.sqlite` from the root, while library defaults (`config/paths.ts`) always use the workspace root. Players and matches can end up in different databases.
-  - `importStaticData()` writes to `<cwd>/data/public/<patch>/`, creating `packages/etl/data/public/...`, which is not gitignored.
-  - `validateChampionTagsFile()` reads `<cwd>/data/manual` and `<cwd>/data/public`, so it fails from `packages/etl`.
-  - `loadEnv()` reads `<cwd>/.env` then `<cwd>/../../.env`; from the repo root the second candidate is two directories above the repository.
-- Environment (OS, Node version, patch): any.
-- Logs / screenshot: `packages/etl/src/cli.ts` (`findPackageRoot`, `resolveDbPath`), `ddragon.ts` (`baseDir`), `tags.ts` (`repoRoot`), `riot/env.ts` (`candidatePaths`). `players.test.ts` only checks `config/paths.ts`, not the CLI resolver.
-- Suspected cause: the CLI duplicates path logic (flagged in the PR B review, never logged) and other modules default to `process.cwd()`.
-- Fix (commit/ticket): pending — route every default path through `config/paths.ts` (`resolveRepoRoot()`), remove the CLI copy, and add a cwd-independence test per command.
-
 ### B-011 — Shared reason and rank-bucket schemas diverge from SPECS §3/§7 outside the T-002.b scope — OPEN
 
 - Severity / Area: S2 / shared
@@ -116,6 +99,16 @@ No new bugs were identified while revising T-013 patch-window and rank-known-cou
 ```
 
 ## Fixed
+
+### B-012 — ETL file paths depend on the current working directory — FIXED
+
+- Severity / Area (engine|etl|web|desktop|vision|docs): S3 / etl
+- Steps to reproduce: see above.
+- Expected / Actual: every default path resolves from resolveRepoRoot().
+- Environment (OS, Node version, patch): any.
+- Logs / screenshot: n/a.
+- Suspected cause: CLI duplicated path logic; modules defaulted to process.cwd().
+- Fix (commit/ticket): B-012 — route defaults through config/paths.ts.
 
 ### B-010 — API key redaction leaks most of a real `RGAPI-<uuid>` key — FIXED
 

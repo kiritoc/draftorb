@@ -5,15 +5,24 @@
  */
 
 import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { join } from 'node:path';
+
+import { resolveRepoRoot } from '../config/paths';
+
+/** Returns the default .env file paths resolved from the repository root. */
+export function defaultEnvPaths(): string[] {
+  try {
+    return [join(resolveRepoRoot(), '.env')];
+  } catch {
+    return [join(process.cwd(), '.env')];
+  }
+}
 
 /**
  * Attempts to load environment variables from a .env file if key is missing.
  */
 export function loadEnv(envPath?: string): void {
-  const candidatePaths = envPath
-    ? [envPath]
-    : [resolve(process.cwd(), '.env'), resolve(process.cwd(), '../../.env')];
+  const candidatePaths = envPath ? [envPath] : defaultEnvPaths();
 
   for (const path of candidatePaths) {
     if (existsSync(path)) {

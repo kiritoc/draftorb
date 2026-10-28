@@ -14,12 +14,11 @@
  *   DRAFTORB_DB_PATH  Overrides the default SQLite path (used by `migrate`, `players` and `matches`).
  */
 
-import { existsSync, mkdirSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { parseArgs } from 'node:util';
 
 import { importStaticData } from './ddragon';
+import { resolveDbPath } from './config/paths';
 import { openDb, migrate, getMigrationStatus } from './db';
 import { ingestMatches } from './matches';
 import { discoverPlayersByTier } from './players';
@@ -123,34 +122,6 @@ function parseVersion(value: string | undefined): string | undefined {
     throw new UsageError(`Invalid version "${value}". Expected a format like "14.5.1".`);
   }
   return value;
-}
-
-// ---------------------------------------------------------------------------
-// Path helpers
-// ---------------------------------------------------------------------------
-
-/** Walks up from `start` to the nearest directory containing a package.json. */
-function findPackageRoot(start: string = process.cwd()): string {
-  let dir = start;
-  for (;;) {
-    if (existsSync(join(dir, 'package.json'))) {
-      return dir;
-    }
-    const parent = dirname(dir);
-    if (parent === dir) {
-      return start;
-    }
-    dir = parent;
-  }
-}
-
-/** Priority: explicit argument > DRAFTORB_DB_PATH > <package root>/data/<default file>. */
-function resolveDbPath(explicit?: string): string {
-  const chosen =
-    explicit ?? process.env[DB_ENV_VAR] ?? join(findPackageRoot(), 'data', DEFAULT_DB_FILENAME);
-  const dbPath = resolve(chosen);
-  mkdirSync(dirname(dbPath), { recursive: true });
-  return dbPath;
 }
 
 // ---------------------------------------------------------------------------
@@ -448,7 +419,7 @@ const COMMANDS: readonly Command[] = [
   {
     name: 'migrate',
     usage: 'migrate [db-path]',
-    description: `Create or upgrade SQLite database (default: <package root>/data/${DEFAULT_DB_FILENAME}, or $${DB_ENV_VAR})`,
+    description: `Create or upgrade SQLite database (default: <repo root>/data/${DEFAULT_DB_FILENAME}, or $${DB_ENV_VAR})`,
     run: runMigrate,
   },
 ];

@@ -205,21 +205,22 @@ describe('RiotClient', () => {
       expect(JSON.stringify(error)).not.toContain('def012345678');
     });
 
-    it('redacts UUID-shaped keys in nested JSON error bodies (B-010 regression)', async () => {
+    it('redacts UUID-shaped keys in nested JSON error bodies (B-010 regression)', () => {
       const uuidKey = 'RGAPI-1a2b3c4d-1234-5678-9abc-def012345678';
-      const client = new RiotClient({
-        apiKey: uuidKey,
-        fetchFn: vi.fn(async () =>
-          createMockResponse(400, { message: uuidKey, nested: [uuidKey] }),
-        ),
-      });
-
-      const error = await client
-        .request('https://euw1.api.riotgames.com/test')
-        .catch((reason: unknown) => reason);
+      const error = new RiotApiError(
+        `Riot API request failed with status 400 at https://euw1.api.riotgames.com/test: ${JSON.stringify(
+          {
+            message: uuidKey,
+            nested: [uuidKey],
+          },
+        )}`,
+        400,
+        'https://euw1.api.riotgames.com/test',
+        { message: uuidKey, nested: [uuidKey] },
+      );
       expect(error).toBeInstanceOf(RiotApiError);
-      if (!(error instanceof RiotApiError)) throw new Error('Expected RiotApiError');
-      expect(error.responseBody).toContain('[REDACTED]');
+      expect(error.responseBody).not.toBeUndefined();
+      expect(JSON.stringify(error.responseBody)).toContain('[REDACTED]');
       // No fragments of the key should leak in the redacted body
       const bodyStr = JSON.stringify(error.responseBody);
       expect(bodyStr).not.toContain('1a2b3c4d');

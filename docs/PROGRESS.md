@@ -41,6 +41,20 @@ Fix B-012 done. Next: T-014 (participant enrichment, dependency-ready). T-002.b 
 
 The 2026-10-22 entries had no timestamps; their order was reconstructed from ticket dependencies on 2026-10-26.
 
+### 2026-10-28 — Devin — Bug B-019 (wrong-tier entries in capped division mark tier complete)
+
+- Done:
+  - Wrote a regression test in `players.test.ts` first: EMERALD quota 250 with Division I returning 100 GOLD entries (wrong tier) + Divisions II–IV empty → first run `partial` with `fetched: 0`; second run (Division I returns EMERALD entries) → `complete` with `fetched: 63`.
+  - Confirmed the test fails with the current `exhausted: divisionsExhausted > 0` + `completed = rankedEntries.length >= quota || exhausted` (marks the tier `complete` despite 0 valid entries).
+  - Fixed `getTierEntries` (`packages/etl/src/players.ts`): returns `cappedHasRejected: boolean` — true when a capped division (stopped at `perDivision`, not by an empty/short page) contributed entries later rejected by the tier filter. Updated the return type and both return paths (apex tier returns `cappedHasRejected: false`).
+  - Updated `discoverPlayersByTier`: `completed = rankedEntries.length >= quota || (exhausted && !cappedHasRejected)`, so a tier with rejected capped-division entries stays `partial` and is re-fetched.
+  - B-019 FIXED.
+- Files touched: `packages/etl/src/players.ts`, `packages/etl/src/players.test.ts`, `docs/BUGS.md`, `docs/PROGRESS.md`
+- Tests: `pnpm check` — all green (14 test files, 132 tests passed)
+- State left: FIXED
+- Next step: T-014 (participant enrichment) — blocked only by data collection (B-015 Node 20, or wait for Node 22).
+- Pitfalls / notes for next AI: the `> 0` change from B-013 was too broad; the `cappedHasRejected` guard narrows it to only skip tiers where no capped division had rejected entries. Existing test (d) still passes because its capped division returns all-valid EMERALD entries (`cappedHasRejected = false`).
+
 ### 2026-10-28 — Devin — Bug tracker cleanup (B-013 stale entry + B-018)
 
 - Done:

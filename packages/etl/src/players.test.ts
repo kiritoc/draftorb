@@ -290,6 +290,61 @@ describe('player discovery', () => {
     db.close();
   });
 
+  it('marks a tier partial when a capped division returns wrong-tier entries, then completes on retry', async () => {
+    const db = openDb(':memory:');
+    migrate(db);
+    const mkWrong = (n: number, division: string) =>
+      Array.from({ length: n }, (_, i) => ({
+        puuid: `wrong-${division}-${i}`,
+        tier: 'GOLD',
+        rank: division,
+        leaguePoints: i,
+      }));
+    const mkRight = (n: number, division: string) =>
+      Array.from({ length: n }, (_, i) => ({
+        puuid: `right-${division}-${i}`,
+        tier: 'EMERALD',
+        rank: division,
+        leaguePoints: i,
+      }));
+
+    let wrongTier = true;
+    const getLeagueEntries = vi.fn(async (_p, _q, _t, division: string, page: number) => {
+      if (division === 'I' && page === 1) {
+        return wrongTier ? mkWrong(100, division) : mkRight(100, division);
+      }
+      return [];
+    });
+    const client = { getLeagueEntries } as unknown as RiotClient;
+
+    const first = await discoverPlayersByTier({
+      platform: 'euw1',
+      db,
+      client,
+      tiers: ['EMERALD'],
+      quotas: { EMERALD: 250 },
+      reset: true,
+    });
+
+    expect(first.tierResults[0]?.status).toBe('partial');
+    expect(first.tierResults[0]?.fetched).toBe(0);
+
+    wrongTier = false;
+    const callsAfterFirst = getLeagueEntries.mock.calls.length;
+    const second = await discoverPlayersByTier({
+      platform: 'euw1',
+      db,
+      client,
+      tiers: ['EMERALD'],
+      quotas: { EMERALD: 250 },
+    });
+
+    expect(second.tierResults[0]?.status).toBe('complete');
+    expect(second.tierResults[0]?.fetched).toBe(63);
+    expect(getLeagueEntries.mock.calls.length).toBeGreaterThan(callsAfterFirst);
+    db.close();
+  });
+
   it('resolves the same SQLite path from the repo root and from packages/etl', () => {
     const original = process.cwd();
     const root = resolveRepoRoot();

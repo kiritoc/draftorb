@@ -114,7 +114,12 @@ async function getTierEntries(
   platform: Platform,
   tier: string,
   quota: number,
-): Promise<{ entries: RiotLeagueEntry[]; pageCount: number; exhausted: boolean }> {
+): Promise<{
+  entries: RiotLeagueEntry[];
+  pageCount: number;
+  exhausted: boolean;
+  cappedHasRejected: boolean;
+}> {
   const normalizedTier = tier.toUpperCase();
   let pageCount = 0;
 
@@ -144,12 +149,13 @@ async function getTierEntries(
         freshBlood: typeof entry.freshBlood === 'boolean' ? entry.freshBlood : undefined,
         hotStreak: typeof entry.hotStreak === 'boolean' ? entry.hotStreak : undefined,
       }));
-    return { entries, pageCount: 1, exhausted: true };
+    return { entries, pageCount: 1, exhausted: true, cappedHasRejected: false };
   }
 
   const perDivision = Math.ceil(quota / DIVISION_ORDER.length);
   const entries: RiotLeagueEntry[] = [];
   let divisionsExhausted = 0;
+  let cappedHasRejected = false;
   for (const division of DIVISION_ORDER) {
     const seen = new Set<string>();
     const divisionEntries: RiotLeagueEntry[] = [];
@@ -181,6 +187,9 @@ async function getTierEntries(
       page += 1;
     }
     if (divisionExhausted) divisionsExhausted += 1;
+    else if (divisionEntries.some((e) => (e.tier ?? '').toUpperCase() !== normalizedTier)) {
+      cappedHasRejected = true;
+    }
     entries.push(...divisionEntries.slice(0, perDivision));
   }
 
@@ -188,6 +197,7 @@ async function getTierEntries(
     entries: entries.filter((entry) => typeof entry.puuid === 'string').slice(0, quota),
     pageCount,
     exhausted: divisionsExhausted > 0,
+    cappedHasRejected,
   };
 }
 
@@ -267,7 +277,7 @@ export async function discoverPlayersByTier(
         }
       }
 
-      const { entries, pageCount, exhausted } = await getTierEntries(
+      const { entries, pageCount, exhausted, cappedHasRejected } = await getTierEntries(
         client,
         platform,
         normalizedTier,
@@ -295,7 +305,7 @@ export async function discoverPlayersByTier(
         return list.length;
       });
       const stored = storeAll(rankedEntries);
-      const completed = rankedEntries.length >= quota || exhausted;
+      const completed = rankedEntries.length >= quota || (exhausted && !cappedHasRejected);
 
       totalFetched += rankedEntries.length;
       totalStored += stored;

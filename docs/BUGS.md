@@ -100,6 +100,18 @@ No new bugs were identified while revising T-013 patch-window and rank-known-cou
 
 ## Fixed
 
+### B-019 — Wrong-tier entries in a capped division still mark the tier complete — FIXED
+
+- Severity / Area (engine|etl|web|desktop|vision|docs): S2 / etl
+- Steps to reproduce: call `discoverPlayersByTier` for an EMERALD tier (quota 250) where Division I page 1 returns 100 entries all labeled `GOLD` (wrong tier) and Divisions II–IV return empty pages; inspect `tierResults[0].status`.
+- Expected / Actual:
+  - Expected: the tier is `partial` because a capped division (stopped at `perDivision` after a full page) returned entries that were rejected by the tier filter, so more valid entries may exist on subsequent pages and the tier must be retried.
+  - Actual: `exhausted = divisionsExhausted > 0` was `true` (III–IV are exhausted), so `completed = rankedEntries.length >= quota || exhausted` was `true` even though `rankedEntries` was 0 after tier filtering. The tier was persisted as `complete` and skipped for `maxAgeDays` (7) despite collecting zero valid players.
+- Environment (OS, Node version, patch): any.
+- Logs / screenshot: `packages/etl/src/players.ts` — `getTierEntries` returned `exhausted: divisionsExhausted > 0` (line 190), and `discoverPlayersByTier` computed `completed = rankedEntries.length >= quota || exhausted` (line 298).
+- Suspected cause: the B-013 fix changed `exhausted` from `divisionsExhausted === DIVISION_ORDER.length` to `divisionsExhausted > 0` to avoid endless retries when some divisions are exhausted and others are capped, but this did not account for capped divisions that returned entries later rejected by the tier/PUUID filter.
+- Fix (commit/ticket): B-019 — `getTierEntries` now returns `cappedHasRejected: boolean` (true when any capped division—stopped at `perDivision`, not by an empty/short page—contributed entries later rejected by the tier filter or missing a puuid). `completed` becomes `rankedEntries.length >= quota || (exhausted && !cappedHasRejected)`, so a tier with rejected capped-division entries stays `partial` and is re-fetched on the next run. Regression test: wrong-tier full page in one division + empty pages in the rest → `partial` with `fetched: 0` on the first run, then `complete` with `fetched: 63` after the division returns right-tier entries. `pnpm check` — 14 test files, 132 tests passed.
+
 ### B-013 — Player discovery marks every fetched tier as completed — FIXED
 
 - Severity / Area (engine|etl|web|desktop|vision|docs): S4 / etl

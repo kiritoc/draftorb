@@ -41,6 +41,30 @@ Fix B-012 done. Next: T-014 (participant enrichment, dependency-ready). T-002.b 
 
 The 2026-10-22 entries had no timestamps; their order was reconstructed from ticket dependencies on 2026-10-26.
 
+### 2026-10-28 — Devin — Bug tracker cleanup (B-013 stale entry + B-018)
+
+- Done:
+  - Removed the stale `### B-013 — ... — OPEN` detailed entry from the `## Open` section in `docs/BUGS.md` (lines 63–71). B-013 is already fully documented as FIXED under `## Fixed` (line 102), with the fix details, tests, and commit/ticket reference. The Open table never listed B-013, so no table change was needed.
+  - Added B-018 to the Open table and its detailed entry: B-014 is FIXED (fix committed in the 2026-10-28 session) but is still listed in the Open table and retains its detailed entry under `## Open` instead of `## Fixed`. Per AGENTS.md rule 6, this was logged, not fixed (out of scope for this task).
+- Files touched: `docs/BUGS.md`, `docs/PROGRESS.md`
+- Tests: none (docs-only change); `pnpm check` — all green (14 test files, 131 tests passed).
+- State left: FIXED (B-013 stale entry removed; B-018 logged for future cleanup)
+- Next step: next contributor to handle B-018 by moving B-014 to `## Fixed` and out of the Open table.
+- Pitfalls / notes for next AI: none
+
+### 2026-10-28 — Devin — Bug B-013 (player discovery completion marker)
+
+- Done:
+  - Wrote 4 regression tests in `players.test.ts`: (a) quota reached on full pages → `complete`, (b) league exhausted below quota on short pages → `complete` with `fetched < quota`, (c) full pages whose `tier` differs from the requested tier → filtered out → `partial` and re-fetched on the next run, (d) some divisions exhausted (empty/short pages) + others capped at `perDivision` (full pages) → `complete` with no endless retries.
+  - Confirmed test (c) fails with the buggy `completed = rankedEntries.length >= quota || pageCount > 0` (always true because `pageCount >= 1`), and test (d) fails with `exhausted = divisionsExhausted === DIVISION_ORDER.length` (too strict — 3 of 4 exhausted divisions still yields `false`).
+  - Fixed `getTierEntries` to return `{ entries, pageCount, exhausted }`: apex tiers are always `exhausted: true`; non-apex tiers are `exhausted` when any division stopped on an empty or short page (keeping the existing `< 100` rule). Changed `completed` to `rankedEntries.length >= quota || exhausted`.
+  - B-013 FIXED.
+- Files touched: `packages/etl/src/players.ts`, `packages/etl/src/players.test.ts`, `docs/BUGS.md`, `docs/TICKETS.md`, `docs/PROGRESS.md`
+- Tests: `pnpm check` — all green (14 test files, 131 tests passed)
+- State left: FIXED
+- Next step: T-014 participant enrichment.
+- Pitfalls / notes for next AI: none
+
 ### 2026-10-28 — Devin — Bug B-014 (CLI args validation)
 
 - Done:

@@ -6,11 +6,11 @@ Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATI
 
 | ID    | Sev | Area   | Title                                                                                    | Status | Found by/date                            | Ticket  |
 | ----- | --- | ------ | ---------------------------------------------------------------------------------------- | ------ | ---------------------------------------- | ------- |
+| B-018 | S4  | docs   | B-014 is still listed in the Open section and table while its fix is complete            | OPEN   | GitHub Copilot project review 2026-10-26 | –       |
 | B-017 | S3  | engine | Node type definitions are visible to the pure engine and shared packages                 | OPEN   | GitHub Copilot project review 2026-10-26 | T-020   |
 | B-016 | S4  | docs   | Bug ID B-007 is used for two different fixed bugs                                        | OPEN   | GitHub Copilot project review 2026-10-26 | –       |
 | B-015 | S3  | etl    | Node 20 is documented as supported but better-sqlite3 segfaults on Node 20.19.0          | OPEN   | GitHub Copilot project review 2026-10-26 | T-001   |
 | B-014 | S3  | etl    | CLI accepts malformed numeric options and unknown tier names                             | FIXED  | GitHub Copilot project review 2026-10-26 | T-013.b |
-| B-013 | S4  | etl    | Player discovery marks every fetched tier as completed                                   | OPEN   | GitHub Copilot project review 2026-10-26 | T-012   |
 | B-011 | S2  | shared | Shared reason and rank-bucket schemas diverge from SPECS §3/§7 outside the T-002.b scope | OPEN   | GitHub Copilot project review 2026-10-26 | T-002.b |
 
 No new bugs were identified during the D-016 formula confirmation; player discovery remains within the current ETL scope.
@@ -18,6 +18,16 @@ No new bugs were identified during the D-016 formula confirmation; player discov
 No new bugs were identified during T-013 (match ingestion); rejected match ids are tracked by design in `match_rejects`, not as bug candidates.
 
 No new bugs were identified while revising T-013 patch-window and rank-known-count behavior.
+
+### B-018 — B-014 still listed in Open section while its fix is complete — OPEN
+
+- Severity / Area: S4 / docs
+- Steps to reproduce: search `docs/BUGS.md` for `### B-014` and for `B-014` in the Open table.
+- Expected / Actual: a FIXED bug should have its detailed entry under `## Fixed` and be absent from the Open table and `## Open` detailed section / B-014 appears in the Open table with status FIXED and retains a detailed entry under `## Open` (header suffix "FIXED"), but has no entry under `## Fixed`.
+- Environment (OS, Node version, patch): n/a.
+- Logs / screenshot: line 12 of the Open table and line 51 (detailed entry).
+- Suspected cause: B-014 was fixed in the 2026-10-28 session (see PROGRESS.md session log) but was never moved from `## Open` to `## Fixed`; only its status flag in the Open table and header was changed to FIXED.
+- Fix (commit/ticket): pending — move B-014's detailed entry to the top of `## Fixed`, remove it from the Open table.
 
 ### B-017 — Node type definitions are visible to the pure engine and shared packages — OPEN
 
@@ -61,16 +71,6 @@ No new bugs were identified while revising T-013 patch-window and rank-known-cou
 - Suspected cause: only `--quota` values got strict validation in T-013.b; the `matches` numeric flags and the tier names were not covered.
 - Fix (commit/ticket): B-014 — added `cli-args.ts` with `parseStrictPositiveInt` (only `/^\d+$/`, safe integers > 0), `parseTierList` (upper-cased, deduplicated, validated against `rankSchema.options`), `parseQuotaList` (nonnegative integers, tier must be in `rankSchema.options`); all errors are `UsageError` naming the flag/bad value. Wired into `cli.ts`. Added tests in `cli-args.test.ts`. Smoke tests confirm exit code 2 before network calls. (T-013.b follow-up)
 
-### B-013 — Player discovery marks every fetched tier as completed — OPEN
-
-- Severity / Area: S4 / etl
-- Steps to reproduce: call `discoverPlayersByTier` for a tier whose pages return fewer players than its quota (for example an early empty page) and inspect `ingest_state`.
-- Expected / Actual: `completed` reflects whether the quota was reached or the league was exhausted, and `status: 'partial'` is reachable / `completed = rankedEntries.length >= quota || pageCount > 0` is always true because `pageCount` is at least 1 after any fetch (apex tiers always return 1), so `partial` is dead code and the tier is skipped for `maxAgeDays` (7) whatever was collected.
-- Environment (OS, Node version, patch): any.
-- Logs / screenshot: `packages/etl/src/players.ts` (`const completed = ...`).
-- Suspected cause: tautological condition; reported in the PR B review ("player-discovery completion is marked after any page") but never logged here.
-- Fix (commit/ticket): pending — define completion explicitly (quota reached or last page shorter than the page size) and test the partial path.
-
 ### B-011 — Shared reason and rank-bucket schemas diverge from SPECS §3/§7 outside the T-002.b scope — OPEN
 
 - Severity / Area: S2 / shared
@@ -99,6 +99,18 @@ No new bugs were identified while revising T-013 patch-window and rank-known-cou
 ```
 
 ## Fixed
+
+### B-013 — Player discovery marks every fetched tier as completed — FIXED
+
+- Severity / Area (engine|etl|web|desktop|vision|docs): S4 / etl
+- Steps to reproduce: call `discoverPlayersByTier` for a tier whose pages return fewer players than its quota (for example an early empty page) and inspect `ingest_state`.
+- Expected / Actual:
+  - Expected: `completed` reflects whether the quota was reached or the league was exhausted, and `status: 'partial'` is reachable.
+  - Actual: `completed = rankedEntries.length >= quota || pageCount > 0` is always true because `pageCount` is at least 1 after any fetch, so `partial` is dead code and the tier is skipped for `maxAgeDays` whatever was collected.
+- Environment (OS, Node version, patch): any.
+- Logs / screenshot: `packages/etl/src/players.ts` (`const completed = ...`).
+- Suspected cause: tautological condition; reported in the PR B review ("player-discovery completion is marked after any page") but never logged here.
+- Fix (commit/ticket): B-013 — `getTierEntries` now returns `{ entries, pageCount, exhausted }`; for apex tiers `exhausted` is always true, and for non-apex tiers `exhausted` is true when any division stopped on an empty or short page (the existing `< 100` rule) — meaning the league is exhausted for that division while other divisions are capped at `perDivision` and cannot contribute more. A tier is complete when its quota is reached OR any division is exhausted; otherwise it is `partial` and is re-fetched on the next run (not skipped for `maxAgeDays`). The `partial` path requires that all divisions received full pages (no exhaustion), so a tier whose pages return wrong-tier entries is still re-fetched. Added regression tests for quota reached (full pages, not exhausted), league exhausted below quota (short pages), all-divisions-capped with wrong tier → partial + re-fetch, and mixed exhausted/capped divisions → complete with no endless retries. `pnpm check` — 14 test files, 131 tests passed.
 
 ### B-012 — ETL file paths depend on the current working directory — FIXED
 

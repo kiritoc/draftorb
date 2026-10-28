@@ -2,11 +2,20 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   check:
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -16,6 +25,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -25,11 +36,24 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ matrix.node-version }}
           cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Run quality checks
-        run: pnpm check
+      - name: Typecheck
+        if: matrix.os == 'ubuntu-latest'
+        run: pnpm typecheck
+
+      - name: Lint
+        if: matrix.os == 'ubuntu-latest' && !cancelled()
+        run: pnpm lint
+
+      - name: Format check
+        if: matrix.os == 'ubuntu-latest' && !cancelled()
+        run: pnpm format:check
+
+      - name: Test
+        if: ${{ !cancelled() }}
+        run: pnpm test

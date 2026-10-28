@@ -9,7 +9,7 @@ Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATI
 | B-017 | S3  | engine | Node type definitions are visible to the pure engine and shared packages                 | OPEN   | GitHub Copilot project review 2026-10-26 | T-020   |
 | B-016 | S4  | docs   | Bug ID B-007 is used for two different fixed bugs                                        | OPEN   | GitHub Copilot project review 2026-10-26 | –       |
 | B-015 | S3  | etl    | Node 20 is documented as supported but better-sqlite3 segfaults on Node 20.19.0          | OPEN   | GitHub Copilot project review 2026-10-26 | T-001   |
-| B-014 | S3  | etl    | CLI accepts malformed numeric options and unknown tier names                             | OPEN   | GitHub Copilot project review 2026-10-26 | T-013.b |
+| B-014 | S3  | etl    | CLI accepts malformed numeric options and unknown tier names                             | FIXED  | GitHub Copilot project review 2026-10-26 | T-013.b |
 | B-013 | S4  | etl    | Player discovery marks every fetched tier as completed                                   | OPEN   | GitHub Copilot project review 2026-10-26 | T-012   |
 | B-011 | S2  | shared | Shared reason and rank-bucket schemas diverge from SPECS §3/§7 outside the T-002.b scope | OPEN   | GitHub Copilot project review 2026-10-26 | T-002.b |
 
@@ -49,17 +49,17 @@ No new bugs were identified while revising T-013 patch-window and rank-known-cou
 - Suspected cause: `better-sqlite3` prebuilt binary / N-API mismatch for this Node 20 build. AGENTS.md rule 4 requires this to be logged here; it was only recorded as a PROGRESS pitfall.
 - Fix (commit/ticket): pending — reproduce on Windows + Node 20 LTS; then either add Node 20 to the CI matrix and fix, or raise `engines` and the docs to Node 22 (DECISIONS.md entry).
 
-### B-014 — CLI accepts malformed numeric options and unknown tier names — OPEN
+### B-014 — CLI accepts malformed numeric options and unknown tier names — FIXED
 
 - Severity / Area: S3 / etl
 - Steps to reproduce:
   1. `pnpm etl matches --per-player=20abc --limit=1.5 --queue=420x`
   2. `pnpm etl players --tiers=DIAMND --quota=DIAMND:100`
-- Expected / Actual: T-013.b acceptance says malformed ingestion options fail as usage errors (exit 2) / `matches` parses numbers with `Number.parseInt`, so `20abc` becomes 20, `1.5` becomes 1 and `1e3` becomes 1; `players` accepts unknown tier names, gives them quota 0 and reports them as `skipped`, and silently ignores quota entries for unknown tiers.
+- Expected / Actual: malformed ingestion options fail as usage errors (exit 2)
 - Environment (OS, Node version, patch): any.
-- Logs / screenshot: `packages/etl/src/cli.ts` (`parsePositiveInt` in `runMatches`, tier/quota parsing in `runPlayers`).
+- Logs / screenshot: moved parsing to `packages/etl/src/cli-args.ts` with strict validation.
 - Suspected cause: only `--quota` values got strict validation in T-013.b; the `matches` numeric flags and the tier names were not covered.
-- Fix (commit/ticket): pending — validate with `/^\d+$/` + `Number.isSafeInteger`, validate tier names against the rank enum, and add CLI usage-error tests.
+- Fix (commit/ticket): B-014 — added `cli-args.ts` with `parseStrictPositiveInt` (only `/^\d+$/`, safe integers > 0), `parseTierList` (upper-cased, deduplicated, validated against `rankSchema.options`), `parseQuotaList` (nonnegative integers, tier must be in `rankSchema.options`); all errors are `UsageError` naming the flag/bad value. Wired into `cli.ts`. Added tests in `cli-args.test.ts`. Smoke tests confirm exit code 2 before network calls. (T-013.b follow-up)
 
 ### B-013 — Player discovery marks every fetched tier as completed — OPEN
 

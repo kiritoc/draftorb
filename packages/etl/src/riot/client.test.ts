@@ -152,6 +152,100 @@ describe('RiotClient', () => {
       expect(JSON.stringify(error)).not.toContain(dummyApiKey);
     });
 
+    it('redacts UUID-shaped Riot API keys completely (B-010 regression)', async () => {
+      const uuidKey = 'RGAPI-1a2b3c4d-1234-5678-9abc-def012345678';
+      const client = new RiotClient({
+        apiKey: uuidKey,
+        fetchFn: vi.fn(async () => createMockResponse(400, `Invalid request: ${uuidKey}`)),
+      });
+
+      const error = await client
+        .request('https://euw1.api.riotgames.com/test')
+        .catch((reason: unknown) => reason);
+      expect(error).toBeInstanceOf(RiotApiError);
+      if (!(error instanceof RiotApiError)) throw new Error('Expected RiotApiError');
+      expect(error.message).toContain('[REDACTED]');
+      expect(error.responseBody).toContain('[REDACTED]');
+      // No fragments of the key should leak
+      expect(error.message).not.toContain('1a2b3c4d');
+      expect(error.message).not.toContain('9abc');
+      expect(error.message).not.toContain('def012345678');
+      expect(error.responseBody).not.toContain('1a2b3c4d');
+      expect(error.responseBody).not.toContain('9abc');
+      expect(error.responseBody).not.toContain('def012345678');
+      expect(error.url).not.toContain('1a2b3c4d');
+      expect(JSON.stringify(error)).not.toContain('1a2b3c4d');
+      expect(JSON.stringify(error)).not.toContain('9abc');
+      expect(JSON.stringify(error)).not.toContain('def012345678');
+    });
+
+    it('redacts UUID-shaped keys in 403 auth errors (B-010 regression)', async () => {
+      const uuidKey = 'RGAPI-1a2b3c4d-1234-5678-9abc-def012345678';
+      const client = new RiotClient({
+        apiKey: uuidKey,
+        fetchFn: vi.fn(async () => createMockResponse(403, `Forbidden: ${uuidKey}`)),
+      });
+
+      const error = await client
+        .request('https://euw1.api.riotgames.com/test')
+        .catch((reason: unknown) => reason);
+      expect(error).toBeInstanceOf(RiotAuthError);
+      if (!(error instanceof RiotAuthError)) throw new Error('Expected RiotAuthError');
+      expect(error.message).toContain('[REDACTED]');
+      expect(error.responseBody).toContain('[REDACTED]');
+      // No fragments of the key should leak
+      expect(error.message).not.toContain('1a2b3c4d');
+      expect(error.message).not.toContain('9abc');
+      expect(error.message).not.toContain('def012345678');
+      expect(error.responseBody).not.toContain('1a2b3c4d');
+      expect(error.responseBody).not.toContain('9abc');
+      expect(error.responseBody).not.toContain('def012345678');
+      expect(JSON.stringify(error)).not.toContain('1a2b3c4d');
+      expect(JSON.stringify(error)).not.toContain('9abc');
+      expect(JSON.stringify(error)).not.toContain('def012345678');
+    });
+
+    it('redacts UUID-shaped keys in nested JSON error bodies (B-010 regression)', async () => {
+      const uuidKey = 'RGAPI-1a2b3c4d-1234-5678-9abc-def012345678';
+      const client = new RiotClient({
+        apiKey: uuidKey,
+        fetchFn: vi.fn(async () =>
+          createMockResponse(400, { message: uuidKey, nested: [uuidKey] }),
+        ),
+      });
+
+      const error = await client
+        .request('https://euw1.api.riotgames.com/test')
+        .catch((reason: unknown) => reason);
+      expect(error).toBeInstanceOf(RiotApiError);
+      if (!(error instanceof RiotApiError)) throw new Error('Expected RiotApiError');
+      expect(error.responseBody).toContain('[REDACTED]');
+      // No fragments of the key should leak in the redacted body
+      const bodyStr = JSON.stringify(error.responseBody);
+      expect(bodyStr).not.toContain('1a2b3c4d');
+      expect(bodyStr).not.toContain('9abc');
+      expect(bodyStr).not.toContain('def012345678');
+    });
+
+    it('shortens 78-character PUUIDs in error bodies (B-010 regression)', async () => {
+      // Real Riot PUUIDs are 78-character base64url strings
+      const realPuuid =
+        'AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-ABCD';
+      const client = new RiotClient({
+        apiKey: dummyApiKey,
+        fetchFn: vi.fn(async () => createMockResponse(400, `Player not found: ${realPuuid}`)),
+      });
+
+      const error = await client
+        .request('https://euw1.api.riotgames.com/test')
+        .catch((reason: unknown) => reason);
+      expect(error).toBeInstanceOf(RiotApiError);
+      if (!(error instanceof RiotApiError)) throw new Error('Expected RiotApiError');
+      // PUUID should be shortened to first 8 chars + ellipsis
+      expect(error.message).toContain('AbCdEfGh…');
+      expect(error.message).not.toContain(realPuuid.slice(8));
+    });
+
     it('waits Retry-After and retries on 429 Rate Limit response', async () => {
       let fetchCalls = 0;
       let currentTime = 1000;

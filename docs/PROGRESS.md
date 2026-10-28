@@ -27,12 +27,12 @@
 
 ## Next recommended ticket
 
-Fix B-010 (S2, API key redaction) and B-012 (cwd-dependent ETL paths) before the next real ETL run, then T-014 (participant enrichment, dependency-ready). T-002.b is unblocked (see B-011 for scope it does not list yet). T-020 is dependency-ready but implements PROPOSED D-020: start it after the owner accepts D-020..D-023.
+Fix B-012 (cwd-dependent ETL paths) before the next real ETL run, then T-014 (participant enrichment, dependency-ready). T-002.b is unblocked (see B-011 for scope it does not list yet). T-020 is dependency-ready but implements PROPOSED D-020: start it after the owner accepts D-020..D-023.
 
 ## Open questions for the owner
 
 - Accept or revise the PROPOSED decisions D-008, D-011, D-017, D-018, D-020, D-021, D-022, D-023 and D-025. SPECS §5/§8 and T-016..T-018, T-020..T-023, T-027.a/T-027.b follow D-020..D-023.
-- Review T-013.b (two acceptance criteria fail: B-010, B-014).
+- Review T-013.b (one acceptance criterion fails: B-014).
 - Node version policy (B-015): make Node 20 work or require Node 22.
 
 ---
@@ -40,6 +40,21 @@ Fix B-010 (S2, API key redaction) and B-012 (cwd-dependent ETL paths) before the
 ## Session log (newest first)
 
 The 2026-10-22 entries had no timestamps; their order was reconstructed from ticket dependencies on 2026-10-26.
+
+### 2026-10-28 — Devin — Bug B-010 (API key redaction)
+
+- Done:
+  - Wrote failing regression tests for B-010 with a UUID-shaped key (`RGAPI-1a2b3c4d-1234-5678-9abc-def012345678`) to verify that the bug leaks key fragments.
+  - Fixed the redaction order in `packages/etl/src/riot/types.ts`: redact API key patterns first (`/RGAPI-[A-Za-z0-9_-]+/g`), then shorten PUUIDs.
+  - Renamed `redactPuuid` to `shortenPuuids` and fixed the regex to match whole 78-character base64url tokens (the verified PUUID length from fixture data) with word boundaries: `(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{78}(?![A-Za-z0-9_-])`.
+  - Removed the redundant `redactPuuid()` call from the 401/403 path in `packages/etl/src/riot/client.ts`; the error constructor already redacts the body.
+  - Added regression tests for: (a) UUID-shaped keys in 400 errors, (b) UUID-shaped keys in 403 auth errors, (c) UUID-shaped keys in nested JSON error bodies, (d) 78-character PUUIDs in error bodies.
+  - Ran `pnpm check` — all green (13 test files, 108 tests passed).
+- Files touched: `packages/etl/src/riot/types.ts`, `packages/etl/src/riot/client.ts`, `packages/etl/src/riot/client.test.ts`, `docs/BUGS.md`, `docs/PROGRESS.md`
+- Tests: `pnpm check` — all green (13 test files, 108 tests passed)
+- State left: FIXED
+- Next step: fix B-012, then T-014.
+- Pitfalls / notes for next AI: none
 
 ### 2026-10-28 — Devin — Ticket T-011.c (Migration 005 verification)
 

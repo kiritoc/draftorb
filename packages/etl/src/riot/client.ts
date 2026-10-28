@@ -18,7 +18,6 @@ import {
   RiotRateLimitError,
   RiotSchemaError,
   platformToRegion,
-  redactPuuid,
 } from './types';
 
 export interface MatchIdsOptions {
@@ -178,7 +177,7 @@ export class RiotClient {
         const bodyText = responseBodyText.trim();
         const hint = 'key expired? Check RIOT_API_KEY in .env';
         throw new RiotAuthError(
-          `Riot API authentication failed (${response.status}) at ${url}: ${hint}${bodyText ? `; ${redactPuuid(bodyText)}` : ''}`,
+          `Riot API authentication failed (${response.status}) at ${url}: ${hint}${bodyText ? `; ${bodyText}` : ''}`,
           response.status,
           url,
           responseBodyText,

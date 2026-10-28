@@ -13,7 +13,6 @@ Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATI
 | B-013 | S4  | etl    | Player discovery marks every fetched tier as completed                                   | OPEN   | GitHub Copilot project review 2026-10-26 | T-012   |
 | B-012 | S3  | etl    | ETL file paths depend on the current working directory                                   | OPEN   | GitHub Copilot project review 2026-10-26 | T-005   |
 | B-011 | S2  | shared | Shared reason and rank-bucket schemas diverge from SPECS §3/§7 outside the T-002.b scope | OPEN   | GitHub Copilot project review 2026-10-26 | T-002.b |
-| B-010 | S2  | etl    | API key redaction leaks most of a real `RGAPI-<uuid>` key                                | OPEN   | GitHub Copilot project review 2026-10-26 | T-013.b |
 
 No new bugs were identified during the D-016 formula confirmation; player discovery remains within the current ETL scope.
 
@@ -103,16 +102,6 @@ No new bugs were identified while revising T-013 patch-window and rank-known-cou
 - Suspected cause: T-002 predates D-021; the T-002.b parity list (D-011) was written from the new export layout, not from SPECS §7.
 - Fix (commit/ticket): pending — extend the T-002.b acceptance with `with: ChampionId[]`, `lowData`, a `rankBucketSchema` that follows SPECS §3, and the `n` semantics.
 
-### B-010 — API key redaction leaks most of a real `RGAPI-<uuid>` key — OPEN
-
-- Severity / Area: S2 / etl (security)
-- Steps to reproduce: `new RiotApiError('x', 400, 'https://euw1.api.riotgames.com/x', 'Invalid request: RGAPI-1a2b3c4d-1234-5678-9abc-def012345678')`, then inspect `message` and `responseBody`.
-- Expected / Actual: the whole key is replaced by `[REDACTED]` / `redactSensitiveText()` first runs `redactPuuid()`, which truncates every run of 8+ hex characters and appends `…`. The key regex `/RGAPI-[A-Za-z0-9_-]+/` then stops at the inserted `…`, so the result is `[REDACTED]…-1234-5678-9abc-def01234…`: 20 of the 32 hex characters of the key leak. The 401/403 path (`redactPuuid(bodyText)` in `client.ts`) has the same problem.
-- Environment (OS, Node version, patch): any; key format as in `.env.example` (`RGAPI-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`).
-- Logs / screenshot: `packages/etl/src/riot/types.ts` (`redactSensitiveText`). The regression tests use `RGAPI-test-api-key-12345`, which has no 8-character hex run, so they cannot detect this.
-- Suspected cause: the redaction order. Also, `redactPuuid()` only matches hex runs, while Riot PUUIDs are base64url-like strings, so it does not redact PUUIDs and mangles unrelated hex values.
-- Fix (commit/ticket): pending — redact key patterns before any other transformation, add a regression test with a UUID-shaped key, and rename or fix `redactPuuid`.
-
 ## Template (copy below the table when detailed)
 
 ```
@@ -127,6 +116,18 @@ No new bugs were identified while revising T-013 patch-window and rank-known-cou
 ```
 
 ## Fixed
+
+### B-010 — API key redaction leaks most of a real `RGAPI-<uuid>` key — FIXED
+
+- Severity / Area (engine|etl|web|desktop|vision|docs): S2 / etl (security)
+- Steps to reproduce: `new RiotApiError('x', 400, 'https://euw1.api.riotgames.com/x', 'Invalid request: RGAPI-1a2b3c4d-1234-5678-9abc-def012345678')`, then inspect `message` and `responseBody`.
+- Expected / Actual:
+  - Expected: the whole key is replaced by `[REDACTED]`.
+  - Actual: `redactSensitiveText()` first runs `redactPuuid()`, which truncates every run of 8+ hex characters and appends `…`. The key regex `/RGAPI-[A-Za-z0-9_-]+/` then stops at the inserted `…`, so the result is `[REDACTED]…-1234-5678-9abc-def01234…`: 20 of the 32 hex characters of the key leak. The 401/403 path (`redactPuuid(bodyText)` in `client.ts`) has the same problem.
+- Environment (OS, Node version, patch): any; key format as in `.env.example` (`RGAPI-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`).
+- Logs / screenshot: `packages/etl/src/riot/types.ts` (`redactSensitiveText`). The regression tests use `RGAPI-test-api-key-12345`, which has no 8-character hex run, so they cannot detect this.
+- Suspected cause: the redaction order. Also, `redactPuuid()` only matched hex runs, while Riot PUUIDs are base64url-like strings, so it did not redact PUUIDs and mangled unrelated hex values.
+- Fix (commit/ticket): B-010 — redact key patterns before any other transformation, renamed `redactPuuid` to `shortenPuuids` and fixed it to match whole 78-character base64url tokens (the verified PUUID length from fixture data), removed the redundant `redactPuuid()` call from the 401/403 path in `client.ts`, and added regression tests with a UUID-shaped key and a 78-character PUUID.
 
 ### B-006 — ETL review hardening gaps — FIXED
 

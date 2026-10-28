@@ -1,14 +1,16 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest';
 import { spawn } from 'node:child_process';
-import { readdirSync, readFileSync, unlinkSync, existsSync } from 'node:fs';
+import { readdirSync, readFileSync, unlinkSync, existsSync, rmSync, mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { migrate, getMigrationStatus, openDb } from './migrate';
 
-const TEST_DB_PATH = 'test-migration.db';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, '../../../../');
 const MIGRATIONS_DIR = join(__dirname, '../../migrations');
+const TEMP_DIR = mkdtempSync(join(tmpdir(), 'draftorb-migrate-'));
+const TEST_DB_PATH = join(TEMP_DIR, 'test-migration.db');
 
 /** Migration versions on disk, in application order. */
 function expectedVersions(): string[] {
@@ -48,6 +50,12 @@ describe('migration runner', () => {
   afterEach(() => {
     if (existsSync(TEST_DB_PATH)) {
       unlinkSync(TEST_DB_PATH);
+    }
+  });
+
+  afterAll(() => {
+    if (existsSync(TEMP_DIR)) {
+      rmSync(TEMP_DIR, { recursive: true, force: true });
     }
   });
 
@@ -276,6 +284,25 @@ describe('migration runner', () => {
         )
         .run(),
     ).toThrow(/UNIQUE/);
+    db.prepare(
+      `INSERT INTO lane_full (
+        my_champion_id, my_role, partner_id, opp1_id, opp2_id, rank_bucket, wins_w, games_w, games_w2
+      ) VALUES (1, 'TOP', NULL, 10, NULL, 'DIAMOND', 1, 1, 1)`,
+    ).run();
+    expect(() =>
+      db
+        .prepare(
+          `INSERT INTO lane_full (
+            my_champion_id, my_role, partner_id, opp1_id, opp2_id, rank_bucket, wins_w, games_w, games_w2
+          ) VALUES (1, 'TOP', NULL, 10, NULL, 'DIAMOND', 2, 2, 2)`,
+        )
+        .run(),
+    ).toThrow(/UNIQUE/);
+    db.prepare(
+      `INSERT INTO lane_full (
+        my_champion_id, my_role, partner_id, opp1_id, opp2_id, rank_bucket, wins_w, games_w, games_w2
+      ) VALUES (1, 'TOP', NULL, 10, 5, 'DIAMOND', 1, 1, 1)`,
+    ).run();
     expect(db.prepare('SELECT COUNT(*) AS count FROM _migrations').get()).toMatchObject({
       count: 5,
     });
@@ -430,7 +457,7 @@ describe('migration runner', () => {
   });
 
   it('should avoid double-applying the same migration when two processes run concurrently', async () => {
-    const dbPath = join(PROJECT_ROOT, 'tmp-concurrent-migration.db');
+    const dbPath = join(TEMP_DIR, 'tmp-concurrent-migration.db');
     if (existsSync(dbPath)) {
       unlinkSync(dbPath);
     }
@@ -476,10 +503,6 @@ describe('migration runner', () => {
     expect(status.pending).toBe(0);
     expect(status.versions).toEqual(expectedVersions());
     db.close();
-
-    if (existsSync(dbPath)) {
-      unlinkSync(dbPath);
-    }
   });
 
   it('should enable foreign keys by default', () => {

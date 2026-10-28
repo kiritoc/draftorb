@@ -4,14 +4,14 @@
 
 - Phase: 1 (Support / Diamond)
 - Current milestone: M0 Foundations (in progress, T-002.b TODO) and M1 ETL (in progress: ingestion done; enrichment, aggregation and export TODO) -> M2 Engine
-- Last updated: 2026-10-26 by GitHub Copilot (Claude Opus 5.5)
+- Last updated: 2026-10-28 by Devin
 
 ## Epic status
 
 | Epic           | Status      | Notes                                                                     |
 | -------------- | ----------- | ------------------------------------------------------------------------- |
 | E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b TODO                                           |
-| E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-013.c DONE; T-011.c, T-013.b REVIEW; T-014 ready |
+| E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.c DONE; T-013.b REVIEW; T-014 ready |
 | E2 Engine      | NOT STARTED | T-020 dependency-ready; needs D-020 accepted                              |
 | E3 Web MVP     | NOT STARTED |                                                                           |
 | E4 Runes       | NOT STARTED |                                                                           |
@@ -32,7 +32,7 @@ Fix B-010 (S2, API key redaction) and B-012 (cwd-dependent ETL paths) before the
 ## Open questions for the owner
 
 - Accept or revise the PROPOSED decisions D-008, D-011, D-017, D-018, D-020, D-021, D-022, D-023 and D-025. SPECS §5/§8 and T-016..T-018, T-020..T-023, T-027.a/T-027.b follow D-020..D-023.
-- Review T-011.c (migration 005, closed without running tests) and T-013.b (two acceptance criteria fail: B-010, B-014).
+- Review T-013.b (two acceptance criteria fail: B-010, B-014).
 - Node version policy (B-015): make Node 20 work or require Node 22.
 
 ---
@@ -40,6 +40,19 @@ Fix B-010 (S2, API key redaction) and B-012 (cwd-dependent ETL paths) before the
 ## Session log (newest first)
 
 The 2026-10-22 entries had no timestamps; their order was reconstructed from ticket dependencies on 2026-10-26.
+
+### 2026-10-28 — Devin — Ticket T-011.c (Migration 005 verification)
+
+- Done:
+  - Ran baseline `pnpm install --frozen-lockfile` and `pnpm check` (green, 13 test files, 104 tests passed).
+  - Added `lane_full` duplicate test to `migrate.test.ts`: insert row with `partner_id` NULL and `opp2_id` NULL, insert same key again expecting /UNIQUE/, then insert same row with `opp2_id = 5` expecting success (non-NULL keys stay distinct).
+  - Fixed test hygiene: moved test databases from repository root to `mkdtempSync(join(tmpdir(), 'draftorb-migrate-'))` for unique temp directory per test run, added `afterAll` to clean temp directory including WAL/SHM files.
+  - Ran `pnpm check` again (green, 13 test files, 104 tests passed).
+- Files touched: `packages/etl/src/db/migrate.test.ts`, `docs/TICKETS.md`, `docs/PROGRESS.md`
+- Tests: `pnpm check` — all green (13 test files, 104 tests passed)
+- State left: DONE
+- Next step: fix B-010 and B-012, then T-014.
+- Pitfalls / notes for next AI: none
 
 ### Template
 

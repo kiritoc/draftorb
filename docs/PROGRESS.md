@@ -46,7 +46,7 @@ The 2026-10-22 entries had no timestamps; their order was reconstructed from tic
 - Done:
   - Ran baseline `pnpm install --frozen-lockfile` and `pnpm check` (green, 13 test files, 104 tests passed).
   - Added `lane_full` duplicate test to `migrate.test.ts`: insert row with `partner_id` NULL and `opp2_id` NULL, insert same key again expecting /UNIQUE/, then insert same row with `opp2_id = 5` expecting success (non-NULL keys stay distinct).
-  - Fixed test hygiene: moved test databases from repository root to `mkdtempSync(join(tmpdir(), 'draftorb-migrate-'))`, added `mkdirSync` in `beforeEach`, added `afterAll` to clean temp directory including WAL/SHM files.
+  - Fixed test hygiene: moved test databases from repository root to `mkdtempSync(join(tmpdir(), 'draftorb-migrate-'))` for unique temp directory per test run, added `afterAll` to clean temp directory including WAL/SHM files.
   - Ran `pnpm check` again (green, 13 test files, 104 tests passed).
 - Files touched: `packages/etl/src/db/migrate.test.ts`, `docs/TICKETS.md`, `docs/PROGRESS.md`
 - Tests: `pnpm check` — all green (13 test files, 104 tests passed)

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest';
 import { spawn } from 'node:child_process';
-import { readdirSync, readFileSync, unlinkSync, existsSync, rmSync, mkdirSync } from 'node:fs';
+import { readdirSync, readFileSync, unlinkSync, existsSync, rmSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -9,7 +9,7 @@ import { migrate, getMigrationStatus, openDb } from './migrate';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, '../../../../');
 const MIGRATIONS_DIR = join(__dirname, '../../migrations');
-const TEMP_DIR = join(tmpdir(), 'draftorb-migrate-');
+const TEMP_DIR = mkdtempSync(join(tmpdir(), 'draftorb-migrate-'));
 const TEST_DB_PATH = join(TEMP_DIR, 'test-migration.db');
 
 /** Migration versions on disk, in application order. */
@@ -42,9 +42,6 @@ function collectProcessOutput(
 
 describe('migration runner', () => {
   beforeEach(() => {
-    if (!existsSync(TEMP_DIR)) {
-      mkdirSync(TEMP_DIR, { recursive: true });
-    }
     if (existsSync(TEST_DB_PATH)) {
       unlinkSync(TEST_DB_PATH);
     }

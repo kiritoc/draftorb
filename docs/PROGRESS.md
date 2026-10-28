@@ -8,16 +8,16 @@
 
 ## Epic status
 
-| Epic           | Status      | Notes                                                                     |
-| -------------- | ----------- | ------------------------------------------------------------------------- |
-| E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b TODO                                           |
-| E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.c DONE; T-013.b REVIEW; T-014 ready |
-| E2 Engine      | NOT STARTED | T-020 dependency-ready; needs D-020 accepted                              |
-| E3 Web MVP     | NOT STARTED |                                                                           |
-| E4 Runes       | NOT STARTED |                                                                           |
-| E5 Items       | NOT STARTED |                                                                           |
-| E6 Live        | NOT STARTED |                                                                           |
-| E7 Vision      | NOT STARTED |                                                                           |
+| Epic           | Status      | Notes                                                                   |
+| -------------- | ----------- | ----------------------------------------------------------------------- |
+| E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b TODO                                         |
+| E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.c DONE; T-013.b DONE; T-014 ready |
+| E2 Engine      | NOT STARTED | T-020 dependency-ready; needs D-020 accepted                            |
+| E3 Web MVP     | NOT STARTED |                                                                         |
+| E4 Runes       | NOT STARTED |                                                                         |
+| E5 Items       | NOT STARTED |                                                                         |
+| E6 Live        | NOT STARTED |                                                                         |
+| E7 Vision      | NOT STARTED |                                                                         |
 
 ## Data collection status
 
@@ -32,7 +32,7 @@ Fix B-012 done. Next: T-014 (participant enrichment, dependency-ready). T-002.b 
 ## Open questions for the owner
 
 - Accept or revise the PROPOSED decisions D-008, D-011, D-017, D-018, D-020, D-021, D-022, D-023 and D-025. SPECS §5/§8 and T-016..T-018, T-020..T-023, T-027.a/T-027.b follow D-020..D-023.
-- Review T-013.b (one acceptance criterion fails: B-014).
+- Review T-013.b (gaps fixed in B-010 and B-014).
 - Node version policy (B-015): make Node 20 work or require Node 22.
 
 ---
@@ -41,7 +41,18 @@ Fix B-012 done. Next: T-014 (participant enrichment, dependency-ready). T-002.b 
 
 The 2026-10-22 entries had no timestamps; their order was reconstructed from ticket dependencies on 2026-10-26.
 
-### 2026-10-28 — Devin — Bug B-012 (cwd-dependent ETL paths)
+### 2026-10-28 — Devin — Bug B-014 (CLI args validation)
+
+- Done:
+  - Created `packages/etl/src/cli-args.ts` with `EXIT`, `CliError`, `UsageError`, `parseStrictPositiveInt`, `parseTierList`, `parseQuotaList`.
+  - Wrote `cli-args.test.ts` first (19 tests) covering all cases; moved parsing from `cli.ts`.
+  - Wired `runMatches` and `runPlayers` to helpers; strict validation for numeric flags and tier names.
+  - B-014 FIXED; T-013.b gaps (B-010, B-014) resolved, T-013.b set to DONE.
+- Files touched: `packages/etl/src/cli-args.ts`, `packages/etl/src/cli-args.test.ts`, `packages/etl/src/cli.ts`, `docs/BUGS.md`, `docs/TICKETS.md`, `docs/PROGRESS.md`
+- Tests: `pnpm check` — all green (14 test files, 127 tests passed)
+- State left: FIXED
+- Next step: T-014
+- Pitfalls / notes for next AI: none
 
 - Done:
   - Routed default paths through `config/paths.ts`: added `defaultDataDir()`, `defaultPublicDataDir()`, `defaultManualDataDir()`.

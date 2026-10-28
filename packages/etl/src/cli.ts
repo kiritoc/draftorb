@@ -24,17 +24,18 @@ import { ingestMatches } from './matches';
 import { discoverPlayersByTier } from './players';
 import { PLATFORMS, RiotClient, RiotAuthError, type Platform } from './riot';
 import { formatCoverageReport, validateChampionTagsFile } from './tags';
+import {
+  CliError,
+  EXIT,
+  UsageError,
+  parseQuotaList,
+  parseStrictPositiveInt,
+  parseTierList,
+} from './cli-args';
 
 // ---------------------------------------------------------------------------
 // Constants & types
 // ---------------------------------------------------------------------------
-
-const EXIT = {
-  OK: 0,
-  FAILURE: 1,
-  USAGE: 2,
-  AUTH: 3,
-} as const;
 
 const DEFAULT_PLATFORM: Platform = 'euw1';
 
@@ -44,27 +45,6 @@ const DEFAULT_DB_FILENAME = 'DraftOrb.sqlite';
 
 /** Data Dragon versions look like "14.5.1" (or "14.5"). */
 const VERSION_PATTERN = /^\d+\.\d+(\.\d+)?$/;
-
-// ---------------------------------------------------------------------------
-// Errors & logging
-// ---------------------------------------------------------------------------
-
-class CliError extends Error {
-  readonly exitCode: number;
-
-  constructor(message: string, exitCode: number = EXIT.FAILURE) {
-    super(message);
-    this.name = 'CliError';
-    this.exitCode = exitCode;
-  }
-}
-
-class UsageError extends CliError {
-  constructor(message: string) {
-    super(message, EXIT.USAGE);
-    this.name = 'UsageError';
-  }
-}
 
 const log = {
   info: (message: string): void => console.log(`[ETL] ${message}`),
@@ -220,35 +200,8 @@ async function runPlayers(args: string[]): Promise<void> {
   const quotaValue = typeof values.quota === 'string' ? values.quota : undefined;
   const resetValue = values.reset === true;
   const platform = parsePlatform(platformArg ?? platformValue);
-  const tiers = tiersValue
-    ? tiersValue
-        .split(',')
-        .map((tier: string) => tier.trim())
-        .filter((tier: string) => tier.length > 0)
-    : undefined;
-  const quotas =
-    quotaValue === undefined
-      ? undefined
-      : Object.fromEntries(
-          quotaValue
-            .split(',')
-            .map((rawPair) => rawPair.trim())
-            .map((pair) => {
-              const [tier, limit, extra] = pair.split(':');
-              if (!tier || limit === undefined || extra !== undefined || !/^\d+$/.test(limit)) {
-                throw new UsageError(
-                  `Invalid quota entry "${pair}". Expected a nonnegative integer in a format like "EMERALD:200,DIAMOND:200".`,
-                );
-              }
-              const quota = Number(limit);
-              if (!Number.isSafeInteger(quota)) {
-                throw new UsageError(
-                  `Invalid quota entry "${pair}". Quotas must be safe nonnegative integers.`,
-                );
-              }
-              return [tier.toUpperCase(), quota];
-            }),
-        );
+  const tiers = typeof tiersValue === 'string' ? parseTierList(tiersValue) : undefined;
+  const quotas = typeof quotaValue === 'string' ? parseQuotaList(quotaValue) : undefined;
 
   log.info(`Discovering players for platform "${platform}"...`);
   const dbPath = resolveDbPath();
@@ -311,18 +264,22 @@ async function runMatches(args: string[]): Promise<void> {
       `Invalid --since-patch value "${sincePatch}". Expected a format like "16.19".`,
     );
   }
-  const parsePositiveInt = (value: unknown, flag: string): number | undefined => {
-    if (value === undefined) return undefined;
-    const parsed = Number.parseInt(String(value), 10);
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-      throw new UsageError(`Invalid ${flag} "${String(value)}". Expected a positive integer.`);
-    }
-    return parsed;
-  };
-  const matchesPerPlayer = parsePositiveInt(values['per-player'], '--per-player');
-  const playerLimit = parsePositiveInt(values.limit, '--limit');
-  const queueId = parsePositiveInt(values.queue, '--queue');
-  const minDurationSeconds = parsePositiveInt(values['min-duration'], '--min-duration');
+  const matchesPerPlayer = parseStrictPositiveInt(
+    typeof values['per-player'] === 'string' ? values['per-player'] : undefined,
+    '--per-player',
+  );
+  const playerLimit = parseStrictPositiveInt(
+    typeof values.limit === 'string' ? values.limit : undefined,
+    '--limit',
+  );
+  const queueId = parseStrictPositiveInt(
+    typeof values.queue === 'string' ? values.queue : undefined,
+    '--queue',
+  );
+  const minDurationSeconds = parseStrictPositiveInt(
+    typeof values['min-duration'] === 'string' ? values['min-duration'] : undefined,
+    '--min-duration',
+  );
   const resetValue = values.reset === true;
 
   log.info(

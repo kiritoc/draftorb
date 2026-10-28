@@ -21,12 +21,17 @@ export type Platform = (typeof PLATFORMS)[number];
 export const REGIONAL_ROUTINGS = ['europe', 'americas', 'asia', 'sea'] as const;
 export type RegionalRouting = (typeof REGIONAL_ROUTINGS)[number];
 
-export function redactPuuid(value: string): string {
-  return value.replace(/([0-9a-fA-F]{8,})(?=[^0-9a-fA-F]|$)/g, (match) => `${match.slice(0, 8)}…`);
+function shortenPuuids(value: string): string {
+  // Riot PUUIDs are 78-character base64url strings
+  return value.replace(
+    /(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{78}(?![A-Za-z0-9_-])/g,
+    (match) => `${match.slice(0, 8)}…`,
+  );
 }
 
 function redactSensitiveText(value: string): string {
-  return redactPuuid(value).replace(/RGAPI-[A-Za-z0-9_-]+/g, '[REDACTED]');
+  // Redact API keys first, then shorten PUUIDs
+  return shortenPuuids(value.replace(/RGAPI-[A-Za-z0-9_-]+/g, '[REDACTED]'));
 }
 
 function redactSensitiveValue(value: unknown): unknown {

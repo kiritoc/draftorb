@@ -84,7 +84,7 @@ Consequences:
 - Context: `packages/etl` implements Node.js scripts using `node:fs/promises`, `node:path`, `node:os`, `process`, and `fetch`. TypeScript compiler requires Node type definitions to type-check Node-specific packages.
 - Decision: Add `@types/node` (^26.x, MIT license, free) as a root devDependency and enable `"types": ["node"]` in `packages/etl/tsconfig.json`.
 - Alternatives: Ambient `declare` statements or relying on `DOM` lib (pollutes non-browser code with DOM types).
-- Consequences: Strict typing for Node.js APIs in the ETL package. Correction 2026-10-26: `packages/engine` and `packages/shared` do not set `"types": []`, so TypeScript still loads the root `@types/node` for them and Node globals type-check there; engine purity is enforced only by review until B-017 is fixed.
+- Consequences: Strict typing for Node.js APIs in the ETL package. Correction 2026-10-26: `packages/engine` and `packages/shared` did not set `"types": []`, so TypeScript still loaded the root `@types/node` for them and Node globals type-checked there; engine purity was enforced only by review until B-017. Since B-017, the engine and shared tsconfigs set `"types": []` and ESLint blocks Node imports and globals in the engine.
 
 ### D-015 — In-house rate limiter and Riot client without external runtime libraries — ACCEPTED
 

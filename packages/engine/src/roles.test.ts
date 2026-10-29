@@ -250,9 +250,81 @@ describe('inferRoles — partial team (< 5 slots)', () => {
     const result = expectAssignment(inferRoles(slots, roleProb));
 
     expect(result.slots.map((s) => s.role)).toEqual(['TOP', 'JUNGLE', 'MID']);
-    // Top pick for each is 0.9, second best is 0.05 -> confidence = 0.9 / (0.9 + 0.05)
     const [first] = result.slots;
-    expect(first?.confidence).toBeCloseTo(0.947, 2);
+    expect(first?.confidence).toBeGreaterThan(0.9);
+  });
+
+  it('does not let a flex champion steal a single-role champion role', () => {
+    const roleProb = makeRoleProb({
+      1: { TOP: 0.6, JUNGLE: 0.4 },
+      2: { TOP: 1.0 },
+    });
+
+    const slots: Slot[] = [{ championId: 1 }, { championId: 2 }];
+    const result = expectAssignment(inferRoles(slots, roleProb));
+
+    expect(result.slots.map((s) => s.role)).toEqual(['JUNGLE', 'TOP']);
+  });
+
+  it('returns null for duplicate fixed roles in a partial team', () => {
+    const roleProb = makeRoleProb({ 1: { TOP: 1.0 }, 2: { TOP: 1.0 } });
+    const slots: Slot[] = [
+      { championId: 1, role: 'TOP' },
+      { championId: 2, role: 'TOP' },
+    ];
+    expect(inferRoles(slots, roleProb)).toBeNull();
+  });
+});
+
+describe('inferRoles — fixed-role regressions', () => {
+  it('returns null for duplicate roles in an all-fixed team', () => {
+    const slots = makeSlots(['TOP', 'TOP', 'MID', 'ADC', 'SUPPORT']);
+    expect(inferRoles(slots, makeRoleProb({}))).toBeNull();
+  });
+
+  it('honors an off-role fixed pick in a full team', () => {
+    const roleProb = makeRoleProb({
+      1: { TOP: 1.0 },
+      2: { TOP: 0.9, JUNGLE: 0.1 },
+      3: { JUNGLE: 0.9, TOP: 0.1 },
+      4: { ADC: 1.0 },
+      5: { SUPPORT: 1.0 },
+    });
+    const slots = makeSlots(['MID', undefined, undefined, undefined, undefined]);
+    const result = expectAssignment(inferRoles(slots, roleProb));
+
+    expect(result.slots.map((s) => s.role)).toEqual(['MID', 'TOP', 'JUNGLE', 'ADC', 'SUPPORT']);
+  });
+
+  it('keeps confidence 1 for fixed and forced slots when others are ambiguous', () => {
+    const roleProb = makeRoleProb({
+      2: { JUNGLE: 0.5, MID: 0.5 },
+      3: { JUNGLE: 0.5, MID: 0.5 },
+      4: { ADC: 1.0 },
+      5: { SUPPORT: 1.0 },
+    });
+    const slots = makeSlots(['TOP', undefined, undefined, undefined, undefined]);
+    const result = expectAssignment(inferRoles(slots, roleProb));
+
+    expect(result.slots[0]?.confidence).toBe(1);
+    expect(result.slots[3]?.confidence).toBe(1);
+    expect(result.slots[1]?.confidence).toBeCloseTo(0.5);
+    expect(result.confidence).toBeCloseTo(0.5);
+  });
+
+  it('applies a custom eps floor', () => {
+    const roleProb = makeRoleProb({
+      1: { TOP: 0.9, JUNGLE: 0.1 },
+      2: { TOP: 0.2, JUNGLE: 0.8 },
+      3: { MID: 1.0 },
+      4: { ADC: 1.0 },
+      5: { SUPPORT: 1.0 },
+    });
+    const slots = makeSlots();
+    const lowFloor = expectAssignment(inferRoles(slots, roleProb));
+    const highFloor = expectAssignment(inferRoles(slots, roleProb, 0.5));
+
+    expect(highFloor.confidence).toBeLessThan(lowFloor.confidence);
   });
 
   it('respects fixed roles in a partial team', () => {

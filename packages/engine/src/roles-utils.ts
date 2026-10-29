@@ -54,6 +54,10 @@ export function assignmentIsViable(
     if (!slot || !assignedRole) {
       return false;
     }
+    // Fixed roles are user overrides: certain regardless of historical data.
+    if (slot.role !== undefined) {
+      continue;
+    }
     if (roleProbability(roleProb, slot.championId, assignedRole) === 0) {
       return false;
     }
@@ -69,6 +73,7 @@ export function assignmentLogProb(
   slots: ReadonlyArray<Slot>,
   roleProb: ChampionRoleProbabilities,
   assignment: Assignment,
+  eps: number = ROLE_INFERENCE_EPS,
 ): number {
   let logSum = 0;
   for (let i = 0; i < slots.length; i++) {
@@ -77,10 +82,11 @@ export function assignmentLogProb(
     if (!slot || !assignedRole) {
       return -Infinity;
     }
-    const p = Math.max(
-      roleProbability(roleProb, slot.championId, assignedRole),
-      ROLE_INFERENCE_EPS,
-    );
+    // Fixed roles have probability 1 (log 1 = 0).
+    if (slot.role !== undefined) {
+      continue;
+    }
+    const p = Math.max(roleProbability(roleProb, slot.championId, assignedRole), eps);
     logSum += Math.log(p);
   }
   return logSum;

@@ -8,8 +8,9 @@
 
 import type { ChampionRoleProbabilities, Role, Slot } from '@draftorb/shared';
 import type { Assignment } from './roles-permutations.js';
-import type { InferredSlot, RoleAssignment } from './roles-types.js';
-import { ALL_ROLES, ROLE_PERMUTATIONS } from './roles-permutations.js';
+import type { RoleAssignment } from './roles-types.js';
+import { ROLE_INFERENCE_EPS } from './config.js';
+import { ROLE_PERMUTATIONS } from './roles-permutations.js';
 import { assignmentIsViable, assignmentIsValid, assignmentLogProb } from './roles-utils.js';
 
 export type { Assignment } from './roles-permutations.js';
@@ -37,53 +38,67 @@ export type { InferredSlot, RoleAssignment } from './roles-types.js';
 export function inferRoles(
   slots: ReadonlyArray<Slot>,
   roleProb: ChampionRoleProbabilities,
+  eps: number = ROLE_INFERENCE_EPS,
 ): RoleAssignment | null {
-  if (slots.length === 0) {
+  if (slots.length === 0 || slots.length > 5) {
     return null;
   }
 
-  if (slots.length === 5) {
-    return inferRolesFull(slots, roleProb);
+  // Reject duplicate fixed roles (one champion per role).
+  const fixedRoles = new Set<Role>();
+  for (const s of slots) {
+    if (s.role !== undefined) {
+      if (fixedRoles.has(s.role)) {
+        return null;
+      }
+      fixedRoles.add(s.role);
+    }
   }
-  return inferRolesPartial(slots, roleProb);
+
+  return inferRolesExact(slots, roleProb, eps);
 }
 
 /**
- * Full 5-slot team: brute-force over all 120 role permutations.
- * Each slot maps to a position; fixed roles constrain which permutations are valid.
+ * Exact solver for 1–5 slots: enumerates role permutations (deduplicated on
+ * the first `slots.length` positions). Fixed slots are certain (prob 1).
+ * Per-slot confidence = marginal mass of the chosen role across viable
+ * assignments; team confidence = best assignment mass / total mass.
  */
-function inferRolesFull(
+function inferRolesExact(
   slots: ReadonlyArray<Slot>,
   roleProb: ChampionRoleProbabilities,
+  eps: number,
 ): RoleAssignment | null {
-  const allFixed = slots.every((s) => s.role !== undefined);
-  if (allFixed) {
-    return {
-      slots: slots.map((s) => ({
-        championId: s.championId,
-        role: s.role as Role,
-        confidence: 1,
-      })),
-      confidence: 1,
-    };
-  }
-
   let bestLogProb = -Infinity;
   let bestProb = 0;
   let totalProb = 0;
   let bestAssignment: Assignment | null = null;
-  let validCount = 0;
+  const slotMass: Map<Role, number>[] = slots.map(() => new Map<Role, number>());
+  const seen = new Set<string>();
 
   for (const perm of ROLE_PERMUTATIONS) {
+    // Partial teams only use the first `slots.length` positions; dedupe prefixes.
+    const key = perm.slice(0, slots.length).join(',');
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+
     if (!assignmentIsValid(slots, perm) || !assignmentIsViable(slots, roleProb, perm)) {
       continue;
     }
 
-    validCount++;
-    const logProb = assignmentLogProb(slots, roleProb, perm);
+    const logProb = assignmentLogProb(slots, roleProb, perm, eps);
     const prob = Math.exp(logProb);
 
     totalProb += prob;
+    for (let i = 0; i < slots.length; i++) {
+      const r = perm[i] as Role;
+      const mass = slotMass[i];
+      if (mass) {
+        mass.set(r, (mass.get(r) ?? 0) + prob);
+      }
+    }
     if (logProb > bestLogProb) {
       bestLogProb = logProb;
       bestProb = prob;
@@ -95,114 +110,20 @@ function inferRolesFull(
     return null;
   }
 
-  const confidence = validCount === 1 ? 1 : bestProb / totalProb;
-  const assignment = bestAssignment as Assignment;
+  const assignment = bestAssignment;
 
   return {
     slots: slots.map((s, i) => {
       const role = s.role ?? (assignment[i] as Role);
+      const confidence =
+        s.role !== undefined || totalProb <= 0 ? 1 : (slotMass[i]?.get(role) ?? 0) / totalProb;
       return {
         championId: s.championId,
         role,
         confidence,
       };
     }),
-    confidence,
-  };
-}
-
-/**
- * Partial team (< 5 slots): greedy assignment of each unknown slot to its
- * most-likely available role. Confidence for each inferred slot is
- * `bestProb / (bestProb + secondBestProb)` — the best role vs the
- * next-best available role.
- */
-function inferRolesPartial(
-  slots: ReadonlyArray<Slot>,
-  roleProb: ChampionRoleProbabilities,
-): RoleAssignment | null {
-  const usedRoles = new Set<Role>();
-
-  for (const s of slots) {
-    if (s.role !== undefined) {
-      usedRoles.add(s.role);
-    }
-  }
-
-  const result: InferredSlot[] = [];
-  let minConfidence = 1;
-  let anyInferred = false;
-
-  for (const s of slots) {
-    if (s.role !== undefined) {
-      result.push({
-        championId: s.championId,
-        role: s.role,
-        confidence: 1,
-      });
-      continue;
-    }
-
-    const probs = roleProb[String(s.championId)];
-    if (!probs) {
-      return null;
-    }
-
-    let bestRole: Role | null = null;
-    let bestProb = -1;
-    let secondBestProb = -1;
-
-    for (const r of ALL_ROLES) {
-      if (usedRoles.has(r)) {
-        continue;
-      }
-      const p = probs[r] ?? 0;
-      if (p > bestProb) {
-        secondBestProb = bestProb;
-        bestProb = p;
-        bestRole = r;
-      } else if (p > secondBestProb) {
-        secondBestProb = p;
-      }
-    }
-
-    if (bestRole === null) {
-      // All roles are claimed by fixed slots; pick the highest-probability role.
-      for (const r of ALL_ROLES) {
-        const p = probs[r] ?? 0;
-        if (p > bestProb) {
-          bestProb = p;
-          bestRole = r;
-        }
-      }
-      if (bestRole === null) {
-        return null;
-      }
-    } else {
-      usedRoles.add(bestRole);
-    }
-
-    anyInferred = true;
-    const slotConfidence = secondBestProb <= 0 ? 1 : bestProb / (bestProb + secondBestProb);
-
-    minConfidence = Math.min(minConfidence, slotConfidence);
-    result.push({
-      championId: s.championId,
-      role: bestRole,
-      confidence: slotConfidence,
-    });
-  }
-
-  if (!anyInferred) {
-    return {
-      slots: result,
-      confidence: 1,
-    };
-  }
-
-  return {
-    slots: result,
-    confidence: minConfidence,
+    confidence: totalProb > 0 ? bestProb / totalProb : 1,
   };
 }
 

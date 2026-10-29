@@ -2,9 +2,11 @@ import { z } from '@draftorb/shared';
 import { loadEnv } from './env';
 import { RiotRateLimiter } from './rate-limiter';
 import {
+  RiotChampionMastery,
   RiotLeagueEntries,
   RiotLeagueList,
   RiotMatchDto,
+  riotChampionMasterySchema,
   riotLeagueEntriesSchema,
   riotLeagueListSchema,
   riotMatchDtoSchema,
@@ -240,6 +242,29 @@ export class RiotClient {
   async getMasterLeague(platform: Platform, queue = 'RANKED_SOLO_5x5'): Promise<RiotLeagueList> {
     const url = `https://${platform}.api.riotgames.com/lol/league/v4/masterleagues/by-queue/${queue}`;
     return this.request(url, riotLeagueListSchema, 'league-v4.master');
+  }
+
+  async getLeagueEntriesByPuuid(platform: Platform, puuid: string): Promise<RiotLeagueEntries> {
+    const url = `https://${platform}.api.riotgames.com/lol/league/v4/entries/by-puuid/${puuid}`;
+    return this.request(url, riotLeagueEntriesSchema, 'league-v4.entriesByPuuid');
+  }
+
+  async getChampionMastery(
+    platform: Platform,
+    puuid: string,
+    championId: number,
+  ): Promise<RiotChampionMastery | null> {
+    const url = `https://${platform}.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/${puuid}/by-champion/${championId}`;
+    try {
+      return await this.request(
+        url,
+        riotChampionMasterySchema,
+        'champion-mastery-v4.byPuuidByChampion',
+      );
+    } catch (err) {
+      if (err instanceof RiotApiError && err.status === 404) return null;
+      throw err;
+    }
   }
 
   async getMatchIdsByPuuid(

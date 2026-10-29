@@ -8,7 +8,12 @@ import {
   type Platform,
   type RiotClient,
 } from './riot';
-import { extractParticipants, InvalidMatchParticipantsError } from './participants';
+import { enrichParticipants, type EnrichmentOptions } from './enrichment';
+import {
+  extractParticipants,
+  InvalidMatchParticipantsError,
+  type ParticipantRow,
+} from './participants';
 import {
   isCompleteStoredMatch,
   storedParticipantCount,
@@ -37,6 +42,8 @@ export interface MatchProcessContext {
   player: { puuid: string; rank_score: number };
   loadRanks: (puuids: readonly string[]) => Map<string, number>;
   base: { stored: number; duplicates: number; filtered: number; invalid: number };
+  onProgress?: (message: string) => void;
+  enrichmentOptions: EnrichmentOptions;
 }
 
 export interface MatchProcessResult {
@@ -60,6 +67,31 @@ export function isTransientMatchError(error: unknown): boolean {
     if (error.status === 0) return true;
   }
   return error instanceof Error && /network|timeout|fetch/i.test(error.message);
+}
+
+/**
+ * Runs enrichment for a stored match and marks it as enriched on success.
+ * Failures are logged but never abort the ingestion flow — the match
+ * stays `enriched = 0` so it will be retried on the next run.
+ */
+async function tryEnrich(
+  ctx: MatchProcessContext,
+  matchId: string,
+  participants: ParticipantRow[],
+): Promise<void> {
+  try {
+    const summary = await enrichParticipants(matchId, participants, ctx.enrichmentOptions);
+    if (summary.failures === 0) {
+      ctx.stmts.markEnriched.run(matchId);
+    }
+    ctx.onProgress?.(
+      `Enriched ${matchId}: ranks=${summary.ranksFetched} cached=${summary.ranksCached} ` +
+        `mastery=${summary.masteryFetched} reused=${summary.masteryCached}` +
+        (summary.failures > 0 ? ` failures=${summary.failures}` : ''),
+    );
+  } catch (err) {
+    ctx.onProgress?.(`enrichment failed for ${matchId}: ${String(err)}`);
+  }
 }
 
 /**
@@ -89,6 +121,13 @@ export async function processMatch(
       outcome = 'filtered';
     } else if (isCompleteStoredMatch(participantCount)) {
       outcome = 'duplicate';
+      const enrichedRow = ctx.stmts.isEnriched.get(matchId) as { enriched: number } | undefined;
+      if (!enrichedRow || !enrichedRow.enriched) {
+        const storedParticipants = ctx.stmts.loadParticipantsForEnrichment.all(
+          matchId,
+        ) as ParticipantRow[];
+        await tryEnrich(ctx, matchId, storedParticipants);
+      }
     } else {
       repairingIncompleteMatch = participantCount !== undefined;
       const raw = await ctx.client.getMatch(ctx.platform, matchId);
@@ -144,6 +183,11 @@ export async function processMatch(
         } else {
           run.stored += 1;
         }
+
+        if (outcome === 'stored') {
+          await tryEnrich(ctx, matchId, participants);
+        }
+
         didCountOutcome = true;
       } else {
         const persist = ctx.db.transaction(() => {

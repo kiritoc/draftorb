@@ -3,21 +3,21 @@
 ## Current status
 
 - Phase: 1 (Support / Diamond)
-- Current milestone: M0 Foundations (T-002.b DONE) and M1 ETL (in progress: ingestion done; enrichment, aggregation and export TODO) -> M2 Engine
+- Current milestone: M0 Foundations (T-002.b DONE) and M1 ETL (in progress: T-014 DONE; T-015..T-019 TODO) -> M2 Engine
 - Last updated: 2026-10-29 by Kilo
 
 ## Epic status
 
-| Epic           | Status      | Notes                                                                                |
-| -------------- | ----------- | ------------------------------------------------------------------------------------ |
-| E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b DONE                                                      |
-| E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e DONE; T-014 ready |
-| E2 Engine      | IN PROGRESS | T-020 DONE; T-021, T-022 next (deps T-002 DONE, D-020..D-023 accepted)               |
-| E3 Web MVP     | NOT STARTED |                                                                                      |
-| E4 Runes       | NOT STARTED |                                                                                      |
-| E5 Items       | NOT STARTED |                                                                                      |
-| E6 Live        | NOT STARTED |                                                                                      |
-| E7 Vision      | NOT STARTED |                                                                                      |
+| Epic           | Status      | Notes                                                                                             |
+| -------------- | ----------- | ------------------------------------------------------------------------------------------------- |
+| E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b DONE                                                                   |
+| E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e, T-014 DONE; T-015..T-019 TODO |
+| E2 Engine      | IN PROGRESS | T-020 DONE; T-021, T-022 next (deps T-002 DONE, D-020..D-023 accepted)                            |
+| E3 Web MVP     | NOT STARTED |                                                                                                   |
+| E4 Runes       | NOT STARTED |                                                                                                   |
+| E5 Items       | NOT STARTED |                                                                                                   |
+| E6 Live        | NOT STARTED |                                                                                                   |
+| E7 Vision      | NOT STARTED |                                                                                                   |
 
 ## Data collection status
 
@@ -27,7 +27,7 @@
 
 ## Next recommended ticket
 
-B-017 done (engine and shared `"types": []` plus ESLint purity guardrails in `eslint.config.mjs` with automated regression tests; T-020's engine-purity prerequisite is fully satisfied — the residual `tsc` gap caused by test files importing `vitest` is logged as B-021 and not fixed). B-022 (all Node built-ins blocked), B-023 (Date() call blocked) and B-024 (regression tests) also fixed. B-011 fixed (spec + T-002.b scope; implementation in T-002.b). Fix B-012 done. T-013.e done (typed schema-less `request()`, timeout/invalid-JSON regression tests, CLI + matches refactor below 300 lines; `pnpm check` 184 tests). **T-013.d done** (`pnpm etl status`, read-only parameterized counts and progress, empty & seeded database tests, CLI handling when database does not exist; `pnpm check` 153 tests). **D-008, D-011, D-017, D-018, D-020, D-021, D-022, D-023 accepted (2026-10-29); D-028 (formerly D-025, @types/... devDeps) renumbered and accepted.** SPECS §5/§8 are now normative. **T-002.b DONE** (shared schema parity); `packages/shared/src/index.ts` split by domain into `schemas/*.ts` (10 modules); rankBucketSchema (8 buckets), sparse role-prob with sum-to-1, Reason.with as ChampionId[], Reason.lowData, n_eff non-integer, lane reason type, DraftResult with insufficientData/poolRecommendations/poolUnavailable, championPoolSchema, manifest roles, all role-keyed export tuple schemas with games_w2, rune/build export schemas; 184 tests pass. Next: **T-021** (Role inference — engine is now unblocked with the T-020 rank kernel/config foundation; T-022 shrinkage builds on T-020's `n_eff`/equiv-count primitives; T-023 recommendation engine depends on T-020..T-022). T-014 (Participant enrichment) remains **data-blocked** (no Riot key, 0 games collected, no SQLite database under `data/`).
+B-017 done (engine and shared `"types": []` plus ESLint purity guardrails in `eslint.config.mjs` with automated regression tests; T-020's engine-purity prerequisite is fully satisfied — the residual `tsc` gap caused by test files importing `vitest` is logged as B-021 and not fixed). B-022 (all Node built-ins blocked), B-023 (Date() call blocked) and B-024 (regression tests) also fixed. B-011 fixed (spec + T-002.b scope; implementation in T-002.b). Fix B-012 done. T-013.e done (typed schema-less `request()`, timeout/invalid-JSON regression tests, CLI + matches refactor below 300 lines; `pnpm check` 184 tests). **T-013.d done** (`pnpm etl status`, read-only parameterized counts and progress, empty & seeded database tests, CLI handling when database does not exist; `pnpm check` 153 tests). **D-008, D-011, D-017, D-018, D-020, D-021, D-022, D-023 accepted (2026-10-29); D-028 (formerly D-025, @types/... devDeps) renumbered and accepted.** SPECS §5/§8 are now normative. **T-002.b DONE** (shared schema parity); `packages/shared/src/index.ts` split by domain into `schemas/*.ts` (10 modules); rankBucketSchema (8 buckets), sparse role-prob with sum-to-1, Reason.with as ChampionId[], Reason.lowData, n_eff non-integer, lane reason type, DraftResult with insufficientData/poolRecommendations/poolUnavailable, championPoolSchema, manifest roles, all role-keyed export tuple schemas with games_w2, rune/build export schemas; 184 tests pass. Next: **T-021** (Role inference — engine is now unblocked with the T-020 rank kernel/config foundation; T-022 shrinkage builds on T-020's `n_eff`/equiv-count primitives; T-023 recommendation engine depends on T-020..T-022). T-014 (Participant enrichment) remains **data-blocked** (no Riot key, 0 games collected, no SQLite database under `data/`). **T-014 implementation DONE** (2026-10-29): enrichment module, mastery endpoint, 22 tests; **T-015 (Aggregate role probabilities) ready**.
 
 ## Open questions for the owner
 
@@ -36,6 +36,25 @@ B-017 done (engine and shared `"types": []` plus ESLint purity guardrails in `es
 ---
 
 ## Session log (newest first)
+
+### 2026-10-29 — Kilo — Ticket T-014 (Participant enrichment)
+
+- Done:
+  - Created `packages/etl/src/enrichment.ts` with `enrichParticipants(matchId, participants, options)` and helpers (`enrichBotLaneRanks`, `enrichMasteryForParticipants`, `rankSummary`), plus the `EnrichmentOptions`/`EnrichmentSummary` interfaces. Ranks for the 4 bot-lane participants (ADC + SUPPORT on both teams) are fetched via `league-v4` by puuid and cached in the `players` table; unranked players cached with NULL `rank_score`. `avg_rank_score`/`rank_known_count` recomputed via `updateMatchRankStats` in `matches-store.ts`. `champion_games` computed as a count of games per (puuid, champion) in our data. `mastery_points` filled via champion-mastery-v4 (`client.getChampionMastery`) for `myRole` participants with `champion_games < minChampGames`, at most once per (puuid, champion) pair (reuses mastery from other match rows, stores 0 for never-played, caches to prevent re-fetch on re-run). Added `getChampionMastery` method to `RiotClient` with HTTP error handling and rate limiting (tested in `riot/client.test.ts`). Failure isolation: rank fetch failures and mastery fetch failures are caught per-participant and counted in `summary.failures` without aborting. Wired enrichment into the ingestion pipeline in `matches-process.ts` and `matches.ts` (via `enrichmentOptions` on `MatchProcessContext`). Phase 1 defaults to `myRole = 'SUPPORT'`.
+  - Created `packages/etl/src/enrichment.test.ts` (22 tests): 7 HTTP error-handling tests for `getChampionMastery` (404, 429 with Retry-After, 5xx with backoff, 401 no retry, 429 exhaustion, rate limiting, URL correctness); 22 enrichment tests across rank enrichment, champion games + mastery, match rank stats, and failure isolation.
+  - Added `RiotChampionMastery` type and `riotChampionMasterySchema` to the Riot schemas module and re-exported from `index.ts`.
+  - Added `updateMatchRankStats(db, matchId, avgRankScore, rankKnownCount)` to `matches-store.ts`.
+  - Updated `index.ts` to export `enrichParticipants`, `EnrichmentOptions`, `EnrichmentSummary`, `createRankLoader`, `rankSummary`, `updateMatchRankStats`, `riotChampionMasterySchema`, `RiotChampionMastery`.
+  - Updated `RIOT_API.md` to mark champion-mastery-v4 as implemented/verified.
+- Files touched: `packages/etl/src/enrichment.ts` (new), `packages/etl/src/enrichment.test.ts` (new), `packages/etl/src/matches-store.ts`, `packages/etl/src/matches-process.ts`, `packages/etl/src/matches.ts`, `packages/etl/src/riot/schemas.ts`, `packages/etl/src/riot/client.ts`, `packages/etl/src/riot/client.test.ts`, `packages/etl/src/index.ts`, `docs/RIOT_API.md`, `docs/TICKETS.md`, `docs/PROGRESS.md`.
+- Tests: `pnpm check` — green (20 test files, 270 tests passed).
+- State left: **DONE (T-014)**.
+- Next step: T-015 (Aggregate role probabilities, depends on T-014).
+- Pitfalls / notes for next AI: the enrichment runs outside the persistence
+  transaction (after `persistAcceptedMatch` returns); `RiotClient.getChampionMastery`
+  uses the champion-mastery-v4 endpoint; review fixes B-027 (unranked seed filtering),
+  B-028 (enriched flag + reprocess pass on completed cursors), B-029 (champion_games
+  refresh on all rows), B-030 (participant rank_score persistence) were applied.
 
 The 2026-10-22 entries had no timestamps; their order was reconstructed from ticket dependencies on 2026-10-26.
 

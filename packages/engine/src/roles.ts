@@ -9,7 +9,6 @@
 import type { ChampionRoleProbabilities, Role, Slot } from '@draftorb/shared';
 import type { Assignment } from './roles-permutations.js';
 import type { RoleAssignment } from './roles-types.js';
-import { ROLE_INFERENCE_EPS } from './config.js';
 import { ROLE_PERMUTATIONS } from './roles-permutations.js';
 import { assignmentIsViable, assignmentIsValid, assignmentLogProb } from './roles-utils.js';
 
@@ -40,7 +39,6 @@ export type { InferredSlot, RoleAssignment } from './roles-types.js';
 export function inferRoles(
   slots: ReadonlyArray<Slot>,
   roleProb: ChampionRoleProbabilities,
-  eps: number = ROLE_INFERENCE_EPS,
 ): RoleAssignment | null {
   if (slots.length === 0 || slots.length > 5) {
     return null;
@@ -57,7 +55,7 @@ export function inferRoles(
     }
   }
 
-  return inferRolesExact(slots, roleProb, eps);
+  return inferRolesExact(slots, roleProb);
 }
 
 /**
@@ -69,7 +67,6 @@ export function inferRoles(
 function inferRolesExact(
   slots: ReadonlyArray<Slot>,
   roleProb: ChampionRoleProbabilities,
-  eps: number,
 ): RoleAssignment | null {
   let bestLogProb = -Infinity;
   let bestProb = 0;
@@ -90,7 +87,7 @@ function inferRolesExact(
       continue;
     }
 
-    const logProb = assignmentLogProb(slots, roleProb, perm, eps);
+    const logProb = assignmentLogProb(slots, roleProb, perm);
     const prob = Math.exp(logProb);
 
     totalProb += prob;

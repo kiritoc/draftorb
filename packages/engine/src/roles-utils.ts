@@ -67,8 +67,9 @@ export function assignmentIsViable(
 
 /**
  * Compute the log-probability of an assignment (sum of log roleProb for each
- * slot). Only zero-probability pairs are replaced by `eps` to avoid -Infinity;
- * positive probabilities are used as-is.
+ * slot). Positive probabilities are used as-is. `eps` is only a defensive
+ * guard against log(0) for callers that skip `assignmentIsViable`; within
+ * `inferRoles` zero-probability roles are rejected first, so it never applies.
  */
 export function assignmentLogProb(
   slots: ReadonlyArray<Slot>,

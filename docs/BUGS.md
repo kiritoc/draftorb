@@ -50,6 +50,8 @@ No new bugs were identified while revising T-013 patch-window and rank-known-cou
 - Logs / screenshot: regression test added in `packages/engine/src/weighting.test.ts` — "returns the prior q when both evidence and prior strength are zero".
 - Fix (commit/ticket): T-020 — `shrink` now returns `q` when `gamesE + k <= 0` before dividing. No other bugs were identified during T-020 session.
 
+### B-016 — Bug ID B-007 is used for two different fixed bugs — FIXED
+
 - Severity / Area: S4 / docs
 - Steps to reproduce: search `docs/BUGS.md` for `### B-007`.
 - Expected / Actual:

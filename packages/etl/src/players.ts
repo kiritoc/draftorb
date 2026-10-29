@@ -114,7 +114,12 @@ async function getTierEntries(
   platform: Platform,
   tier: string,
   quota: number,
-): Promise<{ entries: RiotLeagueEntry[]; pageCount: number }> {
+): Promise<{
+  entries: RiotLeagueEntry[];
+  pageCount: number;
+  exhausted: boolean;
+  cappedHasRejected: boolean;
+}> {
   const normalizedTier = tier.toUpperCase();
   let pageCount = 0;
 
@@ -144,15 +149,18 @@ async function getTierEntries(
         freshBlood: typeof entry.freshBlood === 'boolean' ? entry.freshBlood : undefined,
         hotStreak: typeof entry.hotStreak === 'boolean' ? entry.hotStreak : undefined,
       }));
-    return { entries, pageCount: 1 };
+    return { entries, pageCount: 1, exhausted: true, cappedHasRejected: false };
   }
 
   const perDivision = Math.ceil(quota / DIVISION_ORDER.length);
   const entries: RiotLeagueEntry[] = [];
+  let divisionsExhausted = 0;
+  let cappedHasRejected = false;
   for (const division of DIVISION_ORDER) {
     const seen = new Set<string>();
     const divisionEntries: RiotLeagueEntry[] = [];
     let page = 1;
+    let divisionExhausted = false;
     while (seen.size < perDivision) {
       pageCount += 1;
       const pageEntries = await client.getLeagueEntries(
@@ -162,15 +170,29 @@ async function getTierEntries(
         division,
         page,
       );
-      if (pageEntries.length === 0) break;
+      if (pageEntries.length === 0) {
+        divisionExhausted = true;
+        break;
+      }
       for (const e of pageEntries) {
         if (e.puuid && !seen.has(e.puuid)) {
           seen.add(e.puuid);
           divisionEntries.push(e);
         }
       }
-      if (pageEntries.length < 100) break;
+      if (pageEntries.length < 100) {
+        divisionExhausted = true;
+        break;
+      }
       page += 1;
+    }
+    if (divisionExhausted) divisionsExhausted += 1;
+    else if (
+      divisionEntries
+        .slice(0, perDivision)
+        .some((e) => (e.tier ?? '').toUpperCase() !== normalizedTier)
+    ) {
+      cappedHasRejected = true;
     }
     entries.push(...divisionEntries.slice(0, perDivision));
   }
@@ -178,6 +200,8 @@ async function getTierEntries(
   return {
     entries: entries.filter((entry) => typeof entry.puuid === 'string').slice(0, quota),
     pageCount,
+    exhausted: divisionsExhausted > 0,
+    cappedHasRejected,
   };
 }
 
@@ -257,7 +281,12 @@ export async function discoverPlayersByTier(
         }
       }
 
-      const { entries, pageCount } = await getTierEntries(client, platform, normalizedTier, quota);
+      const { entries, pageCount, exhausted, cappedHasRejected } = await getTierEntries(
+        client,
+        platform,
+        normalizedTier,
+        quota,
+      );
       const rankedEntries = entries
         .filter((entry) => (entry.tier ?? '').toUpperCase() === normalizedTier)
         .slice(0, quota)
@@ -280,7 +309,7 @@ export async function discoverPlayersByTier(
         return list.length;
       });
       const stored = storeAll(rankedEntries);
-      const completed = rankedEntries.length >= quota || pageCount > 0;
+      const completed = rankedEntries.length >= quota || (exhausted && !cappedHasRejected);
 
       totalFetched += rankedEntries.length;
       totalStored += stored;

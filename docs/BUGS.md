@@ -9,8 +9,6 @@ Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATI
 | B-017 | S3  | engine | Node type definitions are visible to the pure engine and shared packages                 | OPEN   | GitHub Copilot project review 2026-10-26 | T-020   |
 | B-016 | S4  | docs   | Bug ID B-007 is used for two different fixed bugs                                        | OPEN   | GitHub Copilot project review 2026-10-26 | –       |
 | B-015 | S3  | etl    | Node 20 is documented as supported but better-sqlite3 segfaults on Node 20.19.0          | OPEN   | GitHub Copilot project review 2026-10-26 | T-001   |
-| B-014 | S3  | etl    | CLI accepts malformed numeric options and unknown tier names                             | FIXED  | GitHub Copilot project review 2026-10-26 | T-013.b |
-| B-013 | S4  | etl    | Player discovery marks every fetched tier as completed                                   | OPEN   | GitHub Copilot project review 2026-10-26 | T-012   |
 | B-011 | S2  | shared | Shared reason and rank-bucket schemas diverge from SPECS §3/§7 outside the T-002.b scope | OPEN   | GitHub Copilot project review 2026-10-26 | T-002.b |
 
 No new bugs were identified during the D-016 formula confirmation; player discovery remains within the current ETL scope.
@@ -49,28 +47,6 @@ No new bugs were identified while revising T-013 patch-window and rank-known-cou
 - Suspected cause: `better-sqlite3` prebuilt binary / N-API mismatch for this Node 20 build. AGENTS.md rule 4 requires this to be logged here; it was only recorded as a PROGRESS pitfall.
 - Fix (commit/ticket): pending — reproduce on Windows + Node 20 LTS; then either add Node 20 to the CI matrix and fix, or raise `engines` and the docs to Node 22 (DECISIONS.md entry).
 
-### B-014 — CLI accepts malformed numeric options and unknown tier names — FIXED
-
-- Severity / Area: S3 / etl
-- Steps to reproduce:
-  1. `pnpm etl matches --per-player=20abc --limit=1.5 --queue=420x`
-  2. `pnpm etl players --tiers=DIAMND --quota=DIAMND:100`
-- Expected / Actual: malformed ingestion options fail as usage errors (exit 2)
-- Environment (OS, Node version, patch): any.
-- Logs / screenshot: moved parsing to `packages/etl/src/cli-args.ts` with strict validation.
-- Suspected cause: only `--quota` values got strict validation in T-013.b; the `matches` numeric flags and the tier names were not covered.
-- Fix (commit/ticket): B-014 — added `cli-args.ts` with `parseStrictPositiveInt` (only `/^\d+$/`, safe integers > 0), `parseTierList` (upper-cased, deduplicated, validated against `rankSchema.options`), `parseQuotaList` (nonnegative integers, tier must be in `rankSchema.options`); all errors are `UsageError` naming the flag/bad value. Wired into `cli.ts`. Added tests in `cli-args.test.ts`. Smoke tests confirm exit code 2 before network calls. (T-013.b follow-up)
-
-### B-013 — Player discovery marks every fetched tier as completed — OPEN
-
-- Severity / Area: S4 / etl
-- Steps to reproduce: call `discoverPlayersByTier` for a tier whose pages return fewer players than its quota (for example an early empty page) and inspect `ingest_state`.
-- Expected / Actual: `completed` reflects whether the quota was reached or the league was exhausted, and `status: 'partial'` is reachable / `completed = rankedEntries.length >= quota || pageCount > 0` is always true because `pageCount` is at least 1 after any fetch (apex tiers always return 1), so `partial` is dead code and the tier is skipped for `maxAgeDays` (7) whatever was collected.
-- Environment (OS, Node version, patch): any.
-- Logs / screenshot: `packages/etl/src/players.ts` (`const completed = ...`).
-- Suspected cause: tautological condition; reported in the PR B review ("player-discovery completion is marked after any page") but never logged here.
-- Fix (commit/ticket): pending — define completion explicitly (quota reached or last page shorter than the page size) and test the partial path.
-
 ### B-011 — Shared reason and rank-bucket schemas diverge from SPECS §3/§7 outside the T-002.b scope — OPEN
 
 - Severity / Area: S2 / shared
@@ -99,6 +75,66 @@ No new bugs were identified while revising T-013 patch-window and rank-known-cou
 ```
 
 ## Fixed
+
+### B-018 — B-014 was still listed in the Open section and table while its fix was complete — FIXED
+
+- Severity / Area (engine|etl|web|desktop|vision|docs): S4 / docs
+- Steps to reproduce: search `docs/BUGS.md` for `### B-014` and for `B-014` in the Open table.
+- Expected / Actual:
+  - Expected: a FIXED bug has its detailed entry under `## Fixed` and is absent from the Open table and `## Open` detailed section.
+  - Actual: B-014 appeared in the Open table with status FIXED and retained a detailed entry under `## Open`, with no entry under `## Fixed`.
+- Environment (OS, Node version, patch): n/a.
+- Logs / screenshot: line 13 of the Open table and the detailed entry under `## Open`.
+- Suspected cause: B-014 was fixed in the 2026-10-28 session (commit `5160711`) but was never moved from `## Open` to `## Fixed`; only its status flag in the Open table and header was changed to FIXED.
+- Fix (commit/ticket): B-018 — removed B-014 from the Open table and the `## Open` detailed section, and moved its detailed entry into `## Fixed` at the top of the fixed list. Verified B-014 appears only once in BUGS.md (under `## Fixed`).
+
+### B-014 — CLI accepts malformed numeric options and unknown tier names — FIXED
+
+- Severity / Area (engine|etl|web|desktop|vision|docs): S3 / etl
+- Steps to reproduce:
+  1. `pnpm etl matches --per-player=20abc --limit=1.5 --queue=420x`
+  2. `pnpm etl players --tiers=DIAMND --quota=DIAMND:100`
+- Expected / Actual: malformed ingestion options fail as usage errors (exit 2)
+- Environment (OS, Node version, patch): any.
+- Logs / screenshot: moved parsing to `packages/etl/src/cli-args.ts` with strict validation.
+- Suspected cause: only `--quota` values got strict validation in T-013.b; the `matches` numeric flags and the tier names were not covered.
+- Fix (commit/ticket): B-014 — added `cli-args.ts` with `parseStrictPositiveInt` (only `/^\d+$/`, safe integers > 0), `parseTierList` (upper-cased, deduplicated, validated against `rankSchema.options`), `parseQuotaList` (nonnegative integers, tier must be in `rankSchema.options`); all errors are `UsageError` naming the flag/bad value. Wired into `cli.ts`. Added tests in `cli-args.test.ts`. Smoke tests confirm exit code 2 before network calls. (T-013.b follow-up)
+
+### B-020 — cappedHasRejected checks unselected entries, falsely blocking tier completion — FIXED
+
+- Severity / Area (engine|etl|web|desktop|vision|docs): S2 / etl
+- Steps to reproduce: call `discoverPlayersByTier` for an EMERALD tier (quota 250) where Division I page 1 returns 100 entries — the first 63 all `EMERALD` (valid) and the remaining 37 all `GOLD` (wrong tier); Divisions II–IV return empty pages. Inspect `tierResults[0].status` and whether the second run re-fetches.
+- Expected / Actual:
+  - Expected: the tier is `complete` with `fetched: 63` (all selected entries are valid EMERALD), and the second run skips the tier without re-fetching.
+  - Actual: `cappedHasRejected` scanned the entire `divisionEntries` array (all 100 entries) instead of only `divisionEntries.slice(0, perDivision)` (the 63 that are actually selected), so the 37 trailing GOLD entries set `cappedHasRejected = true`. This made `completed = false` → `status: 'partial'`, causing the tier to be re-fetched on every run despite collecting the full set of valid entries available.
+- Environment (OS, Node version, patch): any.
+- Logs / screenshot: `packages/etl/src/players.ts` — the `cappedHasRejected` check used `divisionEntries.some(...)` instead of `divisionEntries.slice(0, perDivision).some(...)`.
+- Suspected cause: the B-019 fix checked all collected entries per division rather than only the `perDivision` slice that feeds into the tier filter and the final `entries` array.
+- Fix (commit/ticket): B-020 — changed the `cappedHasRejected` check to `divisionEntries.slice(0, perDivision).some((e) => (e.tier ?? '').toUpperCase() !== normalizedTier)`, matching the entries that are actually retained. Regression test: mixed page with valid EMERALD entries followed by wrong-tier GOLD entries in a capped division, plus empty pages in the other divisions → `complete` with `fetched: 63` on the first run, `skipped` on the second run with no re-fetch. `pnpm check` — 14 test files, 133 tests passed.
+
+### B-019 — Wrong-tier entries in a capped division still mark the tier complete — FIXED
+
+- Severity / Area (engine|etl|web|desktop|vision|docs): S2 / etl
+- Steps to reproduce: call `discoverPlayersByTier` for an EMERALD tier (quota 250) where Division I page 1 returns 100 entries all labeled `GOLD` (wrong tier) and Divisions II–IV return empty pages; inspect `tierResults[0].status`.
+- Expected / Actual:
+  - Expected: the tier is `partial` because a capped division (stopped at `perDivision` after a full page) returned entries that were rejected by the tier filter, so more valid entries may exist on subsequent pages and the tier must be retried.
+  - Actual: `exhausted = divisionsExhausted > 0` was `true` (III–IV are exhausted), so `completed = rankedEntries.length >= quota || exhausted` was `true` even though `rankedEntries` was 0 after tier filtering. The tier was persisted as `complete` and skipped for `maxAgeDays` (7) despite collecting zero valid players.
+- Environment (OS, Node version, patch): any.
+- Logs / screenshot: `packages/etl/src/players.ts` — `getTierEntries` returned `exhausted: divisionsExhausted > 0` (line 190), and `discoverPlayersByTier` computed `completed = rankedEntries.length >= quota || exhausted` (line 298).
+- Suspected cause: the B-013 fix changed `exhausted` from `divisionsExhausted === DIVISION_ORDER.length` to `divisionsExhausted > 0` to avoid endless retries when some divisions are exhausted and others are capped, but this did not account for capped divisions that returned entries later rejected by the tier/PUUID filter.
+- Fix (commit/ticket): B-019 — `getTierEntries` now returns `cappedHasRejected: boolean` (true when any capped division—stopped at `perDivision`, not by an empty/short page—contributed entries later rejected by the tier filter or missing a puuid). `completed` becomes `rankedEntries.length >= quota || (exhausted && !cappedHasRejected)`, so a tier with rejected capped-division entries stays `partial` and is re-fetched on the next run. Regression test: wrong-tier full page in one division + empty pages in the rest → `partial` with `fetched: 0` on the first run, then `complete` with `fetched: 63` after the division returns right-tier entries. `pnpm check` — 14 test files, 132 tests passed.
+
+### B-013 — Player discovery marks every fetched tier as completed — FIXED
+
+- Severity / Area (engine|etl|web|desktop|vision|docs): S4 / etl
+- Steps to reproduce: call `discoverPlayersByTier` for a tier whose pages return fewer players than its quota (for example an early empty page) and inspect `ingest_state`.
+- Expected / Actual:
+  - Expected: `completed` reflects whether the quota was reached or the league was exhausted, and `status: 'partial'` is reachable.
+  - Actual: `completed = rankedEntries.length >= quota || pageCount > 0` is always true because `pageCount` is at least 1 after any fetch, so `partial` is dead code and the tier is skipped for `maxAgeDays` whatever was collected.
+- Environment (OS, Node version, patch): any.
+- Logs / screenshot: `packages/etl/src/players.ts` (`const completed = ...`).
+- Suspected cause: tautological condition; reported in the PR B review ("player-discovery completion is marked after any page") but never logged here.
+- Fix (commit/ticket): B-013 — `getTierEntries` now returns `{ entries, pageCount, exhausted }`; for apex tiers `exhausted` is always true, and for non-apex tiers `exhausted` is true when any division stopped on an empty or short page (the existing `< 100` rule) — meaning the league is exhausted for that division while other divisions are capped at `perDivision` and cannot contribute more. A tier is complete when its quota is reached OR any division is exhausted; otherwise it is `partial` and is re-fetched on the next run (not skipped for `maxAgeDays`). The `partial` path requires that all divisions received full pages (no exhaustion), so a tier whose pages return wrong-tier entries is still re-fetched. Added regression tests for quota reached (full pages, not exhausted), league exhausted below quota (short pages), all-divisions-capped with wrong tier → partial + re-fetch, and mixed exhausted/capped divisions → complete with no endless retries. `pnpm check` — 14 test files, 131 tests passed.
 
 ### B-012 — ETL file paths depend on the current working directory — FIXED
 
@@ -137,7 +173,7 @@ No new bugs were identified while revising T-013 patch-window and rank-known-cou
 - Suspected cause:
   - Error serialization, command argument validation, and database ownership were not consistently enforced at their boundaries.
 - Fix (commit/ticket): T-013.b — recursively redact Riot key patterns in error fields, reuse the shared platform list, make ingestion argument parsing strict, validate quotas completely, isolate transient ID-listing failures, and close only internally owned SQLite connections in `finally`. Updated the documented schema-error policy and ignore coverage for raw ETL data.
-- Follow-up (2026-10-26): redaction is incomplete for real UUID-shaped keys (B-010), and some malformed `matches` and `players` options are still accepted (B-014).
+- Follow-up (2026-10-26): redaction is incomplete for real UUID-shaped keys (B-010). The malformed `matches` and `players` options issue was fixed as B-014.
 
 ### B-007 — Seed rank was excluded from rank reliability counts — FIXED
 

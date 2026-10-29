@@ -41,6 +41,58 @@ Fix B-012 done. Next: T-014 (participant enrichment, dependency-ready). T-002.b 
 
 The 2026-10-22 entries had no timestamps; their order was reconstructed from ticket dependencies on 2026-10-26.
 
+### 2026-10-29 — Devin — Bug B-020 (cappedHasRejected checks unselected entries)
+
+- Done:
+  - Wrote a regression test in `players.test.ts` first: EMERALD quota 250, Division I page 1 returns 100 entries (first 63 EMERALD, last 37 GOLD) + Divisions II–IV empty → first run should be `complete` with `fetched: 63`, second run should `skipped` with no re-fetch.
+  - Confirmed the test fails with the B-019 `cappedHasRejected` check scanning all `divisionEntries` (100 entries) instead of only `divisionEntries.slice(0, perDivision)` (63 entries): the 37 trailing GOLD entries set `cappedHasRejected = true`, yielding `partial` instead of `complete`.
+  - Fixed `packages/etl/src/players.ts`: changed the check to `divisionEntries.slice(0, perDivision).some((e) => (e.tier ?? '').toUpperCase() !== normalizedTier)`, so only the selected entries are evaluated.
+  - B-020 FIXED.
+- Files touched: `packages/etl/src/players.ts`, `packages/etl/src/players.test.ts`, `docs/BUGS.md`, `docs/PROGRESS.md`
+- Tests: `pnpm check` — all green (14 test files, 133 tests passed)
+- State left: FIXED
+- Next step: T-014 participant enrichment — blocked only by data collection (B-015 Node 20).
+- Pitfalls / notes for next AI: the B-019 `cappedHasRejected` guard must check only the slice that feeds into `entries`, not the full page. This mirrors the `entries.push(...divisionEntries.slice(0, perDivision))` selection logic.
+- Docs cleanup: resolved B-018 — moved B-014 from `## Open` (table + detailed entry) into `## Fixed` so it has a single entry, and updated the stale B-006 follow-up reference.
+
+### 2026-10-28 — Devin — Bug B-019 (wrong-tier entries in capped division mark tier complete)
+
+- Done:
+  - Wrote a regression test in `players.test.ts` first: EMERALD quota 250 with Division I returning 100 GOLD entries (wrong tier) + Divisions II–IV empty → first run `partial` with `fetched: 0`; second run (Division I returns EMERALD entries) → `complete` with `fetched: 63`.
+  - Confirmed the test fails with the current `exhausted: divisionsExhausted > 0` + `completed = rankedEntries.length >= quota || exhausted` (marks the tier `complete` despite 0 valid entries).
+  - Fixed `getTierEntries` (`packages/etl/src/players.ts`): returns `cappedHasRejected: boolean` — true when a capped division (stopped at `perDivision`, not by an empty/short page) contributed entries later rejected by the tier filter. Updated the return type and both return paths (apex tier returns `cappedHasRejected: false`).
+  - Updated `discoverPlayersByTier`: `completed = rankedEntries.length >= quota || (exhausted && !cappedHasRejected)`, so a tier with rejected capped-division entries stays `partial` and is re-fetched.
+  - B-019 FIXED.
+- Files touched: `packages/etl/src/players.ts`, `packages/etl/src/players.test.ts`, `docs/BUGS.md`, `docs/PROGRESS.md`
+- Tests: `pnpm check` — all green (14 test files, 132 tests passed)
+- State left: FIXED
+- Next step: T-014 (participant enrichment) — blocked only by data collection (B-015 Node 20, or wait for Node 22).
+- Pitfalls / notes for next AI: the `> 0` change from B-013 was too broad; the `cappedHasRejected` guard narrows it to only skip tiers where no capped division had rejected entries. Existing test (d) still passes because its capped division returns all-valid EMERALD entries (`cappedHasRejected = false`).
+
+### 2026-10-28 — Devin — Bug tracker cleanup (B-013 stale entry + B-018)
+
+- Done:
+  - Removed the stale `### B-013 — ... — OPEN` detailed entry from the `## Open` section in `docs/BUGS.md` (lines 63–71). B-013 is already fully documented as FIXED under `## Fixed` (line 102), with the fix details, tests, and commit/ticket reference. The Open table never listed B-013, so no table change was needed.
+  - Added B-018 to the Open table and its detailed entry: B-014 is FIXED (fix committed in the 2026-10-28 session) but is still listed in the Open table and retains its detailed entry under `## Open` instead of `## Fixed`. Per AGENTS.md rule 6, this was logged, not fixed (out of scope for this task).
+- Files touched: `docs/BUGS.md`, `docs/PROGRESS.md`
+- Tests: none (docs-only change); `pnpm check` — all green (14 test files, 131 tests passed).
+- State left: FIXED (B-013 stale entry removed; B-018 logged for future cleanup)
+- Next step: next contributor to handle B-018 by moving B-014 to `## Fixed` and out of the Open table.
+- Pitfalls / notes for next AI: none
+
+### 2026-10-28 — Devin — Bug B-013 (player discovery completion marker)
+
+- Done:
+  - Wrote 4 regression tests in `players.test.ts`: (a) quota reached on full pages → `complete`, (b) league exhausted below quota on short pages → `complete` with `fetched < quota`, (c) full pages whose `tier` differs from the requested tier → filtered out → `partial` and re-fetched on the next run, (d) some divisions exhausted (empty/short pages) + others capped at `perDivision` (full pages) → `complete` with no endless retries.
+  - Confirmed test (c) fails with the buggy `completed = rankedEntries.length >= quota || pageCount > 0` (always true because `pageCount >= 1`), and test (d) fails with `exhausted = divisionsExhausted === DIVISION_ORDER.length` (too strict — 3 of 4 exhausted divisions still yields `false`).
+  - Fixed `getTierEntries` to return `{ entries, pageCount, exhausted }`: apex tiers are always `exhausted: true`; non-apex tiers are `exhausted` when any division stopped on an empty or short page (keeping the existing `< 100` rule). Changed `completed` to `rankedEntries.length >= quota || exhausted`.
+  - B-013 FIXED.
+- Files touched: `packages/etl/src/players.ts`, `packages/etl/src/players.test.ts`, `docs/BUGS.md`, `docs/TICKETS.md`, `docs/PROGRESS.md`
+- Tests: `pnpm check` — all green (14 test files, 131 tests passed)
+- State left: FIXED
+- Next step: T-014 participant enrichment.
+- Pitfalls / notes for next AI: none
+
 ### 2026-10-28 — Devin — Bug B-014 (CLI args validation)
 
 - Done:

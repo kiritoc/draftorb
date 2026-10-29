@@ -6,11 +6,9 @@ Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATI
 
 | ID    | Sev | Area   | Title                                                                                    | Status | Found by/date                            | Ticket  |
 | ----- | --- | ------ | ---------------------------------------------------------------------------------------- | ------ | ---------------------------------------- | ------- |
-| B-018 | S4  | docs   | B-014 is still listed in the Open section and table while its fix is complete            | OPEN   | GitHub Copilot project review 2026-10-26 | –       |
 | B-017 | S3  | engine | Node type definitions are visible to the pure engine and shared packages                 | OPEN   | GitHub Copilot project review 2026-10-26 | T-020   |
 | B-016 | S4  | docs   | Bug ID B-007 is used for two different fixed bugs                                        | OPEN   | GitHub Copilot project review 2026-10-26 | –       |
 | B-015 | S3  | etl    | Node 20 is documented as supported but better-sqlite3 segfaults on Node 20.19.0          | OPEN   | GitHub Copilot project review 2026-10-26 | T-001   |
-| B-014 | S3  | etl    | CLI accepts malformed numeric options and unknown tier names                             | FIXED  | GitHub Copilot project review 2026-10-26 | T-013.b |
 | B-011 | S2  | shared | Shared reason and rank-bucket schemas diverge from SPECS §3/§7 outside the T-002.b scope | OPEN   | GitHub Copilot project review 2026-10-26 | T-002.b |
 
 No new bugs were identified during the D-016 formula confirmation; player discovery remains within the current ETL scope.
@@ -18,16 +16,6 @@ No new bugs were identified during the D-016 formula confirmation; player discov
 No new bugs were identified during T-013 (match ingestion); rejected match ids are tracked by design in `match_rejects`, not as bug candidates.
 
 No new bugs were identified while revising T-013 patch-window and rank-known-count behavior.
-
-### B-018 — B-014 still listed in Open section while its fix is complete — OPEN
-
-- Severity / Area: S4 / docs
-- Steps to reproduce: search `docs/BUGS.md` for `### B-014` and for `B-014` in the Open table.
-- Expected / Actual: a FIXED bug should have its detailed entry under `## Fixed` and be absent from the Open table and `## Open` detailed section / B-014 appears in the Open table with status FIXED and retains a detailed entry under `## Open` (header suffix "FIXED"), but has no entry under `## Fixed`.
-- Environment (OS, Node version, patch): n/a.
-- Logs / screenshot: line 12 of the Open table and line 51 (detailed entry).
-- Suspected cause: B-014 was fixed in the 2026-10-28 session (see PROGRESS.md session log) but was never moved from `## Open` to `## Fixed`; only its status flag in the Open table and header was changed to FIXED.
-- Fix (commit/ticket): pending — move B-014's detailed entry to the top of `## Fixed`, remove it from the Open table.
 
 ### B-017 — Node type definitions are visible to the pure engine and shared packages — OPEN
 
@@ -59,18 +47,6 @@ No new bugs were identified while revising T-013 patch-window and rank-known-cou
 - Suspected cause: `better-sqlite3` prebuilt binary / N-API mismatch for this Node 20 build. AGENTS.md rule 4 requires this to be logged here; it was only recorded as a PROGRESS pitfall.
 - Fix (commit/ticket): pending — reproduce on Windows + Node 20 LTS; then either add Node 20 to the CI matrix and fix, or raise `engines` and the docs to Node 22 (DECISIONS.md entry).
 
-### B-014 — CLI accepts malformed numeric options and unknown tier names — FIXED
-
-- Severity / Area: S3 / etl
-- Steps to reproduce:
-  1. `pnpm etl matches --per-player=20abc --limit=1.5 --queue=420x`
-  2. `pnpm etl players --tiers=DIAMND --quota=DIAMND:100`
-- Expected / Actual: malformed ingestion options fail as usage errors (exit 2)
-- Environment (OS, Node version, patch): any.
-- Logs / screenshot: moved parsing to `packages/etl/src/cli-args.ts` with strict validation.
-- Suspected cause: only `--quota` values got strict validation in T-013.b; the `matches` numeric flags and the tier names were not covered.
-- Fix (commit/ticket): B-014 — added `cli-args.ts` with `parseStrictPositiveInt` (only `/^\d+$/`, safe integers > 0), `parseTierList` (upper-cased, deduplicated, validated against `rankSchema.options`), `parseQuotaList` (nonnegative integers, tier must be in `rankSchema.options`); all errors are `UsageError` naming the flag/bad value. Wired into `cli.ts`. Added tests in `cli-args.test.ts`. Smoke tests confirm exit code 2 before network calls. (T-013.b follow-up)
-
 ### B-011 — Shared reason and rank-bucket schemas diverge from SPECS §3/§7 outside the T-002.b scope — OPEN
 
 - Severity / Area: S2 / shared
@@ -99,6 +75,30 @@ No new bugs were identified while revising T-013 patch-window and rank-known-cou
 ```
 
 ## Fixed
+
+### B-018 — B-014 was still listed in the Open section and table while its fix was complete — FIXED
+
+- Severity / Area (engine|etl|web|desktop|vision|docs): S4 / docs
+- Steps to reproduce: search `docs/BUGS.md` for `### B-014` and for `B-014` in the Open table.
+- Expected / Actual:
+  - Expected: a FIXED bug has its detailed entry under `## Fixed` and is absent from the Open table and `## Open` detailed section.
+  - Actual: B-014 appeared in the Open table with status FIXED and retained a detailed entry under `## Open`, with no entry under `## Fixed`.
+- Environment (OS, Node version, patch): n/a.
+- Logs / screenshot: line 13 of the Open table and the detailed entry under `## Open`.
+- Suspected cause: B-014 was fixed in the 2026-10-28 session (commit `5160711`) but was never moved from `## Open` to `## Fixed`; only its status flag in the Open table and header was changed to FIXED.
+- Fix (commit/ticket): B-018 — removed B-014 from the Open table and the `## Open` detailed section, and moved its detailed entry into `## Fixed` at the top of the fixed list. Verified B-014 appears only once in BUGS.md (under `## Fixed`).
+
+### B-014 — CLI accepts malformed numeric options and unknown tier names — FIXED
+
+- Severity / Area (engine|etl|web|desktop|vision|docs): S3 / etl
+- Steps to reproduce:
+  1. `pnpm etl matches --per-player=20abc --limit=1.5 --queue=420x`
+  2. `pnpm etl players --tiers=DIAMND --quota=DIAMND:100`
+- Expected / Actual: malformed ingestion options fail as usage errors (exit 2)
+- Environment (OS, Node version, patch): any.
+- Logs / screenshot: moved parsing to `packages/etl/src/cli-args.ts` with strict validation.
+- Suspected cause: only `--quota` values got strict validation in T-013.b; the `matches` numeric flags and the tier names were not covered.
+- Fix (commit/ticket): B-014 — added `cli-args.ts` with `parseStrictPositiveInt` (only `/^\d+$/`, safe integers > 0), `parseTierList` (upper-cased, deduplicated, validated against `rankSchema.options`), `parseQuotaList` (nonnegative integers, tier must be in `rankSchema.options`); all errors are `UsageError` naming the flag/bad value. Wired into `cli.ts`. Added tests in `cli-args.test.ts`. Smoke tests confirm exit code 2 before network calls. (T-013.b follow-up)
 
 ### B-020 — cappedHasRejected checks unselected entries, falsely blocking tier completion — FIXED
 
@@ -173,7 +173,7 @@ No new bugs were identified while revising T-013 patch-window and rank-known-cou
 - Suspected cause:
   - Error serialization, command argument validation, and database ownership were not consistently enforced at their boundaries.
 - Fix (commit/ticket): T-013.b — recursively redact Riot key patterns in error fields, reuse the shared platform list, make ingestion argument parsing strict, validate quotas completely, isolate transient ID-listing failures, and close only internally owned SQLite connections in `finally`. Updated the documented schema-error policy and ignore coverage for raw ETL data.
-- Follow-up (2026-10-26): redaction is incomplete for real UUID-shaped keys (B-010), and some malformed `matches` and `players` options are still accepted (B-014).
+- Follow-up (2026-10-26): redaction is incomplete for real UUID-shaped keys (B-010). The malformed `matches` and `players` options issue was fixed as B-014.
 
 ### B-007 — Seed rank was excluded from rank reliability counts — FIXED
 

@@ -53,6 +53,7 @@ The 2026-10-22 entries had no timestamps; their order was reconstructed from tic
 - State left: FIXED
 - Next step: T-014 participant enrichment — blocked only by data collection (B-015 Node 20).
 - Pitfalls / notes for next AI: the B-019 `cappedHasRejected` guard must check only the slice that feeds into `entries`, not the full page. This mirrors the `entries.push(...divisionEntries.slice(0, perDivision))` selection logic.
+- Docs cleanup: resolved B-018 — moved B-014 from `## Open` (table + detailed entry) into `## Fixed` so it has a single entry, and updated the stale B-006 follow-up reference.
 
 ### 2026-10-28 — Devin — Bug B-019 (wrong-tier entries in capped division mark tier complete)
 

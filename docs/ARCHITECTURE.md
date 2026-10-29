@@ -32,7 +32,7 @@ Status (2026-10-26): `packages/shared` and the ETL ingestion part of `packages/e
 
 ## Stack
 
-Node 22 (CI; Node 20 is the declared minimum, see B-015), pnpm, TypeScript strict, Vite, React, Tailwind, Zod, Vitest, ESLint+Prettier, better-sqlite3, Electron (phase 2), opencv.js / tesseract.js / onnxruntime (vision, phase 2).
+Node 22 (CI and minimum, enforced by `engines` and CI matrix; Node 20 unsupported — see B-015), pnpm, TypeScript strict, Vite, React, Tailwind, Zod, Vitest, ESLint+Prettier, better-sqlite3, Electron (phase 2), opencv.js / tesseract.js / onnxruntime (vision, phase 2).
 
 ## Data flow (draft)
 

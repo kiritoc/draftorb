@@ -6,4 +6,5 @@
  * It takes data objects in and returns results out.
  */
 
-export { add } from './hello.js';
+export * from './config.js';
+export * from './weighting.js';

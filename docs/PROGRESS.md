@@ -50,9 +50,11 @@ B-017 done (engine and shared `"types": []` plus ESLint purity guardrails in `es
 - Tests: `pnpm check` — green (20 test files, 270 tests passed).
 - State left: **DONE (T-014)**.
 - Next step: T-015 (Aggregate role probabilities, depends on T-014).
-- Pitfalls / notes for next AI: the enrichment runs outside the persistence transaction (after `persistAcceptedMatch` returns); `RiotClient.getChampionMastery` uses the champion-mastery-v4 endpoint at `https://<platform>.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/<puuid>/by-champion/<championId>`.
-
-### 2026-10-29 — Kilo — Ticket T-020 (Rank weighting module)
+- Pitfalls / notes for next AI: the enrichment runs outside the persistence
+  transaction (after `persistAcceptedMatch` returns); `RiotClient.getChampionMastery`
+  uses the champion-mastery-v4 endpoint; review fixes B-027 (unranked seed filtering),
+  B-028 (enriched flag + reprocess pass on completed cursors), B-029 (champion_games
+  refresh on all rows), B-030 (participant rank_score persistence) were applied.
 
 The 2026-10-22 entries had no timestamps; their order was reconstructed from ticket dependencies on 2026-10-26.
 

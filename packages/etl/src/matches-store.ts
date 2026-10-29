@@ -159,6 +159,14 @@ export function updateMatchRankStats(
   );
 }
 
+/** Returns match ids that have been stored but not yet enriched. */
+export function listUnenrichedMatches(db: Database.Database, limit = 100): string[] {
+  const rows = db.prepare('SELECT match_id FROM matches WHERE enriched = 0 LIMIT ?').all(limit) as {
+    match_id: string;
+  }[];
+  return rows.map((row) => row.match_id);
+}
+
 /** Whether `next` expands the previously ingested lower-bound window. */
 export function windowWidened(previous?: string, next?: string): boolean {
   return previous !== undefined && (next === undefined || comparePatches(next, previous) < 0);

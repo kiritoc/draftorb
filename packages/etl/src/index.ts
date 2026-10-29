@@ -99,6 +99,7 @@ export {
   comparePatches,
   createRankLoader,
   evaluateMatch,
+  listUnenrichedMatches,
   patchFromGameVersion,
   rankSummary,
   updateMatchRankStats,

@@ -59,8 +59,12 @@ export function mockClient(ids: Record<string, string[]>, matches: Record<string
   return {
     getMatchIdsByPuuid: vi.fn(async (_platform: Platform, puuid: string) => ids[puuid] ?? []),
     getMatch: vi.fn(async (_platform: Platform, matchId: string) => matches[matchId]),
+    getLeagueEntriesByPuuid: vi.fn(async () => []),
+    getChampionMastery: vi.fn(async () => null),
   } as unknown as RiotClient & {
     getMatchIdsByPuuid: ReturnType<typeof vi.fn>;
     getMatch: ReturnType<typeof vi.fn>;
+    getLeagueEntriesByPuuid: ReturnType<typeof vi.fn>;
+    getChampionMastery: ReturnType<typeof vi.fn>;
   };
 }

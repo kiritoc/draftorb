@@ -187,7 +187,11 @@ async function getTierEntries(
       page += 1;
     }
     if (divisionExhausted) divisionsExhausted += 1;
-    else if (divisionEntries.some((e) => (e.tier ?? '').toUpperCase() !== normalizedTier)) {
+    else if (
+      divisionEntries
+        .slice(0, perDivision)
+        .some((e) => (e.tier ?? '').toUpperCase() !== normalizedTier)
+    ) {
       cappedHasRejected = true;
     }
     entries.push(...divisionEntries.slice(0, perDivision));

@@ -100,6 +100,18 @@ No new bugs were identified while revising T-013 patch-window and rank-known-cou
 
 ## Fixed
 
+### B-020 — cappedHasRejected checks unselected entries, falsely blocking tier completion — FIXED
+
+- Severity / Area (engine|etl|web|desktop|vision|docs): S2 / etl
+- Steps to reproduce: call `discoverPlayersByTier` for an EMERALD tier (quota 250) where Division I page 1 returns 100 entries — the first 63 all `EMERALD` (valid) and the remaining 37 all `GOLD` (wrong tier); Divisions II–IV return empty pages. Inspect `tierResults[0].status` and whether the second run re-fetches.
+- Expected / Actual:
+  - Expected: the tier is `complete` with `fetched: 63` (all selected entries are valid EMERALD), and the second run skips the tier without re-fetching.
+  - Actual: `cappedHasRejected` scanned the entire `divisionEntries` array (all 100 entries) instead of only `divisionEntries.slice(0, perDivision)` (the 63 that are actually selected), so the 37 trailing GOLD entries set `cappedHasRejected = true`. This made `completed = false` → `status: 'partial'`, causing the tier to be re-fetched on every run despite collecting the full set of valid entries available.
+- Environment (OS, Node version, patch): any.
+- Logs / screenshot: `packages/etl/src/players.ts` — the `cappedHasRejected` check used `divisionEntries.some(...)` instead of `divisionEntries.slice(0, perDivision).some(...)`.
+- Suspected cause: the B-019 fix checked all collected entries per division rather than only the `perDivision` slice that feeds into the tier filter and the final `entries` array.
+- Fix (commit/ticket): B-020 — changed the `cappedHasRejected` check to `divisionEntries.slice(0, perDivision).some((e) => (e.tier ?? '').toUpperCase() !== normalizedTier)`, matching the entries that are actually retained. Regression test: mixed page with valid EMERALD entries followed by wrong-tier GOLD entries in a capped division, plus empty pages in the other divisions → `complete` with `fetched: 63` on the first run, `skipped` on the second run with no re-fetch. `pnpm check` — 14 test files, 133 tests passed.
+
 ### B-019 — Wrong-tier entries in a capped division still mark the tier complete — FIXED
 
 - Severity / Area (engine|etl|web|desktop|vision|docs): S2 / etl

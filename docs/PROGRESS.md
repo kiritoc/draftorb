@@ -41,6 +41,19 @@ Fix B-012 done. Next: T-014 (participant enrichment, dependency-ready). T-002.b 
 
 The 2026-10-22 entries had no timestamps; their order was reconstructed from ticket dependencies on 2026-10-26.
 
+### 2026-10-29 — Devin — Bug B-020 (cappedHasRejected checks unselected entries)
+
+- Done:
+  - Wrote a regression test in `players.test.ts` first: EMERALD quota 250, Division I page 1 returns 100 entries (first 63 EMERALD, last 37 GOLD) + Divisions II–IV empty → first run should be `complete` with `fetched: 63`, second run should `skipped` with no re-fetch.
+  - Confirmed the test fails with the B-019 `cappedHasRejected` check scanning all `divisionEntries` (100 entries) instead of only `divisionEntries.slice(0, perDivision)` (63 entries): the 37 trailing GOLD entries set `cappedHasRejected = true`, yielding `partial` instead of `complete`.
+  - Fixed `packages/etl/src/players.ts`: changed the check to `divisionEntries.slice(0, perDivision).some((e) => (e.tier ?? '').toUpperCase() !== normalizedTier)`, so only the selected entries are evaluated.
+  - B-020 FIXED.
+- Files touched: `packages/etl/src/players.ts`, `packages/etl/src/players.test.ts`, `docs/BUGS.md`, `docs/PROGRESS.md`
+- Tests: `pnpm check` — all green (14 test files, 133 tests passed)
+- State left: FIXED
+- Next step: T-014 participant enrichment — blocked only by data collection (B-015 Node 20).
+- Pitfalls / notes for next AI: the B-019 `cappedHasRejected` guard must check only the slice that feeds into `entries`, not the full page. This mirrors the `entries.push(...divisionEntries.slice(0, perDivision))` selection logic.
+
 ### 2026-10-28 — Devin — Bug B-019 (wrong-tier entries in capped division mark tier complete)
 
 - Done:

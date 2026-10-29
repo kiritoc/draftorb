@@ -89,29 +89,13 @@ export class RiotClient {
     return this.rateLimiter;
   }
 
-  private async parseJsonBody(
-    response: Response,
+  async request<T>(url: string, schema: z.ZodType<T>, methodKey?: string): Promise<T>;
+  async request(url: string, schema?: undefined, methodKey?: string): Promise<unknown>;
+  async request(
     url: string,
-    retries5xx: number,
+    schema: z.ZodType<unknown> | undefined,
+    methodKey?: string,
   ): Promise<unknown> {
-    const text = await response.text();
-    try {
-      return JSON.parse(text);
-    } catch {
-      if (retries5xx >= this.max5xxRetries) {
-        throw new RiotApiError(
-          `Riot API response body was not valid JSON at ${url}.`,
-          response.status,
-          url,
-          text,
-        );
-      }
-      throw new RiotApiError(`Riot API response was not valid JSON at ${url}.`, 200, url, text);
-    }
-  }
-
-  async request<T>(url: string, schema?: z.ZodType<T>, methodKey?: string): Promise<T>;
-  async request(url: string, schema?: z.ZodType<unknown>, methodKey?: string): Promise<unknown> {
     let retries5xx = 0;
     let retries429 = 0;
 

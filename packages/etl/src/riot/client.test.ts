@@ -273,8 +273,9 @@ describe('RiotClient', () => {
         },
       });
 
-      const result = await client.request<{ success: boolean }>(
+      const result = await client.request(
         'https://euw1.api.riotgames.com/test',
+        z.object({ success: z.boolean() }),
       );
 
       expect(result).toEqual({ success: true });
@@ -328,7 +329,10 @@ describe('RiotClient', () => {
         },
       });
 
-      const result = await client.request<{ data: string }>('https://euw1.api.riotgames.com/test');
+      const result = await client.request(
+        'https://euw1.api.riotgames.com/test',
+        z.object({ data: z.string() }),
+      );
 
       expect(result).toEqual({ data: 'recovered' });
       expect(fetchCalls).toBe(3);
@@ -380,6 +384,94 @@ describe('RiotClient', () => {
         /status 404/,
       );
       expect(fetchCalls).toBe(1);
+    });
+
+    it('retries a fetch that only settles when its AbortSignal fires, then throws RiotApiError with status 0', async () => {
+      const sleepDurations: number[] = [];
+      const mockFetch = vi.fn().mockImplementation((_url, options) => {
+        // A fetch that never settles on its own: it only rejects once the
+        // AbortSignal (created via AbortSignal.timeout in the client) fires.
+        return new Promise<Response>((_, reject) => {
+          const signal = options?.signal;
+          if (!signal) {
+            return;
+          }
+          if (signal.aborted) {
+            reject(new Error('The operation was aborted'));
+            return;
+          }
+          signal.addEventListener('abort', () => reject(new Error('The operation was aborted')), {
+            once: true,
+          });
+        });
+      });
+
+      const client = new RiotClient({
+        apiKey: dummyApiKey,
+        fetchFn: mockFetch,
+        timeoutMs: 1,
+        max5xxRetries: 2,
+        initialBackoffMs: 100,
+        sleepFn: async (ms: number) => {
+          sleepDurations.push(ms);
+        },
+      });
+
+      const error = await client
+        .request('https://euw1.api.riotgames.com/test')
+        .catch((reason: unknown) => reason);
+
+      expect(error).toBeInstanceOf(RiotApiError);
+      if (!(error instanceof RiotApiError)) throw new Error('Expected RiotApiError');
+      expect(error.status).toBe(0);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(sleepDurations).toEqual([100]);
+    });
+
+    it('retries a 200 response with a non-JSON body with backoff, then throws RiotApiError once retries are exhausted', async () => {
+      const sleepDurations: number[] = [];
+      const mockFetch = vi.fn().mockResolvedValue(createMockResponse(200, 'not json'));
+
+      const client = new RiotClient({
+        apiKey: dummyApiKey,
+        fetchFn: mockFetch,
+        max5xxRetries: 2,
+        initialBackoffMs: 100,
+        sleepFn: async (ms: number) => {
+          sleepDurations.push(ms);
+        },
+      });
+
+      const error = await client
+        .request('https://euw1.api.riotgames.com/test')
+        .catch((reason: unknown) => reason);
+
+      expect(error).toBeInstanceOf(RiotApiError);
+      if (!(error instanceof RiotApiError)) throw new Error('Expected RiotApiError');
+      expect(error.status).toBe(200);
+      expect(error.responseBody).toBe('not json');
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(sleepDurations).toEqual([100]);
+    });
+
+    it('resolves when a non-JSON 200 body is followed by a valid JSON body', async () => {
+      const mockFetch = vi
+        .fn()
+        .mockResolvedValueOnce(createMockResponse(200, 'not json'))
+        .mockResolvedValueOnce(createMockResponse(200, { success: true }));
+
+      const client = new RiotClient({
+        apiKey: dummyApiKey,
+        fetchFn: mockFetch,
+        max5xxRetries: 5,
+        initialBackoffMs: 10,
+        sleepFn: async () => {},
+      });
+
+      const result = await client.request('https://euw1.api.riotgames.com/test');
+
+      expect(result).toEqual({ success: true });
+      expect(mockFetch).toHaveBeenCalledTimes(2);
     });
   });
 

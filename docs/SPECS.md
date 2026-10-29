@@ -1,6 +1,6 @@
 # SPECS
 
-Status of this doc: v0.2 (ranking model D-020..D-023) — edit via `DECISIONS.md` when changing behavior. Sections tied to ADRs D-020..D-023 are normative only once those ADRs are accepted.
+Status of this doc: v0.2 (ranking model D-020..D-023) — edit via `DECISIONS.md` when changing behavior.
 
 ## 1. Users & use cases
 

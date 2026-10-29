@@ -12,7 +12,7 @@
 | -------------- | ----------- | ------------------------------------------------------------------------------------ |
 | E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b TODO                                                      |
 | E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e DONE; T-014 ready |
-| E2 Engine      | NOT STARTED | T-020 dependency-ready; needs D-020 accepted                                         |
+| E2 Engine      | NOT STARTED | T-020 unblocked (D-020..D-023 accepted); implement T-020 then T-021..T-023           |
 | E3 Web MVP     | NOT STARTED |                                                                                      |
 | E4 Runes       | NOT STARTED |                                                                                      |
 | E5 Items       | NOT STARTED |                                                                                      |
@@ -27,11 +27,10 @@
 
 ## Next recommended ticket
 
-B-017 done (engine and shared `"types": []` plus ESLint purity guardrails in `eslint.config.mjs` with automated regression tests; T-020's engine-purity prerequisite is fully satisfied — the residual `tsc` gap caused by test files importing `vitest` is logged as B-021 and not fixed). B-022 (all Node built-ins blocked), B-023 (Date() call blocked) and B-024 (regression tests) also fixed. B-011 fixed (spec + T-002.b scope; implementation in T-002.b). Fix B-012 done. T-013.e done (typed schema-less `request()`, timeout/invalid-JSON regression tests, CLI + matches refactor below 300 lines; `pnpm check` 144 tests). **T-013.d done** (`pnpm etl status`, read-only parameterized counts and progress, empty & seeded database tests, CLI handling when database does not exist; `pnpm check` 153 tests). Next: T-002.b (Shared schema parity for D-020..D-023) or T-014 (Participant enrichment, data-blocked). T-020 is dependency-ready but implements PROPOSED D-020: start it after the owner accepts D-020..D-023.
+B-017 done (engine and shared `"types": []` plus ESLint purity guardrails in `eslint.config.mjs` with automated regression tests; T-020's engine-purity prerequisite is fully satisfied — the residual `tsc` gap caused by test files importing `vitest` is logged as B-021 and not fixed). B-022 (all Node built-ins blocked), B-023 (Date() call blocked) and B-024 (regression tests) also fixed. B-011 fixed (spec + T-002.b scope; implementation in T-002.b). Fix B-012 done. T-013.e done (typed schema-less `request()`, timeout/invalid-JSON regression tests, CLI + matches refactor below 300 lines; `pnpm check` 144 tests). **T-013.d done** (`pnpm etl status`, read-only parameterized counts and progress, empty & seeded database tests, CLI handling when database does not exist; `pnpm check` 153 tests). **D-008, D-011, D-017, D-018, D-020, D-021, D-022, D-023 accepted (2026-10-29); D-028 (formerly D-025, @types/... devDeps) renumbered and accepted.** SPECS §5/§8 are now normative. Next: **T-002.b** (Shared schema parity, now fully unblocked — D-020..D-023 accepted, D-027 locked; SPECS §5/§8 normative) or **T-020** (Rank weighting module, all blockers resolved) or **T-014** (Participant enrichment, data-blocked).
 
 ## Open questions for the owner
 
-- Accept or revise the PROPOSED decisions D-008, D-011, D-017, D-018, D-020, D-021, D-022, D-023 and D-025. SPECS §5/§8 and T-016..T-018, T-020..T-023, T-027.a/T-027.b follow D-020..D-023.
 - Review T-013.b (gaps fixed in B-010 and B-014).
 
 ---
@@ -39,6 +38,28 @@ B-017 done (engine and shared `"types": []` plus ESLint purity guardrails in `es
 ## Session log (newest first)
 
 The 2026-10-22 entries had no timestamps; their order was reconstructed from ticket dependencies on 2026-10-26.
+
+### 2026-10-29 — Antigravity — ADR review: accept D-008, D-011, D-017, D-018, D-020..D-023, D-028
+
+- Done:
+  - Read DECISIONS.md, TICKETS.md and cross-referenced code in `packages/` for every PROPOSED decision.
+  - Accepted D-008 (rank at collection time — unavoidable API limitation, already baked into all ETL code).
+  - Accepted D-011 (contract parity gate — prevents schema drift between packages).
+  - Accepted D-017 (`match_rejects` table and lower-bound patch filter — fully implemented and tested; critical for API budget).
+  - Accepted D-018 (incremental `startTime` cursors — fully implemented and tested; avoids full re-listing on every run).
+  - Accepted D-020 (role-relative influence matrix — role-generic architecture from day one; weights are prior-only and will be calibrated by D-023 backtest).
+  - Accepted D-021 (log-odds shrinkage back-off — mathematically bounds win rates; DB tables `lane_vs`/`lane_full`/`games_w2` already migrated in 004/005).
+  - Accepted D-022 (like-for-like item/rune comparison + expert definition — removes survival/state bias; schema columns already in migration 004).
+  - Accepted D-023 (offline backtest gate — prevents speculative tuning; pure engine ensures same code runs in browser and backtest).
+  - Renumbered the original D-025 (type-only `@types/...` devDeps) to D-028 to resolve the ID collision with the existing D-025 correction entry; accepted D-028.
+  - Updated D-025 correction entry: its internal reference changed from "D-025 (above)" to "D-028 (formerly D-025)".
+  - Removed the "Implements PROPOSED D-020: start after the owner accepts it" note from T-020 in TICKETS.md.
+  - Updated PROGRESS.md: E2 epic status, "Next recommended ticket", and "Open questions" (removed the D-008..D-025 acceptance question).
+- Files touched: `docs/DECISIONS.md`, `docs/TICKETS.md`, `docs/PROGRESS.md`
+- Tests: docs-only change; no code modified. `pnpm check` was green before this session (15 test files, 153 tests passed per last session entry).
+- State left: All PROPOSED decisions resolved. SPECS §5/§8 are normative. T-002.b (schema parity) and T-020 (rank weighting module) are now fully unblocked.
+- Next step: **T-002.b** (Shared schema parity — D-020..D-023 now accepted, D-027 locked, all spec questions resolved) or **T-020** (Rank weighting module in `packages/engine`).
+- Pitfalls / notes for next AI: D-028 was formerly D-025 — any code comment referencing "D-025 (type-only deps)" should be updated to D-028 if encountered. The second D-025 entry (the `@types/node` version correction) stays at D-025. SPECS §5/§8 are normative only once D-020..D-023 are accepted — they are now accepted.
 
 ### 2026-10-29 — Antigravity — Ticket T-013.d (ETL status command)
 

@@ -118,7 +118,7 @@ export async function ingestMatches(
 
     const allPlayers = db
       .prepare(
-        'SELECT puuid, rank_score FROM players WHERE platform = ? ORDER BY rank_score DESC, puuid',
+        'SELECT puuid, rank_score FROM players WHERE platform = ? AND rank_score IS NOT NULL ORDER BY rank_score DESC, puuid',
       )
       .all(platform) as PlayerRow[];
 

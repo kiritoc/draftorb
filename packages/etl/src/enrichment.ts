@@ -48,6 +48,8 @@ interface EnrichmentStatements {
   findExistingMastery: Database.Statement;
   getCurrentMastery: Database.Statement;
   updateParticipantEnrichment: Database.Statement;
+  updateChampionGamesAll: Database.Statement;
+  updateParticipantRank: Database.Statement;
 }
 
 function prepareStatements(db: Database.Database): EnrichmentStatements {
@@ -78,10 +80,17 @@ function prepareStatements(db: Database.Database): EnrichmentStatements {
           mastery_points = CASE WHEN @set_mastery = 1 THEN @mastery_points ELSE mastery_points END
       WHERE match_id = @match_id AND puuid = @puuid
     `),
+    updateChampionGamesAll: db.prepare(
+      'UPDATE participants SET champion_games = ? WHERE puuid = ? AND champion_id = ?',
+    ),
+    updateParticipantRank: db.prepare(
+      'UPDATE participants SET rank_score = ? WHERE match_id = ? AND puuid = ?',
+    ),
   };
 }
 
 async function enrichBotLaneRanks(
+  matchId: string,
   participants: ParticipantRow[],
   stmts: EnrichmentStatements,
   seedPuuid: string,
@@ -109,15 +118,17 @@ async function enrichBotLaneRanks(
       const soloEntry = entries.find((e) => e.queueType === 'RANKED_SOLO_5x5');
 
       if (soloEntry) {
+        const rankScore = playerRankScore(soloEntry.tier, soloEntry.rank);
         stmts.upsertPlayer.run({
           puuid: participant.puuid,
           platform,
           tier: soloEntry.tier,
           division: soloEntry.rank,
           lp: soloEntry.leaguePoints,
-          rank_score: playerRankScore(soloEntry.tier, soloEntry.rank),
+          rank_score: rankScore,
           updated_at: Date.now(),
         });
+        stmts.updateParticipantRank.run(rankScore, matchId, participant.puuid);
         result.ranksFetched += 1;
       } else {
         stmts.upsertPlayer.run({
@@ -129,6 +140,7 @@ async function enrichBotLaneRanks(
           rank_score: null,
           updated_at: Date.now(),
         });
+        stmts.updateParticipantRank.run(null, matchId, participant.puuid);
         result.ranksUnranked += 1;
         result.ranksFetched += 1;
       }
@@ -208,6 +220,17 @@ async function enrichMasteryForParticipants(
     });
   }
 
+  const seenPairs = new Set<string>();
+  for (const participant of participants) {
+    const pairKey = `${participant.puuid}:${participant.champion_id}`;
+    if (seenPairs.has(pairKey)) continue;
+    seenPairs.add(pairKey);
+    const refreshedCount = (
+      stmts.countChampionGames.get(participant.puuid, participant.champion_id) as { count: number }
+    ).count;
+    stmts.updateChampionGamesAll.run(refreshedCount, participant.puuid, participant.champion_id);
+  }
+
   return result;
 }
 
@@ -231,6 +254,7 @@ export async function enrichParticipants(
   const summary: EnrichmentSummary = { ...INITIAL_SUMMARY };
 
   const rankResult = await enrichBotLaneRanks(
+    matchId,
     participants,
     stmts,
     seedPuuid,

@@ -241,6 +241,7 @@ describe('migration runner', () => {
       '004_role_generic_aggregates',
       '005_lane_null_unique',
       '006_nullable_rank_score',
+      '007_matches_enriched',
     ]);
     expect(migrate(db)).toEqual([]);
 
@@ -308,7 +309,7 @@ describe('migration runner', () => {
       ) VALUES (1, 'TOP', NULL, 10, 5, 'DIAMOND', 1, 1, 1)`,
     ).run();
     expect(db.prepare('SELECT COUNT(*) AS count FROM _migrations').get()).toMatchObject({
-      count: 6,
+      count: 7,
     });
     db.close();
   });

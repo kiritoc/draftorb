@@ -39,6 +39,42 @@ No new bugs were identified while revising T-013 patch-window and rank-known-cou
 
 ## Fixed
 
+### B-030 — Enriched ranks not persisted to participant rows — FIXED
+
+- Severity / Area: S2 / etl
+- Steps to reproduce: run enrichment on a match with an unknown bot-lane participant whose rank is fetched via league-v4.
+- Expected / Actual:
+  - Expected: `participants.rank_score` for the fetched player is updated to the new rank_score.
+  - Actual: only `players.rank_score` was updated; the `participants` row stayed NULL, leaving match-level rank averages inconsistent with per-participant rank data.
+- Fix (commit/ticket): T-014 — added `updateParticipantRank` statement in `enrichment.ts`; `enrichBotLaneRanks` now writes the fetched rank_score (or NULL for unranked) into the corresponding participant row.
+
+### B-029 — Champion game counts not refreshed on earlier match rows — FIXED
+
+- Severity / Area: S3 / etl
+- Steps to reproduce: ingest two matches with the same (puuid, champion) pair.
+- Expected / Actual:
+  - Expected: both participant rows for that (puuid, champion_id) have `champion_games` = 2 after the second match is stored.
+  - Actual: the first row kept its stale count (1) because only the current match's row was updated.
+- Fix (commit/ticket): T-014 — added `updateChampionGamesAll` statement; after the mastery loop, `enrichMasteryForParticipants` refreshes `champion_games` on every row for each (puuid, champion_id) pair.
+
+### B-028 — Unranked players selected as ingestion seeds corrupt rank averages — FIXED
+
+- Severity / Area: S2 / etl
+- Steps to reproduce: cache an unranked bot-lane player (rank_score NULL in `players`), then run match ingestion.
+- Expected / Actual:
+  - Expected: unranked players are excluded from the seed list for match listing and their NULL score is never used in `rankSummary`.
+  - Actual: the seed query selected all players regardless of NULL rank_score; a NULL score flowing into `rankSummary` was treated as 0, skewing `avg_rank_score` and inflating `rank_known_count` (and listing matches for players outside the ranked pool).
+- Fix (commit/ticket): T-014 — the seed query in `matches.ts` now filters `rank_score IS NOT NULL`; `createRankLoader` (already in `matches-store.ts`) skips NULL entries when building the rank map, and `rankSummary` only counts known ranks.
+
+### B-027 — Transient enrichment failures become permanent gaps (no retry on duplicates) — FIXED
+
+- Severity / Area: S2 / etl
+- Steps to reproduce: store a match, then have a mastery or rank HTTP call fail transiently (429/5xx) during `enrichParticipants`.
+- Expected / Actual:
+  - Expected: the next ingestion run re-attempts enrichment for the stored match.
+  - Actual: `persistAcceptedMatch` committed the match and cursor before enrichment; on retry the match hit the duplicate branch which skipped enrichment entirely, so NULL `mastery_points`/`rank_score` were never recovered.
+- Fix (commit/ticket): T-014 — migration 007 adds an `enriched` flag to `matches` (default 0); `processMatch` runs enrichment after storing and marks the match enriched only when `summary.failures === 0`; the duplicate path checks `enriched` and re-runs enrichment (loading participants from storage) for any match that was not fully enriched.
+
 ### B-026 — Engine `shrink()` returns NaN for empty contexts with zero prior strength — FIXED
 
 - Severity / Area: S3 / engine

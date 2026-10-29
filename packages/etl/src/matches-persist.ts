@@ -11,6 +11,9 @@ export interface MatchPersistStatements {
   updateMatchRanks: Database.Statement;
   insertParticipant: Database.Statement;
   insertReject: Database.Statement;
+  isEnriched: Database.Statement;
+  markEnriched: Database.Statement;
+  loadParticipantsForEnrichment: Database.Statement;
 }
 
 /**
@@ -32,9 +35,9 @@ export function prepareMatchPersist(db: Database.Database): MatchPersistStatemen
     insertMatch: db.prepare(
       `INSERT OR IGNORE INTO matches
        (match_id, platform, patch, queue_id, duration, created_at, avg_rank_score,
-        rank_known_count, fetched_timeline)
-     VALUES (@match_id, @platform, @patch, @queue_id, @duration, @created_at, @avg_rank_score,
-        @rank_known_count, 0)`,
+        rank_known_count, fetched_timeline, enriched)
+      VALUES (@match_id, @platform, @patch, @queue_id, @duration, @created_at, @avg_rank_score,
+         @rank_known_count, 0, 0)`,
     ),
     updateMatchRanks: db.prepare(
       `UPDATE matches SET
@@ -44,7 +47,8 @@ export function prepareMatchPersist(db: Database.Database): MatchPersistStatemen
          duration = @duration,
          created_at = @created_at,
          avg_rank_score = @avg_rank_score,
-         rank_known_count = @rank_known_count
+         rank_known_count = @rank_known_count,
+         enriched = 0
        WHERE match_id = @match_id`,
     ),
     insertParticipant: db.prepare(
@@ -57,6 +61,14 @@ export function prepareMatchPersist(db: Database.Database): MatchPersistStatemen
           @mastery_points, @is_expert, @keystone, @primary_style, @sub_style, @perks_json,
           @items_json, @kills, @deaths, @assists
         )`,
+    ),
+    isEnriched: db.prepare('SELECT enriched FROM matches WHERE match_id = ?'),
+    markEnriched: db.prepare('UPDATE matches SET enriched = 1 WHERE match_id = ?'),
+    loadParticipantsForEnrichment: db.prepare(
+      `SELECT match_id, puuid, team_id, champion_id, role, win, rank_score, champion_games,
+              mastery_points, is_expert, keystone, primary_style, sub_style, perks_json,
+              items_json, kills, deaths, assists
+       FROM participants WHERE match_id = ?`,
     ),
     insertReject: db.prepare(
       `INSERT OR REPLACE INTO match_rejects (match_id, reason, patch, checked_at)

@@ -88,6 +88,9 @@ interface ReprocessOptions {
  * Runs independently of match-ID listing or cursor position so that
  * completed players with no new matches still recover.
  *
+ * Each match's own platform is used for API calls (not the invocation's
+ * platform), so cross-platform databases are handled correctly.
+ *
  * A seed is chosen from the match's own participants: prefer a bot-lane
  * participant with a known rank_score, then any participant with a known
  * rank_score. Matches with no ranked participant are skipped (they have
@@ -96,15 +99,14 @@ interface ReprocessOptions {
 async function reprocessUnenrichedMatches(
   db: Database.Database,
   client: RiotClient,
-  platform: Platform,
   opts: ReprocessOptions,
   log: (msg: string) => void,
 ): Promise<{ reprocessed: number; skipped: number }> {
-  const matchIds = listUnenrichedMatches(db, 100);
+  const pending = listUnenrichedMatches(db);
   let reprocessed = 0;
   let skipped = 0;
 
-  for (const matchId of matchIds) {
+  for (const { matchId, platform } of pending) {
     const participants = db
       .prepare('SELECT * FROM participants WHERE match_id = ?')
       .all(matchId) as ParticipantRow[];
@@ -356,7 +358,6 @@ export async function ingestMatches(
     void reprocessUnenrichedMatches(
       db,
       client,
-      platform,
       {
         myRole: options.myRole ?? 'SUPPORT',
         minChampGames: options.minChampGames ?? 30,

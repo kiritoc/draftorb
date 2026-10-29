@@ -159,12 +159,15 @@ export function updateMatchRankStats(
   );
 }
 
-/** Returns match ids that have been stored but not yet enriched. */
-export function listUnenrichedMatches(db: Database.Database, limit = 100): string[] {
-  const rows = db.prepare('SELECT match_id FROM matches WHERE enriched = 0 LIMIT ?').all(limit) as {
-    match_id: string;
-  }[];
-  return rows.map((row) => row.match_id);
+/** Returns matches that have been stored but not yet enriched, with their platform. */
+export function listUnenrichedMatches(
+  db: Database.Database,
+  limit = 1000,
+): { matchId: string; platform: Platform }[] {
+  const rows = db
+    .prepare('SELECT match_id, platform FROM matches WHERE enriched = 0 LIMIT ?')
+    .all(limit) as { match_id: string; platform: string }[];
+  return rows.map((row) => ({ matchId: row.match_id, platform: row.platform as Platform }));
 }
 
 /** Whether `next` expands the previously ingested lower-bound window. */

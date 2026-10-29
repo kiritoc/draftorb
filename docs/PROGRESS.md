@@ -12,7 +12,7 @@
 | -------------- | ----------- | ------------------------------------------------------------------------------------------------- |
 | E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b DONE                                                                   |
 | E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e, T-014 DONE; T-015..T-019 TODO |
-| E2 Engine      | IN PROGRESS | T-020 DONE; T-021 DONE; T-022 next (deps T-002 DONE, D-020..D-023 accepted)                       |
+| E2 Engine      | IN PROGRESS | T-020 DONE; T-021 DONE; T-022 DONE (deps T-002 DONE, D-020..D-023 accepted)                       |
 | E3 Web MVP     | NOT STARTED |                                                                                                   |
 | E4 Runes       | NOT STARTED |                                                                                                   |
 | E5 Items       | NOT STARTED |                                                                                                   |
@@ -36,6 +36,26 @@ B-017 done (engine and shared `"types": []` plus ESLint purity guardrails in `es
 ---
 
 ## Session log (newest first)
+
+### 2026-10-29 — Kilo — Ticket T-022 (Shrinkage + level mapping)
+
+- Done:
+  - **`packages/engine/src/levels.ts`** (new): pure, deterministic functions implementing SPECS §5 and D-021's layered shrinkage model on equivalent counts:
+    - `layerWinRate(winsE, gamesE, k, q)` — shrunk win rate `(winsE + k*q)/(gamesE + k)`, semantic wrapper around T-020's `shrink`.
+    - `layerTerm(pL, q, eps)` — log-odds correction `logit(pL) - logit(q)` with eps clamping.
+    - `pairTerm(winsE, gamesE, k, p0, eps)` — `logit((winsE + k*p0)/(gamesE + k)) - logit(p0)`; returns 0 when no pair data.
+    - `deltaPp(x, term)` — `100 * (sigmoid(x + term) - sigmoid(x))`.
+    - `mapDeltaPpToLevel(deltaPp, nEff)` — L1/L2/L3 thresholds (≥1.0/2.5/4.5 pp); L2/L3 require `n_eff >= 100`; negative levels (counters) are not gated by n_eff but require `n_eff >= 1` to avoid noise.
+    - `baselineGate(nEff, minGames)` — candidate passes the baseline gate only when `n_eff >= minGames`.
+    - `baselineLogOdds(winsE, gamesE, k0, eps)` — `logit((winsE + k0*0.5)/(gamesE + k0))`, delegates to `shrink` so zero-evidence/zero-prior returns `logit(0.5) = 0` instead of NaN.
+    - `clampedLogit` (internal) — logit with clamping to `[eps, 1-eps]`.
+  - **`packages/engine/src/levels.test.ts`** (new, 28 tests): `layerWinRate` (shrinks toward q, converges to raw rate, no-data fallback, k-in-raw-game-units toy proof); `layerTerm` (zero/positive/negative, shrinks toward q); `pairTerm` (formula, no-data returns 0, clamping); `deltaPp` (formula, zero-term, positivity); `mapDeltaPpToLevel` (L1/L2/L3 thresholds, n_eff>=100 gating for L2/L3, negative levels not gated, minGames floor); `baselineGate` (pass/fail); `baselineLogOdds` (formula, no-data, no NaN/infinity). Plus a non-support TOP lane-group test proving the full chain (baseline → pair → lane_vs, `lane_full` skipped) produces a finite in-range score.
+  - **`packages/engine/src/index.ts`** (updated): barrel re-exports `./levels.js`.
+- Files touched: `packages/engine/src/levels.ts` (new), `packages/engine/src/levels.test.ts` (new), `packages/engine/src/index.ts` (updated), `docs/TICKETS.md`, `docs/PROGRESS.md`.
+- Tests: `pnpm check` — green (22 test files, 320 tests passed; +28 new).
+- Bugs: none. The `baselineLogOdds(0, 0, 0, eps)` NaN edge case (zero prior strength + zero evidence) was caught by a test and fixed by delegating to `shrink` (which returns the prior q when `gamesE + k <= 0`), consistent with the B-026 fix in T-020.
+- State left: **DONE (T-022)**.
+- Next step: T-023 (Recommendation engine, depends on T-020..T-022).
 
 ### 2026-10-29 — Kilo — Ticket T-014 (Participant enrichment)
 

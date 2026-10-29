@@ -76,13 +76,13 @@ Consequences:
 
 - Context: Ticket T-003 and Epic E1 implement CLI commands (`pnpm etl static`, `migrate`, etc.) in TypeScript. Scripts must run seamlessly across Windows, macOS, and Linux without requiring a pre-build step in dev workflows.
 - Decision: Add `tsx` (devDependency in root, MIT license, free) to execute TypeScript CLI files directly via Node.
-- Alternatives: `ts-node` (slower, complex ESM loader issues), native `--experimental-strip-types` (requires Node 22.6+, not backwards compatible with Node 20 LTS baseline), pre-compiling with `tsc` before every command (slow DX, extra build friction for CLI commands).
+- Alternatives: `ts-node` (slower, complex ESM loader issues), native `--experimental-strip-types` (requires Node 22.6+, not backwards compatible with the Node 22 minimum baseline), pre-compiling with `tsc` before every command (slow DX, extra build friction for CLI commands).
 - Consequences: `pnpm etl <command>` invokes `tsx packages/etl/src/cli.ts <command>` seamlessly on all platforms.
 
 ### D-014 — @types/node devDependency for Node.js API typing — ACCEPTED
 
 - Context: `packages/etl` implements Node.js scripts using `node:fs/promises`, `node:path`, `node:os`, `process`, and `fetch`. TypeScript compiler requires Node type definitions to type-check Node-specific packages.
-- Decision: Add `@types/node` (^26.x, MIT license, free) as a root devDependency and enable `"types": ["node"]` in `packages/etl/tsconfig.json`.
+- Decision: Add `@types/node` (^22.x, MIT license, free) as a root devDependency and enable `"types": ["node"]` in `packages/etl/tsconfig.json`. The `@types/node` major version is aligned to the minimum supported Node version (22).
 - Alternatives: Ambient `declare` statements or relying on `DOM` lib (pollutes non-browser code with DOM types).
 - Consequences: Strict typing for Node.js APIs in the ETL package. Correction 2026-10-26: `packages/engine` and `packages/shared` did not set `"types": []`, so TypeScript still loaded the root `@types/node` for them and Node globals type-checked there; engine purity was enforced only by review until B-017. Since B-017, the engine and shared tsconfigs set `"types": []` and ESLint blocks Node imports and globals in the engine.
 
@@ -166,6 +166,21 @@ Consequences:
 - Decision: Keep `@types/better-sqlite3` (^9.6.0, `packages/etl`), `@types/react` and `@types/react-dom` (^19.1.2, `apps/web`) as devDependencies. All are MIT-licensed DefinitelyTyped packages, free, with no runtime code.
 - Alternatives: hand-written declarations — rejected, more maintenance for no benefit.
 - Consequences: no runtime impact. `@types/better-sqlite3` ^9.6.0 is older than `better-sqlite3` 13.0.3; check the typings when upgrading either package.
+
+### D-026 — Require Node 22 (B-015) — ACCEPTED
+
+- Context: B-015 reported that `better-sqlite3` 13.0.3 segfaults on Node 20.19.0. Investigation on Node 20.20.2 confirmed the segfault (exit code 139) when loading `better-sqlite3`'s native addon. The `better-sqlite3` 13.x release declares `engines.node: >=22`, and no 13.x version ships prebuilt binaries compatible with Node 20. The project's CI already runs only Node 22, and the owner's Node policy for this task is **B** (require Node 22).
+- Decision: Raise the minimum supported Node version to 22. Set `engines.node` to `>=22.0.0` in the root `package.json`; update AGENTS.md rule 2 to "Node.js 22+"; update docs/SETUP.md and docs/ARCHITECTURE.md accordingly; align `@types/node` to the Node 22 major (`^22.x`); keep CI on Node 22 only with `node-version: ${{ matrix.node-version }}`.
+- Alternatives:
+  - Make Node 20 work by pinning an older `better-sqlite3` to a version with Node 20 prebuilt binaries — rejected by policy [B]; the owner requires Node 22.
+  - Support both Node 20 and 22 — rejected by policy [B]; not pursued.
+- Consequences: Node 20 is no longer a supported runtime. Developers and CI must use Node 22. `better-sqlite3` 13.0.3 remains pinned in `packages/etl/package.json` (it already satisfies the Node 22 requirement). The `Node version policy` open question in PROGRESS.md is resolved.
+
+### D-025 — Correction: Node 22 minimum raises @types/node from ^26.x to ^22.x — ACCEPTED
+
+- Context: D-025 (above) referenced `@types/better-sqlite3`, `@types/react`, `@types/react-dom` but the root `@types/node` was `^26.6.5` (matching Node 26, not the then-declared Node 20 minimum). D-026 raised the minimum Node version to 22.
+- Decision: Correct the root `@types/node` devDependency from `^26.6.5` to `^22.18.5` to align with the Node 22 minimum. The `@types/better-sqlite3` version is unaffected.
+- Consequences: `@types/node` now matches the supported Node major version; no API surface changes for the ETL package.
 
 ### Template
 

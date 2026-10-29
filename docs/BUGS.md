@@ -8,7 +8,6 @@ Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATI
 | ----- | --- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ---------------------------------------- | ------- |
 | B-021 | S3  | engine | `types: []` in engine/shared tsconfigs is circumvented by test files importing vitest, so the type-checker still resolves Node globals in production files | OPEN   | B-017 fix verification 2026-10-28        | –       |
 | B-016 | S4  | docs   | Bug ID B-007 is used for two different fixed bugs                                                                                                          | OPEN   | GitHub Copilot project review 2026-10-26 | –       |
-| B-015 | S3  | etl    | Node 20 is documented as supported but better-sqlite3 segfaults on Node 20.19.0                                                                            | OPEN   | GitHub Copilot project review 2026-10-26 | T-001   |
 | B-011 | S2  | shared | Shared reason and rank-bucket schemas diverge from SPECS §3/§7 outside the T-002.b scope                                                                   | OPEN   | GitHub Copilot project review 2026-10-26 | T-002.b |
 
 No new bugs were identified during the D-016 formula confirmation; player discovery remains within the current ETL scope.
@@ -36,16 +35,6 @@ No new bugs were identified while revising T-013 patch-window and rank-known-cou
 - Logs / screenshot: n/a.
 - Suspected cause: two parallel branches (PR B and PR C) each picked the next free ID.
 - Fix (commit/ticket): pending — renumber one entry and update any commit or PROGRESS references.
-
-### B-015 — Node 20 is documented as supported but better-sqlite3 segfaults on Node 20.19.0 — OPEN
-
-- Severity / Area: S3 / etl
-- Steps to reproduce: on Node 20.19.0, run `pnpm test` (any test that opens SQLite).
-- Expected / Actual: AGENTS.md ("Node.js 20+"), SETUP.md ("Node.js 20 LTS+") and root `engines` (`>=20.0.0`) promise Node 20 support / PROGRESS (T-013 pitfalls) reports a segfault in `napi_module_register_by_symbol` while loading `better-sqlite3` on Node 20.19.0; Node 22 works. CI only runs Node 22, so the regression is invisible.
-- Environment (OS, Node version, patch): Devin VM, Node 20.19.0, `better-sqlite3` 13.0.3. Not yet reproduced on Windows.
-- Logs / screenshot: see the T-013 session log in PROGRESS.md.
-- Suspected cause: `better-sqlite3` prebuilt binary / N-API mismatch for this Node 20 build. AGENTS.md rule 4 requires this to be logged here; it was only recorded as a PROGRESS pitfall.
-- Fix (commit/ticket): pending — reproduce on Windows + Node 20 LTS; then either add Node 20 to the CI matrix and fix, or raise `engines` and the docs to Node 22 (DECISIONS.md entry).
 
 ### B-011 — Shared reason and rank-bucket schemas diverge from SPECS §3/§7 outside the T-002.b scope — OPEN
 
@@ -75,6 +64,16 @@ No new bugs were identified while revising T-013 patch-window and rank-known-cou
 ```
 
 ## Fixed
+
+### B-015 — Node 20 is documented as supported but better-sqlite3 segfaults on Node 20 — FIXED
+
+- Severity / Area: S3 / etl
+- Steps to reproduce: on Node 20, run `pnpm test` (any test that opens SQLite) or directly load `better-sqlite3`: `node -e "require('better-sqlite3')"` from the `packages/etl` directory.
+- Expected / Actual: before this fix, the project documents Node 20 as supported (AGENTS.md "Node.js 20+", SETUP.md "Node.js 20 LTS+", root `engines` `>=20.0.0`) / on Node 20.20.2, loading `better-sqlite3@13.0.3` segfaults with exit code 139 (`SIGSEGV`). The `better-sqlite3` 13.x release declares `engines.node: >=22` and ships no prebuilt binary compatible with Node 20. Node 22 works correctly: `pnpm check` passes all 141 tests.
+- Environment (OS, Node version, patch): macOS, Node 20.20.2 and Node 22.23.4, `better-sqlite3` 13.0.3.
+- Logs / screenshot: direct `node -e "require('better-sqlite3')"` from `packages/etl` exits with code 139 on Node 20; `pnpm check` passes on Node 22 (15 test files, 141 tests passed).
+- Suspected cause: `better-sqlite3` 13.x prebuilt binary / N-API mismatch for Node 20.
+- Fix (commit/ticket): B-015 — Applied the owner's Node policy [B] (require Node 22): raised `engines.node` to `>=22.0.0` in `package.json`; updated AGENTS.md rule 2 to "Node.js 22+"; updated docs/SETUP.md (Prerequisites, Troubleshooting) and docs/ARCHITECTURE.md (Stack); aligned `@types/node` from `^26.x` to `^22.x` to match the Node 22 minimum; kept CI on Node 22 only with `node-version: ${{ matrix.node-version }}`; recorded D-026 and the D-025 correction in DECISIONS.md. Verified `pnpm check` passes on Node 22. Node 20 is no longer a supported runtime.
 
 ### B-024 — Engine purity ESLint guard has no regression test — FIXED
 

@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-1. **Node.js 22** (https://nodejs.org) — the version CI tests; includes npm. Node 20 is the declared minimum (`engines`), but `better-sqlite3` crashed on Node 20.19.0 (B-015).
+1. **Node.js 22** (https://nodejs.org) — the version CI tests and the minimum supported version. Node 20 is no longer supported: `better-sqlite3` 13.x requires Node >=22 and segfaults on Node 20 (B-015).
 2. **pnpm**: in PowerShell `corepack enable`; Corepack then uses the pnpm version pinned in `package.json` (`packageManager`). Alternative: `npm i -g pnpm`.
 3. **Git**.
 4. (Optional) VS Code. No Python, no Java, no Docker, no compiler needed.
@@ -49,7 +49,7 @@ pnpm etl backtest              # offline validation (T-027.a, T-027.b)
 
 ## Troubleshooting
 
-- `better-sqlite3` install or load fails -> use Node 22 (prebuilt binaries; Node 20.19.0 crashed, B-015); log anything new in BUGS.md.
+- `better-sqlite3` install or load fails -> use Node 22 (prebuilt binaries; `better-sqlite3` 13.x requires Node >=22 and segfaults on Node 20, B-015); log anything new in BUGS.md.
 - 401/403 from Riot -> key expired.
 - 429 -> normal, the client waits for `Retry-After` and retries (up to 5 times).
 - PowerShell script policy errors -> use `pnpm` commands only, avoid `.ps1` scripts.

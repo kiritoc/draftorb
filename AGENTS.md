@@ -17,7 +17,7 @@ Project: **DraftOrb** — a free League of Legends tool that (1) recommends a ch
 ## Golden rules (never break)
 
 1. **100% free.** No paid API, no paid LLM at runtime, no paid hosting. No scraping third-party stats sites (u.gg, op.gg...).
-2. **Language: TypeScript (strict) everywhere.** Node.js 20+, pnpm workspaces.
+2. **Language: TypeScript (strict) everywhere.** Node.js 22+, pnpm workspaces.
 3. **`packages/engine` is pure**: no DOM, no Node APIs, no network, no file I/O, no randomness without a seed. It takes data objects in, returns results out. It must run in browser, Node and Electron.
 4. **Windows-first, minimal setup.** Only Node + pnpm required. No bash-only scripts (use Node scripts), use `path.join`, no symlinks, no native deps that need a compiler (prefer `better-sqlite3` prebuilt binaries; if it fails, log it in BUGS.md).
 5. **No secrets in git.** Riot key goes in `.env` (gitignored). `.env.example` stays up to date.

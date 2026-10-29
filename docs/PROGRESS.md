@@ -33,13 +33,32 @@ B-017 done (engine and shared `"types": []` plus ESLint purity guardrails in `es
 
 - Accept or revise the PROPOSED decisions D-008, D-011, D-017, D-018, D-020, D-021, D-022, D-023 and D-025. SPECS §5/§8 and T-016..T-018, T-020..T-023, T-027.a/T-027.b follow D-020..D-023.
 - Review T-013.b (gaps fixed in B-010 and B-014).
-- Node version policy (B-015): make Node 20 work or require Node 22.
 
 ---
 
 ## Session log (newest first)
 
 The 2026-10-22 entries had no timestamps; their order was reconstructed from ticket dependencies on 2026-10-26.
+
+### 2026-10-29 — Kilo — Bug B-015 (Node 20 vs better-sqlite3) — Applied Node 22 policy
+
+- Done:
+  - Investigated B-015: reproduced the segfault on Node 20.20.2 — `better-sqlite3@13.0.3` exits with code 139 (SIGSEGV) when loaded natively. The 13.x release declares `engines.node: >=22` and has no Node 20 prebuilt binary; no 13.x version works on Node 20.
+  - Applied the owner's Node policy [B] (require Node 22):
+    - Root `package.json`: `engines.node` changed from `>=20.0.0` to `>=22.0.0`.
+    - `AGENTS.md` rule 2: "Node.js 20+" → "Node.js 22+".
+    - `docs/SETUP.md`: Prerequisites and Troubleshooting updated to state Node 22 is the minimum and Node 20 is unsupported (B-015).
+    - `docs/ARCHITECTURE.md` (Stack): updated to "Node 22 (CI and minimum, enforced by `engines` and CI matrix...)".
+    - `@types/node` devDependency aligned from `^26.6.5` to `^22.18.5` (major version matches the minimum supported Node version); `packages/etl/tsconfig.json` already uses `"types": ["node"]` and is unchanged.
+    - CI matrix already uses `node-version: [22]` with `node-version: ${{ matrix.node-version }}` in the setup-node step — verified correct, no change needed.
+    - Added DECISIONS.md entries D-026 (Node 22 policy, ACCEPTED) and a D-025 correction note for the `@types/node` version change.
+  - B-015 moved to FIXED in `docs/BUGS.md` (removed from the Open table and Open detailed section; added detailed entry under `## Fixed`).
+  - Removed the "Node version policy (B-015)" open question from PROGRESS.md.
+- Files touched: `package.json`, `AGENTS.md`, `docs/SETUP.md`, `docs/ARCHITECTURE.md`, `docs/BUGS.md`, `docs/DECISIONS.md`, `docs/PROGRESS.md`, `.github/workflows/ci.yml` (verified already correct)
+- Tests: `pnpm check` on Node 22.23.4 — 15 test files, 141 tests passed. On Node 20.20.2, `better-sqlite3` segfaults (exit 139) — no longer a supported runtime.
+- State left: FIXED (B-015). Node 20 is unsupported; Node 22 is the minimum and only CI target.
+- Next step: T-014 (participant enrichment) — data collection still pending (no Riot key), but the Node 20 blocker is resolved.
+- Pitfalls / notes for next AI: Node 20 users must upgrade to Node 22. `better-sqlite3@13.0.3` is correctly pinned and does not need changing.
 
 ### 2026-10-29 — Kilo — Bugs B-022, B-023, B-024 (engine purity lint guards incomplete)
 

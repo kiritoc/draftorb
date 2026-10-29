@@ -237,7 +237,11 @@ describe('migration runner', () => {
       ) VALUES ('legacy-match', 'legacy-player', 1000, 3109, 'ITEM_PURCHASED', 0, 0)`,
     ).run();
 
-    expect(migrate(db)).toEqual(['004_role_generic_aggregates', '005_lane_null_unique']);
+    expect(migrate(db)).toEqual([
+      '004_role_generic_aggregates',
+      '005_lane_null_unique',
+      '006_nullable_rank_score',
+    ]);
     expect(migrate(db)).toEqual([]);
 
     const match = db
@@ -304,7 +308,7 @@ describe('migration runner', () => {
       ) VALUES (1, 'TOP', NULL, 10, 5, 'DIAMOND', 1, 1, 1)`,
     ).run();
     expect(db.prepare('SELECT COUNT(*) AS count FROM _migrations').get()).toMatchObject({
-      count: 5,
+      count: 6,
     });
     db.close();
   });

@@ -101,8 +101,8 @@ export function createRankLoader(
   return (puuids) => {
     const ranks = new Map<string, number>();
     for (const puuid of new Set(puuids)) {
-      const row = stmt.get(puuid) as { puuid: string; rank_score: number } | undefined;
-      if (row) ranks.set(row.puuid, row.rank_score);
+      const row = stmt.get(puuid) as { puuid: string; rank_score: number | null } | undefined;
+      if (row && row.rank_score !== null) ranks.set(row.puuid, row.rank_score);
     }
     return ranks;
   };
@@ -143,6 +143,20 @@ export function comparePatches(a: string, b: string): number {
   const [aMajor = 0, aMinor = 0] = a.split('.').map(Number);
   const [bMajor = 0, bMinor = 0] = b.split('.').map(Number);
   return aMajor - bMajor || aMinor - bMinor;
+}
+
+/** Updates a match's rank summary columns after enrichment. */
+export function updateMatchRankStats(
+  db: Database.Database,
+  matchId: string,
+  avgRankScore: number,
+  rankKnownCount: number,
+): void {
+  db.prepare('UPDATE matches SET avg_rank_score = ?, rank_known_count = ? WHERE match_id = ?').run(
+    avgRankScore,
+    rankKnownCount,
+    matchId,
+  );
 }
 
 /** Whether `next` expands the previously ingested lower-bound window. */

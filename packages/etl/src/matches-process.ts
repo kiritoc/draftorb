@@ -8,6 +8,7 @@ import {
   type Platform,
   type RiotClient,
 } from './riot';
+import { enrichParticipants, type EnrichmentOptions } from './enrichment';
 import { extractParticipants, InvalidMatchParticipantsError } from './participants';
 import {
   isCompleteStoredMatch,
@@ -37,6 +38,8 @@ export interface MatchProcessContext {
   player: { puuid: string; rank_score: number };
   loadRanks: (puuids: readonly string[]) => Map<string, number>;
   base: { stored: number; duplicates: number; filtered: number; invalid: number };
+  onProgress?: (message: string) => void;
+  enrichmentOptions: EnrichmentOptions;
 }
 
 export interface MatchProcessResult {
@@ -144,6 +147,20 @@ export async function processMatch(
         } else {
           run.stored += 1;
         }
+
+        if (outcome === 'stored') {
+          try {
+            const summary = await enrichParticipants(matchId, participants, ctx.enrichmentOptions);
+            ctx.onProgress?.(
+              `Enriched ${matchId}: ranks=${summary.ranksFetched} cached=${summary.ranksCached} ` +
+                `mastery=${summary.masteryFetched} reused=${summary.masteryCached}` +
+                (summary.failures > 0 ? ` failures=${summary.failures}` : ''),
+            );
+          } catch (err) {
+            ctx.onProgress?.(`enrichment failed for ${matchId}: ${String(err)}`);
+          }
+        }
+
         didCountOutcome = true;
       } else {
         const persist = ctx.db.transaction(() => {

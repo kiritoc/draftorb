@@ -1,6 +1,7 @@
 import type Database from 'better-sqlite3';
 
 import { RiotClient, RiotAuthError, type Platform } from './riot';
+import type { Role } from '@draftorb/shared';
 import { openDb, migrate } from './db';
 import { resolveDbPath } from './config/paths';
 import {
@@ -37,6 +38,8 @@ export interface MatchIngestionOptions {
   client?: RiotClient;
   reset?: boolean;
   onProgress?: (message: string) => void;
+  myRole?: Role;
+  minChampGames?: number;
 }
 
 export interface PlayerIngestionResult {
@@ -215,6 +218,17 @@ export async function ingestMatches(
         player: { puuid: player.puuid, rank_score: player.rank_score },
         loadRanks,
         base,
+        onProgress: log,
+        enrichmentOptions: {
+          db,
+          client,
+          platform,
+          myRole: options.myRole ?? 'SUPPORT',
+          seedPuuid: player.puuid,
+          seedRankScore: player.rank_score,
+          minChampGames: options.minChampGames ?? 30,
+          onProgress: log,
+        },
       };
 
       for (let i = cursor.processed; i < cursor.snapshot.length; i += 1) {

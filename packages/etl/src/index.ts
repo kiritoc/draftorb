@@ -49,6 +49,7 @@ export {
   parseAndApplyEnv,
   parseRateLimitHeader,
   platformToRegion,
+  riotChampionMasterySchema,
   riotLeagueEntriesSchema,
   riotLeagueEntrySchema,
   riotLeagueItemSchema,
@@ -64,6 +65,7 @@ export {
   type RateLimitWindow,
   type RateLimiterOptions,
   type RegionalRouting,
+  type RiotChampionMastery,
   type RiotClientOptions,
   type RiotLeagueEntries,
   type RiotLeagueEntry,
@@ -95,13 +97,18 @@ export {
 } from './participants';
 export {
   comparePatches,
+  createRankLoader,
   evaluateMatch,
   patchFromGameVersion,
+  rankSummary,
+  updateMatchRankStats,
   windowWidened,
   type MatchOutcome,
   type PlayerCursor,
   type RejectReason,
 } from './matches-store';
+
+export { enrichParticipants, type EnrichmentOptions, type EnrichmentSummary } from './enrichment';
 
 export {
   DEFAULT_PLAYER_QUOTAS,

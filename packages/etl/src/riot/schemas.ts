@@ -147,3 +147,15 @@ export const riotMatchDtoSchema = z
   })
   .passthrough();
 export type RiotMatchDto = z.infer<typeof riotMatchDtoSchema>;
+
+export const riotChampionMasterySchema = z
+  .object({
+    championId: z.number().int(),
+    championLevel: z.number().int().optional(),
+    championPoints: z.number().int(),
+    lastPlayTime: z.number().int().optional(),
+    chestGranted: z.boolean().optional(),
+    tokensEarned: z.number().int().optional(),
+  })
+  .passthrough();
+export type RiotChampionMastery = z.infer<typeof riotChampionMasterySchema>;

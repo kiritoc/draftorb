@@ -49,14 +49,14 @@ export function prepareMatchPersist(db: Database.Database): MatchPersistStatemen
     ),
     insertParticipant: db.prepare(
       `INSERT INTO participants (
-         match_id, puuid, team_id, champion_id, role, win, rank_score, champion_games,
-         mastery_points, is_expert, keystone, primary_style, sub_style, perks_json,
-         items_json, kills, deaths, assists
-       ) VALUES (
-         @match_id, @puuid, @team_id, @champion_id, @role, @win, @rank_score, @champion_games,
-         @mastery_points, @is_expert, @keystone, @primary_style, @sub_style, @perks_json,
-         @items_json, @kills, @deaths, @assists
-       )`,
+          match_id, puuid, team_id, champion_id, role, win, rank_score, champion_games,
+          mastery_points, is_expert, keystone, primary_style, sub_style, perks_json,
+          items_json, kills, deaths, assists
+        ) VALUES (
+          @match_id, @puuid, @team_id, @champion_id, @role, @win, @rank_score, @champion_games,
+          @mastery_points, @is_expert, @keystone, @primary_style, @sub_style, @perks_json,
+          @items_json, @kills, @deaths, @assists
+        )`,
     ),
     insertReject: db.prepare(
       `INSERT OR REPLACE INTO match_rejects (match_id, reason, patch, checked_at)

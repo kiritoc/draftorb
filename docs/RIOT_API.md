@@ -23,7 +23,7 @@ Always verify details at https://developer.riotgames.com (limits and endpoints m
 | Champion mastery (experience filter) | champion-mastery-v4 `champion-masteries/by-puuid/{puuid}/by-champion/{championId}` — expert fallback (D-022), one call per (puuid, champion) pair, cached in `participants.mastery_points` (T-014) |
 | Static data                          | Data Dragon: `https://ddragon.leagueoflegends.com/` (versions.json, champion.json, item.json, runesReforged.json) — no key needed                                                                  |
 
-Not implemented in `RiotClient` yet: champion-mastery-v4 (T-014). `getMatchTimeline` exists but is not used yet and returns an unvalidated payload (T-051).
+Not implemented in `RiotClient` yet: `getMatchTimeline` exists but is not used yet and returns an unvalidated payload (T-051). Champion mastery-v4 is implemented (`getChampionMastery`, T-014).
 
 ## Client requirements (T-010)
 

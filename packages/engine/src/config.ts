@@ -243,6 +243,14 @@ export const DEFAULT_CONFIG: RankWeightingConfig = rankWeightingConfigSchema.par
   },
 });
 
+// --- Role inference config (SPECS §4) ---
+
+/**
+ * Floor for probability in log-probability calculations to avoid -Infinity.
+ * Used in role inference when computing log roleProb for assignments.
+ */
+export const ROLE_INFERENCE_EPS = 1e-4;
+
 // --- Influence lookup ---
 
 export interface InfluenceOpts {

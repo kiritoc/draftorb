@@ -8,3 +8,5 @@
 
 export * from './config.js';
 export * from './weighting.js';
+export * from './roles.js';
+export * from './roles-types.js';

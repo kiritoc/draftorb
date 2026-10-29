@@ -4,12 +4,12 @@ Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATI
 
 ## Open
 
-| ID    | Sev | Area   | Title                                                                                    | Status | Found by/date                            | Ticket  |
-| ----- | --- | ------ | ---------------------------------------------------------------------------------------- | ------ | ---------------------------------------- | ------- |
-| B-017 | S3  | engine | Node type definitions are visible to the pure engine and shared packages                 | OPEN   | GitHub Copilot project review 2026-10-26 | T-020   |
-| B-016 | S4  | docs   | Bug ID B-007 is used for two different fixed bugs                                        | OPEN   | GitHub Copilot project review 2026-10-26 | –       |
-| B-015 | S3  | etl    | Node 20 is documented as supported but better-sqlite3 segfaults on Node 20.19.0          | OPEN   | GitHub Copilot project review 2026-10-26 | T-001   |
-| B-011 | S2  | shared | Shared reason and rank-bucket schemas diverge from SPECS §3/§7 outside the T-002.b scope | OPEN   | GitHub Copilot project review 2026-10-26 | T-002.b |
+| ID    | Sev | Area   | Title                                                                                                                                                      | Status | Found by/date                            | Ticket  |
+| ----- | --- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ---------------------------------------- | ------- |
+| B-021 | S3  | engine | `types: []` in engine/shared tsconfigs is circumvented by test files importing vitest, so the type-checker still resolves Node globals in production files | OPEN   | B-017 fix verification 2026-10-28        | –       |
+| B-016 | S4  | docs   | Bug ID B-007 is used for two different fixed bugs                                                                                                          | OPEN   | GitHub Copilot project review 2026-10-26 | –       |
+| B-015 | S3  | etl    | Node 20 is documented as supported but better-sqlite3 segfaults on Node 20.19.0                                                                            | OPEN   | GitHub Copilot project review 2026-10-26 | T-001   |
+| B-011 | S2  | shared | Shared reason and rank-bucket schemas diverge from SPECS §3/§7 outside the T-002.b scope                                                                   | OPEN   | GitHub Copilot project review 2026-10-26 | T-002.b |
 
 No new bugs were identified during the D-016 formula confirmation; player discovery remains within the current ETL scope.
 
@@ -17,15 +17,15 @@ No new bugs were identified during T-013 (match ingestion); rejected match ids a
 
 No new bugs were identified while revising T-013 patch-window and rank-known-count behavior.
 
-### B-017 — Node type definitions are visible to the pure engine and shared packages — OPEN
+### B-021 — `types: []` does not isolate the engine type-checker from Node globals — OPEN
 
 - Severity / Area: S3 / engine
-- Steps to reproduce: add `process.cwd()` or `Buffer.from('x')` to a file in `packages/engine/src`, then run `pnpm typecheck` and `pnpm lint`.
-- Expected / Actual: AGENTS.md rule 3 (no Node APIs in the engine) is enforced by tooling / the root devDependency `@types/node` is visible to every package because `packages/engine/tsconfig.json` and `packages/shared/tsconfig.json` do not set `"types": []`, and `eslint.config.mjs` has no `no-restricted-imports`, `no-restricted-globals` or `no-restricted-properties` rules for the engine (`node:*`, `Date.now`, `Math.random`). Such code is expected to type-check and lint cleanly (not run).
+- Steps to reproduce: add `export const probe = process.cwd();` to `packages/engine/src/hello.ts` (production code, no vitest import), then run `pnpm typecheck`.
+- Expected / Actual: with `"types": []` in `packages/engine/tsconfig.json`, `@types/node` is no longer auto-included by the `types` mechanism, so the type-checker is expected to reject `process` / Node globals in production files / `pnpm typecheck` still passes (exit 0): `@types/node` is loaded into the engine program because `packages/engine/src/hello.test.ts` imports `vitest`, and `vitest`'s type declarations import `node:vm`, which pulls in the whole `@types/node` package including the ambient `process`/`Buffer` globals. `types: []` only disables `@types` auto-inclusion, not type inclusion that arrives via a module-import chain. ESLint's `no-restricted-globals` does reject `process`, so `pnpm lint` fails as intended.
 - Environment (OS, Node version, patch): any.
-- Logs / screenshot: `node_modules/@types/node` exists at the repository root.
-- Suspected cause: D-014 assumed that `"types": ["node"]` in `packages/etl` keeps Node types out of the engine; TypeScript loads every visible `@types` package when `types` is not set.
-- Fix (commit/ticket): pending — set `"types": []` in the engine and shared tsconfigs and add ESLint restrictions for `packages/engine/**` before T-020.
+- Logs / screenshot: `pnpm exec tsc --noEmit -p packages/engine/tsconfig.json --listFiles` lists `node_modules/.../@types/node/globals.d.ts` (which declares `process`) and `vitest/dist/...` files; `pnpm typecheck` exits 0 with the probe; `pnpm lint` reports `no-restricted-globals` on `process`.
+- Suspected cause: test files live in the same `tsc` program as production code and import the vitest framework, whose types depend on `node:*` modules.
+- Fix (commit/ticket): not fixed in this session (out of B-017 scope per AGENTS rule 6). Candidate future fix: exclude `**/*.test.ts` from the engine and shared `tsconfig.json` `include` (or add a dedicated test type-check), so production source is type-checked without the framework's Node dependency. Not applied because it would remove type-checking coverage of test files from `pnpm check` and is a behavioral change outside B-017's prescribed fix.
 
 ### B-016 — Bug ID B-007 is used for two different fixed bugs — OPEN
 
@@ -75,6 +75,52 @@ No new bugs were identified while revising T-013 patch-window and rank-known-cou
 ```
 
 ## Fixed
+
+### B-024 — Engine purity ESLint guard has no regression test — FIXED
+
+- Severity / Area (engine|etl|web|desktop|vision|docs): S4 / engine, docs
+- Steps to reproduce: remove a restricted global (e.g. `process`) from the `no-restricted-globals` rule in `eslint.config.mjs`, then run `pnpm lint` and `pnpm test`.
+- Expected / Actual:
+  - Expected: an automated test catches the regression and fails CI.
+  - Actual: no test exercised the ESLint purity guards, so CI stayed green even after the temporary `process.cwd()` probe was removed during the B-017 fix session.
+- Environment (OS, Node version, patch): any.
+- Logs / screenshot: none prior to this fix.
+- Suspected cause: the B-017 fix verified purity by hand with a throwaway probe in `packages/engine/src/hello.ts` that was deleted before commit, leaving no automated regression test.
+- Fix (commit/ticket): B-024 — added `packages/engine/src/lint-regression.test.ts`, a vitest suite that writes fixture files into `packages/engine/src/__lint_test__/`, lints them via the ESLint Node API, and asserts the specific `ruleId` of each error: `no-restricted-imports` for bare `crypto`/`net`/`node:crypto` imports (B-022, with the imported symbols used to avoid false positives from `no-unused-vars`); `no-restricted-syntax` for `Date()` and `new Date()` (B-023); `no-restricted-globals` for `process.cwd()` and `no-restricted-properties` for `Math.random()` (B-017); and a pure `add(a, b)` function produces zero errors (guards against overblocking). Added ESLint test-file overrides so `*.test.ts` files in engine/shared are not subject to the production purity rules. `pnpm check` — 15 test files, 141 tests passed.
+
+### B-023 — Unseeded `Date()` call escapes the engine lint guard — FIXED
+
+- Severity / Area (engine|etl|web|desktop|vision|docs): S3 / engine
+- Steps to reproduce: add `export const probe = Date();` to a file in `packages/engine/src`, then run `pnpm lint`.
+- Expected / Actual:
+  - Expected: `Date()` (a call expression returning the current time as a string) is rejected by the engine purity rules.
+  - Actual: the `no-restricted-syntax` rule only matched `NewExpression[callee.name='Date'][arguments.length=0]` (i.e. `new Date()`), so the zero-argument `Date()` call passed both lint and typecheck, allowing non-deterministic time access in an engine that must produce identical outputs for identical inputs.
+- Environment (OS, Node version, patch): any.
+- Logs / screenshot: before the fix, `Date()` produced no lint error; `new Date()` was already rejected.
+- Suspected cause: the selector only covered the `new Date()` form, not the `Date()` call form.
+- Fix (commit/ticket): B-023 — added a `CallExpression[callee.name='Date'][arguments.length=0]` selector with the same purity message to the `no-restricted-syntax` rule in `eslint.config.mjs`. Verified by the regression test in B-024. `pnpm check` — green.
+
+### B-022 — Bare Node built-in imports escape the engine guard — FIXED
+
+- Severity / Area (engine|etl|web|desktop|vision|docs): S2 / engine
+- Steps to reproduce: add `import { createHash } from "crypto";` to a file in `packages/engine/src`, then run `pnpm lint`.
+- Expected / Actual:
+  - Expected: any bare Node built-in import specifier (e.g. `crypto`, `net`, `tls`, `events`) and any `node:*` import is rejected by `no-restricted-imports`.
+  - Actual: the pattern list only covered `node:*` (the `node:` prefix form) plus a handful of manually listed bare names (`fs`, `fs/*`, `path`, `os`, `child_process`, `http`, `https`, `better-sqlite3`). A bare `crypto` import was not in the list, so `import { createHash } from "crypto"` passed lint while also type-checking (Node typings reach the engine through Vitest, see B-021).
+- Environment (OS, Node version, patch): any.
+- Logs / screenshot: before the fix, `import { createHash } from "crypto"` produced no lint error; after the fix it reports `no-restricted-imports`.
+- Suspected cause: the pattern list was a manual subset, not the complete set of Node built-in modules.
+- Fix (commit/ticket): B-022 — replaced the manual subset with a comprehensive list of every Node built-in module specifier in both forms (`module` and `module/*` for subpaths, plus `node:*` for the prefix form) in the `no-restricted-imports` rule for both `packages/engine/**/*.ts` and `packages/shared/**/*.ts`. The list covers `assert`, `async_hooks`, `buffer`, `child_process`, `cluster`, `console`, `constants`, `crypto`, `dgram`, `diagnostics_channel`, `dns`, `domain`, `events`, `fs`, `http`, `http2`, `https`, `inspector`, `module`, `net`, `os`, `path`, `perf_hooks`, `process`, `punycode`, `querystring`, `readline`, `repl`, `stream`, `string_decoder`, `sys`, `timers`, `tls`, `trace_events`, `tty`, `url`, `util`, `v8`, `vm`, `wasi`, `worker_threads`, `zlib`, and `better-sqlite3`. Verified by the regression test in B-024. `pnpm check` — green.
+
+### B-017 — Node type definitions are visible to the pure engine and shared packages — FIXED
+
+- Severity / Area (engine|etl|web|desktop|vision|docs): S3 / engine
+- Steps to reproduce: add `process.cwd()` or `Buffer.from('x')` to a file in `packages/engine/src`, then run `pnpm typecheck` and `pnpm lint`.
+- Expected / Actual: AGENTS.md rule 3 (no Node APIs in the engine) is enforced by tooling / the root devDependency `@types/node` was visible to every package because `packages/engine/tsconfig.json` and `packages/shared/tsconfig.json` did not set `"types": []`, and `eslint.config.mjs` had no `no-restricted-imports`, `no-restricted-globals` or `no-restricted-properties` rules for the engine. Such code type-checked and linted cleanly (not run).
+- Environment (OS, Node version, patch): any.
+- Logs / screenshot: `node_modules/@types/node` exists at the repository root.
+- Suspected cause: D-014 assumed that `"types": ["node"]` in `packages/etl` keeps Node types out of the engine; TypeScript loads every visible `@types` package when `types` is not set.
+- Fix (commit/ticket): B-017 — added `"types": []` to the `compilerOptions` of `packages/engine/tsconfig.json` and `packages/shared/tsconfig.json` (disabling `@types` auto-inclusion, the mechanism described in the suspected cause), and added ESLint blocks in `eslint.config.mjs` for `packages/engine/**/*.ts` (`no-restricted-imports` for `node:*`, `fs`, `fs/*`, `path`, `os`, `child_process`, `http`, `https`, `better-sqlite3`; `no-restricted-globals` for `process`, `Buffer`, `__dirname`, `__filename`, `require`, `window`, `document`, `localStorage`, `fetch`; `no-restricted-properties` for `Date.now` and `Math.random` with message "engine must be pure: pass time and seeds in through config"; `no-restricted-syntax` for `new Date()`). A second block covers `packages/shared/**/*.ts` with the same `no-restricted-imports` rule. Verification: `process.cwd()` and `Math.random()` in `packages/engine/src/hello.ts` are both rejected by `pnpm lint` (`no-restricted-globals` / `no-restricted-properties`); the probe was then removed and `pnpm check` is green. Note: `pnpm typecheck` does not itself reject `process.cwd()` in engine production files because the engine test file (`hello.test.ts`) imports `vitest`, whose type declarations import `node:vm` and load `@types/node` globals into the same `tsc` program — see B-021 for this residual limitation; ESLint is the comprehensive enforcement. `pnpm check` — 14 test files, 133 tests passed.
 
 ### B-018 — B-014 was still listed in the Open section and table while its fix was complete — FIXED
 

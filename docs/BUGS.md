@@ -76,6 +76,42 @@ No new bugs were identified while revising T-013 patch-window and rank-known-cou
 
 ## Fixed
 
+### B-024 — Engine purity ESLint guard has no regression test — FIXED
+
+- Severity / Area (engine|etl|web|desktop|vision|docs): S4 / engine, docs
+- Steps to reproduce: remove a restricted global (e.g. `process`) from the `no-restricted-globals` rule in `eslint.config.mjs`, then run `pnpm lint` and `pnpm test`.
+- Expected / Actual:
+  - Expected: an automated test catches the regression and fails CI.
+  - Actual: no test exercised the ESLint purity guards, so CI stayed green even after the temporary `process.cwd()` probe was removed during the B-017 fix session.
+- Environment (OS, Node version, patch): any.
+- Logs / screenshot: none prior to this fix.
+- Suspected cause: the B-017 fix verified purity by hand with a throwaway probe in `packages/engine/src/hello.ts` that was deleted before commit, leaving no automated regression test.
+- Fix (commit/ticket): B-024 — added `packages/engine/src/lint-regression.test.ts`, a vitest suite that writes fixture files into `packages/engine/src/__lint_test__/`, lints them via the ESLint Node API, and asserts: bare `crypto`/`net`/`node:crypto` imports fail (B-022); `Date()` and `new Date()` both fail (B-023); `process.cwd()` and `Math.random()` fail (B-017); and a pure `add(a, b)` function passes (guards against overblocking). Added ESLint test-file overrides so `*.test.ts` files in engine/shared are not subject to the production purity rules. `pnpm check` — 15 test files, 141 tests passed.
+
+### B-023 — Unseeded `Date()` call escapes the engine lint guard — FIXED
+
+- Severity / Area (engine|etl|web|desktop|vision|docs): S3 / engine
+- Steps to reproduce: add `export const probe = Date();` to a file in `packages/engine/src`, then run `pnpm lint`.
+- Expected / Actual:
+  - Expected: `Date()` (a call expression returning the current time as a string) is rejected by the engine purity rules.
+  - Actual: the `no-restricted-syntax` rule only matched `NewExpression[callee.name='Date'][arguments.length=0]` (i.e. `new Date()`), so the zero-argument `Date()` call passed both lint and typecheck, allowing non-deterministic time access in an engine that must produce identical outputs for identical inputs.
+- Environment (OS, Node version, patch): any.
+- Logs / screenshot: before the fix, `Date()` produced no lint error; `new Date()` was already rejected.
+- Suspected cause: the selector only covered the `new Date()` form, not the `Date()` call form.
+- Fix (commit/ticket): B-023 — added a `CallExpression[callee.name='Date'][arguments.length=0]` selector with the same purity message to the `no-restricted-syntax` rule in `eslint.config.mjs`. Verified by the regression test in B-024. `pnpm check` — green.
+
+### B-022 — Bare Node built-in imports escape the engine guard — FIXED
+
+- Severity / Area (engine|etl|web|desktop|vision|docs): S2 / engine
+- Steps to reproduce: add `import { createHash } from "crypto";` to a file in `packages/engine/src`, then run `pnpm lint`.
+- Expected / Actual:
+  - Expected: any bare Node built-in import specifier (e.g. `crypto`, `net`, `tls`, `events`) and any `node:*` import is rejected by `no-restricted-imports`.
+  - Actual: the pattern list only covered `node:*` (the `node:` prefix form) plus a handful of manually listed bare names (`fs`, `fs/*`, `path`, `os`, `child_process`, `http`, `https`, `better-sqlite3`). A bare `crypto` import was not in the list, so `import { createHash } from "crypto"` passed lint while also type-checking (Node typings reach the engine through Vitest, see B-021).
+- Environment (OS, Node version, patch): any.
+- Logs / screenshot: before the fix, `import { createHash } from "crypto"` produced no lint error; after the fix it reports `no-restricted-imports`.
+- Suspected cause: the pattern list was a manual subset, not the complete set of Node built-in modules.
+- Fix (commit/ticket): B-022 — replaced the manual subset with a comprehensive list of every Node built-in module specifier in both forms (`module` and `module/*` for subpaths, plus `node:*` for the prefix form) in the `no-restricted-imports` rule for both `packages/engine/**/*.ts` and `packages/shared/**/*.ts`. The list covers `assert`, `async_hooks`, `buffer`, `child_process`, `cluster`, `console`, `constants`, `crypto`, `dgram`, `diagnostics_channel`, `dns`, `domain`, `events`, `fs`, `http`, `http2`, `https`, `inspector`, `module`, `net`, `os`, `path`, `perf_hooks`, `process`, `punycode`, `querystring`, `readline`, `repl`, `stream`, `string_decoder`, `sys`, `timers`, `tls`, `trace_events`, `tty`, `url`, `util`, `v8`, `vm`, `wasi`, `worker_threads`, `zlib`, and `better-sqlite3`. Verified by the regression test in B-024. `pnpm check` — green.
+
 ### B-017 — Node type definitions are visible to the pure engine and shared packages — FIXED
 
 - Severity / Area (engine|etl|web|desktop|vision|docs): S3 / engine

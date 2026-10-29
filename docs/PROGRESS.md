@@ -332,7 +332,7 @@ The 2026-10-22 entries had no timestamps; their order was reconstructed from tic
 - Done: applied the D-024 product decision and documented the browser-only per-role pool, score-preserving engine contract, and independently paginated "From your pool" and "Best overall" lists.
 - Files touched: `AGENTS.md`, `docs/CONVENTIONS.md`, `docs/DATA_MODEL.md`, `docs/DECISIONS.md`, `docs/GLOSSARY.md`, `docs/PLAN_SUMMARY.md`, `docs/PROGRESS.md`, `docs/SPECS.md`, `docs/TESTING.md`, `docs/TICKETS.md`
 - Tests: none (documentation and product-contract changes only).
-- State left: REVIEW (branch `d-024-champion-pool`, rebased onto `pr-c-data-model-alignment`).
+- State left: REVIEW (branch `d-024-champion-pool`, rebased onto `pr-c-data-model-alignment`). Merged into main (ba66453).
 - Next step: implement shared pool schemas in T-002.b before the engine and UI pool work.
 - Pitfalls / notes for next AI: the pool must never change scoring, candidate scores, or global order; the engine returns complete lists, and pagination is UI-only.
 
@@ -344,7 +344,7 @@ The 2026-10-22 entries had no timestamps; their order was reconstructed from tic
   - Reviewed PR B and recorded the remaining acceptance gaps in the review handoff.
 - Files touched: `packages/etl/migrations/004_role_generic_aggregates.sql`, `packages/etl/src/db/migrate.ts`, `packages/etl/src/matches.ts`, `packages/etl/src/participants.ts`, relevant ETL tests and fixtures, `docs/BUGS.md`, `docs/DATA_MODEL.md`, `docs/DECISIONS.md`, `docs/GLOSSARY.md`, `docs/SPECS.md`, `docs/TICKETS.md`, `docs/PROGRESS.md`
 - Tests: `pnpm install --frozen-lockfile && pnpm typecheck && pnpm lint && pnpm format:check && pnpm test` passed (11 files, 96 tests).
-- State left: REVIEW (branch `pr-c-data-model-alignment`, rebased onto `main`).
+- State left: REVIEW (branch `pr-c-data-model-alignment`, rebased onto `main`). Merged into main (c237fe6).
 - Next step: review the rebased PR C branch; then continue with T-014 participant enrichment.
 - Pitfalls / notes for next AI: migration 004 drops and recreates derived aggregate tables because their old support-specific schema is obsolete; `champions.json.roles` remains a bootstrap hint and has no JUNGLE entries in patch 16.21.
 
@@ -379,7 +379,7 @@ The 2026-10-22 entries had no timestamps; their order was reconstructed from tic
   - Added `.github/workflows/ci.yml`: push + pull_request, matrix `ubuntu-latest` / `windows-latest`, Node 22, pnpm from `packageManager`, `pnpm install --frozen-lockfile && pnpm check`. No secrets; tests never touch the network.
 - Files touched: `.prettierignore`, `package.json`, `.github/workflows/ci.yml`, `docs/SETUP.md`, `docs/PROGRESS.md` (+ formatting-only changes from Prettier).
 - Tests: `pnpm check` — all green (9 files, 83 tests).
-- State left: REVIEW
+- State left: REVIEW. Merged into main (3ea2e11).
 - Next step: PR B (ETL robustness).
 - Pitfalls / notes for next AI:
   - `pnpm format` is now safe repo-wide (the lockfile and generated data are ignored); `pnpm format:check` is enforced in CI.

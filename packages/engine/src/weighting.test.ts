@@ -273,4 +273,9 @@ describe('shrink', () => {
     // 0 wins out of 1 game, k=20, q=0.5 → (0 + 10)/(1 + 20) = 10/21 ≈ 0.476
     expect(shrink(0, 1, 20, 0.5)).toBeCloseTo(10 / 21, 5);
   });
+
+  it('returns the prior q when both evidence and prior strength are zero', () => {
+    expect(shrink(0, 0, 0, 0.55)).toBe(0.55);
+    expect(shrink(0, 0, 0, 0.7)).toBe(0.7);
+  });
 });

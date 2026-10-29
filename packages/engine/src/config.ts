@@ -205,7 +205,17 @@ export const rankWeightingConfigSchema = z
     exportMinGames: z.number().nonnegative(),
     influence: influenceConfigSchema,
   })
-  .strict();
+  .strict()
+  .superRefine((config, ctx) => {
+    if (config.exportMinGames > config.minGames) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          'exportMinGames must be <= minGames so every row that passes the scoring gate survives export',
+        path: ['exportMinGames'],
+      });
+    }
+  });
 
 export type RankWeightingConfig = z.infer<typeof rankWeightingConfigSchema>;
 

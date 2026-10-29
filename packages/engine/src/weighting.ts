@@ -175,7 +175,14 @@ export function sigmoid(x: number): number {
  * equivalent-game prior strength (SPECS §5, D-021):
  *
  *   `p = (wins_e + k * q) / (games_e + k)`
+ *
+ * When both the evidence and prior strength are zero (`games_e + k == 0`),
+ * returns the prior `q` instead of NaN.
  */
 export function shrink(winsE: number, gamesE: number, k: number, q: number): number {
-  return (winsE + k * q) / (gamesE + k);
+  const denom = gamesE + k;
+  if (denom <= 0) {
+    return q;
+  }
+  return (winsE + k * q) / denom;
 }

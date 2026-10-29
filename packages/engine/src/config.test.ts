@@ -185,3 +185,19 @@ describe('ROLES and SIDES', () => {
     expect(SIDES).toEqual(['ally', 'enemy']);
   });
 });
+
+describe('exportMinGames / minGames invariant', () => {
+  it('accepts exportMinGames equal to minGames', () => {
+    expect(rankWeightingConfigSchema.parse({ ...DEFAULT_CONFIG, exportMinGames: 25 })).toBeTruthy();
+  });
+
+  it('accepts exportMinGames below minGames', () => {
+    expect(rankWeightingConfigSchema.parse({ ...DEFAULT_CONFIG, exportMinGames: 10 })).toBeTruthy();
+  });
+
+  it('rejects exportMinGames above minGames', () => {
+    expect(() =>
+      rankWeightingConfigSchema.parse({ ...DEFAULT_CONFIG, exportMinGames: 30, minGames: 25 }),
+    ).toThrow();
+  });
+});

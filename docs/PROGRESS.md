@@ -27,7 +27,7 @@
 
 ## Next recommended ticket
 
-B-017 done (engine and shared `"types": []` plus ESLint purity guardrails in `eslint.config.mjs` with automated regression tests; T-020's engine-purity prerequisite is fully satisfied — the residual `tsc` gap caused by test files importing `vitest` is logged as B-021 and not fixed). B-022 (all Node built-ins blocked), B-023 (Date() call blocked) and B-024 (regression tests) also fixed. Fix B-012 done. Next: T-014 (participant enrichment, dependency-ready). T-002.b is unblocked (see B-011 for scope it does not list yet). T-020 is dependency-ready but implements PROPOSED D-020: start it after the owner accepts D-020..D-023.
+B-017 done (engine and shared `"types": []` plus ESLint purity guardrails in `eslint.config.mjs` with automated regression tests; T-020's engine-purity prerequisite is fully satisfied — the residual `tsc` gap caused by test files importing `vitest` is logged as B-021 and not fixed). B-022 (all Node built-ins blocked), B-023 (Date() call blocked) and B-024 (regression tests) also fixed. B-011 fixed (spec + T-002.b scope; implementation in T-002.b). Fix B-012 done. Next: T-002.b (now fully specified with reason `with` array, `lowData`, `rankBucketSchema`, sparse role-prob, and `n_eff` semantics) or T-014 (participant enrichment, data-blocked). T-020 is dependency-ready but implements PROPOSED D-020: start it after the owner accepts D-020..D-023.
 
 ## Open questions for the owner
 
@@ -39,6 +39,33 @@ B-017 done (engine and shared `"types": []` plus ESLint purity guardrails in `es
 ## Session log (newest first)
 
 The 2026-10-22 entries had no timestamps; their order was reconstructed from ticket dependencies on 2026-10-26.
+
+### 2026-10-29 — Kilo — Bug B-016 (duplicate B-007 ID)
+
+- Done:
+  - Resolved the B-016 ID collision: kept B-007 for "Seed rank was excluded from rank reliability counts"; renumbered the duplicate "Invalid match responses left the ingestion cursor stuck" to B-025 (the next free ID after B-024) with the title note "(formerly a duplicate B-007)"; removed B-016 from the Open table and Open detailed section and added its detailed entry to `## Fixed` with status FIXED.
+  - Verified no code or commit references to B-007 or B-016 exist outside `docs/BUGS.md`.
+- Files touched: `docs/BUGS.md`, `docs/PROGRESS.md`
+- Tests: none (docs-only change). `pnpm check` was green before this session; this change alters no code.
+- State left: FIXED (B-016). All bug IDs are now unique.
+- Next step: T-014 (participant enrichment) or T-002.b (schema implementation).
+- Pitfalls / notes for next AI: none
+
+### 2026-10-29 — Kilo — Bug B-011 (spec-level: reason/rank-bucket/role-prob divergence)
+
+- Done:
+  - Resolved B-011 at the spec level (docs only, no code; T-002.b will implement the schemas later).
+  - **SPECS §7**: explicitly stated that `Reason.n` and `Recommendation.reliability.games` carry `n_eff` (a real number, not a raw game count), because every threshold and `lowData` flag is evaluated against `n_eff`; `DraftResult.insufficientData` separately exposes both `nEff` and `rawGames`.
+  - **SPECS §3**: defined the 8 rank buckets (IRON=0 .. DIAMOND=6, MASTER_PLUS=7 where MASTER_PLUS merges MASTER/GRANDMASTER/CHALLENGER). Stated that exports and `manifest.rankBuckets` use these 8 buckets, not the 10 raw rank tiers.
+  - **DATA_MODEL**: documented that `rank_bucket`/`bucket` columns and `MANIFEST.rankBuckets` use the 8 buckets; stated `role-prob.json` is sparse (only roles with games), added the zod 4 note that `z.record(enumSchema)` requires every key so a sparse map needs `z.partialRecord`, and added the sum-to-1 invariant (tolerance 1e-6).
+  - **TICKETS.md T-002.b**: added `Reason.with: ChampionId[]`, `Reason.lowData`, `rankBucketSchema` (8 buckets), the sparse role-prob shape with sum check, and the `n_eff` semantics to both scope and acceptance; removed the "See B-011 ..." sentence.
+  - **DECISIONS.md**: added D-027 recording the three owner choices (ACCEPTED).
+  - **BUGS.md**: moved B-011 from Open to Fixed.
+- Files touched: `docs/SPECS.md`, `docs/DATA_MODEL.md`, `docs/TICKETS.md`, `docs/DECISIONS.md`, `docs/BUGS.md`, `docs/PROGRESS.md`
+- Tests: none (docs-only change). `pnpm check` was green before this session; this change alters no code.
+- State left: B-011 FIXED (spec level resolved; schema implementation pending T-002.b).
+- Next step: T-014 (participant enrichment) is the next recommended ticket, though blocked on data collection. T-002.b is now fully specified and unblocked.
+- Pitfalls / notes for next AI: the three owner choices are locked in D-027; do not revisit dense maps, raw-game `n`, or the `MASTER` bucket name in T-002.b.
 
 ### 2026-10-29 — Kilo — Bug B-015 (Node 20 vs better-sqlite3) — Applied Node 22 policy
 

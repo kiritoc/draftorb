@@ -36,7 +36,7 @@ Any subset can be empty. Engine must never crash on missing info.
 
 ## 3. Rank logic
 
-Rank buckets for weighting (distinct from persisted `rank_score` in DATA_MODEL.md): IRON=0, BRONZE=1, SILVER=2, GOLD=3, PLATINUM=4, EMERALD=5, DIAMOND=6, MASTER+(M/GM/C)=7 (config in `engine/config.ts`). Persisted player `rank_score` uses the accepted D-016 tier/division formula and is not an exact rank or a weighting bucket.
+Rank buckets for weighting (distinct from persisted `rank_score` in DATA_MODEL.md): the 8 buckets are IRON=0, BRONZE=1, SILVER=2, GOLD=3, PLATINUM=4, EMERALD=5, DIAMOND=6, MASTER_PLUS=7 (where MASTER_PLUS merges MASTER, GRANDMASTER and CHALLENGER; config in `engine/config.ts`). Exports and `manifest.rankBuckets` use these 8 rank buckets, not the 10 raw rank tiers (IRON..CHALLENGER). Persisted player `rank_score` uses the accepted D-016 tier/division formula and is not an exact rank or a weighting bucket.
 
 - **Draft probabilities** (pairs, matchups, baselines): weight per game `w = exp(-|gameRank - userRank| / tau)`, tau=1.25 (config). Never use data below userRank-2 tiers.
 - **Runes & items**: use games with `gameRank >= userRank` (up to Challenger). Weight `w = min(1 + alpha*(gameRank-userRank), wMax)`, alpha=0.25, wMax=2.0. Only expert players (D-022): `champion_games >= minChampGames` (default 30) in our data, with the champion-mastery-v4 fallback applied only to participants of the user's role (`is_expert` flag). Show both winrate and pick share among those players.
@@ -131,7 +131,7 @@ DraftResult {
 }
 ```
 
-Sorted desc. Always show why + sample sizes. Never show a % without sample size. Reason type `lane`, `DraftResult.insufficientData` and the pool fields (`poolRank`, `poolRecommendations`, `poolUnavailable`) are added to the shared schemas by T-002.b.
+Sorted desc. Always show why + sample sizes. Never show a % without sample size. A `Reason.n` and `Recommendation.reliability.games` carry the **effective sample size** `n_eff = (sum w)^2 / sum w^2` (a real number, not a raw game count), because every threshold and `lowData` flag in §5/§7 is evaluated against `n_eff`; `DraftResult.insufficientData` separately exposes `nEff` and `rawGames` for champions that fail the baseline gate. Reason type `lane`, `DraftResult.insufficientData` and the pool fields (`poolRank`, `poolRecommendations`, `poolUnavailable`) are added to the shared schemas by T-002.b.
 
 ## 7.1 Recommendation lists (D-024)
 

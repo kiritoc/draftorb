@@ -67,7 +67,8 @@ export function assignmentIsViable(
 
 /**
  * Compute the log-probability of an assignment (sum of log roleProb for each
- * slot). Zero-probability pairs are floored at ROLE_INFERENCE_EPS to avoid -Infinity.
+ * slot). Only zero-probability pairs are replaced by `eps` to avoid -Infinity;
+ * positive probabilities are used as-is.
  */
 export function assignmentLogProb(
   slots: ReadonlyArray<Slot>,
@@ -86,8 +87,10 @@ export function assignmentLogProb(
     if (slot.role !== undefined) {
       continue;
     }
-    const p = Math.max(roleProbability(roleProb, slot.championId, assignedRole), eps);
-    logSum += Math.log(p);
+    // Only floor true zeros; positive observations below `eps` keep their
+    // relative order (flooring them could reverse role preferences).
+    const raw = roleProbability(roleProb, slot.championId, assignedRole);
+    logSum += Math.log(raw > 0 ? raw : eps);
   }
   return logSum;
 }

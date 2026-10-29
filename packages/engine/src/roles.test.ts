@@ -312,19 +312,27 @@ describe('inferRoles — fixed-role regressions', () => {
     expect(result.confidence).toBeCloseTo(0.5);
   });
 
-  it('applies a custom eps floor', () => {
+  it('does not flatten positive probabilities below eps', () => {
+    // Flooring both of champ 2's rare roles to eps would tie the two
+    // assignments and let the first-enumerated (worse) one win.
     const roleProb = makeRoleProb({
-      1: { TOP: 0.9, JUNGLE: 0.1 },
-      2: { TOP: 0.2, JUNGLE: 0.8 },
-      3: { MID: 1.0 },
-      4: { ADC: 1.0 },
-      5: { SUPPORT: 1.0 },
+      1: { TOP: 0.5, JUNGLE: 0.5 },
+      2: { TOP: 5e-5, JUNGLE: 1e-5 },
     });
-    const slots = makeSlots();
-    const lowFloor = expectAssignment(inferRoles(slots, roleProb));
-    const highFloor = expectAssignment(inferRoles(slots, roleProb, 0.5));
+    const slots: Slot[] = [{ championId: 1 }, { championId: 2 }];
+    const result = expectAssignment(inferRoles(slots, roleProb));
 
-    expect(highFloor.confidence).toBeLessThan(lowFloor.confidence);
+    expect(result.slots.map((s) => s.role)).toEqual(['JUNGLE', 'TOP']);
+  });
+
+  it('includes every viable role in partial-team confidence', () => {
+    const roleProb = makeRoleProb({
+      1: { TOP: 0.2, JUNGLE: 0.2, MID: 0.2, ADC: 0.2, SUPPORT: 0.2 },
+    });
+    const result = expectAssignment(inferRoles([{ championId: 1 }], roleProb));
+
+    expect(result.slots[0]?.confidence).toBeCloseTo(0.2);
+    expect(result.confidence).toBeCloseTo(0.2);
   });
 
   it('respects fixed roles in a partial team', () => {

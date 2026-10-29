@@ -23,11 +23,13 @@ export type { InferredSlot, RoleAssignment } from './roles-types.js';
  * - For a full 5-slot team, the remaining slots are assigned roles to maximize
  *   the sum of log roleProb, subject to "one champion per role" (brute-force
  *   over all 120 permutations).
- * - For partial teams (< 5 slots), each unknown slot greedily takes its
- *   most-likely available role.
- * - `confidence` is the probability mass of the best valid assignment relative
- *   to the total across all valid assignments. It is 1 when only one valid
- *   assignment exists, and lower when multiple assignments are plausible.
+ * - Partial teams (< 5 slots) use the same exact solver over distinct
+ *   one-to-one role assignments of the present slots (no greedy step).
+ * - Per-slot `confidence` is the marginal probability mass of the chosen role
+ *   across all viable assignments (1 for fixed or forced slots).
+ * - Team `confidence` is the probability mass of the best viable assignment
+ *   relative to the total across all viable assignments. It is 1 when only one
+ *   viable assignment exists.
  *
  * @param slots    The team's draft slots (1–5 entries). Fixed roles honored.
  * @param roleProb The `role-prob.json` map of champion -> role probabilities.

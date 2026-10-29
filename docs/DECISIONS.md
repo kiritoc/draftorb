@@ -182,6 +182,16 @@ Consequences:
 - Decision: Correct the root `@types/node` devDependency from `^26.6.5` to `^22.18.5` to align with the Node 22 minimum. The `@types/better-sqlite3` version is unaffected.
 - Consequences: `@types/node` now matches the supported Node major version; no API surface changes for the ETL package.
 
+### D-027 — B-011 resolution: n semantics, apex bucket name, role-prob sparsity — ACCEPTED (owner decision)
+
+- Context: B-011 identified that SPECS §3/§7 and the shared schemas diverged on three points that T-002.b must resolve at the spec level before implementing the schemas.
+- Decision (owner-chosen):
+  1. **`Reason.n` and `Recommendation.reliability.games` carry `n_eff` (a real number), not raw games.** Every threshold and `lowData` flag in SPECS is evaluated against `n_eff = (sum w)^2 / sum w^2`; exposing `n_eff` makes the displayed sample size meaningful alongside weighted winrates. `DraftResult.insufficientData` continues to expose both `nEff` and `rawGames` for champions that fail the baseline gate.
+  2. **The merged apex rank bucket is named `MASTER_PLUS`.** It merges MASTER, GRANDMASTER and CHALLENGER. Exports and `manifest.rankBuckets` use the 8 buckets (IRON, BRONZE, SILVER, GOLD, PLATINUM, EMERALD, DIAMOND, MASTER_PLUS), not the 10 raw rank tiers.
+  3. **`role-prob.json` is sparse:** each champion entry lists only the roles with non-zero probability (roles that have games); absent roles are treated as 0. In zod 4, `z.record(roleSchema, numberSchema)` requires every key, so a sparse map must use `z.partialRecord` (or equivalent). Each champion's probabilities sum to 1 (tolerance 1e-6).
+- Alternatives considered: (1) raw games — rejected because thresholds use `n_eff`, so showing raw counts would mislead; (2) `MASTER` without suffix — rejected, ambiguous with the raw MASTER tier; (3) dense maps — rejected, bloats the file with zero entries for off-role champions.
+- Consequences: T-002.b schemas use `z.number().nonnegative()` (not `.int()`) for `Reason.n` and `reliability.games`; a `rankBucketSchema` with 8 values replaces `rankSchema` in bucket-typed fields; `championRoleProbabilitiesSchema` uses `z.partialRecord`; all export rows and `manifest.rankBuckets` carry the 8-value bucket.
+
 ### Template
 
 ```

@@ -50,6 +50,8 @@ Notes: match ingestion persists the match row and its 10 participant rows in one
 
 ## Aggregated tables (SQLite) — recomputed per patch; role-generic (Phase 1 populates only `my_role = 'SUPPORT'`)
 
+Rank buckets: every `rank_bucket` column and every exported `bucket` field uses the 8 SPECS §3 rank buckets (IRON, BRONZE, SILVER, GOLD, PLATINUM, EMERALD, DIAMOND, MASTER_PLUS), not the 10 raw rank tiers. `MANIFEST.rankBuckets` mirrors this same 8-value list.
+
 - `role_prob(champion_id, role, games, prob)`
 - `baseline(champion_id, my_role, rank_bucket, wins_w, games_w, games_w2)` (weighted; `games_w2` = sum of squared weights for `n_eff`, SPECS §3)
 - `pair_ally(my_champion_id, my_role, other_champion_id, other_role, rank_bucket, wins_w, games_w, games_w2)`
@@ -66,10 +68,10 @@ Adding a role means data only: no schema or code change. Migration 004 (T-011.b)
 Validated by one zod schema family parameterized by role (`packages/shared`, T-002.b). The role is carried by the file path, not by a column in the rows (the SQLite tables keep `my_role`). The web app loads only the roles listed in `manifest.json`. Keep each file < 5 MB gzip.
 
 ```
-manifest.json          // { patch, generatedAt, region, rankBuckets, roles: ["SUPPORT"], files[], schemaVersion }
+manifest.json          // { patch, generatedAt, region, rankBuckets: [the 8 §3 buckets, not 10 tiers], roles: ["SUPPORT"], files[], schemaVersion }
 champions.json         // id, name, icon, roles
 items.json             // item catalog (from Data Dragon)
-role-prob.json         // { [championId]: { SUPPORT: 0.92, ... } }
+role-prob.json         // { [championId]: { SUPPORT: 0.92, ... } } — sparse: a champion entry lists only the roles in which it has been observed with a non-zero probability (roles with games); absent roles are treated as 0. Each champion's probabilities sum to 1 (tolerance 1e-6). Note for T-002.b: in zod 4, `z.record(roleSchema, numberSchema)` requires every key in `roleSchema` to be present, so a sparse map must use `z.partialRecord(roleSchema, numberSchema)` (or equivalent) instead of `z.record`.
 roles/<ROLE>/baseline.json    // [championId, bucket, wins_w, games_w, games_w2]
 roles/<ROLE>/ally-pairs.json  // [championId, allyId, role, bucket, wins_w, games_w, games_w2]
 roles/<ROLE>/enemy-pairs.json // [championId, enemyId, role, bucket, wins_w, games_w, games_w2]

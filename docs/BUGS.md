@@ -4,11 +4,9 @@ Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATI
 
 ## Open
 
-| ID    | Sev | Area   | Title                                                                                                                                                      | Status | Found by/date                            | Ticket  |
-| ----- | --- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ---------------------------------------- | ------- |
-| B-021 | S3  | engine | `types: []` in engine/shared tsconfigs is circumvented by test files importing vitest, so the type-checker still resolves Node globals in production files | OPEN   | B-017 fix verification 2026-10-28        | –       |
-| B-016 | S4  | docs   | Bug ID B-007 is used for two different fixed bugs                                                                                                          | OPEN   | GitHub Copilot project review 2026-10-26 | –       |
-| B-011 | S2  | shared | Shared reason and rank-bucket schemas diverge from SPECS §3/§7 outside the T-002.b scope                                                                   | OPEN   | GitHub Copilot project review 2026-10-26 | T-002.b |
+| ID    | Sev | Area   | Title                                                                                                                                                      | Status | Found by/date                     | Ticket |
+| ----- | --- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | --------------------------------- | ------ |
+| B-021 | S3  | engine | `types: []` in engine/shared tsconfigs is circumvented by test files importing vitest, so the type-checker still resolves Node globals in production files | OPEN   | B-017 fix verification 2026-10-28 | –      |
 
 No new bugs were identified during the D-016 formula confirmation; player discovery remains within the current ETL scope.
 
@@ -26,30 +24,6 @@ No new bugs were identified while revising T-013 patch-window and rank-known-cou
 - Suspected cause: test files live in the same `tsc` program as production code and import the vitest framework, whose types depend on `node:*` modules.
 - Fix (commit/ticket): not fixed in this session (out of B-017 scope per AGENTS rule 6). Candidate future fix: exclude `**/*.test.ts` from the engine and shared `tsconfig.json` `include` (or add a dedicated test type-check), so production source is type-checked without the framework's Node dependency. Not applied because it would remove type-checking coverage of test files from `pnpm check` and is a behavioral change outside B-017's prescribed fix.
 
-### B-016 — Bug ID B-007 is used for two different fixed bugs — OPEN
-
-- Severity / Area: S4 / docs
-- Steps to reproduce: search `docs/BUGS.md` for `### B-007`.
-- Expected / Actual: every bug has a unique ID / "Seed rank was excluded from rank reliability counts" and "Invalid match responses left the ingestion cursor stuck" both use B-007.
-- Environment (OS, Node version, patch): n/a.
-- Logs / screenshot: n/a.
-- Suspected cause: two parallel branches (PR B and PR C) each picked the next free ID.
-- Fix (commit/ticket): pending — renumber one entry and update any commit or PROGRESS references.
-
-### B-011 — Shared reason and rank-bucket schemas diverge from SPECS §3/§7 outside the T-002.b scope — OPEN
-
-- Severity / Area: S2 / shared
-- Steps to reproduce: compare `reasonSchema`, `manifestSchema.rankBuckets` and `supportPairEntrySchema` in `packages/shared/src/index.ts` with SPECS §3 and §7, then with the T-002.b scope in TICKETS.md.
-- Expected / Actual:
-  - SPECS §7: `Reason.with: ChampionId[]` (a `lane` reason references the lane-group champions, two for `lane_vs` and three for `lane_full`) and `Reason.lowData: boolean` / the schema has a single optional `with: ChampionId` and no `lowData`.
-  - SPECS §3: rank buckets merge MASTER, GRANDMASTER and CHALLENGER into one bucket / `rankBuckets` and the pair-entry bucket use the 10-value `rankSchema`.
-  - T-002.b adds the `lane` reason type, `games_w2`, `insufficientData` and the pool fields, but none of the above, so the engine (T-023) cannot emit a valid `lane` reason even after T-002.b.
-  - To clarify in SPECS: `Reason.n` and `reliability.games` are integers in the schema, while every threshold uses a real-valued `n_eff`; state whether these fields carry raw games or `n_eff`.
-- Environment (OS, Node version, patch): n/a (contract).
-- Logs / screenshot: n/a.
-- Suspected cause: T-002 predates D-021; the T-002.b parity list (D-011) was written from the new export layout, not from SPECS §7.
-- Fix (commit/ticket): pending — extend the T-002.b acceptance with `with: ChampionId[]`, `lowData`, a `rankBucketSchema` that follows SPECS §3, and the `n` semantics.
-
 ## Template (copy below the table when detailed)
 
 ```
@@ -64,6 +38,32 @@ No new bugs were identified while revising T-013 patch-window and rank-known-cou
 ```
 
 ## Fixed
+
+### B-016 — Bug ID B-007 is used for two different fixed bugs — FIXED
+
+- Severity / Area: S4 / docs
+- Steps to reproduce: search `docs/BUGS.md` for `### B-007`.
+- Expected / Actual:
+  - Expected: every bug has a unique ID.
+  - Actual: "Seed rank was excluded from rank reliability counts" and "Invalid match responses left the ingestion cursor stuck" both used B-007.
+- Environment (OS, Node version, patch): n/a.
+- Logs / screenshot: n/a.
+- Suspected cause: two parallel branches (PR B and PR C) each picked the next free ID.
+- Fix (commit/ticket): B-016 — kept B-007 for "Seed rank was excluded from rank reliability counts"; renumbered the duplicate to B-025 ("Invalid match responses left the ingestion cursor stuck") with the title note "(formerly a duplicate B-007)"; removed B-016 from the Open table and Open detailed section. `pnpm check` not affected (docs-only change).
+
+### B-011 — Shared reason and rank-bucket schemas diverge from SPECS §3/§7 (T-002.b scope expanded to include them) — FIXED
+
+- Severity / Area: S2 / shared
+- Steps to reproduce: compare `reasonSchema`, `manifestSchema.rankBuckets` and `supportPairEntrySchema` in `packages/shared/src/index.ts` with SPECS §3 and §7, then with the T-002.b scope in TICKETS.md.
+- Expected / Actual:
+  - SPECS §7: `Reason.with` should be `ChampionId[]` (a `lane` reason references the lane-group champions, two for `lane_vs` and three for `lane_full`) and `Reason.lowData: boolean` should be present; the schema has a single optional `with: ChampionId` and no `lowData`.
+  - SPECS §3: rank buckets merge MASTER, GRANDMASTER and CHALLENGER into one bucket; `rankBuckets` and the pair-entry bucket use the 10-value `rankSchema` instead of the 8 buckets.
+  - T-002.b adds the `lane` reason type, `games_w2`, `insufficientData` and the pool fields, but none of the above, so the engine (T-023) cannot emit a valid `lane` reason even after T-002.b.
+  - To clarify in SPECS: `Reason.n` and `reliability.games` are integers in the schema, while every threshold uses a real-valued `n_eff`; state whether these fields carry raw games or `n_eff`.
+- Environment (OS, Node version, patch): n/a (contract).
+- Logs / screenshot: n/a.
+- Suspected cause: T-002 predates D-021; the T-002.b parity list (D-011) was written from the new export layout, not from SPECS §7.
+- Fix (commit/ticket): spec + T-002.b scope; implementation in T-002.b. Resolved three owner choices (D-027): `Reason.n` and `Recommendation.reliability.games` carry `n_eff` (a real number); the merged apex bucket is `MASTER_PLUS`; `role-prob.json` is sparse (`z.partialRecord` in zod 4) with probabilities summing to 1 per champion (tolerance 1e-6). SPECS §3 now defines the 8 buckets and states exports + manifest use them; SPECS §7 states `n`/`games` carry `n_eff`; DATA_MODEL documents the sparse role-prob shape, zod-4 `z.partialRecord` requirement, and the sum-to-1 invariant; T-002.b scope and acceptance now include `Reason.with: ChampionId[]`, `Reason.lowData`, `rankBucketSchema`, the role-prob shape, and the sum check.
 
 ### B-015 — Node 20 is documented as supported but better-sqlite3 segfaults on Node 20 — FIXED
 
@@ -236,7 +236,7 @@ No new bugs were identified while revising T-013 patch-window and rank-known-cou
   - The rank summary counted only database rows returned for match participants and reported zero when the fallback seed rank was used.
 - Fix (commit/ticket): C3 — include the seed player's PUUID and fallback rank in `rankSummary`; regression coverage asserts every ingested match has at least one known rank.
 
-### B-007 — Invalid match responses left the ingestion cursor stuck — FIXED
+### B-025 — Invalid match responses left the ingestion cursor stuck (formerly a duplicate B-007) — FIXED
 
 - Severity / Area (engine|etl|web|desktop|vision|docs): S2 / etl
 - Steps to reproduce:

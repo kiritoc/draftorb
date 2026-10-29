@@ -208,6 +208,24 @@ Owner decision 2026-10-29.
 - Alternatives considered: (1) raw games — rejected because thresholds use `n_eff`, so showing raw counts would mislead; (2) `MASTER` without suffix — rejected, ambiguous with the raw MASTER tier; (3) dense maps — rejected, bloats the file with zero entries for off-role champions.
 - Consequences: T-002.b schemas use `z.number().nonnegative()` (not `.int()`) for `Reason.n` and `reliability.games`; a `rankBucketSchema` with 8 values replaces `rankSchema` in bucket-typed fields; `championRoleProbabilitiesSchema` uses `z.partialRecord`; all export rows and `manifest.rankBuckets` carry the 8-value bucket.
 
+### D-029 — Review resolutions: lowData required, manifest version pinned, zero-prob and pool-duplicate guards — ACCEPTED
+
+- Context: Code review flagged four gaps in the T-002.b shared schemas:
+  1. `Reason.lowData` was optional in the schema even though T-002.b calls it a boolean field.
+  2. `manifestSchema.schemaVersion` accepted any positive integer, so tests used both 1 and 2 for the role-keyed manifest with no agreed value.
+  3. `championRoleProbabilitiesSchema` accepted zero-valued role entries (e.g. `{ SUPPORT: 1, TOP: 0 }`) because `min(0)` allows 0 and the sum still equals 1, violating the sparse-map contract in DATA_MODEL.md.
+  4. `championPoolSchema` accepted duplicate champion ids (e.g. `{ SUPPORT: [41, 41] }`), violating the per-role uniqueness contract that feeds recommendation generation.
+- Decision:
+  1. **`Reason.lowData` is required (`z.boolean()`).** The engine emits it for every reason — `true` when the reason's supporting term has `n_eff < minGames` (the term contributes 0 to the score, SPECS §5), `false` otherwise, including for non-data-driven reasons (e.g. `comp`) that carry no sample-size gate.
+  2. **`MANIFEST_SCHEMA_VERSION = 1`** is a shared literal exported from `packages/shared/src/schemas/core.js`. `manifestSchema.schemaVersion` is `z.literal(MANIFEST_SCHEMA_VERSION)`. Version 1 is the agreed format for the role-keyed layout described in DATA_MODEL.md; it is bumped by convention when a JSON format changes, after which both the exporter and loader are updated together.
+  3. **Zero-valued roles are rejected.** The inner value schema uses `z.number().finite().gt(0).max(1)` so any present role must have a positive probability; zero is omitted rather than encoded. This is combined with the existing sum-to-1 refinement (tolerance 1e-6).
+  4. **Duplicate pool ids are rejected.** Each role's array is refined with `new Set(ids).size === ids.length`; the pool-size ceiling (`poolMaxSize`, default 40) remains a UI concern per T-002.b/D-024.
+- Alternatives considered:
+  - Leave `lowData` optional and let the engine choose — rejected, it removes a useful validation signal and contradicts the T-002.b acceptance criterion ("`Reason.lowData` exists").
+  - Accept any version number and let exporters pick — rejected, causes the exact drift the review found (tests using 1 and 2 with no loader agreement).
+  - Keep `min(0)` and add a separate zero-check refinement — rejected in favor of the simpler `gt(0)`, which communicates intent at the value level.
+- Consequences: four test cases updated (zero-valued role map made sparse, duplicate pool id, manifest version pinning, zero-rejection negative test); `MANIFEST_SCHEMA_VERSION` re-exported from the package barrel. No engine or ETL code consumed these schemas yet (T-020/T-019 are not started), so no downstream breakage.
+
 ### Template
 
 ```

@@ -1,7 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { describe, it, expect } from 'vitest';
 
 import {
+  type BaselineEntry,
+  type DraftResult,
+  type RankBucket,
+  type Rank,
+  allyPairEntrySchema,
+  baselineEntrySchema,
   championIdSchema,
+  championPoolSchema,
   championRangeSchema,
   championRoleProbabilitiesSchema,
   championSchema,
@@ -10,16 +17,24 @@ import {
   championTagsSchema,
   damageTypeSchema,
   draftInputSchema,
+  draftResultSchema,
+  enemyPairEntrySchema,
   gameStateSchema,
   itemIdSchema,
+  itemBuildExportSchema,
   itemSchema,
   itemsMapSchema,
   itemTagsSchema,
   itemTagsMapSchema,
+  laneFullEntrySchema,
+  laneVsEntrySchema,
   manifestSchema,
+  rankBucketSchema,
   rankSchema,
   recommendationSchema,
+  reasonTypeSchema,
   roleSchema,
+  runeExportSchema,
   runePageSchema,
   runeTreeSchema,
   runeTreesSchema,
@@ -33,7 +48,28 @@ import {
 describe('shared schemas', () => {
   it('accepts valid rank and role values', () => {
     expect(rankSchema.parse('DIAMOND')).toBe('DIAMOND');
+    expect(rankSchema.parse('CHALLENGER')).toBe('CHALLENGER');
     expect(roleSchema.parse('SUPPORT')).toBe('SUPPORT');
+  });
+
+  it('rankBucketSchema accepts the 8 buckets and rejects raw tiers', () => {
+    const buckets: RankBucket[] = [
+      'IRON',
+      'BRONZE',
+      'SILVER',
+      'GOLD',
+      'PLATINUM',
+      'EMERALD',
+      'DIAMOND',
+      'MASTER_PLUS',
+    ];
+    for (const b of buckets) {
+      expect(rankBucketSchema.parse(b)).toBe(b);
+    }
+    expect(() => rankSchema.parse('PLAT')).toThrow();
+    expect(() => rankBucketSchema.parse('MASTER' as Rank)).toThrow();
+    expect(() => rankBucketSchema.parse('CHALLENGER' as Rank)).toThrow();
+    expect(() => rankBucketSchema.parse('GRANDMASTER' as Rank)).toThrow();
   });
 
   it('accepts a valid draft input', () => {
@@ -54,13 +90,16 @@ describe('shared schemas', () => {
     expect(() => rankSchema.parse('PLAT')).toThrow();
   });
 
-  it('accepts a recommendation payload and game state', () => {
+  it('accepts a recommendation payload with new reason fields and game state', () => {
     const recommendation = {
       championId: 41,
       score: 12.5,
       rank: 1,
-      reasons: [{ type: 'synergy', with: 18, level: 2, deltaPp: 1.5, n: 120 }],
-      reliability: { games: 80, lowData: false },
+      reasons: [
+        { type: 'lane', with: [41, 34], level: 2, deltaPp: 1.5, n: 120.5, lowData: false },
+        { type: 'synergy', with: [18], level: 1, deltaPp: 0.8, lowData: true },
+      ],
+      reliability: { games: 80.5, lowData: false },
       warnings: ['countered by enemy support'],
     };
 
@@ -80,6 +119,40 @@ describe('shared schemas', () => {
     expect(gameStateSchema.parse(gameState)).toEqual(gameState);
   });
 
+  it('reasonTypeSchema includes lane', () => {
+    expect(reasonTypeSchema.parse('synergy')).toBe('synergy');
+    expect(reasonTypeSchema.parse('counter')).toBe('counter');
+    expect(reasonTypeSchema.parse('comp')).toBe('comp');
+    expect(reasonTypeSchema.parse('blind')).toBe('blind');
+    expect(reasonTypeSchema.parse('lane')).toBe('lane');
+  });
+
+  it('rejects non-array Reason.with', () => {
+    expect(() =>
+      recommendationSchema.parse({
+        championId: 41,
+        score: 12.5,
+        rank: 1,
+        reasons: [{ type: 'synergy', with: 18 }],
+        reliability: { games: 80, lowData: false },
+        warnings: [],
+      }),
+    ).toThrow();
+  });
+
+  it('recommendation accepts optional poolRank', () => {
+    const rec = {
+      championId: 41,
+      score: 12.5,
+      rank: 1,
+      poolRank: 1,
+      reasons: [],
+      reliability: { games: 80, lowData: false },
+      warnings: [],
+    };
+    expect(recommendationSchema.parse(rec)).toEqual(rec);
+  });
+
   it('validates static data payloads', () => {
     const champion = {
       id: 41,
@@ -91,9 +164,15 @@ describe('shared schemas', () => {
     expect(championsMapSchema.parse({ '41': champion })).toEqual({ '41': champion });
 
     const roleMap = {
-      '41': { SUPPORT: 0.82, ADC: 0.12, MID: 0.06, TOP: 0, JUNGLE: 0 },
+      '41': { SUPPORT: 0.82, ADC: 0.12, MID: 0.06 },
     };
     expect(championRoleProbabilitiesSchema.parse(roleMap)).toEqual(roleMap);
+
+    const sparseRoleMap = {
+      '41': { SUPPORT: 1.0 },
+      '34': { TOP: 0.7, JUNGLE: 0.3 },
+    };
+    expect(championRoleProbabilitiesSchema.parse(sparseRoleMap)).toEqual(sparseRoleMap);
 
     const tags = {
       '41': {
@@ -114,7 +193,6 @@ describe('shared schemas', () => {
     expect(damageTypeSchema.parse('AP')).toBe('AP');
     expect(championRangeSchema.parse('RANGED')).toBe('RANGED');
 
-    // Mismatched map key vs championId
     expect(() =>
       championTagsMapSchema.parse({
         '999': {
@@ -137,10 +215,27 @@ describe('shared schemas', () => {
       generatedAt: '2026-10-22T00:00:00Z',
       region: 'EUW',
       rankBuckets: ['DIAMOND'],
+      roles: ['SUPPORT'],
       files: [{ path: 'champions.json' }],
       schemaVersion: 1,
     };
     expect(manifestSchema.parse(manifest)).toEqual(manifest);
+  });
+
+  it('rejects champion role probabilities that do not sum to 1', () => {
+    expect(() =>
+      championRoleProbabilitiesSchema.parse({
+        '41': { SUPPORT: 0.5, ADC: 0.3 },
+      }),
+    ).toThrow();
+  });
+
+  it('rejects role probabilities with zero-valued roles', () => {
+    expect(() =>
+      championRoleProbabilitiesSchema.parse({
+        '41': { SUPPORT: 1, TOP: 0 },
+      }),
+    ).toThrow();
   });
 
   it('rejects invalid champion ids and blanks', () => {
@@ -210,28 +305,170 @@ describe('shared schemas', () => {
       keystoneId: 8005,
       selectedPerkIds: [8005, 9111, 9104, 8299, 8444, 8453],
       statShardIds: [5008, 5002, 5003],
+      winsWeighted: 154.2,
+      gamesWeighted: 300.0,
+      gamesW2: 900.0,
       winrate: 0.534,
       pickShare: 0.41,
     };
     expect(runePageSchema.parse(runePage)).toEqual(runePage);
   });
 
-  it('validates support baseline and support pair tables without loose rest elements', () => {
+  it('validates support baseline and support pair tables with gamesW2', () => {
     const baselineEntry = {
       championId: 41,
       rankBucket: 'DIAMOND',
       winsWeighted: 154.2,
       gamesWeighted: 300.0,
+      gamesW2: 900.0,
     };
     expect(supportBaselineEntrySchema.parse(baselineEntry)).toEqual(baselineEntry);
     expect(supportBaselineTableSchema.parse([baselineEntry])).toEqual([baselineEntry]);
 
-    const validPair = [41, 18, 'ADC', 'DIAMOND', 52.4, 100.0] as const;
+    const validPair = [41, 18, 'ADC', 'DIAMOND', 52.4, 100.0, 250.0] as const;
     expect(supportPairEntrySchema.parse(validPair)).toEqual(validPair);
     expect(supportPairTableSchema.parse([validPair])).toEqual([validPair]);
 
-    // Rejects tuples with extra elements (verifies removal of .rest())
-    const invalidPairTooLong = [41, 18, 'ADC', 'DIAMOND', 52.4, 100.0, 999.0];
-    expect(() => supportPairEntrySchema.parse(invalidPairTooLong)).toThrow();
+    const invalidPairTooShort = [41, 18, 'ADC', 'DIAMOND', 52.4, 100.0] as const;
+    expect(() => supportPairEntrySchema.parse(invalidPairTooShort)).toThrow();
+  });
+
+  it('validates role-keyed export tuple schemas', () => {
+    const baseline: BaselineEntry = [41, 'DIAMOND', 52.4, 100.0, 250.0];
+    expect(baselineEntrySchema.parse(baseline)).toEqual(baseline);
+
+    const allyPair = [41, 18, 'ADC', 'DIAMOND', 52.4, 100.0, 250.0] as const;
+    expect(allyPairEntrySchema.parse(allyPair)).toEqual(allyPair);
+
+    const enemyPair = [41, 34, 'TOP', 'EMERALD', 40.0, 80.0, 160.0] as const;
+    expect(enemyPairEntrySchema.parse(enemyPair)).toEqual(enemyPair);
+
+    const laneVs1v1 = [41, 34, null, 'DIAMOND', 50.0, 100.0, 250.0] as const;
+    expect(laneVsEntrySchema.parse(laneVs1v1)).toEqual(laneVs1v1);
+
+    const laneVs2v2 = [41, 34, 54, 'DIAMOND', 50.0, 100.0, 250.0] as const;
+    expect(laneVsEntrySchema.parse(laneVs2v2)).toEqual(laneVs2v2);
+
+    const laneFull1v1 = [41, null, 34, null, 'DIAMOND', 50.0, 100.0, 250.0] as const;
+    expect(laneFullEntrySchema.parse(laneFull1v1)).toEqual(laneFull1v1);
+
+    const laneFull2v2 = [41, 18, 34, 54, 'DIAMOND', 50.0, 100.0, 250.0] as const;
+    expect(laneFullEntrySchema.parse(laneFull2v2)).toEqual(laneFull2v2);
+  });
+
+  it('rejects rankSchema values where rankBucketSchema is expected', () => {
+    expect(() => baselineEntrySchema.parse([41, 'MASTER' as Rank, 52.4, 100.0, 250.0])).toThrow();
+    expect(() => baselineEntrySchema.parse([41, 'MASTER_PLUS', 52.4, 100.0, 250.0])).not.toThrow();
+  });
+
+  it('validates champion pool storage envelope', () => {
+    const pool = {
+      version: 1,
+      pools: {
+        SUPPORT: [41, 18, 34, 54],
+        ADC: [18, 54],
+      },
+    };
+    expect(championPoolSchema.parse(pool)).toEqual(pool);
+
+    expect(() => championPoolSchema.parse({ version: 2, pools: {} })).toThrow();
+    expect(() => championPoolSchema.parse({ version: 1, pools: { TOP: [-1] } })).toThrow();
+    expect(() => championPoolSchema.parse({ version: 1, pools: { SUPPORT: [41, 41] } })).toThrow();
+  });
+
+  it('validates DraftResult with insufficientData and pool recommendations', () => {
+    const result: DraftResult = {
+      recommendations: [
+        {
+          championId: 41,
+          score: 0.72,
+          rank: 1,
+          reasons: [{ type: 'synergy', with: [18], level: 2, n: 120.5, lowData: false }],
+          reliability: { games: 150.3, lowData: false },
+          warnings: [],
+        },
+      ],
+      insufficientData: [{ championId: 54, nEff: 12.5, rawGames: 20 }],
+      poolRecommendations: [
+        {
+          championId: 41,
+          score: 0.72,
+          rank: 1,
+          poolRank: 1,
+          reasons: [],
+          reliability: { games: 150.3, lowData: false },
+          warnings: [],
+        },
+      ],
+      poolUnavailable: [{ championId: 54, reason: 'insufficientData' }],
+    };
+    expect(draftResultSchema.parse(result)).toEqual(result);
+
+    expect(() =>
+      draftResultSchema.parse({
+        recommendations: [],
+        insufficientData: [{ championId: 54, nEff: 12.5, rawGames: 20 }],
+      }),
+    ).not.toThrow();
+
+    expect(() =>
+      draftResultSchema.parse({
+        recommendations: [],
+        insufficientData: [{ championId: 54, nEff: 12.5, rawGames: 20 }],
+        poolUnavailable: [{ championId: 999, reason: 'bogus' }],
+      }),
+    ).toThrow();
+  });
+
+  it('validates rune and item build export schemas', () => {
+    const runeExport = {
+      championId: 41,
+      myRole: 'SUPPORT',
+      contexts: [
+        {
+          contextKey: 'lane:enemySupport,enemyAdc',
+          contextLevel: 1,
+          pages: [
+            {
+              primaryStyleId: 8000,
+              subStyleId: 8400,
+              keystoneId: 8005,
+              selectedPerkIds: [8005, 9111, 9104, 8299, 8444, 8453],
+              winsW: 154.2,
+              gamesW: 300.0,
+              gamesW2: 900.0,
+              winrate: 0.534,
+              pickShare: 0.41,
+            },
+          ],
+        },
+      ],
+    };
+    expect(runeExportSchema.parse(runeExport)).toEqual(runeExport);
+
+    const itemExport = {
+      championId: 41,
+      myRole: 'SUPPORT',
+      contexts: [
+        {
+          slotIdx: 1,
+          timeBucket: '5-10min',
+          stateBucket: 'ahead',
+          profileKey: 'AP',
+          laneKey: 'lane:enemySupport,enemyAdc',
+          items: [
+            {
+              itemId: 3089,
+              winsW: 154.2,
+              gamesW: 300.0,
+              gamesW2: 900.0,
+              winrate: 0.534,
+              pickShare: 0.41,
+            },
+          ],
+        },
+      ],
+    };
+    expect(itemBuildExportSchema.parse(itemExport)).toEqual(itemExport);
   });
 });

@@ -3,14 +3,14 @@
 ## Current status
 
 - Phase: 1 (Support / Diamond)
-- Current milestone: M0 Foundations (in progress, T-002.b TODO) and M1 ETL (in progress: ingestion done; enrichment, aggregation and export TODO) -> M2 Engine
-- Last updated: 2026-10-28 by Devin
+- Current milestone: M0 Foundations (T-002.b DONE) and M1 ETL (in progress: ingestion done; enrichment, aggregation and export TODO) -> M2 Engine
+- Last updated: 2026-10-29 by Kilo
 
 ## Epic status
 
 | Epic           | Status      | Notes                                                                                |
 | -------------- | ----------- | ------------------------------------------------------------------------------------ |
-| E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b TODO                                                      |
+| E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b DONE                                                      |
 | E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e DONE; T-014 ready |
 | E2 Engine      | NOT STARTED | T-020 unblocked (D-020..D-023 accepted); implement T-020 then T-021..T-023           |
 | E3 Web MVP     | NOT STARTED |                                                                                      |
@@ -27,7 +27,7 @@
 
 ## Next recommended ticket
 
-B-017 done (engine and shared `"types": []` plus ESLint purity guardrails in `eslint.config.mjs` with automated regression tests; T-020's engine-purity prerequisite is fully satisfied — the residual `tsc` gap caused by test files importing `vitest` is logged as B-021 and not fixed). B-022 (all Node built-ins blocked), B-023 (Date() call blocked) and B-024 (regression tests) also fixed. B-011 fixed (spec + T-002.b scope; implementation in T-002.b). Fix B-012 done. T-013.e done (typed schema-less `request()`, timeout/invalid-JSON regression tests, CLI + matches refactor below 300 lines; `pnpm check` 144 tests). **T-013.d done** (`pnpm etl status`, read-only parameterized counts and progress, empty & seeded database tests, CLI handling when database does not exist; `pnpm check` 153 tests). **D-008, D-011, D-017, D-018, D-020, D-021, D-022, D-023 accepted (2026-10-29); D-028 (formerly D-025, @types/... devDeps) renumbered and accepted.** SPECS §5/§8 are now normative. Next: **T-002.b** (Shared schema parity, now fully unblocked — D-020..D-023 accepted, D-027 locked; SPECS §5/§8 normative) or **T-020** (Rank weighting module, all blockers resolved) or **T-014** (Participant enrichment, data-blocked).
+B-017 done (engine and shared `"types": []` plus ESLint purity guardrails in `eslint.config.mjs` with automated regression tests; T-020's engine-purity prerequisite is fully satisfied — the residual `tsc` gap caused by test files importing `vitest` is logged as B-021 and not fixed). B-022 (all Node built-ins blocked), B-023 (Date() call blocked) and B-024 (regression tests) also fixed. B-011 fixed (spec + T-002.b scope; implementation in T-002.b). Fix B-012 done. T-013.e done (typed schema-less `request()`, timeout/invalid-JSON regression tests, CLI + matches refactor below 300 lines; `pnpm check` 184 tests). **T-013.d done** (`pnpm etl status`, read-only parameterized counts and progress, empty & seeded database tests, CLI handling when database does not exist; `pnpm check` 153 tests). **D-008, D-011, D-017, D-018, D-020, D-021, D-022, D-023 accepted (2026-10-29); D-028 (formerly D-025, @types/... devDeps) renumbered and accepted.** SPECS §5/§8 are now normative. **T-002.b DONE** (shared schema parity); `packages/shared/src/index.ts` split by domain into `schemas/*.ts` (10 modules); rankBucketSchema (8 buckets), sparse role-prob with sum-to-1, Reason.with as ChampionId[], Reason.lowData, n_eff non-integer, lane reason type, DraftResult with insufficientData/poolRecommendations/poolUnavailable, championPoolSchema, manifest roles, all role-keyed export tuple schemas with games_w2, rune/build export schemas; 184 tests pass. Next: **T-020** (Rank weighting module, first engine module) or **T-014** (Participant enrichment, data-blocked).
 
 ## Open questions for the owner
 
@@ -38,6 +38,44 @@ B-017 done (engine and shared `"types": []` plus ESLint purity guardrails in `es
 ## Session log (newest first)
 
 The 2026-10-22 entries had no timestamps; their order was reconstructed from ticket dependencies on 2026-10-26.
+
+### 2026-10-29 — Kilo — Review fixes for T-002.b schemas (D-029)
+
+- Done:
+  - **reasons.ts**: `Reason.lowData` changed from optional to required (`z.boolean()`). Documented that the engine emits it for every reason: `true` when the supporting term has `n_eff < minGames` (the term contributes 0 to the score), `false` otherwise including non-data-driven reasons (e.g. `comp`).
+  - **core.ts**: added `MANIFEST_SCHEMA_VERSION = 1` shared constant and re-exported it from the barrel.
+  - **manifest.ts**: `schemaVersion` changed from `z.number().int().positive()` to `z.literal(MANIFEST_SCHEMA_VERSION)`, pinning the role-keyed manifest to the agreed version 1. Updated doc comment.
+  - **champions.ts**: `roleProbInnerSchema` value changed from `z.number().finite().min(0).max(1)` to `z.number().finite().gt(0).max(1)`, rejecting zero-valued role entries that violate the sparse-map contract. Sum-to-1 refinement retained.
+  - **draft.ts**: `championPoolSchema` now uses a refined `z.array(championIdSchema)` that rejects duplicate champion ids per role. Updated doc comment.
+  - **index.test.ts**: made the zero-valued role-map test sparse (removed `TOP: 0, JUNGLE: 0`); added a negative test rejecting zero-valued roles; added a negative test rejecting duplicate pool ids.
+  - **parity.test.ts**: changed manifest `schemaVersion` from 2 to 1; added negative assertion that version 2 is rejected; added `MANIFEST_SCHEMA_VERSION` export check.
+  - **DECISIONS.md**: added D-029 documenting all four review resolutions.
+- Files touched: `packages/shared/src/schemas/core.ts`, `packages/shared/src/schemas/reasons.ts`, `packages/shared/src/schemas/manifest.ts`, `packages/shared/src/schemas/champions.ts`, `packages/shared/src/schemas/draft.ts`, `packages/shared/src/index.ts`, `packages/shared/src/index.test.ts`, `packages/shared/src/schemas/parity.test.ts`, `docs/DECISIONS.md`, `docs/PROGRESS.md`
+- Tests: `pnpm check` — green (18 test files, 185 tests passed; +1 new test for zero-prob rejection).
+- State left: DONE (review fixes).
+- Next step: T-020 (Rank weighting module — first engine module).
+- Pitfalls / notes for next AI: no downstream consumers of these schemas yet (T-020/T-019 not started); all changes are pure schema/validation fixes with no logic.
+
+### 2026-10-29 — Kilo — Ticket T-002.b (Shared schema parity for D-020..D-023)
+
+- Done:
+  - Split `packages/shared/src/index.ts` (was 312 lines, over the 300-line convention) into domain modules under `packages/shared/src/schemas/`: `core.ts` (SHARED_VERSION, roleSchema, rankSchema, rankBucketSchema, championId/itemId, damageType, championRange), `reasons.ts` (reasonType/reasonLevel/reason, reliability, recommendation), `draft.ts` (slot, draftInput, championPool, insufficientDataEntry, poolUnavailableEntry, draftResult), `game.ts` (playerState, gameState), `champions.ts` (champion, championsMap, championRoleProbabilities), `tags.ts` (tags), `manifest.ts` (manifestFile, manifest), `tables.ts` (support* + role-keyed export tuples), `items.ts` (item + itemBuild export schemas), `runes.ts` (rune trees, runePage, rune export schemas). `index.ts` is now a thin re-export barrel.
+  - Added `rankBucketSchema` (8 buckets: IRON, BRONZE, SILVER, GOLD, PLATINUM, EMERALD, DIAMOND, MASTER_PLUS) replacing `rankSchema` in `supportPairEntrySchema`, `supportBaselineEntrySchema`, and `manifestSchema.rankBuckets`. `rankSchema` (10 raw tiers) retained for `draftInputSchema.userRank` and CLI tier parsing.
+  - Reason type `lane` added to `reasonTypeSchema`. `Reason.with` changed from single `ChampionId` to `ChampionId[]`. `Reason.lowData` added. `Reason.n` and `Reliability.games` changed from `z.number().int()` to `z.number()` (n_eff is a real number, D-027).
+  - `Recommendation.poolRank?` added (D-024). `DraftResult` schema added with `insufficientData` (`{ championId, nEff, rawGames }`), `poolRecommendations?` (Recommendation[]), `poolUnavailable?` (`{ championId, reason: 'insufficientData' | 'unknownChampion' }[]`).
+  - `championPoolSchema` added: versioned envelope `{ version: 1, pools: { <ROLE>: ChampionId[] } }` using `z.partialRecord` for sparse role maps.
+  - `championRoleProbabilitiesSchema` changed to sparse via `z.partialRecord(roleSchema, ...)` with sum-to-1 refinement (tolerance 1e-6, D-027).
+  - Manifest schema: added `roles: z.array(roleSchema)`, changed `rankBuckets` to `z.array(rankBucketSchema)`.
+  - Added role-keyed export tuple schemas (DATA_MODEL.md): `baselineEntrySchema` (5-tuple), `allyPairEntrySchema` (7-tuple), `enemyPairEntrySchema` (7-tuple), `laneVsEntrySchema` (7-tuple with nullable opp2Id for 1v1), `laneFullEntrySchema` (8-tuple with nullable partnerId/opp2Id for 1v1). All include `gamesW2`.
+  - Added rune export schemas (`runeContextPageSchema`, `runeContextEntrySchema`, `runeExportSchema`) and item build export schemas (`itemBuildEntrySchema`, `itemBuildContextSchema`, `itemBuildExportSchema`) with `gamesW2` on every row. Added `gamesW2` to existing `runePageSchema`.
+  - Added `CHAMPIONS_TRIVIAL_VERSION` constant note. Updated `tags.ts` with `ChampionTagsScaling` type export.
+  - Updated `index.test.ts`: all existing tests updated for new field shapes; added 10 new test cases covering rankBucketSchema, sparse role-prob, non-array `with` rejection, poolRank, lane reason type, non-integer n_eff, role-keyed export tuples, nullable lane fields, pool envelope, DraftResult, rune/build exports.
+  - Added `schemas/parity.test.ts`: 17 D-011 contract parity tests that fail if any required schema or field is missing.
+- Files touched: `packages/shared/src/index.ts` (rewritten as barrel), `packages/shared/src/schemas/core.ts` (new), `packages/shared/src/schemas/reasons.ts` (new), `packages/shared/src/schemas/draft.ts` (new), `packages/shared/src/schemas/game.ts` (new), `packages/shared/src/schemas/champions.ts` (new), `packages/shared/src/schemas/tags.ts` (new), `packages/shared/src/schemas/manifest.ts` (new), `packages/shared/src/schemas/tables.ts` (new), `packages/shared/src/schemas/items.ts` (new), `packages/shared/src/schemas/runes.ts` (new), `packages/shared/src/index.test.ts` (updated), `packages/shared/src/schemas/parity.test.ts` (new), `docs/TICKETS.md`, `docs/PROGRESS.md`
+- Tests: `pnpm check` — green (18 test files, 184 tests passed). No existing tests modified beyond schema-shape updates; no behavior changed in ETL/engine packages.
+- State left: DONE (T-002.b).
+- Next step: T-020 (Rank weighting module — first engine module, all purity guardrails in place) or T-014 (Participant enrichment, data-blocked).
+- Pitfalls / notes for next AI: `rankSchema` (10 tiers) is still the correct schema for `DraftInput.userRank` and CLI tier parsing; `rankBucketSchema` (8 buckets) is used only for aggregation/export row `bucket` columns and manifest. The `WEIGHTS` const tuple in `tables.ts` uses `as const` — if you need to add a field to all export schemas, update the tuple there.
 
 ### 2026-10-29 — Antigravity — ADR review: accept D-008, D-011, D-017, D-018, D-020..D-023, D-028
 

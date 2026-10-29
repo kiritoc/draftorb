@@ -1,7 +1,12 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import { championTagsMapSchema, type ChampionsMap, type ChampionTagsMap } from '@draftorb/shared';
+import {
+  championTagsMapSchema,
+  championsMapSchema,
+  type ChampionsMap,
+  type ChampionTagsMap,
+} from '@draftorb/shared';
 import { resolveRepoRoot } from './config/paths';
 
 export interface ChampionCoverageItem {
@@ -88,9 +93,7 @@ export function evaluateChampionTagsCoverage(
   }
 
   const supportCoveragePercent =
-    totalSupportCount > 0
-      ? Number(((taggedSupportCount / totalSupportCount) * 100).toFixed(1))
-      : 100;
+    totalSupportCount > 0 ? Number(((taggedSupportCount / totalSupportCount) * 100).toFixed(1)) : 0;
 
   const overallCoveragePercent =
     totalChampions > 0 ? Number(((Object.keys(tags).length / totalChampions) * 100).toFixed(1)) : 0;
@@ -133,8 +136,11 @@ export function formatCoverageReport(coverage: ChampionTagsCoverageReport): stri
       lines.push(`  - [ID: ${sup.id}] ${sup.name} (roles: ${sup.roles.join(', ')})`);
     }
     lines.push('----------------------------------------------------');
-  } else {
+  } else if (coverage.totalSupportCount > 0) {
     lines.push('All required support champions are tagged! (100% support coverage)');
+    lines.push('----------------------------------------------------');
+  } else {
+    lines.push('No support champions found in catalog.');
     lines.push('----------------------------------------------------');
   }
 
@@ -222,7 +228,7 @@ export async function validateChampionTagsFile(
   const parseResult = championTagsMapSchema.safeParse(parsedRawTags);
   if (!parseResult.success) {
     for (const issue of parseResult.error.issues) {
-      errors.push(`Schema error at ${issue.path.join('.')}: ${issue.message}`);
+      errors.push(`Schema error at ${issue.path.join('.') || '(root)'}: ${issue.message}`);
     }
   }
 
@@ -238,8 +244,26 @@ export async function validateChampionTagsFile(
     );
   }
 
-  const parsedChampions = JSON.parse(rawChampionsContent) as ChampionsMap;
-  const coverage = evaluateChampionTagsCoverage(tags, parsedChampions);
+  let parsedChampions: unknown;
+  try {
+    parsedChampions = JSON.parse(rawChampionsContent);
+  } catch (err) {
+    throw new Error(
+      `Champions file is not valid JSON: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
+  const championsParse = championsMapSchema.safeParse(parsedChampions);
+  if (!championsParse.success) {
+    for (const issue of championsParse.error.issues) {
+      errors.push(
+        `Champions schema error at ${issue.path.join('.') || '(root)'}: ${issue.message}`,
+      );
+    }
+  }
+
+  const champions: ChampionsMap = championsParse.success ? championsParse.data : {};
+  const coverage = evaluateChampionTagsCoverage(tags, champions);
 
   if (coverage.missingSupports.length > 0) {
     for (const missing of coverage.missingSupports) {

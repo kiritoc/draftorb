@@ -117,6 +117,44 @@ describe('champion tags coverage and validation', () => {
     expect(result.coverage.flexPicks.length).toBeGreaterThan(0);
   });
 
+  it('reports errors and empty coverage for a malformed champions catalog', async () => {
+    const repoRoot = path.resolve(__dirname, '../../..');
+    const invalidChampionsPath = path.join(
+      repoRoot,
+      'data',
+      'manual',
+      'test-malformed-champions.json',
+    );
+
+    // 'BOGUS' is not a valid Role, so the champions catalog fails schema validation.
+    await fs.writeFile(
+      invalidChampionsPath,
+      JSON.stringify({
+        '1': { id: 1, name: 'Annie', icon: 'Annie.png', roles: ['BOGUS'] },
+      }),
+      'utf8',
+    );
+    try {
+      const result = await validateChampionTagsFile({
+        championsFilePath: invalidChampionsPath,
+        repoRoot,
+      });
+
+      expect(result.isValid).toBe(false);
+      expect(result.errors.some((e) => e.includes('Champions schema error'))).toBe(true);
+      // Coverage is computed over the empty fallback, so it reports no champions
+      // and does NOT falsely claim 100% support coverage.
+      expect(result.coverage.totalChampions).toBe(0);
+      expect(result.coverage.supportCoveragePercent).toBe(0);
+      expect(result.coverage.overallCoveragePercent).toBe(0);
+      expect(formatCoverageReport(result.coverage)).not.toContain(
+        'All required support champions are tagged!',
+      );
+    } finally {
+      await fs.unlink(invalidChampionsPath).catch(() => {});
+    }
+  });
+
   it('reports errors when validating invalid tags data or missing files', async () => {
     await expect(
       validateChampionTagsFile({

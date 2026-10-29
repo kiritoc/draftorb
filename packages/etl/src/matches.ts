@@ -1,36 +1,26 @@
 import type Database from 'better-sqlite3';
 
-import {
-  RiotClient,
-  RiotApiError,
-  RiotAuthError,
-  RiotSchemaError,
-  riotMatchDtoSchema,
-  type Platform,
-} from './riot';
-import { extractParticipants, InvalidMatchParticipantsError } from './participants';
-import { resolveDbPath } from './config/paths';
+import { RiotClient, RiotAuthError, type Platform } from './riot';
 import { openDb, migrate } from './db';
-import {
-  isCompleteStoredMatch,
-  persistAcceptedMatch,
-  prepareMatchPersist,
-  storedParticipantCount,
-} from './matches-persist';
+import { resolveDbPath } from './config/paths';
 import {
   clearIngestState,
   createRankLoader,
   cursorKey,
-  evaluateMatch,
-  findRejection,
   listMatchIds,
-  patchFromGameVersion,
-  rankSummary,
   readCursor,
   windowWidened,
   writeCursor,
   type PlayerCursor,
 } from './matches-store';
+import { prepareMatchPersist } from './matches-persist';
+import {
+  isTransientMatchError,
+  processMatch,
+  type MatchProcessContext,
+  type MatchProcessResult,
+  type RunTotals,
+} from './matches-process';
 
 export const RANKED_SOLO_QUEUE_ID = 420;
 export const DEFAULT_MATCHES_PER_PLAYER = 20;
@@ -78,6 +68,17 @@ interface PlayerRow {
   rank_score: number;
 }
 
+const ZERO_RUN: RunTotals = { stored: 0, duplicates: 0, filtered: 0, invalid: 0 };
+
+function buildPlayerResult(
+  puuid: string,
+  status: PlayerIngestionResult['status'],
+  listed: number,
+  run: RunTotals,
+): PlayerIngestionResult {
+  return { puuid, status, listed, ...run };
+}
+
 const newCursor = (
   snapshot: string[],
   lastGameCreation = 0,
@@ -94,17 +95,6 @@ const newCursor = (
   invalid: 0,
   updatedAt: 0,
 });
-
-function isTransientMatchError(error: unknown): boolean {
-  if (error instanceof RiotAuthError) return false;
-  if (error instanceof RiotSchemaError) return false;
-  if (error instanceof RiotApiError) {
-    if (error.status === 429) return true;
-    if (error.status >= 500) return true;
-    if (error.status === 0) return true;
-  }
-  return error instanceof Error && /network|timeout|fetch/i.test(error.message);
-}
 
 export async function ingestMatches(
   options: MatchIngestionOptions = {},
@@ -175,15 +165,7 @@ export async function ingestMatches(
           if (newIds.length === 0) {
             consecutiveFailed = 0;
             playersSkipped += 1;
-            playerResults.push({
-              puuid: player.puuid,
-              status: 'skipped',
-              listed: 0,
-              stored: 0,
-              duplicates: 0,
-              filtered: 0,
-              invalid: 0,
-            });
+            playerResults.push(buildPlayerResult(player.puuid, 'skipped', 0, ZERO_RUN));
             continue;
           }
           cursor = newCursor(newIds, cursor.lastGameCreation, sincePatch);
@@ -198,15 +180,9 @@ export async function ingestMatches(
         if (isTransientMatchError(error)) {
           playersFailed += 1;
           consecutiveFailed += 1;
-          playerResults.push({
-            puuid: player.puuid,
-            status: 'failed',
-            listed: cursor?.snapshot.length ?? 0,
-            stored: 0,
-            duplicates: 0,
-            filtered: 0,
-            invalid: 0,
-          });
+          playerResults.push(
+            buildPlayerResult(player.puuid, 'failed', cursor?.snapshot.length ?? 0, ZERO_RUN),
+          );
           log(
             `[${index + 1}/${players.length}] ${player.puuid.slice(0, 12)}… transient failure while listing match ids`,
           );
@@ -224,169 +200,36 @@ export async function ingestMatches(
         filtered: cursor.filtered,
         invalid: cursor.invalid,
       };
-      const run = { stored: 0, duplicates: 0, filtered: 0, invalid: 0 };
-      let lastGameCreation = cursor.lastGameCreation;
+      const run: RunTotals = { stored: 0, duplicates: 0, filtered: 0, invalid: 0 };
       let playerFailed = false;
+
+      const ctx: MatchProcessContext = {
+        db,
+        stmts,
+        client,
+        platform,
+        cursorKey: key,
+        queueId,
+        minDuration,
+        sincePatch,
+        player: { puuid: player.puuid, rank_score: player.rank_score },
+        loadRanks,
+        base,
+      };
 
       for (let i = cursor.processed; i < cursor.snapshot.length; i += 1) {
         const matchId = cursor.snapshot[i] as string;
-        let outcome: 'stored' | 'duplicate' | 'filtered' | 'invalid' = 'filtered';
-        let didCountOutcome = false;
-        let repairingIncompleteMatch = false;
-
-        try {
-          const participantCount = storedParticipantCount(stmts, matchId);
-          if (findRejection(db, matchId, sincePatch)) {
-            outcome = 'filtered';
-          } else if (isCompleteStoredMatch(participantCount)) {
-            outcome = 'duplicate';
-          } else {
-            repairingIncompleteMatch = participantCount !== undefined;
-            const raw = await client.getMatch(platform, matchId);
-            const parsed = riotMatchDtoSchema.safeParse(raw);
-            if (!parsed.success) {
-              throw new RiotSchemaError(matchId, parsed.error.message);
-            }
-            const match = parsed.data;
-            const evaluated = evaluateMatch(match, queueId, minDuration, sincePatch);
-            outcome = evaluated.outcome;
-            if (evaluated.reason === null) {
-              lastGameCreation = Math.max(lastGameCreation, match.info.gameCreation);
-              const participantIds = match.info.participants.map(
-                (matchParticipant) => matchParticipant.puuid,
-              );
-              const ranksByPuuid = loadRanks(participantIds);
-              const participants = extractParticipants(match, ranksByPuuid);
-              const rank = rankSummary(
-                ranksByPuuid,
-                participants.map((row) => row.puuid),
-                player.puuid,
-                player.rank_score,
-              );
-              const matchRow = {
-                match_id: matchId,
-                platform,
-                patch: patchFromGameVersion(match.info.gameVersion),
-                queue_id: match.info.queueId,
-                duration: match.info.gameDuration,
-                created_at: match.info.gameCreation,
-                avg_rank_score: rank.avg,
-                rank_known_count: rank.known,
-              };
-              outcome = persistAcceptedMatch(db, stmts, {
-                match: matchRow,
-                participants,
-                repairingIncompleteMatch,
-                cursorKey: key,
-                applyOutcome: (persisted) => {
-                  cursor.processed = i + 1;
-                  cursor.stored = base.stored + run.stored + (persisted === 'stored' ? 1 : 0);
-                  cursor.duplicates =
-                    base.duplicates + run.duplicates + (persisted === 'duplicate' ? 1 : 0);
-                  cursor.filtered = base.filtered + run.filtered;
-                  cursor.invalid = base.invalid + run.invalid;
-                  cursor.lastGameCreation = lastGameCreation;
-                  cursor.updatedAt = Date.now();
-                  return cursor;
-                },
-              });
-              if (outcome === 'duplicate') {
-                run.duplicates += 1;
-              } else {
-                run.stored += 1;
-              }
-              didCountOutcome = true;
-            } else {
-              const persist = db.transaction(() => {
-                stmts.insertReject.run({
-                  match_id: matchId,
-                  reason: evaluated.reason,
-                  patch:
-                    evaluated.reason === 'patch'
-                      ? patchFromGameVersion(match.info.gameVersion)
-                      : null,
-                  checked_at: Date.now(),
-                });
-                if (repairingIncompleteMatch) {
-                  stmts.deleteMatch.run(matchId);
-                }
-                cursor.processed = i + 1;
-                cursor.filtered = base.filtered + run.filtered + 1;
-                cursor.invalid = base.invalid + run.invalid;
-                cursor.lastGameCreation = lastGameCreation;
-                cursor.updatedAt = Date.now();
-                writeCursor(db, key, cursor);
-              });
-              persist();
-              run.filtered += 1;
-              didCountOutcome = true;
-            }
-          }
-        } catch (error) {
-          if (error instanceof RiotAuthError) {
-            throw error;
-          }
-          if (
-            error instanceof RiotSchemaError ||
-            error instanceof InvalidMatchParticipantsError ||
-            (error instanceof RiotApiError && [400, 404].includes(error.status))
-          ) {
-            const persist = db.transaction(() => {
-              if (repairingIncompleteMatch) {
-                stmts.deleteMatch.run(matchId);
-              }
-              stmts.insertReject.run({
-                match_id: matchId,
-                reason: 'invalid',
-                patch: null,
-                checked_at: Date.now(),
-              });
-              cursor.processed = i + 1;
-              cursor.invalid = base.invalid + run.invalid + 1;
-              cursor.updatedAt = Date.now();
-              writeCursor(db, key, cursor);
-            });
-            persist();
-            run.invalid += 1;
-            didCountOutcome = true;
-            continue;
-          }
-          if (isTransientMatchError(error)) {
-            playerFailed = true;
-            break;
-          }
-          throw error;
+        const result: MatchProcessResult = await processMatch(ctx, matchId, i, cursor, run);
+        if (result.playerFailed) {
+          playerFailed = true;
+          break;
         }
-
-        if (!didCountOutcome) {
-          run[outcome === 'duplicate' ? 'duplicates' : outcome] += 1;
-        }
-
-        cursor.processed = i + 1;
-        cursor.stored = base.stored + run.stored;
-        cursor.duplicates = base.duplicates + run.duplicates;
-        cursor.filtered = base.filtered + run.filtered;
-        cursor.invalid = base.invalid + run.invalid;
-        cursor.lastGameCreation = lastGameCreation;
-        cursor.updatedAt = Date.now();
-        const persistCursor = db.transaction(() => {
-          writeCursor(db, key, cursor);
-        });
-        persistCursor();
       }
 
       if (playerFailed) {
         playersFailed += 1;
         consecutiveFailed += 1;
-        playerResults.push({
-          puuid: player.puuid,
-          status: 'failed',
-          listed: cursor.snapshot.length,
-          stored: run.stored,
-          duplicates: run.duplicates,
-          filtered: run.filtered,
-          invalid: run.invalid,
-        });
+        playerResults.push(buildPlayerResult(player.puuid, 'failed', cursor.snapshot.length, run));
         log(
           `[${index + 1}/${players.length}] ${player.puuid.slice(0, 12)}… transient failure (player failed)`,
         );
@@ -401,15 +244,7 @@ export async function ingestMatches(
       cursor.updatedAt = Date.now();
       writeCursor(db, key, cursor);
 
-      playerResults.push({
-        puuid: player.puuid,
-        status: 'done',
-        listed: cursor.snapshot.length,
-        stored: run.stored,
-        duplicates: run.duplicates,
-        filtered: run.filtered,
-        invalid: run.invalid,
-      });
+      playerResults.push(buildPlayerResult(player.puuid, 'done', cursor.snapshot.length, run));
       log(
         `[${index + 1}/${players.length}] ${player.puuid.slice(0, 12)}… ` +
           `ids=${cursor.snapshot.length} stored=${run.stored} dup=${run.duplicates} ` +

@@ -8,16 +8,16 @@
 
 ## Epic status
 
-| Epic           | Status      | Notes                                                                   |
-| -------------- | ----------- | ----------------------------------------------------------------------- |
-| E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b TODO                                         |
-| E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.c DONE; T-013.b DONE; T-014 ready |
-| E2 Engine      | NOT STARTED | T-020 dependency-ready; needs D-020 accepted                            |
-| E3 Web MVP     | NOT STARTED |                                                                         |
-| E4 Runes       | NOT STARTED |                                                                         |
-| E5 Items       | NOT STARTED |                                                                         |
-| E6 Live        | NOT STARTED |                                                                         |
-| E7 Vision      | NOT STARTED |                                                                         |
+| Epic           | Status      | Notes                                                                                |
+| -------------- | ----------- | ------------------------------------------------------------------------------------ |
+| E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b TODO                                                      |
+| E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e DONE; T-014 ready |
+| E2 Engine      | NOT STARTED | T-020 dependency-ready; needs D-020 accepted                                         |
+| E3 Web MVP     | NOT STARTED |                                                                                      |
+| E4 Runes       | NOT STARTED |                                                                                      |
+| E5 Items       | NOT STARTED |                                                                                      |
+| E6 Live        | NOT STARTED |                                                                                      |
+| E7 Vision      | NOT STARTED |                                                                                      |
 
 ## Data collection status
 
@@ -27,7 +27,7 @@
 
 ## Next recommended ticket
 
-B-017 done (engine and shared `"types": []` plus ESLint purity guardrails in `eslint.config.mjs` with automated regression tests; T-020's engine-purity prerequisite is fully satisfied — the residual `tsc` gap caused by test files importing `vitest` is logged as B-021 and not fixed). B-022 (all Node built-ins blocked), B-023 (Date() call blocked) and B-024 (regression tests) also fixed. B-011 fixed (spec + T-002.b scope; implementation in T-002.b). Fix B-012 done. **T-013.e done** (typed schema-less `request()`, timeout/invalid-JSON regression tests, CLI + matches refactor below 300 lines; `pnpm check` 144 tests). Next: T-013.d (`pnpm etl status`, read-only, deps T-013 satisfied — a small unblocked follow-up now that the CLI is split into `commands/`), or T-002.b / T-014 (data-blocked). T-020 is dependency-ready but implements PROPOSED D-020: start it after the owner accepts D-020..D-023.
+B-017 done (engine and shared `"types": []` plus ESLint purity guardrails in `eslint.config.mjs` with automated regression tests; T-020's engine-purity prerequisite is fully satisfied — the residual `tsc` gap caused by test files importing `vitest` is logged as B-021 and not fixed). B-022 (all Node built-ins blocked), B-023 (Date() call blocked) and B-024 (regression tests) also fixed. B-011 fixed (spec + T-002.b scope; implementation in T-002.b). Fix B-012 done. T-013.e done (typed schema-less `request()`, timeout/invalid-JSON regression tests, CLI + matches refactor below 300 lines; `pnpm check` 144 tests). **T-013.d done** (`pnpm etl status`, read-only parameterized counts and progress, empty & seeded database tests, CLI handling when database does not exist; `pnpm check` 153 tests). Next: T-002.b (Shared schema parity for D-020..D-023) or T-014 (Participant enrichment, data-blocked). T-020 is dependency-ready but implements PROPOSED D-020: start it after the owner accepts D-020..D-023.
 
 ## Open questions for the owner
 
@@ -40,7 +40,22 @@ B-017 done (engine and shared `"types": []` plus ESLint purity guardrails in `es
 
 The 2026-10-22 entries had no timestamps; their order was reconstructed from ticket dependencies on 2026-10-26.
 
-### 2026-10-29 — Kilo — Ticket T-013.e (PR B review leftovers)
+### 2026-10-29 — Antigravity — Ticket T-013.d (ETL status command)
+
+- Done:
+  - Implemented `getEtlStatus(db, platform?)` and `formatEtlStatus(status)` in `packages/etl/src/status.ts`. Queries are strictly read-only parameterized SQL returning migration status (`applied`, `pending`, `missingVersions`), players per platform and tier, matches per platform and patch, total participants count, resumable match cursors done vs partial per platform (`match-ingest:<platform>:%`), and rejects per reason.
+  - Made schema inspection strictly non-mutating: migration versions are computed by reading migrations from disk and querying `_migrations` only if it exists without invoking write-capable helpers (`ensureMigrationsTable`), leaving unmigrated database files untouched.
+  - Handled older schemas before migration 003 dynamically via `PRAGMA table_info(matches)` checking for `rank_known_count`, keeping `getEtlStatus` functional on 001/002 databases and omitting `rankKnownCount1` without SQL column errors.
+  - Clarified report scope in `formatEtlStatus`: labeled match cursors explicitly as `Match cursors:` and labeled rejects as `Rejects (global):` to prevent misinterpretation as platform-scoped.
+  - Implemented CLI command `status [platform]` in `packages/etl/src/commands/status.ts`, registered in `packages/etl/src/cli.ts`, and removed `status` from `PLANNED_COMMANDS` in `packages/etl/src/commands/shared.ts`. Resolves database path read-only without creating parent directories, prints "no database at <path>" and exits 0 when DB does not exist, and opens existing databases with `{ readonly: true, fileMustExist: true }`.
+  - Added unit test suites in `packages/etl/src/status.test.ts` (6 tests: empty DB, 001/002 DB without `rank_known_count`, readonly unmigrated DB, seeded DB, platform filtering, missing migration formatting) and `packages/etl/src/commands/status.test.ts` (6 tests: non-existent DB, non-existent parent directory, unmigrated DB immutability, existing DB formatting, platform positional arg, usage error on invalid platform).
+  - Re-exported status types and functions from `packages/etl/src/index.ts`.
+  - Moved `pnpm etl status [platform]` to "Implemented" in `docs/SETUP.md`.
+- Files touched: `packages/etl/src/status.ts`, `packages/etl/src/status.test.ts`, `packages/etl/src/commands/status.ts`, `packages/etl/src/commands/status.test.ts`, `packages/etl/src/commands/shared.ts`, `packages/etl/src/cli.ts`, `packages/etl/src/index.ts`, `docs/SETUP.md`, `docs/TICKETS.md`, `docs/PROGRESS.md`
+- Tests: `pnpm check`
+- State left: DONE (T-013.d).
+- Next step: T-002.b (shared schema parity) or T-014 (participant enrichment).
+- Pitfalls / notes for next AI: none
 
 - Done:
   - `RiotClient.request()` overloads now require a schema for the typed overload and return `unknown` when no schema is passed — `request<T>(url, schema: z.ZodType<T>, methodKey?): Promise<T>` and `request(url, schema?: undefined, methodKey?): Promise<unknown>` — and the unused private `parseJsonBody()` was deleted. Fixed every call site the compiler reported, including the two `client.request<{...}>(url)` tests in `riot/client.test.ts`, which now pass an explicit schema.

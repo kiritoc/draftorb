@@ -22,6 +22,7 @@ import { checkKeyCommand } from './commands/check-key';
 import { playersCommand } from './commands/players';
 import { matchesCommand } from './commands/matches';
 import { migrateCommand } from './commands/migrate';
+import { statusCommand } from './commands/status';
 import { log, type Command, findCommand, formatHelp, isHelpFlag } from './commands/shared';
 
 const COMMANDS: readonly Command[] = [
@@ -31,6 +32,7 @@ const COMMANDS: readonly Command[] = [
   playersCommand,
   matchesCommand,
   migrateCommand,
+  statusCommand,
 ];
 
 async function main(argv: string[]): Promise<void> {

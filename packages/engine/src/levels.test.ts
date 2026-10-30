@@ -9,12 +9,26 @@ import {
   layerTerm,
   laneTerm,
   layerWinRate,
+  isLowData,
   levelFromConfig,
   mapDeltaPpToLevel,
   pairTerm,
   scoreLane,
   scorePair,
 } from './levels.js';
+
+describe('isLowData', () => {
+  it('treats NaN n_eff as lowData', () => {
+    expect(isLowData(Number.NaN, 25)).toBe(true);
+    expect(pairTerm(Number.NaN, Number.NaN, 40, 0.5, DEFAULT_CONFIG.eps, 25)).toBe(0);
+  });
+
+  it('flags empty and below-minGames samples, passes at minGames', () => {
+    expect(isLowData(0, 0)).toBe(true);
+    expect(isLowData(24, 25)).toBe(true);
+    expect(isLowData(25, 25)).toBe(false);
+  });
+});
 
 describe('laneTerm', () => {
   it('is 0 when lowData (gamesE < minGames), nonzero at minGames', () => {

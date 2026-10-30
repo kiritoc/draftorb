@@ -95,7 +95,8 @@ export function laneTerm(
  * and its reason is flagged `lowData`. Empty samples are always lowData.
  */
 export function isLowData(nEff: number, minGames: number): boolean {
-  return nEff <= 0 || nEff < minGames;
+  // Written as a negated positive check so NaN counts as lowData.
+  return !(nEff > 0 && nEff >= minGames);
 }
 
 /**

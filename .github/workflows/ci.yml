@@ -26,7 +26,7 @@ jobs:
       changed: ${{ steps.diff.outputs.changed }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ github.head_ref }}
           persist-credentials: false
@@ -35,7 +35,7 @@ jobs:
         with:
           run_install: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: pnpm
@@ -82,7 +82,7 @@ jobs:
           repositories: ${{ github.event.repository.name }}
           permission-contents: write
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ github.head_ref }}
           token: ${{ steps.app.outputs.token }}
@@ -96,12 +96,17 @@ jobs:
         env:
           PATCH: ${{ runner.temp }}/format.patch
         run: |
-          # Reject anything outside the working tree or under .github.
-          if git apply --numstat "$PATCH" | awk '{print $3}' | grep -E '^(\.github/|/|\.\./)'; then
-            echo "::error::Patch touches disallowed paths"; exit 1
+          # Prettier only edits files in place: reject creates, deletes, renames, copies.
+          if grep -qE '^(new file mode|deleted file mode|rename (from|to)|copy (from|to)) ' "$PATCH"; then
+            echo "::error::Patch adds, deletes, renames or copies files"; exit 1
           fi
+          # git apply refuses paths outside the repo by default.
           git apply --check "$PATCH"
           git apply "$PATCH"
+          # Only existing files changed, so git diff lists every touched path (NUL-safe).
+          if git diff --name-only -z | grep -qzE '^\.github/'; then
+            echo "::error::Patch touches .github"; exit 1
+          fi
 
       - name: Commit formatting changes
         id: commit
@@ -124,7 +129,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           persist-credentials: false
 
@@ -134,7 +139,7 @@ jobs:
           run_install: false
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: ${{ matrix.node-version }}
           cache: pnpm

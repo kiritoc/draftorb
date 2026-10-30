@@ -16,7 +16,8 @@ jobs:
   # Untrusted: runs PR-controlled code with no secrets and a read-only token.
   format:
     # Only same-repo PRs; fork PRs have no secrets and are covered by format:check.
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    # On push events pull_request is empty, so this is false there too.
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

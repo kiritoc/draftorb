@@ -116,9 +116,10 @@ export function deltaPp(x: number, term: number): number {
  *   otherwise → 0
  *
  * Any lowData reason (`n_eff < minGames`) maps to 0, for both signs.
- * Positive L2/L3 additionally require `n_eff >= 100`; when that fails, a
- * qualifying delta falls back to L1 instead of disappearing. Negative levels
- * (being countered) are not subject to the 100-game gate.
+ * Positive L2/L3 additionally require `n_eff >= highLevelMinGames` (config,
+ * default 100); when that fails, a qualifying delta falls back to L1 instead
+ * of disappearing. Negative levels (being countered) are not subject to the
+ * `highLevelMinGames` gate.
  */
 export function mapDeltaPpToLevel(
   deltaPp: number,

@@ -158,9 +158,10 @@ export function deltaPp(x: number, term: number): number {
  *   otherwise → 0
  *
  * Any lowData reason (`n_eff < minGames`) maps to 0, for both signs.
- * L2/L3 additionally require `n_eff >= highLevelMinGames` (config, default
- * 100) for both signs ("negative symmetric"); when that fails, a qualifying
- * delta falls back to ±1 instead of disappearing.
+ * Positive L2/L3 additionally require `n_eff >= highLevelMinGames` (config,
+ * default 100); when that fails, a qualifying delta falls back to L1 instead
+ * of disappearing. Negative levels (being countered) are not subject to the
+ * `highLevelMinGames` gate.
  */
 export function mapDeltaPpToLevel(
   deltaPp: number,
@@ -176,7 +177,7 @@ export function mapDeltaPpToLevel(
     return 0;
   }
   const sign = deltaPp < 0 ? -1 : 1;
-  const highLevelsAllowed = nEff >= highLevelMinGames;
+  const highLevelsAllowed = sign < 0 || nEff >= highLevelMinGames;
 
   if (abs >= 4.5 && highLevelsAllowed) {
     return sign * 3;

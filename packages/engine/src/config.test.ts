@@ -201,3 +201,21 @@ describe('exportMinGames / minGames invariant', () => {
     ).toThrow();
   });
 });
+
+describe('highLevelMinGames / minGames invariant', () => {
+  it('defaults to 100', () => {
+    expect(DEFAULT_CONFIG.highLevelMinGames).toBe(100);
+  });
+
+  it('accepts highLevelMinGames equal to minGames', () => {
+    expect(
+      rankWeightingConfigSchema.parse({ ...DEFAULT_CONFIG, highLevelMinGames: 25 }),
+    ).toBeTruthy();
+  });
+
+  it('rejects highLevelMinGames below minGames', () => {
+    expect(() =>
+      rankWeightingConfigSchema.parse({ ...DEFAULT_CONFIG, highLevelMinGames: 20, minGames: 25 }),
+    ).toThrow();
+  });
+});

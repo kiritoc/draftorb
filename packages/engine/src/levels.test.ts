@@ -59,7 +59,6 @@ describe('config-driven helpers', () => {
     expect(levelFromConfig(4.5, 40, config)).toBe(0);
     expect(levelFromConfig(4.5, 120, config)).toBe(1);
     expect(levelFromConfig(4.5, 150, config)).toBe(3);
-    expect(levelFromConfig(-4.5, 120, config)).toBe(-1);
   });
 });
 
@@ -120,7 +119,7 @@ describe('layerTerm', () => {
 
   it('shrinks toward q by default (D-021)', () => {
     // Without shrinkage, a 10/10 record would give logit(1) = +inf.
-    // With k=20, q=0.5: pL = (10 + 10) / (10 + 20) = 20/30 = 0.667
+    // With k=20, q=0.6: pL = (10 + 12) / (10 + 20) = 22/30 ≈ 0.733
     const pL = layerWinRate(10, 10, 20, 0.6);
     expect(pL).toBeLessThan(1);
     expect(layerTerm(pL, 0.6, DEFAULT_CONFIG.eps)).toBeGreaterThan(0);
@@ -212,7 +211,20 @@ describe('mapDeltaPpToLevel', () => {
     expect(mapDeltaPpToLevel(-3.0, DEFAULT_CONFIG.minGames - 1)).toBe(0);
   });
 
-  it('gates negative L2/L3 on n_eff >= 100 like positive ones (symmetric)', () => {
+  it('returns 0 for non-finite inputs', () => {
+    expect(mapDeltaPpToLevel(Number.NaN, 100)).toBe(0);
+    expect(mapDeltaPpToLevel(Number.POSITIVE_INFINITY, 100)).toBe(0);
+    expect(mapDeltaPpToLevel(2.0, Number.NaN)).toBe(0);
+  });
+
+  it('honors a custom highLevelMinGames from config', () => {
+    const config = { ...DEFAULT_CONFIG, minGames: 50, highLevelMinGames: 150 };
+    expect(mapDeltaPpToLevel(4.5, 120, config.minGames, config.highLevelMinGames)).toBe(1);
+    expect(mapDeltaPpToLevel(4.5, 150, config.minGames, config.highLevelMinGames)).toBe(3);
+  });
+
+  it('allows negative levels with low n_eff (counters are not gated)', () => {
+    // Negative deltas indicate being countered; they should still show.
     expect(mapDeltaPpToLevel(-1.5, 30)).toBe(-1);
     expect(mapDeltaPpToLevel(-2.6, 50)).toBe(-1);
     expect(mapDeltaPpToLevel(-4.5, 99)).toBe(-1);

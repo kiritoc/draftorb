@@ -62,6 +62,9 @@ jobs:
           retention-days: 1
 
   # Trusted: only applies the patch and pushes; never runs PR code.
+  # Setup: a GitHub App installed on this repo with Contents: read & write.
+  # Set repo variable FORMAT_BOT_APP_ID and secret FORMAT_BOT_PRIVATE_KEY.
+  # Without them this job fails and `check` reports the format issues instead.
   commit-format:
     needs: format
     if: needs.format.outputs.changed == 'true'
@@ -97,15 +100,18 @@ jobs:
           PATCH: ${{ runner.temp }}/format.patch
         run: |
           # Prettier only edits files in place: reject creates, deletes, renames, copies.
-          if grep -qE '^(new file mode|deleted file mode|rename (from|to)|copy (from|to)) ' "$PATCH"; then
+          if grep -qE '^((new|deleted) file mode|(rename|copy) (from|to) |(---|\+\+\+) /dev/null)' "$PATCH"; then
             echo "::error::Patch adds, deletes, renames or copies files"; exit 1
           fi
           # git apply refuses paths outside the repo by default.
           git apply --check "$PATCH"
           git apply "$PATCH"
-          # Only existing files changed, so git diff lists every touched path (NUL-safe).
-          if git diff --name-only -z | grep -qzE '^\.github/'; then
-            echo "::error::Patch touches .github"; exit 1
+          # Every change must be a modification of a tracked file outside .github.
+          # Includes untracked files, so a sneaked-in new file is caught too.
+          # Odd filenames (e.g. with newlines) only cause a rejection, never a bypass.
+          STATUS="$(git status --porcelain -z --untracked-files=all | tr '\0' '\n')"
+          if printf '%s\n' "$STATUS" | grep -qvE '^ M ' || printf '%s\n' "$STATUS" | grep -qE '^ M \.github/'; then
+            echo "::error::Patch adds files or touches .github"; exit 1
           fi
 
       - name: Commit formatting changes

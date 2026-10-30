@@ -30,18 +30,23 @@ describe('layerWinRate', () => {
   });
 
   it('k is in raw-game units: heavily weighted small sample shrinks like n_eff raw games', () => {
-    // Weighted sample: Σw = 10, Σw² = 20 → n_eff = 5; weighted win rate 0.6.
-    const { winsE, gamesE } = toEquivalentCounts(6, 10, 20);
-    expect(gamesE).toBeCloseTo(5, 10);
-    expect(winsE).toBeCloseTo(3, 10);
+    // Realizable sample (weights in (0, 1]): 10 raw games, 2 at w=1 and 8 at w=0.5.
+    // Wins: both w=1 games + 3 of the w=0.5 games → winsW = 2 + 1.5 = 3.5.
+    // Σw = 2 + 4 = 6, Σw² = 2 + 8*0.25 = 4 → n_eff = 36/4 = 9.
+    const sumW = 2 * 1 + 8 * 0.5;
+    const sumW2 = 2 * 1 ** 2 + 8 * 0.5 ** 2;
+    const winsW = 2 * 1 + 3 * 0.5;
+    const { winsE, gamesE } = toEquivalentCounts(winsW, sumW, sumW2);
+    expect(gamesE).toBeCloseTo(9, 10);
+    expect(winsE).toBeCloseTo((3.5 * 9) / 6, 10); // 5.25
 
-    // Shrinks exactly like 3 wins out of 5 raw games.
+    // Shrinks exactly like 5.25 wins out of 9 raw games.
     const pEquiv = layerWinRate(winsE, gamesE, 20, 0.5);
-    const pRaw = layerWinRate(3, 5, 20, 0.5);
+    const pRaw = layerWinRate(5.25, 9, 20, 0.5);
     expect(pEquiv).toBeCloseTo(pRaw, 10);
 
-    // Feeding the weighted counts directly would under-shrink (6/10 vs k=20).
-    const pNaive = layerWinRate(6, 10, 20, 0.5);
+    // Feeding the weighted counts directly would over-shrink (3.5/6 vs k=20).
+    const pNaive = layerWinRate(winsW, sumW, 20, 0.5);
     expect(Math.abs(pNaive - pEquiv)).toBeGreaterThan(1e-3);
 
     // More equivalent games at the same rate → weaker shrinkage.
@@ -166,9 +171,8 @@ describe('mapDeltaPpToLevel', () => {
   it('L1 does not require n_eff >= 100 (only L2/L3 do)', () => {
     // A small but real effect shows as L1 even with modest n_eff.
     expect(mapDeltaPpToLevel(1.0, 30)).toBe(1);
-    // The lowData gate (minGames) is the caller's responsibility: when a term
-    // is lowData its deltaPp collapses to ~0, so the level is naturally 0.
-    // The level function itself only gates L2/L3 by n_eff >= 100.
+    // Below minGames the level is 0 (lowData); between minGames and 100,
+    // positive L2/L3 deltas fall back to L1.
     expect(mapDeltaPpToLevel(2.5, 99)).toBe(1); // n_eff < 100 → L1 fallback
     expect(mapDeltaPpToLevel(4.5, 99)).toBe(1); // n_eff < 100 → L1 fallback
     expect(mapDeltaPpToLevel(2.5, 100)).toBe(2);

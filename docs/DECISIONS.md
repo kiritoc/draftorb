@@ -226,6 +226,17 @@ Owner decision 2026-10-29.
   - Keep `min(0)` and add a separate zero-check refinement — rejected in favor of the simpler `gt(0)`, which communicates intent at the value level.
 - Consequences: four test cases updated (zero-valued role map made sparse, duplicate pool id, manifest version pinning, zero-rejection negative test); `MANIFEST_SCHEMA_VERSION` re-exported from the package barrel. No engine or ETL code consumed these schemas yet (T-020/T-019 are not started), so no downstream breakage.
 
+### D-030 — T-023 engine assumptions: per-bucket kernel, rawGames, lane opponent order — PROPOSED
+
+- Context: SPECS §5 and DATA_MODEL.md do not say (1) who applies the §3 rank-distance kernel to exported rows, (2) where `rawGames` for `insufficientData` comes from (rows carry only weighted counts), or (3) in which order `lane_vs`/`lane_full` store the two bot-lane opponents.
+- Decision (assumption used by `packages/engine/src/recommend.ts`):
+  1. Exported rows are per rank bucket. The engine applies `w_b = rankDistanceWeight(bucket, userBucket)` per row and sums `wins_w*w_b`, `games_w*w_b`, `games_w2*w_b^2`; recency and reliability are already folded into the exported weights.
+  2. `rawGames` is approximated by the rounded sum of `games_w` over the buckets kept by the kernel (an exact raw count needs a new export column).
+  3. Lane opponents are stored in `LANE_GROUPS[myRole].enemies` order (SUPPORT: enemy SUPPORT then enemy ADC; ADC: enemy ADC then enemy SUPPORT); `lane_full`'s partner is the single lane-group ally.
+  4. `compNeed` (T-025) and `blindSafety` (T-024) contribute 0 until their tickets.
+- Alternatives: (a) ETL pre-applies the kernel per `userRank` — rejected for now, multiplies export size by 8; (b) add a raw `games` column — deferred to T-019 if the owner wants exact `rawGames`.
+- Consequences: T-019 must export opponents in the order above. If rejected, only `indexTables`/key building in `packages/engine/src/recommend.ts` changes.
+
 ### Template
 
 ```

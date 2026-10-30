@@ -146,7 +146,8 @@ export function mapDeltaPpToLevel(
  * `minGames` gets no score and no rank — it goes to `insufficientData`.
  */
 export function baselineGate(nEff: number, minGames: number): boolean {
-  return nEff >= minGames;
+  // Empty samples never pass, even with minGames = 0 (golden rule 8).
+  return nEff > 0 && nEff >= minGames;
 }
 
 /**

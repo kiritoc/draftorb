@@ -12,7 +12,7 @@
 | -------------- | ----------- | ------------------------------------------------------------------------------------------------- |
 | E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b DONE                                                                   |
 | E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e, T-014 DONE; T-015..T-019 TODO |
-| E2 Engine      | IN PROGRESS | T-020 DONE; T-021 DONE; T-022 DONE (deps T-002 DONE, D-020..D-023 accepted)                       |
+| E2 Engine      | IN PROGRESS | T-020 DONE; T-021 DONE; T-022 DONE; T-023 IN PROGRESS (D-030 PROPOSED)                            |
 | E3 Web MVP     | NOT STARTED |                                                                                                   |
 | E4 Runes       | NOT STARTED |                                                                                                   |
 | E5 Items       | NOT STARTED |                                                                                                   |
@@ -37,6 +37,20 @@ B-017 done (engine and shared `"types": []` plus ESLint purity guardrails in `es
 
 ## Session log (newest first)
 
+### 2026-10-30 — Ticket T-023 (Recommendation engine, role-generic)
+
+- Done:
+  - **`packages/engine/src/recommend.ts`** (new): `recommend(input, data, config)` → `DraftResult`. Candidate set (roleProb >= 0.05 + pool, picked champions excluded), per-bucket rank kernel + equivalent counts, baseline gate → baseline → pairs (descending influence, `s * conf * influence`) → `lane_vs` → `lane_full` (skipped for 1v1 lane groups via `LANE_GROUPS`). Reasons with `deltaPp`, `n` (n_eff), `lowData`, level; "countered by enemy" and `offRole` warnings. D-024 pool contract (`poolRecommendations` with `poolRank`, `poolUnavailable`).
+  - **`packages/engine/src/levels.ts`**: `baselineGate` rejects `nEff <= 0` even with `minGames = 0` (review finding); regression test in `packages/engine/src/levels.test.ts`.
+  - **`packages/engine/src/recommend.test.ts`** (new): SUPPORT and TOP golden cases, lowData pair, insufficientData, sort/NaN/determinism, lane layers, pool property tests (identical scores, order kept, poolRank, offRole, poolUnavailable).
+  - `packages/engine/src/index.ts` re-exports `./recommend.js`.
+- Decisions: D-030 PROPOSED (per-bucket kernel, `rawGames` approximation, lane opponent order, comp/blind = 0).
+- Not done: golden JSON fixtures under `packages/engine/test/golden/` (tests are inline); `compNeed` (T-025) and `blindSafety` (T-024).
+- Open review findings on `packages/engine/src/levels.ts`: negative L2/L3 skip the 100-game gate (owner call: SPECS says "negative symmetric"); level thresholds hardcoded instead of in `packages/engine/src/config.ts`.
+- Tests: `pnpm check` not yet run on this change.
+- State left: **IN PROGRESS (T-023)** until `pnpm check` is green and D-030 is accepted.
+- Next step: run `pnpm check`, resolve the two open findings, then T-024.
+
 ### 2026-10-29 — Kilo — Ticket T-022 (Shrinkage + level mapping)
 
 - Done:
@@ -56,7 +70,7 @@ B-017 done (engine and shared `"types": []` plus ESLint purity guardrails in `es
 - Bugs: B-031 and B-032 (found in review, fixed — see follow-up below). The `baselineLogOdds(0, 0, 0, eps)` NaN edge case (zero prior strength + zero evidence) was caught by a test and fixed by delegating to `shrink` (which returns the prior q when `gamesE + k <= 0`), consistent with the B-026 fix in T-020.
 - Review follow-up: fixed B-031 (pair/lane terms below `minGames` now contribute 0; added `isLowData` and gated `laneTerm`) and B-032 (`mapDeltaPpToLevel` takes `minGames`, gates lowData for both signs, falls back to L1 when `n_eff < 100`). The k-units test now converts weighted counts via `toEquivalentCounts`; the TOP chain test uses valid counts and asserts the lowData fallback and large-sample dominance. `docs/BUGS.md` updated.
 - State left: **DONE (T-022)**.
-- Next step: T-023 (Recommendation engine, depends on T-020..T-022).
+- Next step: T-023 (Recommendation engine, depends on T-020..T-022 and T-002.b).
 
 ### 2026-10-29 — Kilo — Ticket T-014 (Participant enrichment)
 

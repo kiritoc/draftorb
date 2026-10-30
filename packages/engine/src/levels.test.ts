@@ -190,6 +190,11 @@ describe('baselineGate', () => {
     expect(baselineGate(24, DEFAULT_CONFIG.minGames)).toBe(false);
     expect(baselineGate(0, DEFAULT_CONFIG.minGames)).toBe(false);
   });
+
+  it('rejects an empty sample even when minGames is 0 (golden rule 8)', () => {
+    expect(baselineGate(0, 0)).toBe(false);
+    expect(baselineGate(0.5, 0)).toBe(true);
+  });
 });
 
 describe('baselineLogOdds', () => {

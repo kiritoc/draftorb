@@ -192,6 +192,11 @@ export const rankWeightingConfigSchema = z
     rankWindowTiers: z.number().int().nonnegative(),
     minGames: z.number().nonnegative(),
     highLevelMinGames: z.number().nonnegative(),
+    levelCutoffsPp: z
+      .tuple([z.number().positive(), z.number().positive(), z.number().positive()])
+      .refine(([l1, l2, l3]) => l1 < l2 && l2 < l3, {
+        message: 'levelCutoffsPp must be strictly increasing (L1 < L2 < L3)',
+      }),
     k0: z.number().nonnegative(),
     k: z.number().nonnegative(),
     kLane: z.number().nonnegative(),
@@ -235,6 +240,7 @@ export const DEFAULT_CONFIG: RankWeightingConfig = rankWeightingConfigSchema.par
   rankWindowTiers: 2,
   minGames: 25,
   highLevelMinGames: 100,
+  levelCutoffsPp: [1.0, 2.5, 4.5],
   k0: 20,
   k: 40,
   kLane: 40,

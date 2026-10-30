@@ -150,7 +150,8 @@ export function deltaPp(x: number, term: number): number {
 }
 
 /**
- * Map a `deltaPp` to a reason level (SPECS §5, "like Karakal"):
+ * Map a `deltaPp` to a reason level (SPECS §5, "like Karakal"). With the
+ * default `levelCutoffsPp` (config) `[1.0, 2.5, 4.5]`:
  *
  *   |deltaPp| >= 4.5 → ±3
  *   |deltaPp| >= 2.5 → ±2
@@ -168,35 +169,43 @@ export function mapDeltaPpToLevel(
   nEff: number,
   minGames: number = DEFAULT_CONFIG.minGames,
   highLevelMinGames: number = DEFAULT_CONFIG.highLevelMinGames,
+  cutoffsPp: readonly [number, number, number] = DEFAULT_CONFIG.levelCutoffsPp,
 ): number {
   if (!Number.isFinite(deltaPp) || !Number.isFinite(nEff)) {
     return 0;
   }
   const abs = Math.abs(deltaPp);
-  if (abs < 1.0 || isLowData(nEff, minGames)) {
+  const [l1, l2, l3] = cutoffsPp;
+  if (abs < l1 || isLowData(nEff, minGames)) {
     return 0;
   }
   const sign = deltaPp < 0 ? -1 : 1;
-  const highLevelsAllowed = sign < 0 || nEff >= highLevelMinGames;
+  const highLevelsAllowed = nEff >= highLevelMinGames;
 
-  if (abs >= 4.5 && highLevelsAllowed) {
+  if (abs >= l3 && highLevelsAllowed) {
     return sign * 3;
   }
-  if (abs >= 2.5 && highLevelsAllowed) {
+  if (abs >= l2 && highLevelsAllowed) {
     return sign * 2;
   }
   return sign * 1;
 }
 
 /**
- * `mapDeltaPpToLevel` with both n_eff gates taken from `config`.
+ * `mapDeltaPpToLevel` with both n_eff gates and the pp cutoffs taken from `config`.
  */
 export function levelFromConfig(
   deltaPp: number,
   nEff: number,
   config: RankWeightingConfig,
 ): number {
-  return mapDeltaPpToLevel(deltaPp, nEff, config.minGames, config.highLevelMinGames);
+  return mapDeltaPpToLevel(
+    deltaPp,
+    nEff,
+    config.minGames,
+    config.highLevelMinGames,
+    config.levelCutoffsPp,
+  );
 }
 
 /**

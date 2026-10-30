@@ -165,9 +165,7 @@ describe('recommend — pool contract (D-024)', () => {
       expect(same?.reasons).toEqual(r.reasons);
     }
     const baseIds = new Set(without.recommendations.map((r) => r.championId));
-    const kept = withPool.recommendations
-      .map((r) => r.championId)
-      .filter((id) => baseIds.has(id));
+    const kept = withPool.recommendations.map((r) => r.championId).filter((id) => baseIds.has(id));
     expect(kept).toEqual(without.recommendations.map((r) => r.championId));
   });
 

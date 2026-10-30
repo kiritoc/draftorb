@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { draftResultSchema } from '@draftorb/shared';
 import type { DraftInput } from '@draftorb/shared';
 
+import { DEFAULT_CONFIG } from './config.js';
 import { recommend } from './recommend.js';
 import type { DraftData } from './recommend.js';
 
@@ -17,6 +18,8 @@ const TOP_A = 30;
 const TOP_B = 31;
 const ENEMY_TOP = 40;
 const UNKNOWN = 999;
+const MID_NODATA = 6; // known (in roleProb) but no SUPPORT baseline row
+const FLEX_BOT = 13; // SUPPORT 0.6 / ADC 0.4 flex ally
 
 const supportData: DraftData = {
   roleProb: {
@@ -27,6 +30,8 @@ const supportData: DraftData = {
     [ENEMY_SUP]: { SUPPORT: 1 },
     [ENEMY_ADC]: { ADC: 1 },
     [ALLY_ADC]: { ADC: 1 },
+    [MID_NODATA]: { MID: 1 },
+    [FLEX_BOT]: { SUPPORT: 0.6, ADC: 0.4 },
   },
   baseline: [
     [SUP_A, 'DIAMOND', 50, 100, 100],
@@ -98,6 +103,26 @@ describe('recommend — SUPPORT golden', () => {
     const a = recommend(input, supportData);
     expect(recommend(input, supportData)).toEqual(a);
     expect(a.recommendations.every((r) => r.reasons.length === 0)).toBe(true);
+  });
+
+  it("reserves the user's role so a flex ally is inferred as the lane partner", () => {
+    const data: DraftData = {
+      ...supportData,
+      allyPairs: [[SUP_A, FLEX_BOT, 'ADC', 'DIAMOND', 60, 100, 100]],
+    };
+    const input = supportInput({ allies: [{ championId: FLEX_BOT }] });
+    const a = recommend(input, data).recommendations.find((r) => r.championId === SUP_A);
+    const synergy = a?.reasons.find((r) => r.type === 'synergy');
+    expect(synergy?.with).toEqual([FLEX_BOT]);
+    expect(synergy?.deltaPp).toBeGreaterThan(0);
+  });
+
+  it('respects a configured candidate roleProb cutoff', () => {
+    const config = { ...DEFAULT_CONFIG, candidateRoleProbMin: 0.7 };
+    const ids = recommend(supportInput(), supportData, config).recommendations.map(
+      (r) => r.championId,
+    );
+    expect(ids).not.toContain(FLEX_BOT);
   });
 
   it('applies lane_vs then lane_full when the bot lane is fully known', () => {
@@ -187,11 +212,17 @@ describe('recommend — pool contract (D-024)', () => {
   });
 
   it('lists pool champions without a score in poolUnavailable', () => {
-    const result = recommend(supportInput({ pool }), supportData);
+    const result = recommend(supportInput({ pool: [...pool, MID_NODATA] }), supportData);
     expect(result.poolUnavailable).toEqual([
+      { championId: MID_NODATA, reason: 'insufficientData' },
       { championId: SUP_LOW, reason: 'insufficientData' },
       { championId: UNKNOWN, reason: 'unknownChampion' },
     ]);
+    expect(result.insufficientData).toContainEqual({
+      championId: MID_NODATA,
+      nEff: 0,
+      rawGames: 0,
+    });
     expect(result.insufficientData.some((e) => e.championId === SUP_LOW)).toBe(true);
     expect(result.insufficientData.some((e) => e.championId === UNKNOWN)).toBe(false);
   });

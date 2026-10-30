@@ -51,9 +51,6 @@ import { inferRoles } from './roles.js';
 import { roleProbability } from './roles-utils.js';
 import { rankDistanceWeight, sigmoid, toEquivalentCounts } from './weighting.js';
 
-/** Minimum `roleProb[c][myRole]` for a candidate to be in the default set (SPECS §5). */
-export const CANDIDATE_ROLE_PROB_MIN = 0.05;
-
 /** Lane group per role (SPECS §5, D-021). 1v1 groups have no allies (lane_full skipped). */
 export const LANE_GROUPS: Readonly<
   Record<Role, { readonly allies: readonly Role[]; readonly enemies: readonly Role[] }>
@@ -152,17 +149,30 @@ function equivalent(counts: Counts | undefined): { winsE: number; gamesE: number
   return toEquivalentCounts(counts.winsW, counts.gamesW, counts.gamesW2);
 }
 
+/** Placeholder id for the user's own slot during ally role inference. */
+const USER_PLACEHOLDER_ID: ChampionId = -1;
+
 function resolveTeam(
   slots: ReadonlyArray<Slot>,
   roleProb: ChampionRoleProbabilities,
   side: Side,
+  reservedRole?: Role,
 ): KnownSlot[] {
   if (slots.length === 0) {
     return [];
   }
-  const inferred = inferRoles(slots, roleProb);
+  // Reserve the user's role on the ally side so a flex ally cannot take it.
+  const canReserve = reservedRole !== undefined && !slots.some((s) => s.role === reservedRole);
+  const inferred = canReserve
+    ? inferRoles([...slots, { championId: USER_PLACEHOLDER_ID, role: reservedRole }], {
+        ...roleProb,
+        [USER_PLACEHOLDER_ID]: { [reservedRole]: 1 },
+      })
+    : inferRoles(slots, roleProb);
   if (inferred) {
-    return inferred.slots.map((s) => ({ ...s, side }));
+    return inferred.slots
+      .filter((s) => s.championId !== USER_PLACEHOLDER_ID)
+      .map((s) => ({ ...s, side }));
   }
   // No valid assignment: keep only user-fixed roles (confidence 1).
   return slots.flatMap((s) =>
@@ -307,7 +317,7 @@ export function recommend(
   const tables = indexTables(data, userIdx, config);
 
   const slots = [
-    ...resolveTeam(input.allies, data.roleProb, 'ally'),
+    ...resolveTeam(input.allies, data.roleProb, 'ally', myRole),
     ...resolveTeam(input.enemies, data.roleProb, 'enemy'),
   ];
   const picked = new Set<ChampionId>([
@@ -318,7 +328,7 @@ export function recommend(
   const roleSet = new Set<ChampionId>();
   for (const key of Object.keys(data.roleProb)) {
     const id = Number(key);
-    if (roleProbability(data.roleProb, id, myRole) >= CANDIDATE_ROLE_PROB_MIN) {
+    if (roleProbability(data.roleProb, id, myRole) >= config.candidateRoleProbMin) {
       roleSet.add(id);
     }
   }
@@ -334,8 +344,8 @@ export function recommend(
     const r = scoreCandidate(id, myRole, slots, tables, config, !roleSet.has(id));
     if (isScored(r)) {
       scored.push(r);
-    } else if (roleSet.has(id) || tables.baseline.has(`${id}`)) {
-      // Pool-only ids with no data at all are `unknownChampion`, not insufficientData.
+    } else if (roleSet.has(id) || tables.baseline.has(`${id}`) || `${id}` in data.roleProb) {
+      // Only ids absent from roleProb and baseline are `unknownChampion`.
       insufficientData.push(r);
     }
   }

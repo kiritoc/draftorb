@@ -59,7 +59,7 @@ describe('config-driven helpers', () => {
     expect(levelFromConfig(4.5, 40, config)).toBe(0);
     expect(levelFromConfig(4.5, 120, config)).toBe(1);
     expect(levelFromConfig(4.5, 150, config)).toBe(3);
-    expect(levelFromConfig(-4.5, 120, config)).toBe(-1);
+    expect(levelFromConfig(-4.5, 120, config)).toBe(-3);
   });
 });
 
@@ -218,19 +218,18 @@ describe('mapDeltaPpToLevel', () => {
     expect(mapDeltaPpToLevel(2.0, Number.NaN)).toBe(0);
   });
 
-  it('gates negative L2/L3 on n_eff >= 100 like positive ones (symmetric)', () => {
+  it('allows negative L2/L3 with n_eff < 100 (counters are not gated, SPECS §5)', () => {
     expect(mapDeltaPpToLevel(-1.5, 30)).toBe(-1);
-    expect(mapDeltaPpToLevel(-2.6, 50)).toBe(-1);
-    expect(mapDeltaPpToLevel(-4.5, 99)).toBe(-1);
+    expect(mapDeltaPpToLevel(-2.6, 50)).toBe(-2);
+    expect(mapDeltaPpToLevel(-4.5, 99)).toBe(-3);
     expect(mapDeltaPpToLevel(-4.5, 100)).toBe(-3);
-    expect(mapDeltaPpToLevel(4.5, 50)).toBe(-mapDeltaPpToLevel(-4.5, 50));
   });
 
-  it('honors a custom highLevelMinGames for both signs', () => {
+  it('honors a custom highLevelMinGames for positive levels only', () => {
     expect(mapDeltaPpToLevel(4.5, 120, 50, 150)).toBe(1);
     expect(mapDeltaPpToLevel(4.5, 150, 50, 150)).toBe(3);
-    expect(mapDeltaPpToLevel(-4.5, 120, 50, 150)).toBe(-1);
-    expect(mapDeltaPpToLevel(-4.5, 150, 50, 150)).toBe(-3);
+    expect(mapDeltaPpToLevel(-4.5, 120, 50, 150)).toBe(-3);
+    expect(mapDeltaPpToLevel(-4.5, 40, 50, 150)).toBe(0);
   });
 
   it('L1 does not require n_eff >= 100 (only L2/L3 do)', () => {

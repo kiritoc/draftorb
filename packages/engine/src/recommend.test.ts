@@ -82,7 +82,11 @@ describe('recommend — SUPPORT golden', () => {
   it('sends a low-sample candidate to insufficientData, never ranked', () => {
     const result = recommend(supportInput(), supportData);
     expect(result.recommendations.some((r) => r.championId === SUP_LOW)).toBe(false);
-    expect(result.insufficientData).toEqual([{ championId: SUP_LOW, nEff: 10, rawGames: 10 }]);
+    // FLEX_BOT is a SUPPORT candidate (roleProb 0.6) with no baseline row.
+    expect(result.insufficientData).toEqual([
+      { championId: SUP_LOW, nEff: 10, rawGames: 10 },
+      { championId: FLEX_BOT, nEff: 0, rawGames: 0 },
+    ]);
   });
 
   it('excludes picked champions, never yields NaN, and sorts desc', () => {
@@ -213,9 +217,10 @@ describe('recommend — pool contract (D-024)', () => {
 
   it('lists pool champions without a score in poolUnavailable', () => {
     const result = recommend(supportInput({ pool: [...pool, MID_NODATA] }), supportData);
+    // poolUnavailable is sorted by championId.
     expect(result.poolUnavailable).toEqual([
-      { championId: MID_NODATA, reason: 'insufficientData' },
       { championId: SUP_LOW, reason: 'insufficientData' },
+      { championId: MID_NODATA, reason: 'insufficientData' },
       { championId: UNKNOWN, reason: 'unknownChampion' },
     ]);
     expect(result.insufficientData).toContainEqual({

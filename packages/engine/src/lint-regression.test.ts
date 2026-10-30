@@ -32,7 +32,9 @@ function hasErrorWithRuleId(results: ESLint.LintResult[], ruleId: string): boole
   return results.some((r) => r.messages.some((m) => m.ruleId === ruleId));
 }
 
-describe('engine purity lint regression (B-022, B-023, B-017)', () => {
+// The first ESLint run cold-loads the flat config and the typescript-eslint
+// parser, which can exceed vitest's 5s default on slow CI runners (Windows).
+describe('engine purity lint regression (B-022, B-023, B-017)', { timeout: 30_000 }, () => {
   it('rejects bare Node built-in import (crypto) — B-022', async () => {
     const code =
       'import { createHash } from "crypto";\nexport const probe = createHash("sha256");\n';

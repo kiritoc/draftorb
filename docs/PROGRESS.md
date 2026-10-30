@@ -46,10 +46,10 @@ B-017 done (engine and shared `"types": []` plus ESLint purity guardrails in `es
   - `packages/engine/src/index.ts` re-exports `./recommend.js`.
 - Decisions: D-030 PROPOSED (per-bucket kernel, `rawGames` approximation, lane opponent order, comp/blind = 0).
 - Not done: golden JSON fixtures under `packages/engine/test/golden/` (tests are inline); `compNeed` (T-025) and `blindSafety` (T-024).
-- Review findings on `packages/engine/src/levels.ts`: resolved (`highLevelMinGames` gates positive L2/L3 only, while negative counters remain exempt per SPECS §5; the pp cutoffs stay as SPECS §5 constants).
+- Review findings on `packages/engine/src/levels.ts`: resolved (`highLevelMinGames` gates L2/L3 for both signs, per SPECS §5 "negative symmetric"; the pp cutoffs default to the SPECS §5 values via `levelCutoffsPp`).
 - Tests: `pnpm check` not yet run on this change.
 - State left: **IN PROGRESS (T-023)** until `pnpm check` is green and D-030 is accepted.
-- Review follow-up (merge with `main`): kept `main`'s `highLevelMinGames` config and `levelFromConfig`; positive L2/L3 require `n_eff >= highLevelMinGames`, while negative counter levels remain exempt as required by SPECS §5; `baselineGate` rejects empty/NaN samples via `isLowData`.
+- Review follow-up (merge with `main`): kept `main`'s `highLevelMinGames` config and `levelFromConfig`; L2/L3 require `n_eff >= highLevelMinGames` for both signs (SPECS §5, "negative symmetric"); `baselineGate` rejects empty/NaN samples via `isLowData`.
 - Next step: run `pnpm check`, accept D-030, then T-024.
 
 ### 2026-10-29 — Kilo — Ticket T-022 (Shrinkage + level mapping)

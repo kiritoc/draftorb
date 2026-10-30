@@ -7,7 +7,7 @@
  * priors from SPECS §3/§5; each scalar is calibrated by the D-023 backtest.
  */
 
-import { z, roleSchema } from '@draftorb/shared';
+import    {      z, roleSchema } from '@draftorb/shared';
 import type { Rank, RankBucket, Role } from '@draftorb/shared';
 
 // --- Engine-specific enums (not in shared) ---

@@ -107,7 +107,7 @@ jobs:
         id: commit
         uses: stefanzweifel/git-auto-commit-action@v7
         with:
-          commit_message: "style: apply prettier"
+          commit_message: 'style: apply prettier'
 
   check:
     needs: [format, commit-format]

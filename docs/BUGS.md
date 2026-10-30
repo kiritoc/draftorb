@@ -39,6 +39,30 @@ No new bugs were identified while revising T-013 patch-window and rank-known-cou
 
 ## Fixed
 
+### B-032 — Reason level mapping drops strong positive effects and badges empty samples — FIXED
+
+- Severity / Area: S3 / engine
+- Steps to reproduce: call `mapDeltaPpToLevel(4.5, 50)` and `mapDeltaPpToLevel(1.1, 0)`.
+- Expected / Actual:
+  - Expected: `4.5@50` falls back to L1 (L2/L3 need `n_eff >= 100`); `1.1@0` is lowData and maps to 0 (SPECS §5).
+  - Actual: `4.5@50` returned 0 (the L2/L3 branches exited before the L1 check); `1.1@0` returned +1 (the positive L1 branch ignored `n_eff`).
+- Environment (OS, Node version, patch): any.
+- Logs / screenshot: regression tests in `packages/engine/src/levels.test.ts` (`mapDeltaPpToLevel`).
+- Suspected cause: early returns on the L2/L3 thresholds; no `minGames` input to the mapper.
+- Fix (commit/ticket): T-022 review — `mapDeltaPpToLevel(deltaPp, nEff, minGames)` returns 0 for lowData (both signs), and positive deltas below 100 `n_eff` fall back to L1.
+
+### B-031 — Pair and lane terms below `minGames` still alter scores — FIXED
+
+- Severity / Area: S2 / engine
+- Steps to reproduce: call `pairTerm(10, 10, 40, 0.5, eps)` with `minGames = 25`.
+- Expected / Actual:
+  - Expected: 0 (SPECS §5 low-data rule: a term with `n_eff < minGames` is 0).
+  - Actual: a positive correction; only `gamesE <= 0` was gated.
+- Environment (OS, Node version, patch): any.
+- Logs / screenshot: regression tests in `packages/engine/src/levels.test.ts` (`pairTerm` at `minGames - 1` / `minGames`, TOP chain lowData fallback).
+- Suspected cause: `pairTerm` had no `minGames` parameter; no gated lane-term helper existed.
+- Fix (commit/ticket): T-022 review — added `isLowData`, a `minGames` parameter on `pairTerm`, and a gated `laneTerm`.
+
 ### B-030 — Enriched ranks not persisted to participant rows — FIXED
 
 - Severity / Area: S2 / etl

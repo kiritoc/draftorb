@@ -191,6 +191,7 @@ export const rankWeightingConfigSchema = z
     unknownRankFactor: z.number().gt(0).max(1),
     rankWindowTiers: z.number().int().nonnegative(),
     minGames: z.number().nonnegative(),
+    highLevelMinGames: z.number().nonnegative(),
     k0: z.number().nonnegative(),
     k: z.number().nonnegative(),
     kLane: z.number().nonnegative(),
@@ -215,6 +216,13 @@ export const rankWeightingConfigSchema = z
         path: ['exportMinGames'],
       });
     }
+    if (config.highLevelMinGames < config.minGames) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'highLevelMinGames must be >= minGames so L2/L3 never fire on lowData reasons',
+        path: ['highLevelMinGames'],
+      });
+    }
   });
 
 export type RankWeightingConfig = z.infer<typeof rankWeightingConfigSchema>;
@@ -225,6 +233,7 @@ export const DEFAULT_CONFIG: RankWeightingConfig = rankWeightingConfigSchema.par
   unknownRankFactor: 0.5,
   rankWindowTiers: 2,
   minGames: 25,
+  highLevelMinGames: 100,
   k0: 20,
   k: 40,
   kLane: 40,

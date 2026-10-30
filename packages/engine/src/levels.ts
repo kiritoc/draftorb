@@ -108,11 +108,6 @@ export function deltaPp(x: number, term: number): number {
 }
 
 /**
- * Minimum `n_eff` for positive L2/L3 reason levels (SPECS §5).
- */
-export const HIGH_LEVEL_MIN_GAMES = 100;
-
-/**
  * Map a `deltaPp` to a reason level (SPECS §5, "like Karakal"):
  *
  *   |deltaPp| >= 4.5 → ±3
@@ -129,7 +124,7 @@ export function mapDeltaPpToLevel(
   deltaPp: number,
   nEff: number,
   minGames: number = DEFAULT_CONFIG.minGames,
-  highLevelMinGames: number = HIGH_LEVEL_MIN_GAMES,
+  highLevelMinGames: number = DEFAULT_CONFIG.highLevelMinGames,
 ): number {
   if (!Number.isFinite(deltaPp) || !Number.isFinite(nEff)) {
     return 0;

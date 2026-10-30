@@ -168,6 +168,12 @@ describe('mapDeltaPpToLevel', () => {
     expect(mapDeltaPpToLevel(2.0, Number.NaN)).toBe(0);
   });
 
+  it('honors a custom highLevelMinGames from config', () => {
+    const config = { ...DEFAULT_CONFIG, minGames: 50, highLevelMinGames: 150 };
+    expect(mapDeltaPpToLevel(4.5, 120, config.minGames, config.highLevelMinGames)).toBe(1);
+    expect(mapDeltaPpToLevel(4.5, 150, config.minGames, config.highLevelMinGames)).toBe(3);
+  });
+
   it('allows negative levels with low n_eff (counters are not gated)', () => {
     // Negative deltas indicate being countered; they should still show.
     expect(mapDeltaPpToLevel(-1.5, 30)).toBe(-1);

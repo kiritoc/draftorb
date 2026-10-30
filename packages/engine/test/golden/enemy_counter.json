@@ -1,0 +1,74 @@
+{
+  "name": "enemy_counter",
+  "input": {
+    "userRank": "DIAMOND",
+    "userRole": "SUPPORT",
+    "allies": [],
+    "enemies": [{ "championId": 200, "role": "SUPPORT" }],
+    "blindPick": false
+  },
+  "data": {
+    "championIds": [1, 2, 200],
+    "roleProb": {
+      "1": { "SUPPORT": 1.0 },
+      "2": { "SUPPORT": 1.0 },
+      "200": { "SUPPORT": 1.0 }
+    },
+    "baselines": [
+      [1, "DIAMOND", 30, 50, 0.1],
+      [2, "DIAMOND", 30, 50, 0.1],
+      [200, "DIAMOND", 30, 50, 0.1]
+    ],
+    "allyPairs": [],
+    "enemyPairs": [
+      [1, 200, "SUPPORT", "DIAMOND", 10, 50, 0.1],
+      [2, 200, "SUPPORT", "DIAMOND", 30, 50, 0.1]
+    ],
+    "laneVs": [],
+    "laneFull": [],
+    "tags": {
+      "1": {
+        "championId": 1,
+        "damageType": "AP",
+        "archetype": "mage",
+        "hardEngage": false,
+        "peel": true,
+        "poke": true,
+        "waveclear": true,
+        "scaling": { "early": false, "mid": true, "late": true },
+        "range": "RANGED",
+        "ccCount": 1
+      },
+      "2": {
+        "championId": 2,
+        "damageType": "AP",
+        "archetype": "mage",
+        "hardEngage": false,
+        "peel": true,
+        "poke": true,
+        "waveclear": true,
+        "scaling": { "early": false, "mid": true, "late": true },
+        "range": "RANGED",
+        "ccCount": 1
+      },
+      "200": {
+        "championId": 200,
+        "damageType": "AP",
+        "archetype": "mage",
+        "hardEngage": false,
+        "peel": true,
+        "poke": true,
+        "waveclear": true,
+        "scaling": { "early": false, "mid": true, "late": true },
+        "range": "RANGED",
+        "ccCount": 1
+      }
+    }
+  },
+  "expected": {
+    "recommendations": [
+      { "championId": 2, "rank": 1, "reasons": [{ "type": "counter", "lowData": false }] },
+      { "championId": 1, "rank": 2, "reasons": [{ "type": "counter", "lowData": false }] }
+    ]
+  }
+}

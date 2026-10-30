@@ -3,8 +3,8 @@
 ## Current status
 
 - Phase: 1 (Support / Diamond)
-- Current milestone: M0 Foundations (T-002.b DONE) and M1 ETL (in progress: T-014 DONE; T-015..T-019 TODO) -> M2 Engine
-- Last updated: 2026-10-29 by Kilo
+- Current milestone: M0 Foundations (T-002.b DONE) and M1 ETL (in progress: T-014 DONE; T-015..T-019 TODO) -> M2 Engine (T-020..T-023 DONE)
+- Last updated: 2026-10-30 by Antigravity
 
 ## Epic status
 
@@ -12,7 +12,7 @@
 | -------------- | ----------- | ------------------------------------------------------------------------------------------------- |
 | E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b DONE                                                                   |
 | E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e, T-014 DONE; T-015..T-019 TODO |
-| E2 Engine      | IN PROGRESS | T-020 DONE; T-021 DONE; T-022 DONE (deps T-002 DONE, D-020..D-023 accepted)                       |
+| E2 Engine      | IN PROGRESS | T-020 DONE; T-021 DONE; T-022 DONE; T-023 DONE                                                    |
 | E3 Web MVP     | NOT STARTED |                                                                                                   |
 | E4 Runes       | NOT STARTED |                                                                                                   |
 | E5 Items       | NOT STARTED |                                                                                                   |
@@ -27,7 +27,9 @@
 
 ## Next recommended ticket
 
-B-017 done (engine and shared `"types": []` plus ESLint purity guardrails in `eslint.config.mjs` with automated regression tests; T-020's engine-purity prerequisite is fully satisfied — the residual `tsc` gap caused by test files importing `vitest` is logged as B-021 and not fixed). B-022 (all Node built-ins blocked), B-023 (Date() call blocked) and B-024 (regression tests) also fixed. B-011 fixed (spec + T-002.b scope; implementation in T-002.b). Fix B-012 done. T-013.e done (typed schema-less `request()`, timeout/invalid-JSON regression tests, CLI + matches refactor below 300 lines; `pnpm check` 184 tests). **T-013.d done** (`pnpm etl status`, read-only parameterized counts and progress, empty & seeded database tests, CLI handling when database does not exist; `pnpm check` 153 tests). **D-008, D-011, D-017, D-018, D-020, D-021, D-022, D-023 accepted (2026-10-29); D-028 (formerly D-025, @types/... devDeps) renumbered and accepted.** SPECS §5/§8 are now normative. **T-002.b DONE** (shared schema parity); `packages/shared/src/index.ts` split by domain into `schemas/*.ts` (10 modules); rankBucketSchema (8 buckets), sparse role-prob with sum-to-1, Reason.with as ChampionId[], Reason.lowData, n_eff non-integer, lane reason type, DraftResult with insufficientData/poolRecommendations/poolUnavailable, championPoolSchema, manifest roles, all role-keyed export tuple schemas with games_w2, rune/build export schemas; 184 tests pass. **T-020 DONE** (rank weighting module: config + kernel + n_eff + equivalent-counts + influence matrix; 49 engine tests). **T-021 DONE** (Role inference — `inferRoles` with brute-force permutation over 120 assignments, viability check for missing champions, confidence = best/total probability mass; 15 tests). Next: **T-022** (Shrinkage + level mapping — builds on T-020's `n_eff`/equiv-count primitives; T-023 recommendation engine depends on T-020..T-022). T-014 (Participant enrichment) remains **data-blocked** (no Riot key, 0 games collected, no SQLite database under `data/`). **T-014 implementation DONE** (2026-10-29): enrichment module, mastery endpoint, 22 tests; **T-015 (Aggregate role probabilities) ready**.
+T-023 is **DONE** (Role-generic recommendation engine with explanations, layered shrinkage scoring, pool contract D-024, composition needs, golden test runner and golden fixtures including non-support TOP 1v1 lane group).
+Next engine tickets: **T-024** (Blind pick mode), **T-025** (Comp needs full model), **T-026** (Golden test suite 20+ scenarios) or **T-027.a** (Draft backtest harness).
+Next ETL ticket: **T-015** (Aggregate role probabilities, depends on T-014).
 
 ## Open questions for the owner
 
@@ -36,6 +38,46 @@ B-017 done (engine and shared `"types": []` plus ESLint purity guardrails in `es
 ---
 
 ## Session log (newest first)
+
+### 2026-10-30 — Antigravity — Ticket T-023 (Recommendation engine, role-generic)
+
+- Done:
+  - **`packages/engine/src/recommend.ts`** (new): pure, deterministic recommendation engine implementing SPECS §5-7 for any `myRole`:
+    - Candidate enumeration via `roleProb >= ROLE_PROB_THRESHOLD` (0.05), plus user pool champions (D-024).
+    - Baseline gate: excludes candidates with baseline `n_eff < minGames`, routing them to `insufficientData`.
+    - Layer 1 (pairs): allies and enemies sorted by descending role influence with ties broken by ascending champion ID (SPECS §5, TICKETS.md T-026), shrunk toward `p0` with prior strength `k`.
+    - Layer 2 (`lane_vs`): bot lane (SUPPORT/ADC) shrinks toward pair predictions `q = sigmoid(x)` once lane enemies are known; 1v1 lane groups (TOP, MID, JUNGLE) score 1v1 matchup.
+    - Layer 3 (`lane_full`): evaluates full 2v2 lane context for bot lane; skipped for 1v1 lane groups (TOP, MID, JUNGLE).
+    - Layer 4 (composition): comp need bonuses from `computeCompNeed`.
+    - Layer 5 (blind safety): `computeBlindSafety` penalty/bonus when blind pick or fewer than 2 lane enemies known.
+    - Reason generation: reasons emitted in canonical order (pairs by descending influence, ties by championId, then `lane_vs`, `lane_full`, `comp`, `blind`), with level mapping and `lowData` flags.
+    - Pool contract (D-024): `recommendations` is the complete overall ranking; `poolRecommendations` retains exact global rank and sequential `poolRank`; pool champions never modify candidate scores; missing baseline data maps to `poolUnavailable` (`insufficientData`) and `insufficientData`; unknown champion IDs map to `poolUnavailable` (`unknownChampion`); below-threshold pool picks receive `offRole` warning.
+  - **`packages/engine/src/comp.ts`** and **`packages/engine/src/comp.test.ts`** (new): composition needs scoring from champion tags (engage, peel, waveclear, poke, damage balance).
+  - **`packages/engine/src/golden.test.ts`** (new): pure golden test runner loading fixtures from `packages/engine/test/golden/*.json`.
+  - **Golden test fixtures** (8 scenarios in `packages/engine/test/golden/`):
+    - `ally_adc_synergy.json`: ally ADC pair synergy dominating recommendation.
+    - `blind_pick_safe_supports.json`: blind pick mode with baseline and comp evaluation.
+    - `enemy_counter.json`: enemy counter pick penalizing unfavorable matchup.
+    - `low_data_flag.json`: low data pair term flagged `lowData: true` with zero delta contribution.
+    - `pool_recommendations_order.json`: personal pool preserves overall recommendation order with `poolRank`.
+    - `top_lane_1v1_matchup.json`: non-support role (TOP) consuming influence matrix and `laneGroup(TOP)` (1v1, `lane_full` skipped).
+    - `pool_unavailable_and_offrole.json`: pool handling with unknown champions, insufficient data, and `offRole` warnings.
+    - `flex_role_inference.json`: enemy flex pick evaluated with role inference confidence weighting.
+  - **`packages/engine/src/recommend.test.ts`** (new, 25 tests): candidate enumeration, baseline gate, score ranking, sequential ranks, tie-breaking by champion ID, pair synergies and counters, bot lane vs and 1v1 lane full skipping, pool contract (score invariance, subsequence order, insufficientData, unknownChampion, offRole, roleProb-set relative order preservation), reason reference validity, reason ordering, determinism, edge cases.
+  - **`packages/engine/src/index.ts`** (updated): exported `./comp.js` and `./recommend.js`.
+- Files touched:
+  - `packages/engine/src/recommend.ts` (new)
+  - `packages/engine/src/recommend.test.ts` (new)
+  - `packages/engine/src/comp.ts` (new)
+  - `packages/engine/src/comp.test.ts` (new)
+  - `packages/engine/src/golden.test.ts` (new)
+  - `packages/engine/src/index.ts` (updated)
+  - `packages/engine/test/golden/*.json` (8 fixtures)
+  - `docs/TICKETS.md` (updated T-023 to DONE)
+  - `docs/PROGRESS.md` (updated)
+- Tests: `pnpm check` — green (25 test files, 412 tests passed; typecheck, eslint, prettier format check, vitest all passing cleanly).
+- State left: **DONE (T-023)**.
+- Next step: T-024 (Blind pick mode) or T-025 (Comp needs) or T-015 (Aggregate role probabilities in ETL).
 
 ### 2026-10-29 — Kilo — Ticket T-022 (Shrinkage + level mapping)
 

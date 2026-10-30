@@ -1,0 +1,103 @@
+{
+  "name": "pool_recommendations_order",
+  "input": {
+    "userRank": "DIAMOND",
+    "userRole": "SUPPORT",
+    "allies": [],
+    "enemies": [],
+    "blindPick": true,
+    "pool": [2, 4]
+  },
+  "data": {
+    "championIds": [1, 2, 3, 4, 5],
+    "roleProb": {
+      "1": { "SUPPORT": 1.0 },
+      "2": { "SUPPORT": 1.0 },
+      "3": { "SUPPORT": 1.0 },
+      "4": { "SUPPORT": 1.0 },
+      "5": { "SUPPORT": 1.0 }
+    },
+    "baselines": [
+      [1, "DIAMOND", 35, 50, 0.1],
+      [2, "DIAMOND", 30, 50, 0.1],
+      [3, "DIAMOND", 25, 50, 0.1],
+      [4, "DIAMOND", 28, 50, 0.1],
+      [5, "DIAMOND", 20, 50, 0.1]
+    ],
+    "allyPairs": [],
+    "enemyPairs": [],
+    "laneVs": [],
+    "laneFull": [],
+    "tags": {
+      "1": {
+        "championId": 1,
+        "damageType": "AP",
+        "archetype": "mage",
+        "hardEngage": false,
+        "peel": true,
+        "poke": true,
+        "waveclear": true,
+        "scaling": { "early": false, "mid": true, "late": true },
+        "range": "RANGED",
+        "ccCount": 1
+      },
+      "2": {
+        "championId": 2,
+        "damageType": "AP",
+        "archetype": "enchanter",
+        "hardEngage": false,
+        "peel": true,
+        "poke": true,
+        "waveclear": true,
+        "scaling": { "early": false, "mid": true, "late": true },
+        "range": "RANGED",
+        "ccCount": 1
+      },
+      "3": {
+        "championId": 3,
+        "damageType": "AP",
+        "archetype": "tank",
+        "hardEngage": false,
+        "peel": true,
+        "poke": false,
+        "waveclear": true,
+        "scaling": { "early": false, "mid": true, "late": true },
+        "range": "MELEE",
+        "ccCount": 2
+      },
+      "4": {
+        "championId": 4,
+        "damageType": "AP",
+        "archetype": "enchanter",
+        "hardEngage": false,
+        "peel": true,
+        "poke": true,
+        "waveclear": true,
+        "scaling": { "early": false, "mid": true, "late": true },
+        "range": "RANGED",
+        "ccCount": 1
+      },
+      "5": {
+        "championId": 5,
+        "damageType": "AP",
+        "archetype": "tank",
+        "hardEngage": false,
+        "peel": true,
+        "poke": false,
+        "waveclear": true,
+        "scaling": { "early": false, "mid": true, "late": true },
+        "range": "MELEE",
+        "ccCount": 2
+      }
+    }
+  },
+  "expected": {
+    "recommendations": [
+      { "championId": 1, "rank": 1 },
+      { "championId": 2, "rank": 2 },
+      { "championId": 4, "rank": 3 },
+      { "championId": 3, "rank": 4 },
+      { "championId": 5, "rank": 5 }
+    ]
+  }
+}

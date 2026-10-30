@@ -11,6 +11,7 @@
  * prior strengths `k` are in raw-game units.
  */
 
+import { DEFAULT_CONFIG } from './config.js';
 import { sigmoid, shrink } from './weighting.js';
 
 /**
@@ -48,7 +49,7 @@ export function layerTerm(pL: number, q: number, eps: number): number {
  *   `pairTerm = logit((winsE + k*p0)/(gamesE + k)) - logit(p0)`
  *
  * where `p0` is the baseline win probability (the layer below the pairs).
- * Returns 0 when there is no pair data (`gamesE == 0`).
+ * Returns 0 when the pair is lowData (`gamesE < minGames`, SPECS §5) or empty.
  */
 export function pairTerm(
   winsE: number,
@@ -56,12 +57,44 @@ export function pairTerm(
   k: number,
   p0: number,
   eps: number,
+  minGames: number = DEFAULT_CONFIG.minGames,
 ): number {
-  if (gamesE <= 0) {
+  if (isLowData(gamesE, minGames)) {
     return 0;
   }
   const pL = layerWinRate(winsE, gamesE, k, p0);
   return layerTerm(pL, p0, eps);
+}
+
+/**
+ * The lane term for an exact lane context, shrunk toward the running
+ * prediction `q` (SPECS §5):
+ *
+ *   `laneTerm = logit((winsE + kLane*q)/(gamesE + kLane)) - logit(q)`
+ *
+ * Returns 0 when the context is lowData (`gamesE < minGames`) or empty.
+ */
+export function laneTerm(
+  winsE: number,
+  gamesE: number,
+  kLane: number,
+  q: number,
+  eps: number,
+  minGames: number = DEFAULT_CONFIG.minGames,
+): number {
+  if (isLowData(gamesE, minGames)) {
+    return 0;
+  }
+  const pL = layerWinRate(winsE, gamesE, kLane, q);
+  return layerTerm(pL, q, eps);
+}
+
+/**
+ * Low-data rule (SPECS §5): a term whose `n_eff < minGames` contributes 0
+ * and its reason is flagged `lowData`. Empty samples are always lowData.
+ */
+export function isLowData(nEff: number, minGames: number): boolean {
+  return nEff <= 0 || nEff < minGames;
 }
 
 /**
@@ -77,58 +110,35 @@ export function deltaPp(x: number, term: number): number {
 /**
  * Map a `deltaPp` to a reason level (SPECS §5, "like Karakal"):
  *
- *   |deltaPp| >= 4.5 with n_eff >= 100 → ±3
- *   |deltaPp| >= 2.5 with n_eff >= 100 → ±2
- *   |deltaPp| >= 1.0 with n_eff >= 100 → ±1
+ *   |deltaPp| >= 4.5 → ±3
+ *   |deltaPp| >= 2.5 → ±2
+ *   |deltaPp| >= 1.0 → ±1
  *   otherwise → 0
  *
- * Positive levels require `n_eff >= 100` (SPECS §5: "L1 >= +1.0pp, L2 >= +2.5pp,
- * L3 >= +4.5pp (needs n_eff >= 100)"). The `minGames` threshold gates the
- * entry-level L1: below it, even a large delta collapses to 0 (no data).
- * Negative levels (being countered) are never gated by n_eff — a champion
- * that is hard-countered in lane should still show the warning.
+ * Any lowData reason (`n_eff < minGames`) maps to 0, for both signs.
+ * Positive L2/L3 additionally require `n_eff >= 100`; when that fails, a
+ * qualifying delta falls back to L1 instead of disappearing. Negative levels
+ * (being countered) are not subject to the 100-game gate.
  */
-export function mapDeltaPpToLevel(deltaPp: number, nEff: number): number {
+export function mapDeltaPpToLevel(
+  deltaPp: number,
+  nEff: number,
+  minGames: number = DEFAULT_CONFIG.minGames,
+): number {
   const abs = Math.abs(deltaPp);
+  if (abs < 1.0 || isLowData(nEff, minGames)) {
+    return 0;
+  }
   const sign = deltaPp < 0 ? -1 : 1;
+  const highLevelsAllowed = sign < 0 || nEff >= 100;
 
-  if (deltaPp > 0) {
-    // Positive levels require n_eff >= 100 for L2/L3, and >= minGames for L1.
-    // (minGames default 25; L1 needs >= 1.0pp AND n_eff >= minGames per lowData logic.)
-    // SPECS §5: "L1 >= +1.0pp, L2 >= +2.5pp, L3 >= +4.5pp (needs n_eff >= 100)".
-    // The L2/L3 thresholds each require n_eff >= 100; L1 requires the term to
-    // not be flagged lowData (n_eff >= minGames at the reason level).
-    if (abs >= 4.5) {
-      return nEff >= 100 ? sign * 3 : 0;
-    }
-    if (abs >= 2.5) {
-      return nEff >= 100 ? sign * 2 : 0;
-    }
-    if (abs >= 1.0) {
-      // L1: the term itself must not be lowData (n_eff >= minGames).
-      // We pass minGames externally; here we use a conservative floor: n_eff >= 1
-      // for L1 to render at all (the caller sets lowData separately).
-      // The strict minGames gate is handled by the caller via lowData.
-      return sign * 1;
-    }
-    return 0;
+  if (abs >= 4.5 && highLevelsAllowed) {
+    return sign * 3;
   }
-
-  // Negative delta (counter-picked): render the level regardless of n_eff,
-  // but require at least 1 effective game so we don't show noise.
-  if (nEff < 1) {
-    return 0;
+  if (abs >= 2.5 && highLevelsAllowed) {
+    return sign * 2;
   }
-  if (abs >= 4.5) {
-    return -3;
-  }
-  if (abs >= 2.5) {
-    return -2;
-  }
-  if (abs >= 1.0) {
-    return -1;
-  }
-  return 0;
+  return sign * 1;
 }
 
 /**

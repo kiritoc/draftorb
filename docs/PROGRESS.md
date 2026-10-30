@@ -53,7 +53,8 @@ B-017 done (engine and shared `"types": []` plus ESLint purity guardrails in `es
   - **`packages/engine/src/index.ts`** (updated): barrel re-exports `./levels.js`.
 - Files touched: `packages/engine/src/levels.ts` (new), `packages/engine/src/levels.test.ts` (new), `packages/engine/src/index.ts` (updated), `docs/TICKETS.md`, `docs/PROGRESS.md`.
 - Tests: `pnpm check` — green (22 test files, 320 tests passed; +28 new).
-- Bugs: none. The `baselineLogOdds(0, 0, 0, eps)` NaN edge case (zero prior strength + zero evidence) was caught by a test and fixed by delegating to `shrink` (which returns the prior q when `gamesE + k <= 0`), consistent with the B-026 fix in T-020.
+- Bugs: B-031 and B-032 (found in review, fixed — see follow-up below). The `baselineLogOdds(0, 0, 0, eps)` NaN edge case (zero prior strength + zero evidence) was caught by a test and fixed by delegating to `shrink` (which returns the prior q when `gamesE + k <= 0`), consistent with the B-026 fix in T-020.
+- Review follow-up: fixed B-031 (pair/lane terms below `minGames` now contribute 0; added `isLowData` and gated `laneTerm`) and B-032 (`mapDeltaPpToLevel` takes `minGames`, gates lowData for both signs, falls back to L1 when `n_eff < 100`). The k-units test now converts weighted counts via `toEquivalentCounts`; the TOP chain test uses valid counts and asserts the lowData fallback and large-sample dominance. `docs/BUGS.md` updated.
 - State left: **DONE (T-022)**.
 - Next step: T-023 (Recommendation engine, depends on T-020..T-022).
 

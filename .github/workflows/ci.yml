@@ -13,7 +13,129 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Untrusted: runs PR-controlled code with no secrets and a read-only token.
+  format:
+    # Only same-repo PRs; fork PRs have no secrets and are covered by format:check.
+    # On push events pull_request is empty, so this is false there too.
+    # Dependabot runs lack the app secret, and bot commits block its rebases.
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.head_ref }}
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      # Workflows are never auto-formatted (bot must not edit .github); format them locally.
+      - run: pnpm prettier --write . '!.github/**'
+
+      - name: Create patch
+        id: diff
+        run: |
+          git diff --binary -- . ':!.github' > format.patch
+          # Bot commit = our subject + git-auto-commit-action's default committer.
+          LAST="$(git log -1 --format='%cn|%s')"
+          if [ -s format.patch ] && [ "$LAST" = 'github-actions[bot]|style: apply prettier' ]; then
+            # Prettier is not stable on its own output: don't push again, let check fail.
+            echo "::warning::Still unformatted after the bot's commit; not committing again"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          elif [ -s format.patch ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/upload-artifact@v7
+        if: steps.diff.outputs.changed == 'true'
+        with:
+          name: format-patch
+          path: format.patch
+          retention-days: 1
+
+  # Trusted: only applies the patch and pushes; never runs PR code.
+  # Setup: a GitHub App installed on this repo with Contents: read & write.
+  # Set repo variable FORMAT_BOT_APP_ID and secret FORMAT_BOT_PRIVATE_KEY.
+  # Without them this job fails and `check` reports the format issues instead.
+  # Contributors: after the bot pushes, run `git pull --rebase` before pushing again.
+  commit-format:
+    needs: format
+    if: needs.format.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    outputs:
+      changed: ${{ steps.commit.outputs.changes_detected }}
+
+    steps:
+      - name: Create app token
+        id: app
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.FORMAT_BOT_APP_ID }}
+          private-key: ${{ secrets.FORMAT_BOT_PRIVATE_KEY }}
+          # Least privilege: this repo only, contents:write only.
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.head_ref }}
+          token: ${{ steps.app.outputs.token }}
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: format-patch
+          path: ${{ runner.temp }}
+
+      - name: Apply patch
+        env:
+          PATCH: ${{ runner.temp }}/format.patch
+        run: |
+          # Prettier only edits files in place: reject creates, deletes, renames, copies.
+          if grep -qE '^((new|deleted) file mode|(rename|copy) (from|to) |(---|\+\+\+) /dev/null)' "$PATCH"; then
+            echo "::error::Patch adds, deletes, renames or copies files"; exit 1
+          fi
+          # git apply refuses paths outside the repo by default.
+          git apply --check "$PATCH"
+          git apply "$PATCH"
+          # Every change must be a modification of a tracked file outside .github.
+          # Includes untracked files, so a sneaked-in new file is caught too.
+          # Odd filenames (e.g. with newlines) only cause a rejection, never a bypass.
+          STATUS="$(git status --porcelain -z --untracked-files=all | tr '\0' '\n')"
+          if printf '%s\n' "$STATUS" | grep -qvE '^ M ' || printf '%s\n' "$STATUS" | grep -qE '^ M \.github/'; then
+            echo "::error::Patch adds files or touches .github"; exit 1
+          fi
+
+      - name: Commit formatting changes
+        id: commit
+        uses: stefanzweifel/git-auto-commit-action@v7
+        with:
+          # The format job matches this subject + the github-actions[bot] committer.
+          commit_message: 'style: apply prettier'
+
   check:
+    needs: [format, commit-format]
+    # Run when format was skipped (push/fork) or made no change.
+    # Skip when format pushed a commit: that push starts a new run.
+    if: ${{ !cancelled() && needs.commit-format.outputs.changed != 'true' }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     strategy:
@@ -24,17 +146,17 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           run_install: false
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node-version }}
           cache: pnpm

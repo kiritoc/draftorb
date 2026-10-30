@@ -5,6 +5,3 @@ data/
 dist/
 node_modules/
 coverage/
-# Workflows are excluded from the auto-format bot's patch, so keep them out of
-# prettier entirely; otherwise format:check fails on changes the bot can't fix.
-.github/

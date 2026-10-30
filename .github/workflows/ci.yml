@@ -41,7 +41,8 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile --ignore-scripts
-      - run: pnpm prettier --write .
+      # Workflows are never auto-formatted (bot must not edit .github); format them locally.
+      - run: pnpm prettier --write . '!.github/**'
 
       - name: Create patch
         id: diff

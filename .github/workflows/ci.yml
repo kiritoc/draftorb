@@ -51,7 +51,9 @@ jobs:
         id: diff
         run: |
           git diff --binary -- . ':!.github' > format.patch
-          if [ -s format.patch ] && [ "$(git log -1 --format=%s)" = 'style: apply prettier' ]; then
+          # Bot commit = our subject + git-auto-commit-action's default committer.
+          LAST="$(git log -1 --format='%cn|%s')"
+          if [ -s format.patch ] && [ "$LAST" = 'github-actions[bot]|style: apply prettier' ]; then
             # Prettier is not stable on its own output: don't push again, let check fail.
             echo "::warning::Still unformatted after the bot's commit; not committing again"
             echo "changed=false" >> "$GITHUB_OUTPUT"
@@ -126,6 +128,7 @@ jobs:
         id: commit
         uses: stefanzweifel/git-auto-commit-action@v7
         with:
+          # The format job matches this subject + the github-actions[bot] committer.
           commit_message: 'style: apply prettier'
 
   check:

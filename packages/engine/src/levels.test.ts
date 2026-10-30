@@ -59,6 +59,7 @@ describe('config-driven helpers', () => {
     expect(levelFromConfig(4.5, 40, config)).toBe(0);
     expect(levelFromConfig(4.5, 120, config)).toBe(1);
     expect(levelFromConfig(4.5, 150, config)).toBe(3);
+    expect(levelFromConfig(-4.5, 120, config)).toBe(-1);
   });
 });
 
@@ -217,25 +218,12 @@ describe('mapDeltaPpToLevel', () => {
     expect(mapDeltaPpToLevel(2.0, Number.NaN)).toBe(0);
   });
 
-  it('honors a custom highLevelMinGames from config', () => {
-    const config = { ...DEFAULT_CONFIG, minGames: 50, highLevelMinGames: 150 };
-    expect(mapDeltaPpToLevel(4.5, 120, config.minGames, config.highLevelMinGames)).toBe(1);
-    expect(mapDeltaPpToLevel(4.5, 150, config.minGames, config.highLevelMinGames)).toBe(3);
-  });
-
-  it('allows negative levels with low n_eff (counters are not gated)', () => {
-    // Negative deltas indicate being countered; they should still show.
+  it('gates negative L2/L3 on n_eff >= 100 like positive ones (symmetric)', () => {
     expect(mapDeltaPpToLevel(-1.5, 30)).toBe(-1);
     expect(mapDeltaPpToLevel(-2.6, 50)).toBe(-1);
     expect(mapDeltaPpToLevel(-4.5, 99)).toBe(-1);
     expect(mapDeltaPpToLevel(-4.5, 100)).toBe(-3);
     expect(mapDeltaPpToLevel(4.5, 50)).toBe(-mapDeltaPpToLevel(-4.5, 50));
-  });
-
-  it('returns 0 for non-finite inputs', () => {
-    expect(mapDeltaPpToLevel(Number.NaN, 100)).toBe(0);
-    expect(mapDeltaPpToLevel(Number.POSITIVE_INFINITY, 100)).toBe(0);
-    expect(mapDeltaPpToLevel(2.0, Number.NaN)).toBe(0);
   });
 
   it('honors a custom highLevelMinGames for both signs', () => {

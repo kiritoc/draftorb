@@ -12,6 +12,7 @@
  */
 
 import { DEFAULT_CONFIG } from './config.js';
+import type { LevelThresholds } from './config.js';
 import { sigmoid, shrink } from './weighting.js';
 
 /**
@@ -108,7 +109,8 @@ export function deltaPp(x: number, term: number): number {
 }
 
 /**
- * Map a `deltaPp` to a reason level (SPECS §5, "like Karakal"):
+ * Map a `deltaPp` to a reason level (SPECS §5, "like Karakal"). With the
+ * default `levelThresholds` (config):
  *
  *   |deltaPp| >= 4.5 → ±3
  *   |deltaPp| >= 2.5 → ±2
@@ -116,26 +118,27 @@ export function deltaPp(x: number, term: number): number {
  *   otherwise → 0
  *
  * Any lowData reason (`n_eff < minGames`) maps to 0, for both signs.
- * Positive L2/L3 additionally require `n_eff >= 100`; when that fails, a
- * qualifying delta falls back to L1 instead of disappearing. Negative levels
- * (being countered) are not subject to the 100-game gate.
+ * L2/L3 additionally require `n_eff >= highLevelMinGames` (default 100) for
+ * both signs ("negative symmetric"); when that fails, a qualifying delta
+ * falls back to ±1 instead of disappearing.
  */
 export function mapDeltaPpToLevel(
   deltaPp: number,
   nEff: number,
   minGames: number = DEFAULT_CONFIG.minGames,
+  thresholds: LevelThresholds = DEFAULT_CONFIG.levelThresholds,
 ): number {
   const abs = Math.abs(deltaPp);
-  if (abs < 1.0 || isLowData(nEff, minGames)) {
+  if (abs < thresholds.l1 || isLowData(nEff, minGames)) {
     return 0;
   }
   const sign = deltaPp < 0 ? -1 : 1;
-  const highLevelsAllowed = sign < 0 || nEff >= 100;
+  const highLevelsAllowed = nEff >= thresholds.highLevelMinGames;
 
-  if (abs >= 4.5 && highLevelsAllowed) {
+  if (abs >= thresholds.l3 && highLevelsAllowed) {
     return sign * 3;
   }
-  if (abs >= 2.5 && highLevelsAllowed) {
+  if (abs >= thresholds.l2 && highLevelsAllowed) {
     return sign * 2;
   }
   return sign * 1;

@@ -178,7 +178,9 @@ function makeReason(
   lowData: boolean,
   config: RankWeightingConfig,
 ): Reason {
-  const level = lowData ? 0 : mapDeltaPpToLevel(dpp, n, config.minGames);
+  const level = lowData
+    ? 0
+    : mapDeltaPpToLevel(dpp, n, config.minGames, config.levelThresholds);
   return {
     type,
     with: withIds,

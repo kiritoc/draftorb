@@ -13,24 +13,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Untrusted: runs PR-controlled code with no secrets and a read-only token.
   format:
+    # Only same-repo PRs; fork PRs have no secrets and are covered by format:check.
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
     outputs:
-      changed: ${{ steps.commit.outputs.changes_detected }}
+      changed: ${{ steps.diff.outputs.changed }}
 
     steps:
-      - name: Create app token
-        id: app
-        uses: actions/create-github-app-token@v2
-        with:
-          app-id: ${{ vars.FORMAT_BOT_APP_ID }}
-          private-key: ${{ secrets.FORMAT_BOT_PRIVATE_KEY }}
-
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.head_ref }}
-          token: ${{ steps.app.outputs.token }}
+          persist-credentials: false
 
       - uses: pnpm/action-setup@v4
         with:
@@ -41,8 +39,67 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --ignore-scripts
       - run: pnpm prettier --write .
+
+      - name: Create patch
+        id: diff
+        run: |
+          git diff --binary -- . ':!.github' > format.patch
+          if [ -s format.patch ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: steps.diff.outputs.changed == 'true'
+        with:
+          name: format-patch
+          path: format.patch
+          retention-days: 1
+
+  # Trusted: only applies the patch and pushes; never runs PR code.
+  commit-format:
+    needs: format
+    if: needs.format.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    outputs:
+      changed: ${{ steps.commit.outputs.changes_detected }}
+
+    steps:
+      - name: Create app token
+        id: app
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.FORMAT_BOT_APP_ID }}
+          private-key: ${{ secrets.FORMAT_BOT_PRIVATE_KEY }}
+          # Least privilege: this repo only, contents:write only.
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          token: ${{ steps.app.outputs.token }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: format-patch
+          path: ${{ runner.temp }}
+
+      - name: Apply patch
+        env:
+          PATCH: ${{ runner.temp }}/format.patch
+        run: |
+          # Reject anything outside the working tree or under .github.
+          if git apply --numstat "$PATCH" | awk '{print $3}' | grep -E '^(\.github/|/|\.\./)'; then
+            echo "::error::Patch touches disallowed paths"; exit 1
+          fi
+          git apply --check "$PATCH"
+          git apply "$PATCH"
 
       - name: Commit formatting changes
         id: commit
@@ -51,10 +108,10 @@ jobs:
           commit_message: "style: apply prettier"
 
   check:
-    needs: format
+    needs: [format, commit-format]
     # Run when format was skipped (push/fork) or made no change.
     # Skip when format pushed a commit: that push starts a new run.
-    if: ${{ !cancelled() && needs.format.outputs.changed != 'true' }}
+    if: ${{ !cancelled() && needs.commit-format.outputs.changed != 'true' }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     strategy:

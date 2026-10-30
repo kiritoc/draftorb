@@ -182,26 +182,6 @@ function createInfluenceMatrix(): InfluenceMatrix {
 
 export const DEFAULT_INFLUENCE: InfluenceMatrix = createInfluenceMatrix();
 
-// --- Reason level thresholds (SPECS §5) ---
-
-/**
- * `deltaPp` cutoffs for levels 1-3 and the `n_eff` required for levels 2-3.
- * Applied symmetrically to positive and negative deltas.
- */
-export const levelThresholdsSchema = z
-  .object({
-    l1: z.number().positive(),
-    l2: z.number().positive(),
-    l3: z.number().positive(),
-    highLevelMinGames: z.number().nonnegative(),
-  })
-  .strict()
-  .refine((t) => t.l1 < t.l2 && t.l2 < t.l3, {
-    message: 'level thresholds must be strictly increasing (l1 < l2 < l3)',
-  });
-
-export type LevelThresholds = z.infer<typeof levelThresholdsSchema>;
-
 // --- Full config schema ---
 
 export const rankWeightingConfigSchema = z
@@ -211,6 +191,7 @@ export const rankWeightingConfigSchema = z
     unknownRankFactor: z.number().gt(0).max(1),
     rankWindowTiers: z.number().int().nonnegative(),
     minGames: z.number().nonnegative(),
+    highLevelMinGames: z.number().nonnegative(),
     k0: z.number().nonnegative(),
     k: z.number().nonnegative(),
     kLane: z.number().nonnegative(),
@@ -223,7 +204,6 @@ export const rankWeightingConfigSchema = z
     alpha: z.number().nonnegative(),
     wMax: z.number().gte(1),
     exportMinGames: z.number().nonnegative(),
-    levelThresholds: levelThresholdsSchema,
     influence: influenceConfigSchema,
   })
   .strict()
@@ -236,6 +216,13 @@ export const rankWeightingConfigSchema = z
         path: ['exportMinGames'],
       });
     }
+    if (config.highLevelMinGames < config.minGames) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'highLevelMinGames must be >= minGames so L2/L3 never fire on lowData reasons',
+        path: ['highLevelMinGames'],
+      });
+    }
   });
 
 export type RankWeightingConfig = z.infer<typeof rankWeightingConfigSchema>;
@@ -246,6 +233,7 @@ export const DEFAULT_CONFIG: RankWeightingConfig = rankWeightingConfigSchema.par
   unknownRankFactor: 0.5,
   rankWindowTiers: 2,
   minGames: 25,
+  highLevelMinGames: 100,
   k0: 20,
   k: 40,
   kLane: 40,
@@ -258,7 +246,6 @@ export const DEFAULT_CONFIG: RankWeightingConfig = rankWeightingConfigSchema.par
   alpha: 0.25,
   wMax: 2.0,
   exportMinGames: 10,
-  levelThresholds: { l1: 1.0, l2: 2.5, l3: 4.5, highLevelMinGames: 100 },
   influence: {
     draft: createInfluenceMatrix(),
     lane: createInfluenceMatrix(),

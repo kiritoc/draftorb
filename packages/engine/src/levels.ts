@@ -12,7 +12,7 @@
  */
 
 import { DEFAULT_CONFIG } from './config.js';
-import type { LevelThresholds } from './config.js';
+import type { RankWeightingConfig } from './config.js';
 import { sigmoid, shrink } from './weighting.js';
 
 /**
@@ -95,7 +95,48 @@ export function laneTerm(
  * and its reason is flagged `lowData`. Empty samples are always lowData.
  */
 export function isLowData(nEff: number, minGames: number): boolean {
-  return nEff <= 0 || nEff < minGames;
+  // Written as a negated positive check so NaN counts as lowData.
+  return !(nEff > 0 && nEff >= minGames);
+}
+
+/**
+ * A layer's log-odds term plus its lowData flag (SPECS §5): a lowData term is
+ * 0 and its reason must be flagged `lowData`.
+ */
+export interface LayerTermResult {
+  term: number;
+  lowData: boolean;
+}
+
+/**
+ * `pairTerm` with the lowData flag and all parameters taken from `config`,
+ * so callers cannot mix a tuned config with default thresholds.
+ */
+export function scorePair(
+  winsE: number,
+  gamesE: number,
+  p0: number,
+  config: RankWeightingConfig,
+): LayerTermResult {
+  return {
+    term: pairTerm(winsE, gamesE, config.k, p0, config.eps, config.minGames),
+    lowData: isLowData(gamesE, config.minGames),
+  };
+}
+
+/**
+ * `laneTerm` with the lowData flag and all parameters taken from `config`.
+ */
+export function scoreLane(
+  winsE: number,
+  gamesE: number,
+  q: number,
+  config: RankWeightingConfig,
+): LayerTermResult {
+  return {
+    term: laneTerm(winsE, gamesE, config.kLane, q, config.eps, config.minGames),
+    lowData: isLowData(gamesE, config.minGames),
+  };
 }
 
 /**
@@ -109,8 +150,7 @@ export function deltaPp(x: number, term: number): number {
 }
 
 /**
- * Map a `deltaPp` to a reason level (SPECS §5, "like Karakal"). With the
- * default `levelThresholds` (config):
+ * Map a `deltaPp` to a reason level (SPECS §5, "like Karakal"):
  *
  *   |deltaPp| >= 4.5 → ±3
  *   |deltaPp| >= 2.5 → ±2
@@ -118,39 +158,53 @@ export function deltaPp(x: number, term: number): number {
  *   otherwise → 0
  *
  * Any lowData reason (`n_eff < minGames`) maps to 0, for both signs.
- * L2/L3 additionally require `n_eff >= highLevelMinGames` (default 100) for
- * both signs ("negative symmetric"); when that fails, a qualifying delta
- * falls back to ±1 instead of disappearing.
+ * L2/L3 additionally require `n_eff >= highLevelMinGames` (config, default
+ * 100) for both signs ("negative symmetric"); when that fails, a qualifying
+ * delta falls back to ±1 instead of disappearing.
  */
 export function mapDeltaPpToLevel(
   deltaPp: number,
   nEff: number,
   minGames: number = DEFAULT_CONFIG.minGames,
-  thresholds: LevelThresholds = DEFAULT_CONFIG.levelThresholds,
+  highLevelMinGames: number = DEFAULT_CONFIG.highLevelMinGames,
 ): number {
+  if (!Number.isFinite(deltaPp) || !Number.isFinite(nEff)) {
+    return 0;
+  }
   const abs = Math.abs(deltaPp);
-  if (abs < thresholds.l1 || isLowData(nEff, minGames)) {
+  if (abs < 1.0 || isLowData(nEff, minGames)) {
     return 0;
   }
   const sign = deltaPp < 0 ? -1 : 1;
-  const highLevelsAllowed = nEff >= thresholds.highLevelMinGames;
+  const highLevelsAllowed = nEff >= highLevelMinGames;
 
-  if (abs >= thresholds.l3 && highLevelsAllowed) {
+  if (abs >= 4.5 && highLevelsAllowed) {
     return sign * 3;
   }
-  if (abs >= thresholds.l2 && highLevelsAllowed) {
+  if (abs >= 2.5 && highLevelsAllowed) {
     return sign * 2;
   }
   return sign * 1;
 }
 
 /**
+ * `mapDeltaPpToLevel` with both n_eff gates taken from `config`.
+ */
+export function levelFromConfig(
+  deltaPp: number,
+  nEff: number,
+  config: RankWeightingConfig,
+): number {
+  return mapDeltaPpToLevel(deltaPp, nEff, config.minGames, config.highLevelMinGames);
+}
+
+/**
  * Baseline gate (SPECS §5): a candidate whose baseline `n_eff` is below
  * `minGames` gets no score and no rank — it goes to `insufficientData`.
+ * Empty (and NaN) samples never pass, even with `minGames = 0` (golden rule 8).
  */
 export function baselineGate(nEff: number, minGames: number): boolean {
-  // Empty samples never pass, even with minGames = 0 (golden rule 8).
-  return nEff > 0 && nEff >= minGames;
+  return !isLowData(nEff, minGames);
 }
 
 /**

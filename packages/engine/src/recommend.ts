@@ -44,7 +44,7 @@ import {
   deltaPp,
   isLowData,
   laneTerm,
-  mapDeltaPpToLevel,
+  levelFromConfig,
   pairTerm,
 } from './levels.js';
 import { inferRoles } from './roles.js';
@@ -178,9 +178,7 @@ function makeReason(
   lowData: boolean,
   config: RankWeightingConfig,
 ): Reason {
-  const level = lowData
-    ? 0
-    : mapDeltaPpToLevel(dpp, n, config.minGames, config.levelThresholds);
+  const level = lowData ? 0 : levelFromConfig(dpp, n, config);
   return {
     type,
     with: withIds,

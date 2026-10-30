@@ -9,9 +9,59 @@ import {
   layerTerm,
   laneTerm,
   layerWinRate,
+  isLowData,
+  levelFromConfig,
   mapDeltaPpToLevel,
   pairTerm,
+  scoreLane,
+  scorePair,
 } from './levels.js';
+
+describe('isLowData', () => {
+  it('treats NaN n_eff as lowData', () => {
+    expect(isLowData(Number.NaN, 25)).toBe(true);
+    expect(pairTerm(Number.NaN, Number.NaN, 40, 0.5, DEFAULT_CONFIG.eps, 25)).toBe(0);
+  });
+
+  it('flags empty and below-minGames samples, passes at minGames', () => {
+    expect(isLowData(0, 0)).toBe(true);
+    expect(isLowData(24, 25)).toBe(true);
+    expect(isLowData(25, 25)).toBe(false);
+  });
+});
+
+describe('laneTerm', () => {
+  it('is 0 when lowData (gamesE < minGames), nonzero at minGames', () => {
+    const m = DEFAULT_CONFIG.minGames;
+    expect(laneTerm(m - 1, m - 1, 40, 0.5, DEFAULT_CONFIG.eps, m)).toBe(0);
+    expect(laneTerm(m, m, 40, 0.5, DEFAULT_CONFIG.eps, m)).toBeGreaterThan(0);
+  });
+
+  it('shrinks toward the running prediction q, not the baseline', () => {
+    const q = 0.6;
+    const t = laneTerm(30, 50, 40, q, DEFAULT_CONFIG.eps, 0);
+    // pL = (30 + 24) / 90 = 0.6 = q → no correction.
+    expect(t).toBeCloseTo(0, 10);
+  });
+});
+
+describe('config-driven helpers', () => {
+  it('scorePair / scoreLane flag lowData and use config thresholds', () => {
+    const config = { ...DEFAULT_CONFIG, minGames: 50, highLevelMinGames: 150 };
+    expect(scorePair(30, 40, 0.5, config)).toEqual({ term: 0, lowData: true });
+    const lane = scoreLane(40, 60, 0.5, config);
+    expect(lane.lowData).toBe(false);
+    expect(lane.term).toBeGreaterThan(0);
+  });
+
+  it('levelFromConfig applies both n_eff gates from config', () => {
+    const config = { ...DEFAULT_CONFIG, minGames: 50, highLevelMinGames: 150 };
+    expect(levelFromConfig(4.5, 40, config)).toBe(0);
+    expect(levelFromConfig(4.5, 120, config)).toBe(1);
+    expect(levelFromConfig(4.5, 150, config)).toBe(3);
+    expect(levelFromConfig(-4.5, 120, config)).toBe(-1);
+  });
+});
 
 describe('layerWinRate', () => {
   it('shrinks toward q when evidence is small (k in raw-game units)', () => {
@@ -170,12 +220,17 @@ describe('mapDeltaPpToLevel', () => {
     expect(mapDeltaPpToLevel(4.5, 50)).toBe(-mapDeltaPpToLevel(-4.5, 50));
   });
 
-  it('reads thresholds from config (non-default values)', () => {
-    const t = { l1: 2, l2: 3, l3: 6, highLevelMinGames: 120 };
-    expect(mapDeltaPpToLevel(1.5, 200, 25, t)).toBe(0);
-    expect(mapDeltaPpToLevel(5, 200, 25, t)).toBe(2);
-    expect(mapDeltaPpToLevel(6, 119, 25, t)).toBe(1);
-    expect(mapDeltaPpToLevel(-6, 120, 25, t)).toBe(-3);
+  it('returns 0 for non-finite inputs', () => {
+    expect(mapDeltaPpToLevel(Number.NaN, 100)).toBe(0);
+    expect(mapDeltaPpToLevel(Number.POSITIVE_INFINITY, 100)).toBe(0);
+    expect(mapDeltaPpToLevel(2.0, Number.NaN)).toBe(0);
+  });
+
+  it('honors a custom highLevelMinGames for both signs', () => {
+    expect(mapDeltaPpToLevel(4.5, 120, 50, 150)).toBe(1);
+    expect(mapDeltaPpToLevel(4.5, 150, 50, 150)).toBe(3);
+    expect(mapDeltaPpToLevel(-4.5, 120, 50, 150)).toBe(-1);
+    expect(mapDeltaPpToLevel(-4.5, 150, 50, 150)).toBe(-3);
   });
 
   it('L1 does not require n_eff >= 100 (only L2/L3 do)', () => {
@@ -201,8 +256,9 @@ describe('baselineGate', () => {
     expect(baselineGate(0, DEFAULT_CONFIG.minGames)).toBe(false);
   });
 
-  it('rejects an empty sample even when minGames is 0 (golden rule 8)', () => {
+  it('rejects an empty or NaN sample even when minGames is 0 (golden rule 8)', () => {
     expect(baselineGate(0, 0)).toBe(false);
+    expect(baselineGate(Number.NaN, 0)).toBe(false);
     expect(baselineGate(0.5, 0)).toBe(true);
   });
 });

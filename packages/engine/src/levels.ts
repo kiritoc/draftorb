@@ -12,6 +12,7 @@
  */
 
 import { DEFAULT_CONFIG } from './config.js';
+import type { RankWeightingConfig } from './config.js';
 import { sigmoid, shrink } from './weighting.js';
 
 /**
@@ -98,6 +99,46 @@ export function isLowData(nEff: number, minGames: number): boolean {
 }
 
 /**
+ * A layer's log-odds term plus its lowData flag (SPECS §5): a lowData term is
+ * 0 and its reason must be flagged `lowData`.
+ */
+export interface LayerTermResult {
+  term: number;
+  lowData: boolean;
+}
+
+/**
+ * `pairTerm` with the lowData flag and all parameters taken from `config`,
+ * so callers cannot mix a tuned config with default thresholds.
+ */
+export function scorePair(
+  winsE: number,
+  gamesE: number,
+  p0: number,
+  config: RankWeightingConfig,
+): LayerTermResult {
+  return {
+    term: pairTerm(winsE, gamesE, config.k, p0, config.eps, config.minGames),
+    lowData: isLowData(gamesE, config.minGames),
+  };
+}
+
+/**
+ * `laneTerm` with the lowData flag and all parameters taken from `config`.
+ */
+export function scoreLane(
+  winsE: number,
+  gamesE: number,
+  q: number,
+  config: RankWeightingConfig,
+): LayerTermResult {
+  return {
+    term: laneTerm(winsE, gamesE, config.kLane, q, config.eps, config.minGames),
+    lowData: isLowData(gamesE, config.minGames),
+  };
+}
+
+/**
  * Convert a log-odds term into a percentage-point delta, given the running
  * log-odds `x` before the term is applied (SPECS §5):
  *
@@ -144,6 +185,17 @@ export function mapDeltaPpToLevel(
     return sign * 2;
   }
   return sign * 1;
+}
+
+/**
+ * `mapDeltaPpToLevel` with both n_eff gates taken from `config`.
+ */
+export function levelFromConfig(
+  deltaPp: number,
+  nEff: number,
+  config: RankWeightingConfig,
+): number {
+  return mapDeltaPpToLevel(deltaPp, nEff, config.minGames, config.highLevelMinGames);
 }
 
 /**

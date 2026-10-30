@@ -9,9 +9,44 @@ import {
   layerTerm,
   laneTerm,
   layerWinRate,
+  levelFromConfig,
   mapDeltaPpToLevel,
   pairTerm,
+  scoreLane,
+  scorePair,
 } from './levels.js';
+
+describe('laneTerm', () => {
+  it('is 0 when lowData (gamesE < minGames), nonzero at minGames', () => {
+    const m = DEFAULT_CONFIG.minGames;
+    expect(laneTerm(m - 1, m - 1, 40, 0.5, DEFAULT_CONFIG.eps, m)).toBe(0);
+    expect(laneTerm(m, m, 40, 0.5, DEFAULT_CONFIG.eps, m)).toBeGreaterThan(0);
+  });
+
+  it('shrinks toward the running prediction q, not the baseline', () => {
+    const q = 0.6;
+    const t = laneTerm(30, 50, 40, q, DEFAULT_CONFIG.eps, 0);
+    // pL = (30 + 24) / 90 = 0.6 = q → no correction.
+    expect(t).toBeCloseTo(0, 10);
+  });
+});
+
+describe('config-driven helpers', () => {
+  it('scorePair / scoreLane flag lowData and use config thresholds', () => {
+    const config = { ...DEFAULT_CONFIG, minGames: 50, highLevelMinGames: 150 };
+    expect(scorePair(30, 40, 0.5, config)).toEqual({ term: 0, lowData: true });
+    const lane = scoreLane(40, 60, 0.5, config);
+    expect(lane.lowData).toBe(false);
+    expect(lane.term).toBeGreaterThan(0);
+  });
+
+  it('levelFromConfig applies both n_eff gates from config', () => {
+    const config = { ...DEFAULT_CONFIG, minGames: 50, highLevelMinGames: 150 };
+    expect(levelFromConfig(4.5, 40, config)).toBe(0);
+    expect(levelFromConfig(4.5, 120, config)).toBe(1);
+    expect(levelFromConfig(4.5, 150, config)).toBe(3);
+  });
+});
 
 describe('layerWinRate', () => {
   it('shrinks toward q when evidence is small (k in raw-game units)', () => {

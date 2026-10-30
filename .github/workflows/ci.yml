@@ -13,7 +13,47 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  format:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      changed: ${{ steps.commit.outputs.changes_detected }}
+    steps:
+      - name: Create app token
+        id: app
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.FORMAT_BOT_APP_ID }}
+          private-key: ${{ secrets.FORMAT_BOT_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          token: ${{ steps.app.outputs.token }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm prettier --write .
+
+      - name: Commit formatting changes
+        id: commit
+        uses: stefanzweifel/git-auto-commit-action@v7
+        with:
+          commit_message: "style: apply prettier"
+
   check:
+    needs: format
+    # Run when format was skipped (push/fork) or made no change.
+    # Skip when format pushed a commit: that push starts a new run.
+    if: ${{ !cancelled() && needs.format.outputs.changed != 'true' }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     strategy:
@@ -21,7 +61,6 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
         node-version: [22]
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4

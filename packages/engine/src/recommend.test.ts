@@ -230,8 +230,10 @@ describe('recommend — candidate threshold from config', () => {
       baseline: [...supportData.baseline, [EDGE, 'DIAMOND', 50, 100, 100]],
     };
     const ids = (min: number): number[] =>
-      recommend(supportInput(), data, { ...DEFAULT_CONFIG, candidateRoleProbMin: min })
-        .recommendations.map((r) => r.championId);
+      recommend(supportInput(), data, {
+        ...DEFAULT_CONFIG,
+        candidateRoleProbMin: min,
+      }).recommendations.map((r) => r.championId);
     expect(ids(0.05)).toContain(EDGE);
     expect(ids(0.1)).not.toContain(EDGE);
   });

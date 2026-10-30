@@ -234,6 +234,9 @@ Owner decision 2026-10-29.
   2. `rawGames` is approximated by the rounded sum of `games_w` over the buckets kept by the kernel (an exact raw count needs a new export column).
   3. Lane opponents are stored in `LANE_GROUPS[myRole].enemies` order (SUPPORT: enemy SUPPORT then enemy ADC; ADC: enemy ADC then enemy SUPPORT); `lane_full`'s partner is the single lane-group ally.
   4. `compNeed` (T-025) and `blindSafety` (T-024) contribute 0 until their tickets.
+  5. The candidate cutoff `roleProb[c][myRole] >= candidateRoleProbMin` is a config field (`packages/engine/src/config.ts`, default 0.05) so the D-023 backtest can tune it.
+  6. Allied role inference reserves `input.userRole`: unknown allies are never assigned the user's role.
+  7. A pool champion present in `roleProb` but without a baseline row for `myRole` goes to `insufficientData` (`nEff: 0`) and `poolUnavailable` as `insufficientData`; `unknownChampion` is reserved for ids absent from both `roleProb` and the baseline.
 - Alternatives: (a) ETL pre-applies the kernel per `userRank` — rejected for now, multiplies export size by 8; (b) add a raw `games` column — deferred to T-019 if the owner wants exact `rawGames`.
 - Consequences: T-019 must export opponents in the order above. If rejected, only `indexTables`/key building in `packages/engine/src/recommend.ts` changes.
 

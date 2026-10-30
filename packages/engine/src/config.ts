@@ -203,6 +203,7 @@ export const rankWeightingConfigSchema = z
     alpha: z.number().nonnegative(),
     wMax: z.number().gte(1),
     exportMinGames: z.number().nonnegative(),
+    candidateRoleProbMin: z.number().gte(0).max(1),
     influence: influenceConfigSchema,
   })
   .strict()
@@ -237,6 +238,7 @@ export const DEFAULT_CONFIG: RankWeightingConfig = rankWeightingConfigSchema.par
   alpha: 0.25,
   wMax: 2.0,
   exportMinGames: 10,
+  candidateRoleProbMin: 0.05,
   influence: {
     draft: createInfluenceMatrix(),
     lane: createInfluenceMatrix(),

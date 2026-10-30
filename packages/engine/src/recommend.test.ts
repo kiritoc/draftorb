@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { draftResultSchema } from '@draftorb/shared';
 import type { DraftInput } from '@draftorb/shared';
 
+import { DEFAULT_CONFIG } from './config.js';
 import { recommend } from './recommend.js';
 import type { DraftData } from './recommend.js';
 
@@ -200,5 +201,54 @@ describe('recommend — pool contract (D-024)', () => {
     const result = recommend(supportInput({ pool: [] }), supportData);
     expect(result.poolRecommendations).toBeUndefined();
     expect(result.poolUnavailable).toBeUndefined();
+  });
+
+  it('reports a known off-role pool pick with no baseline as insufficientData', () => {
+    const MID_NO_BASE = 6;
+    const data: DraftData = {
+      ...supportData,
+      roleProb: { ...supportData.roleProb, [MID_NO_BASE]: { MID: 1 } },
+    };
+    const result = recommend(supportInput({ pool: [MID_NO_BASE] }), data);
+    expect(result.poolUnavailable).toEqual([
+      { championId: MID_NO_BASE, reason: 'insufficientData' },
+    ]);
+    expect(result.insufficientData).toContainEqual({
+      championId: MID_NO_BASE,
+      nEff: 0,
+      rawGames: 0,
+    });
+  });
+});
+
+describe('recommend — candidate threshold from config', () => {
+  it('uses config.candidateRoleProbMin for candidate membership', () => {
+    const EDGE = 7;
+    const data: DraftData = {
+      ...supportData,
+      roleProb: { ...supportData.roleProb, [EDGE]: { SUPPORT: 0.06, MID: 0.94 } },
+      baseline: [...supportData.baseline, [EDGE, 'DIAMOND', 50, 100, 100]],
+    };
+    const ids = (min: number): number[] =>
+      recommend(supportInput(), data, { ...DEFAULT_CONFIG, candidateRoleProbMin: min })
+        .recommendations.map((r) => r.championId);
+    expect(ids(0.05)).toContain(EDGE);
+    expect(ids(0.1)).not.toContain(EDGE);
+  });
+});
+
+describe('recommend — ally role inference', () => {
+  it("never assigns an unknown ally the user's role", () => {
+    const FLEX = 20;
+    const data: DraftData = {
+      ...supportData,
+      roleProb: { ...supportData.roleProb, [FLEX]: { SUPPORT: 0.9, ADC: 0.1 } },
+      allyPairs: [[SUP_A, FLEX, 'ADC', 'DIAMOND', 60, 100, 100]],
+    };
+    const input = supportInput({ allies: [{ championId: FLEX }] });
+    const a = recommend(input, data).recommendations.find((r) => r.championId === SUP_A);
+    const synergy = a?.reasons.find((r) => r.type === 'synergy');
+    expect(synergy?.with).toEqual([FLEX]);
+    expect(synergy?.lowData).toBe(false);
   });
 });

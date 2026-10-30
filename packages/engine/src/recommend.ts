@@ -17,23 +17,15 @@
  */
 
 import type {
-  AllyPairTable,
-  BaselineTable,
   ChampionId,
-  ChampionRoleProbabilities,
   DraftInput,
   DraftResult,
-  EnemyPairTable,
   InsufficientDataEntry,
-  LaneFullTable,
-  LaneVsTable,
   PoolUnavailableEntry,
-  RankBucket,
   Reason,
   ReasonLevel,
   Recommendation,
   Role,
-  Slot,
 } from '@draftorb/shared';
 
 import { DEFAULT_CONFIG, bucketIndex, getInfluence, rankToBucket } from './config.js';
@@ -47,9 +39,14 @@ import {
   mapDeltaPpToLevel,
   pairTerm,
 } from './levels.js';
-import { inferRoles } from './roles.js';
+import { equivalent, indexTables } from './recommend-tables.js';
+import type { Counts, DraftData, Tables } from './recommend-tables.js';
+import { resolveTeam } from './recommend-team.js';
+import type { KnownSlot } from './recommend-team.js';
 import { roleProbability } from './roles-utils.js';
-import { rankDistanceWeight, sigmoid, toEquivalentCounts } from './weighting.js';
+import { sigmoid } from './weighting.js';
+
+export type { DraftData } from './recommend-tables.js';
 
 /** Lane group per role (SPECS §5, D-021). 1v1 groups have no allies (lane_full skipped). */
 export const LANE_GROUPS: Readonly<
@@ -62,122 +59,7 @@ export const LANE_GROUPS: Readonly<
   JUNGLE: { allies: [], enemies: ['JUNGLE'] },
 };
 
-/** Role-keyed tables for `input.userRole` (DATA_MODEL.md). */
-export interface DraftData {
-  readonly roleProb: ChampionRoleProbabilities;
-  readonly baseline: BaselineTable;
-  readonly allyPairs: AllyPairTable;
-  readonly enemyPairs: EnemyPairTable;
-  readonly laneVs: LaneVsTable;
-  readonly laneFull: LaneFullTable;
-}
-
-interface Counts {
-  winsW: number;
-  gamesW: number;
-  gamesW2: number;
-  rawGames: number;
-}
-
-interface KnownSlot {
-  readonly championId: ChampionId;
-  readonly role: Role;
-  readonly confidence: number;
-  readonly side: Side;
-}
-
-interface Tables {
-  readonly baseline: ReadonlyMap<string, Counts>;
-  readonly ally: ReadonlyMap<string, Counts>;
-  readonly enemy: ReadonlyMap<string, Counts>;
-  readonly laneVs: ReadonlyMap<string, Counts>;
-  readonly laneFull: ReadonlyMap<string, Counts>;
-}
-
 type Scored = Omit<Recommendation, 'rank' | 'poolRank'>;
-
-function accumulate(
-  map: Map<string, Counts>,
-  key: string,
-  bucket: RankBucket,
-  userIdx: number,
-  winsW: number,
-  gamesW: number,
-  gamesW2: number,
-  config: RankWeightingConfig,
-): void {
-  const w = rankDistanceWeight(bucketIndex(bucket), userIdx, config.tau, config.rankWindowTiers);
-  if (w <= 0) {
-    return;
-  }
-  const c = map.get(key) ?? { winsW: 0, gamesW: 0, gamesW2: 0, rawGames: 0 };
-  c.winsW += w * winsW;
-  c.gamesW += w * gamesW;
-  c.gamesW2 += w * w * gamesW2;
-  c.rawGames += gamesW;
-  map.set(key, c);
-}
-
-function indexTables(data: DraftData, userIdx: number, config: RankWeightingConfig): Tables {
-  const baseline = new Map<string, Counts>();
-  for (const [c, b, wi, g, g2] of data.baseline) {
-    accumulate(baseline, `${c}`, b, userIdx, wi, g, g2, config);
-  }
-  const ally = new Map<string, Counts>();
-  for (const [c, o, r, b, wi, g, g2] of data.allyPairs) {
-    accumulate(ally, `${c}|${o}|${r}`, b, userIdx, wi, g, g2, config);
-  }
-  const enemy = new Map<string, Counts>();
-  for (const [c, o, r, b, wi, g, g2] of data.enemyPairs) {
-    accumulate(enemy, `${c}|${o}|${r}`, b, userIdx, wi, g, g2, config);
-  }
-  const laneVs = new Map<string, Counts>();
-  for (const [c, o1, o2, b, wi, g, g2] of data.laneVs) {
-    accumulate(laneVs, `${c}|${o1}|${o2 ?? ''}`, b, userIdx, wi, g, g2, config);
-  }
-  const laneFull = new Map<string, Counts>();
-  for (const [c, p, o1, o2, b, wi, g, g2] of data.laneFull) {
-    accumulate(laneFull, `${c}|${p ?? ''}|${o1}|${o2 ?? ''}`, b, userIdx, wi, g, g2, config);
-  }
-  return { baseline, ally, enemy, laneVs, laneFull };
-}
-
-function equivalent(counts: Counts | undefined): { winsE: number; gamesE: number } {
-  if (!counts) {
-    return { winsE: 0, gamesE: 0 };
-  }
-  return toEquivalentCounts(counts.winsW, counts.gamesW, counts.gamesW2);
-}
-
-function resolveTeam(
-  slots: ReadonlyArray<Slot>,
-  roleProb: ChampionRoleProbabilities,
-  side: Side,
-  reservedRole?: Role,
-): KnownSlot[] {
-  if (slots.length === 0) {
-    return [];
-  }
-  // Reserve the user's role on the allied side: a sentinel slot fixed to it
-  // keeps unknown allies from being assigned that role.
-  const USER_SENTINEL = -1;
-  const reserve = reservedRole !== undefined && slots.length < 5;
-  const inferred = reserve
-    ? inferRoles([...slots, { championId: USER_SENTINEL, role: reservedRole }], {
-        ...roleProb,
-        [USER_SENTINEL]: { [reservedRole]: 1 },
-      })
-    : inferRoles(slots, roleProb);
-  if (inferred) {
-    return inferred.slots
-      .filter((s) => !(reserve && s.championId === USER_SENTINEL))
-      .map((s) => ({ ...s, side }));
-  }
-  // No valid assignment: keep only user-fixed roles (confidence 1).
-  return slots.flatMap((s) =>
-    s.role !== undefined ? [{ championId: s.championId, role: s.role, confidence: 1, side }] : [],
-  );
-}
 
 function makeReason(
   type: Reason['type'],
@@ -187,7 +69,7 @@ function makeReason(
   lowData: boolean,
   config: RankWeightingConfig,
 ): Reason {
-  const level = lowData ? 0 : mapDeltaPpToLevel(dpp, n, config.minGames);
+  const level = lowData ? 0 : mapDeltaPpToLevel(dpp, n, config.minGames, config);
   return {
     type,
     with: withIds,

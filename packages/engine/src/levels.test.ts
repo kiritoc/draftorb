@@ -162,10 +162,17 @@ describe('mapDeltaPpToLevel', () => {
     expect(mapDeltaPpToLevel(-3.0, DEFAULT_CONFIG.minGames - 1)).toBe(0);
   });
 
-  it('allows negative levels with low n_eff (counters are not gated)', () => {
-    // Negative deltas indicate being countered; they should still show.
+  it('gates negative L2/L3 on n_eff >= 100 like positive ones (symmetric, D-030)', () => {
     expect(mapDeltaPpToLevel(-1.5, 30)).toBe(-1);
-    expect(mapDeltaPpToLevel(-2.6, 50)).toBe(-2);
+    expect(mapDeltaPpToLevel(-2.6, 50)).toBe(-1);
+    expect(mapDeltaPpToLevel(-4.5, 99)).toBe(-1);
+    expect(mapDeltaPpToLevel(-2.6, 100)).toBe(-2);
+  });
+
+  it('reads level thresholds from config', () => {
+    const config = { ...DEFAULT_CONFIG, levelL1Pp: 2, levelHighMinGames: 50 };
+    expect(mapDeltaPpToLevel(1.5, 100, DEFAULT_CONFIG.minGames, config)).toBe(0);
+    expect(mapDeltaPpToLevel(3.0, 50, DEFAULT_CONFIG.minGames, config)).toBe(2);
   });
 
   it('L1 does not require n_eff >= 100 (only L2/L3 do)', () => {

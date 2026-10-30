@@ -204,6 +204,10 @@ export const rankWeightingConfigSchema = z
     wMax: z.number().gte(1),
     exportMinGames: z.number().nonnegative(),
     candidateRoleProbMin: z.number().gte(0).max(1),
+    levelL1Pp: z.number().positive(),
+    levelL2Pp: z.number().positive(),
+    levelL3Pp: z.number().positive(),
+    levelHighMinGames: z.number().nonnegative(),
     influence: influenceConfigSchema,
   })
   .strict()
@@ -239,6 +243,10 @@ export const DEFAULT_CONFIG: RankWeightingConfig = rankWeightingConfigSchema.par
   wMax: 2.0,
   exportMinGames: 10,
   candidateRoleProbMin: 0.05,
+  levelL1Pp: 1.0,
+  levelL2Pp: 2.5,
+  levelL3Pp: 4.5,
+  levelHighMinGames: 100,
   influence: {
     draft: createInfluenceMatrix(),
     lane: createInfluenceMatrix(),

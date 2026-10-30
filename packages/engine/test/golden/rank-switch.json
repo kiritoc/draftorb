@@ -1,0 +1,42 @@
+{
+  "data": {
+    "roleProb": {
+      "1": { "SUPPORT": 1 },
+      "2": { "SUPPORT": 1 }
+    },
+    "baseline": [
+      [1, "DIAMOND", 50, 100, 100],
+      [1, "EMERALD", 70, 100, 100],
+      [2, "DIAMOND", 65, 100, 100],
+      [2, "EMERALD", 45, 100, 100]
+    ],
+    "allyPairs": [],
+    "enemyPairs": [],
+    "laneVs": [],
+    "laneFull": []
+  },
+  "cases": [
+    {
+      "name": "Diamond user -> Diamond-strong champion first",
+      "input": {
+        "userRank": "DIAMOND",
+        "userRole": "SUPPORT",
+        "allies": [],
+        "enemies": [],
+        "blindPick": false
+      },
+      "expected": { "order": [2, 1] }
+    },
+    {
+      "name": "Emerald user -> ordering changes only through data weights",
+      "input": {
+        "userRank": "EMERALD",
+        "userRole": "SUPPORT",
+        "allies": [],
+        "enemies": [],
+        "blindPick": false
+      },
+      "expected": { "order": [1, 2] }
+    }
+  ]
+}

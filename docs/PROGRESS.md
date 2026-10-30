@@ -12,7 +12,7 @@
 | -------------- | ----------- | ------------------------------------------------------------------------------------------------- |
 | E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b DONE                                                                   |
 | E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e, T-014 DONE; T-015..T-019 TODO |
-| E2 Engine      | IN PROGRESS | T-020 DONE; T-021 DONE; T-022 DONE; T-023 IN PROGRESS (D-030 PROPOSED)                            |
+| E2 Engine      | IN PROGRESS | T-020 DONE; T-021 DONE; T-022 DONE; T-023 IN PROGRESS (D-030 ACCEPTED)                            |
 | E3 Web MVP     | NOT STARTED |                                                                                                   |
 | E4 Runes       | NOT STARTED |                                                                                                   |
 | E5 Items       | NOT STARTED |                                                                                                   |
@@ -44,12 +44,12 @@ B-017 done (engine and shared `"types": []` plus ESLint purity guardrails in `es
   - **`packages/engine/src/levels.ts`**: `baselineGate` rejects `nEff <= 0` even with `minGames = 0` (review finding); regression test in `packages/engine/src/levels.test.ts`.
   - **`packages/engine/src/recommend.test.ts`** (new): SUPPORT and TOP golden cases, lowData pair, insufficientData, sort/NaN/determinism, lane layers, pool property tests (identical scores, order kept, poolRank, offRole, poolUnavailable).
   - `packages/engine/src/index.ts` re-exports `./recommend.js`.
-- Decisions: D-030 PROPOSED (per-bucket kernel, `rawGames` approximation, lane opponent order, comp/blind = 0).
-- Not done: golden JSON fixtures under `packages/engine/test/golden/` (tests are inline); `compNeed` (T-025) and `blindSafety` (T-024).
-- Open review findings on `packages/engine/src/levels.ts`: negative L2/L3 skip the 100-game gate (owner call: SPECS says "negative symmetric"); level thresholds hardcoded instead of in `packages/engine/src/config.ts`.
-- Tests: `pnpm check` not yet run on this change.
-- State left: **IN PROGRESS (T-023)** until `pnpm check` is green and D-030 is accepted.
-- Next step: run `pnpm check`, resolve the two open findings, then T-024.
+- Decisions: D-030 ACCEPTED by the owner (per-bucket kernel, `rawGames` approximation, lane opponent order, comp/blind = 0, items 8-11).
+- Review follow-up: `recommend.ts` split into `packages/engine/src/recommend-tables.ts` and `packages/engine/src/recommend-team.ts` (< 300 lines each); conflicting-ally fallback keeps inferable allies; level thresholds moved to `packages/engine/src/config.ts` and negative L2/L3 now use the same `n_eff >= 100` gate (D-030 items 8-11); golden JSON suite `packages/engine/test/golden/*.json` run by `packages/engine/src/golden.test.ts`; new tests for rank window, neighbouring-bucket weighting, delta sum, ADC lane order.
+- Not done: `compNeed` (T-025) and `blindSafety` (T-024); exact `rawGames` (needs a T-019 export column); `picked` reason in `poolUnavailable` (schema change, deferred).
+- Tests: `pnpm check` not yet run on the review follow-up.
+- State left: **IN PROGRESS (T-023)** until `pnpm check` is green on the review follow-up (D-030 accepted).
+- Next step: run `pnpm check`; when green, set T-023 to DONE in `docs/TICKETS.md`, then T-024.
 
 ### 2026-10-29 — Kilo — Ticket T-022 (Shrinkage + level mapping)
 

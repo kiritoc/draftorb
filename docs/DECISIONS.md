@@ -226,7 +226,7 @@ Owner decision 2026-10-29.
   - Keep `min(0)` and add a separate zero-check refinement — rejected in favor of the simpler `gt(0)`, which communicates intent at the value level.
 - Consequences: four test cases updated (zero-valued role map made sparse, duplicate pool id, manifest version pinning, zero-rejection negative test); `MANIFEST_SCHEMA_VERSION` re-exported from the package barrel. No engine or ETL code consumed these schemas yet (T-020/T-019 are not started), so no downstream breakage.
 
-### D-030 — T-023 engine assumptions: per-bucket kernel, rawGames, lane opponent order — PROPOSED
+### D-030 — T-023 engine assumptions: per-bucket kernel, rawGames, lane opponent order — ACCEPTED
 
 - Context: SPECS §5 and DATA_MODEL.md do not say (1) who applies the §3 rank-distance kernel to exported rows, (2) where `rawGames` for `insufficientData` comes from (rows carry only weighted counts), or (3) in which order `lane_vs`/`lane_full` store the two bot-lane opponents.
 - Decision (assumption used by `packages/engine/src/recommend.ts`):
@@ -237,6 +237,10 @@ Owner decision 2026-10-29.
   5. The candidate cutoff `roleProb[c][myRole] >= candidateRoleProbMin` is a config field (`packages/engine/src/config.ts`, default 0.05) so the D-023 backtest can tune it.
   6. Allied role inference reserves `input.userRole`: unknown allies are never assigned the user's role.
   7. A pool champion present in `roleProb` but without a baseline row for `myRole` goes to `insufficientData` (`nEff: 0`) and `poolUnavailable` as `insufficientData`; `unknownChampion` is reserved for ids absent from both `roleProb` and the baseline.
+  8. If no joint ally assignment exists (e.g. an unknown ally only plays the user's role), only the allies that cannot take any free role are dropped; the others are re-inferred and keep their pair/lane terms.
+  9. `conf_lane` is the product of the confidences of the champions used by that lookup: enemies only for `lane_vs`, partner and enemies for `lane_full`.
+  10. "Negative symmetric" (SPECS §5 levels): L2/L3 need `n_eff >= levelHighMinGames` (100) for both signs; level thresholds live in `packages/engine/src/config.ts` (`levelL1Pp`, `levelL2Pp`, `levelL3Pp`, `levelHighMinGames`).
+  11. A pool champion already picked in the draft is not a candidate and is not listed in `poolUnavailable` (the UI already shows it as picked). Adding a `picked` reason would change the shared schema (T-002.b) and is deferred.
 - Alternatives: (a) ETL pre-applies the kernel per `userRank` — rejected for now, multiplies export size by 8; (b) add a raw `games` column — deferred to T-019 if the owner wants exact `rawGames`.
 - Consequences: T-019 must export opponents in the order above. If rejected, only `indexTables`/key building in `packages/engine/src/recommend.ts` changes.
 

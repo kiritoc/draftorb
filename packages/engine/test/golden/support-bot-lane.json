@@ -1,0 +1,52 @@
+{
+  "data": {
+    "roleProb": {
+      "1": { "SUPPORT": 1 },
+      "2": { "SUPPORT": 1 },
+      "3": { "SUPPORT": 1 },
+      "10": { "SUPPORT": 1 },
+      "11": { "ADC": 1 },
+      "12": { "ADC": 1 }
+    },
+    "baseline": [
+      [1, "DIAMOND", 50, 100, 100],
+      [2, "DIAMOND", 52, 100, 100],
+      [3, "DIAMOND", 6, 10, 10]
+    ],
+    "allyPairs": [[1, 12, "ADC", "DIAMOND", 6, 10, 10]],
+    "enemyPairs": [[2, 10, "SUPPORT", "DIAMOND", 30, 200, 200]],
+    "laneVs": [],
+    "laneFull": []
+  },
+  "cases": [
+    {
+      "name": "enemy support hard-counters candidate 2 -> penalized with reason",
+      "input": {
+        "userRank": "DIAMOND",
+        "userRole": "SUPPORT",
+        "allies": [{ "championId": 12, "role": "ADC" }],
+        "enemies": [{ "championId": 10, "role": "SUPPORT" }],
+        "blindPick": false
+      },
+      "expected": {
+        "order": [1, 2],
+        "insufficientData": [3],
+        "reasons": [
+          { "championId": 2, "type": "counter", "with": [10], "levelSign": -1, "lowData": false },
+          { "championId": 1, "type": "synergy", "with": [12], "levelSign": 0, "lowData": true }
+        ]
+      }
+    },
+    {
+      "name": "nothing known -> baseline order, no reasons",
+      "input": {
+        "userRank": "DIAMOND",
+        "userRole": "SUPPORT",
+        "allies": [],
+        "enemies": [],
+        "blindPick": true
+      },
+      "expected": { "order": [2, 1], "insufficientData": [3] }
+    }
+  ]
+}

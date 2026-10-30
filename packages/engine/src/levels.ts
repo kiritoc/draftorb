@@ -12,6 +12,7 @@
  */
 
 import { DEFAULT_CONFIG } from './config.js';
+import type { RankWeightingConfig } from './config.js';
 import { sigmoid, shrink } from './weighting.js';
 
 /**
@@ -115,27 +116,28 @@ export function deltaPp(x: number, term: number): number {
  *   |deltaPp| >= 1.0 → ±1
  *   otherwise → 0
  *
- * Any lowData reason (`n_eff < minGames`) maps to 0, for both signs.
- * Positive L2/L3 additionally require `n_eff >= 100`; when that fails, a
- * qualifying delta falls back to L1 instead of disappearing. Negative levels
- * (being countered) are not subject to the 100-game gate.
+ * Thresholds come from config (`levelL1Pp`, `levelL2Pp`, `levelL3Pp`,
+ * `levelHighMinGames`). Any lowData reason (`n_eff < minGames`) maps to 0.
+ * L2/L3 require `n_eff >= levelHighMinGames` for both signs ("negative
+ * symmetric", D-030); when that fails, a qualifying delta falls back to ±1.
  */
 export function mapDeltaPpToLevel(
   deltaPp: number,
   nEff: number,
   minGames: number = DEFAULT_CONFIG.minGames,
+  config: RankWeightingConfig = DEFAULT_CONFIG,
 ): number {
   const abs = Math.abs(deltaPp);
-  if (abs < 1.0 || isLowData(nEff, minGames)) {
+  if (abs < config.levelL1Pp || isLowData(nEff, minGames)) {
     return 0;
   }
   const sign = deltaPp < 0 ? -1 : 1;
-  const highLevelsAllowed = sign < 0 || nEff >= 100;
+  const highLevelsAllowed = nEff >= config.levelHighMinGames;
 
-  if (abs >= 4.5 && highLevelsAllowed) {
+  if (abs >= config.levelL3Pp && highLevelsAllowed) {
     return sign * 3;
   }
-  if (abs >= 2.5 && highLevelsAllowed) {
+  if (abs >= config.levelL2Pp && highLevelsAllowed) {
     return sign * 2;
   }
   return sign * 1;

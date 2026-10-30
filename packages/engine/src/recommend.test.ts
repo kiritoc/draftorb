@@ -153,6 +153,82 @@ describe('recommend — TOP golden (1v1, lane_full skipped)', () => {
   });
 });
 
+describe('recommend — scoring invariants', () => {
+  it('per-reason deltas add up to the total delta 100 * (P - p0)', () => {
+    const recs = recommend(supportInput(), supportData).recommendations;
+    const b = recs.find((r) => r.championId === SUP_B);
+    const p0 = (52 + DEFAULT_CONFIG.k0 * 0.5) / (100 + DEFAULT_CONFIG.k0);
+    const sum = b?.reasons.reduce((acc, r) => acc + r.deltaPp, 0) ?? NaN;
+    expect(sum).toBeCloseTo(100 * ((b?.score ?? 0) - p0), 8);
+  });
+
+  it('ignores rows outside the rank window (never below userRank - 2 tiers)', () => {
+    const FAR = 8;
+    const data: DraftData = {
+      ...supportData,
+      roleProb: { ...supportData.roleProb, [FAR]: { SUPPORT: 1 } },
+      baseline: [...supportData.baseline, [FAR, 'IRON', 900, 1000, 1000]],
+    };
+    const result = recommend(supportInput(), data);
+    expect(result.recommendations.some((r) => r.championId === FAR)).toBe(false);
+    expect(result.insufficientData).toContainEqual({ championId: FAR, nEff: 0, rawGames: 0 });
+  });
+
+  it('down-weights a neighbouring bucket (n_eff drops below the same-rank count)', () => {
+    const NEAR = 9;
+    const data: DraftData = {
+      ...supportData,
+      roleProb: { ...supportData.roleProb, [NEAR]: { SUPPORT: 1 } },
+      baseline: [
+        ...supportData.baseline,
+        [NEAR, 'DIAMOND', 50, 100, 100],
+        [NEAR, 'EMERALD', 50, 100, 100],
+      ],
+    };
+    const near = recommend(supportInput(), data).recommendations.find((r) => r.championId === NEAR);
+    expect(near?.reliability.games).toBeGreaterThan(100);
+    expect(near?.reliability.games).toBeLessThan(200);
+  });
+});
+
+describe('recommend — ADC golden (bot lane, opponents in ADC-first order)', () => {
+  const ADC_A = 50;
+  const ALLY_SUP = 51;
+  const data: DraftData = {
+    roleProb: {
+      [ADC_A]: { ADC: 1 },
+      [ALLY_SUP]: { SUPPORT: 1 },
+      [ENEMY_SUP]: { SUPPORT: 1 },
+      [ENEMY_ADC]: { ADC: 1 },
+    },
+    baseline: [[ADC_A, 'DIAMOND', 50, 100, 100]],
+    allyPairs: [],
+    enemyPairs: [],
+    laneVs: [[ADC_A, ENEMY_ADC, ENEMY_SUP, 'DIAMOND', 70, 100, 100]],
+    laneFull: [[ADC_A, ALLY_SUP, ENEMY_ADC, ENEMY_SUP, 'DIAMOND', 60, 100, 100]],
+  };
+
+  it('looks up lane_vs and lane_full with enemy ADC then enemy SUPPORT', () => {
+    const input: DraftInput = {
+      userRank: 'DIAMOND',
+      userRole: 'ADC',
+      allies: [{ championId: ALLY_SUP, role: 'SUPPORT' }],
+      enemies: [
+        { championId: ENEMY_SUP, role: 'SUPPORT' },
+        { championId: ENEMY_ADC, role: 'ADC' },
+      ],
+      blindPick: false,
+    };
+    const a = recommend(input, data).recommendations[0];
+    const lanes = a?.reasons.filter((r) => r.type === 'lane') ?? [];
+    expect(lanes.map((r) => r.with)).toEqual([
+      [ENEMY_ADC, ENEMY_SUP],
+      [ALLY_SUP, ENEMY_ADC, ENEMY_SUP],
+    ]);
+    expect(lanes.every((r) => !r.lowData)).toBe(true);
+  });
+});
+
 describe('recommend — pool contract (D-024)', () => {
   const pool = [MID_POOL, SUP_LOW, UNKNOWN, SUP_B];
 
@@ -252,5 +328,19 @@ describe('recommend — ally role inference', () => {
     const synergy = a?.reasons.find((r) => r.type === 'synergy');
     expect(synergy?.with).toEqual([FLEX]);
     expect(synergy?.lowData).toBe(false);
+  });
+
+  it('keeps an inferable ally when another ally only plays the user role', () => {
+    const SUP_ONLY = 21;
+    const data: DraftData = {
+      ...supportData,
+      roleProb: { ...supportData.roleProb, [SUP_ONLY]: { SUPPORT: 1 } },
+      allyPairs: [[SUP_A, ALLY_ADC, 'ADC', 'DIAMOND', 60, 100, 100]],
+    };
+    const input = supportInput({ allies: [{ championId: SUP_ONLY }, { championId: ALLY_ADC }] });
+    const a = recommend(input, data).recommendations.find((r) => r.championId === SUP_A);
+    const synergy = a?.reasons.filter((r) => r.type === 'synergy') ?? [];
+    expect(synergy.map((r) => r.with)).toEqual([[ALLY_ADC]]);
+    expect(synergy[0]?.lowData).toBe(false);
   });
 });

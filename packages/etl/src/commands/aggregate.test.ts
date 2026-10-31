@@ -74,4 +74,44 @@ describe('aggregateCommand', () => {
     await aggregateCommand.run(['16.20']);
     expect(output()).toMatch(/role_prob left unchanged/);
   });
+
+  it('writes baseline rows even when the target patch has no participants', async () => {
+    const dbPath = join(directory, 'test.sqlite');
+    process.env.DRAFTORB_DB_PATH = dbPath;
+    const db = openDb(dbPath);
+    migrate(db);
+    db.prepare(
+      `INSERT INTO matches (
+        match_id, platform, patch, queue_id, duration, created_at, avg_rank_score, rank_known_count
+      ) VALUES ('m1', 'euw1', '16.20', 420, 1800, 1, 6.5, 2)`,
+    ).run();
+    db.prepare(
+      `INSERT INTO participants (
+        match_id, puuid, team_id, champion_id, role, win, rank_score,
+        champion_games, mastery_points, is_expert, keystone, primary_style,
+        sub_style, perks_json, items_json, kills, deaths, assists
+      ) VALUES (
+        'm1', 'p1', 100, 412, 'SUPPORT', 1, 6.5, 0, NULL, NULL, 8439, 8400, 8300, '{}', '[]', 0, 0, 0
+      )`,
+    ).run();
+    db.close();
+
+    // Target patch 16.21 has no participants; role_prob is left unchanged but
+    // baseline must still aggregate the stored 16.20 games (<= snapshot).
+    await aggregateCommand.run(['16.21']);
+    expect(output()).toMatch(/role_prob left unchanged/);
+    expect(output()).toMatch(/Aggregated baselines:/);
+
+    const db2 = openDb(dbPath);
+    try {
+      const count = db2.prepare('SELECT COUNT(*) AS count FROM baseline').get() as {
+        count: number;
+      };
+      expect(count.count).toBeGreaterThan(0);
+      const row = db2.prepare('SELECT games FROM baseline LIMIT 1').get() as { games: number };
+      expect(row.games).toBe(1);
+    } finally {
+      db2.close();
+    }
+  });
 });

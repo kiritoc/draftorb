@@ -113,6 +113,8 @@ export { enrichParticipants, type EnrichmentOptions, type EnrichmentSummary } fr
 
 export { aggregateRoleProb, type RoleProbRow } from './aggregate';
 
+export { aggregateBaseline, type BaselineRow } from './aggregate-baseline';
+
 export {
   DEFAULT_PLAYER_QUOTAS,
   DEFAULT_PLAYER_TIER_SEQUENCE,

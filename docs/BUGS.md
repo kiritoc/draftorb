@@ -4,12 +4,11 @@ Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATI
 
 ## Open
 
-| ID    | Sev | Area   | Title                                                                                                                                                                  | Status | Found by/date                     | Ticket                                                                        |
-| ----- | --- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | --------------------------------- | ----------------------------------------------------------------------------- |
-| B-025 | S3  | engine | Baseline `games` column (raw match count, read as `rawGames`) is not populated by ETL aggregation yet (defaults to 0)                                                  | OPEN   | T-023 review 2026-10-30           | T-016 (engine + schema + column done in T-023; aggregation must fill `games`) |
-| B-026 | S3  | engine | `blindSafety` approximates `pickShare(e)` with roleProb (no pick-rate export)                                                                                          | OPEN   | T-023 review 2026-10-30           | –                                                                             |
-| B-027 | S3  | engine | `W_COMP`, `W_BLIND`, `BLIND_WORST_CASE_FACTOR`, `HARD_COUNTER_DELTA_PP` and `LANE_GROUPS` were module constants; now injectable via `RecommendConfig` (T-027.a tuning) | FIXED  | T-023 review 2026-10-31           | T-027.a                                                                       |
-| B-021 | S3  | engine | `types: []` in engine/shared tsconfigs is circumvented by test files importing vitest, so the type-checker still resolves Node globals in production files             | OPEN   | B-017 fix verification 2026-10-28 | –                                                                             |
+| ID    | Sev | Area   | Title                                                                                                                                                                  | Status | Found by/date                     | Ticket  |
+| ----- | --- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | --------------------------------- | ------- |
+| B-026 | S3  | engine | `blindSafety` approximates `pickShare(e)` with roleProb (no pick-rate export)                                                                                          | OPEN   | T-023 review 2026-10-30           | –       |
+| B-027 | S3  | engine | `W_COMP`, `W_BLIND`, `BLIND_WORST_CASE_FACTOR`, `HARD_COUNTER_DELTA_PP` and `LANE_GROUPS` were module constants; now injectable via `RecommendConfig` (T-027.a tuning) | FIXED  | T-023 review 2026-10-31           | T-027.a |
+| B-021 | S3  | engine | `types: []` in engine/shared tsconfigs is circumvented by test files importing vitest, so the type-checker still resolves Node globals in production files             | OPEN   | B-017 fix verification 2026-10-28 | –       |
 
 T-023 review (2026-10-30) fixed in-PR: blind safety firing on every 1v1 role, blind safety re-scoring known enemies, unknown pool ids being scored, role-inference failure dropping a whole team, raw-winrate hard-counter warning, missing `W_comp`/`W_blind`, engine magic numbers outside `config.ts`, missing level 0 for lowData reasons (`reasonLevelSchema` now includes 0, SPECS §7), board-picked pool champions now reported as `poolUnavailable` `picked`, hard-counter warnings emitted as codes (`counteredBy:<ROLE>:<id>`), `rawGames` optional (omitted when unknown instead of a fake 0).
 
@@ -45,6 +44,14 @@ No new bugs were identified while revising T-013 patch-window and rank-known-cou
 ```
 
 ## Fixed
+
+### B-033 — Baseline `games` column not populated by ETL aggregation — FIXED
+
+- Severity / Area: S3 / engine
+- Steps to reproduce: run `pnpm etl aggregate` and inspect `baseline.games` — defaults to 0, `insufficientData.rawGames` never reported.
+- Expected / Actual: the raw match count per baseline row should be populated so `insufficientData` can report sample size (SPECS §7, D-030 item 9).
+- Fix (commit/ticket): T-016 — `aggregateBaseline` populates `wins_w`, `games_w`, `games_w2` and `games` (raw contributing match count) per (champion, my_role, rank_bucket) row; `games` defaults to 0 on empty tables and is exported as the 6th baseline column (migration 008).
+- Verification: `packages/etl/src/aggregate-baseline.test.ts` asserts weighted counts and `n_eff` on toy data.
 
 ### B-032 — Reason level mapping drops strong positive effects and badges empty samples — FIXED
 

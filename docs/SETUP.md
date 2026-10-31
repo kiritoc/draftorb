@@ -37,7 +37,7 @@ pnpm etl check-key [platform]  # test the Riot API key (default: euw1)
 pnpm etl players [platform]    # discover players by tier (--tiers, --quota, --reset)
 pnpm etl matches [platform]    # ingest matches, resumable, Ctrl+C safe (--since-patch, --per-player, --limit, --queue, --min-duration, --reset)
 pnpm etl status [platform]     # counts and progress
-pnpm etl aggregate             # compute aggregated tables (role probabilities; T-015)
+pnpm etl aggregate             # compute aggregated tables (role probabilities and rank-weighted baselines; T-015, T-016)
 ```
 
 Planned (target state, see TICKETS.md):

@@ -236,6 +236,9 @@ importers:
 
   packages/etl:
     dependencies:
+      '@draftorb/engine':
+        specifier: workspace:*
+        version: link:../engine
       '@draftorb/shared':
         specifier: workspace:*
         version: link:../shared

@@ -348,8 +348,7 @@ describe('migration runner', () => {
     expect(games[0]?.dflt_value).toBe('0');
 
     const row = db.prepare('SELECT games FROM baseline WHERE champion_id = 1').get() as
-      | { games: number }
-      | undefined;
+      { games: number } | undefined;
     expect(row?.games).toBe(0);
     db.close();
   });

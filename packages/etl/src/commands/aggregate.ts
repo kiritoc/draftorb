@@ -42,12 +42,10 @@ async function runAggregate(args: string[]): Promise<void> {
     }
 
     const baselineRows = aggregateBaseline(db, { patch });
-    console.log(`Aggregated baselines: ${baselineRows.length} row(s) written to baseline.`);
-    for (const row of baselineRows) {
-      console.log(
-        `  champion ${row.championId} ${row.myRole} ${row.rankBucket}: wins_w=${row.winsW.toFixed(2)} games_w=${row.gamesW.toFixed(2)} games_w2=${row.gamesW2.toFixed(2)} games=${row.games}`,
-      );
-    }
+    const champions = new Set(baselineRows.map((row) => row.championId)).size;
+    console.log(
+      `Aggregated baselines: ${baselineRows.length} row(s) for ${champions} champion(s) written to baseline.`,
+    );
   } finally {
     db.close();
   }

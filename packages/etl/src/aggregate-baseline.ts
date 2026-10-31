@@ -55,45 +55,19 @@ export function aggregateBaseline(
     throw new Error(`Invalid patch "${options.patch}". Expected a format like "16.21".`);
   }
 
-  const allRows = db
-    .prepare(
-      `SELECT
-         p.champion_id AS championId,
-         p.role AS myRole,
-         p.win AS win,
-         m.avg_rank_score AS rankScore,
-         m.patch AS patch,
-         m.rank_known_count AS rankKnownCount
-       FROM participants p
-       JOIN matches m ON m.match_id = p.match_id`,
-    )
-    .all() as Array<{
-    championId: number;
-    myRole: string;
-    win: number;
-    rankScore: number | null;
-    patch: string;
-    rankKnownCount: number;
-  }>;
-
   const snapshotPatch = options.patch;
-  const rows =
-    snapshotPatch === undefined
-      ? allRows
-      : allRows.filter((row) => comparePatches(row.patch, snapshotPatch) <= 0);
 
-  if (rows.length === 0) {
-    const clear = db.prepare('DELETE FROM baseline');
-    const write = db.transaction(() => {
-      clear.run();
-    });
-    write.immediate();
-    return [];
-  }
-
-  // Patch -> numeric index, sorted so newer patches have higher indices.
-  const patchSet = new Set(rows.map((row) => row.patch));
-  if (snapshotPatch !== undefined) patchSet.add(snapshotPatch);
+  // Patch -> numeric index. Only distinct stored patches are indexed (dense),
+  // so a gap in collected patches counts as one step of recency decay.
+  // comparePatches is numeric, so the snapshot filter is applied in JS
+  // (SQL string comparison would misorder "16.9" and "16.10").
+  const storedPatches = (
+    db.prepare('SELECT DISTINCT patch FROM matches').all() as Array<{ patch: string }>
+  )
+    .map((row) => row.patch)
+    .filter((patch) => snapshotPatch === undefined || comparePatches(patch, snapshotPatch) <= 0);
+  const patchSet = new Set(storedPatches);
+  if (snapshotPatch !== undefined && patchSet.size > 0) patchSet.add(snapshotPatch);
   const patches = [...patchSet].sort(comparePatches);
   const patchIndex = new Map<string, number>();
   patches.forEach((patch, i) => {
@@ -116,13 +90,36 @@ export function aggregateBaseline(
     }
   >();
 
-  for (const row of rows) {
-    const gameBucketIdx =
-      row.rankScore === null ? null : Math.max(0, Math.min(Math.floor(row.rankScore), maxBucket));
-    if (gameBucketIdx === null) continue;
+  // Streamed with iterate() so the full participants table is never held in memory.
+  // matches.avg_rank_score and participants.role are NOT NULL (migrations 001/004).
+  const rows = db
+    .prepare(
+      `SELECT
+         p.champion_id AS championId,
+         p.role AS myRole,
+         p.win AS win,
+         m.avg_rank_score AS rankScore,
+         m.patch AS patch,
+         m.rank_known_count AS rankKnownCount
+       FROM participants p
+       JOIN matches m ON m.match_id = p.match_id`,
+    )
+    .iterate() as IterableIterator<{
+    championId: number;
+    myRole: string;
+    win: number;
+    rankScore: number;
+    patch: string;
+    rankKnownCount: number;
+  }>;
 
+  for (const row of rows) {
+    // Newer-than-snapshot patches are absent from patchIndex and skipped here.
     const pIdx = patchIndex.get(row.patch);
     if (pIdx === undefined) continue;
+
+    // rank_score scale: integer part = RANK_BUCKET_ORDER index (6.5 = DIAMOND).
+    const gameBucketIdx = Math.max(0, Math.min(Math.floor(row.rankScore), maxBucket));
 
     for (const rankBucket of RANK_BUCKET_ORDER) {
       const uIdx = bucketIndex(rankBucket);

@@ -3,6 +3,9 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import type Database from 'better-sqlite3';
+import { DEFAULT_CONFIG, nEff } from '@draftorb/engine';
+
 import { migrate, openDb } from './db';
 import { aggregateBaseline, type BaselineRow } from './aggregate-baseline';
 
@@ -67,8 +70,57 @@ function requireRow(
   return row;
 }
 
-function nEff(gamesW: number, gamesW2: number): number {
-  return (gamesW * gamesW) / gamesW2;
+interface ToyGame {
+  patch: string;
+  rankScore: number;
+  win: number;
+  rankKnownCount?: number;
+  championId?: number;
+  role?: string;
+  participantRankScore?: number | null;
+}
+
+let toyMatchIndex = 0;
+
+function seedGames(db: Database.Database, games: ToyGame[]): void {
+  const insertMatch = db.prepare(
+    `INSERT INTO matches (
+      match_id, platform, patch, queue_id, duration, created_at, avg_rank_score, rank_known_count
+    ) VALUES (?, 'euw1', ?, 420, 1800, 1, ?, ?)`,
+  );
+  const insertParticipant = db.prepare(
+    `INSERT INTO participants (
+      match_id, puuid, team_id, champion_id, role, win, rank_score,
+      champion_games, mastery_points, is_expert, keystone, primary_style,
+      sub_style, perks_json, items_json, kills, deaths, assists
+    ) VALUES (?, ?, 100, ?, ?, ?, ?, 0, NULL, NULL, 8439, 8400, 8300, '{}', '[]', 0, 0, 0)`,
+  );
+  for (const game of games) {
+    toyMatchIndex += 1;
+    const matchId = `toy${toyMatchIndex}`;
+    insertMatch.run(matchId, game.patch, game.rankScore, game.rankKnownCount ?? 2);
+    insertParticipant.run(
+      matchId,
+      `toy-p${toyMatchIndex}`,
+      game.championId ?? 412,
+      game.role ?? 'SUPPORT',
+      game.win,
+      game.participantRankScore === undefined ? game.rankScore : game.participantRankScore,
+    );
+  }
+}
+
+function withSeededDb(games: ToyGame[], run: (db: Database.Database) => void): void {
+  withFreshDb((dbPath) => {
+    const db = openDb(dbPath);
+    try {
+      migrate(db);
+      seedGames(db, games);
+      run(db);
+    } finally {
+      db.close();
+    }
+  });
 }
 
 function withFreshDb(run: (dbPath: string) => void): void {
@@ -189,6 +241,112 @@ describe('aggregateBaseline', () => {
         db.close();
       }
     });
+  });
+
+  it('excludes matches newer than the snapshot patch and measures recency from it', () => {
+    withSeededDb(
+      [
+        { patch: '16.9', rankScore: 6.5, win: 1 },
+        { patch: '16.10', rankScore: 6.5, win: 0 },
+        { patch: '16.11', rankScore: 6.5, win: 1 },
+      ],
+      (db) => {
+        // Numeric patch order: 16.9 < 16.10 < 16.11 (not lexical).
+        const rows = aggregateBaseline(db, { patch: '16.10' });
+        const diamond = requireRow(rows, 412, 'SUPPORT', 'DIAMOND');
+        expect(diamond.games).toBe(2);
+        expect(diamond.gamesW).toBeCloseTo(1 + DEFAULT_CONFIG.decay);
+        expect(diamond.winsW).toBeCloseTo(DEFAULT_CONFIG.decay);
+      },
+    );
+  });
+
+  it('uses a snapshot patch with no stored games as the current patch', () => {
+    withSeededDb([{ patch: '16.20', rankScore: 6.5, win: 1 }], (db) => {
+      const rows = aggregateBaseline(db, { patch: '16.21' });
+      const diamond = requireRow(rows, 412, 'SUPPORT', 'DIAMOND');
+      expect(diamond.gamesW).toBeCloseTo(DEFAULT_CONFIG.decay);
+    });
+  });
+
+  it('counts a participant with unknown rank using the match rank', () => {
+    withSeededDb([{ patch: '16.21', rankScore: 6.5, win: 1, participantRankScore: null }], (db) => {
+      const diamond = requireRow(aggregateBaseline(db), 412, 'SUPPORT', 'DIAMOND');
+      expect(diamond.games).toBe(1);
+      expect(diamond.gamesW).toBeCloseTo(1);
+    });
+  });
+
+  it('down-weights games where only the seed rank is known', () => {
+    withSeededDb([{ patch: '16.21', rankScore: 6.5, win: 1, rankKnownCount: 1 }], (db) => {
+      const diamond = requireRow(aggregateBaseline(db), 412, 'SUPPORT', 'DIAMOND');
+      expect(diamond.gamesW).toBeCloseTo(DEFAULT_CONFIG.unknownRankFactor);
+      expect(diamond.gamesW2).toBeCloseTo(DEFAULT_CONFIG.unknownRankFactor ** 2);
+      expect(diamond.games).toBe(1);
+    });
+  });
+
+  it('keeps games exactly rankWindowTiers below the user bucket', () => {
+    // GOLD (3) vs PLATINUM (4) vs DIAMOND (6): Diamond user window floor is 6 - 2 = 4.
+    withSeededDb(
+      [
+        { patch: '16.21', rankScore: 4.5, win: 1 },
+        { patch: '16.21', rankScore: 3.5, win: 1 },
+      ],
+      (db) => {
+        const diamond = requireRow(aggregateBaseline(db), 412, 'SUPPORT', 'DIAMOND');
+        expect(diamond.games).toBe(1);
+        expect(diamond.gamesW).toBeCloseTo(Math.exp(-2 / DEFAULT_CONFIG.tau));
+      },
+    );
+  });
+
+  it('clamps out-of-range rank scores to the first and last buckets', () => {
+    withSeededDb(
+      [
+        { patch: '16.21', rankScore: 9.2, win: 1, championId: 1 },
+        { patch: '16.21', rankScore: -0.5, win: 1, championId: 2 },
+      ],
+      (db) => {
+        const rows = aggregateBaseline(db);
+        expect(requireRow(rows, 1, 'SUPPORT', 'MASTER_PLUS').gamesW).toBeCloseTo(1);
+        expect(requireRow(rows, 2, 'SUPPORT', 'IRON').gamesW).toBeCloseTo(1);
+      },
+    );
+  });
+
+  it('keys rows by champion and role', () => {
+    withSeededDb(
+      [
+        { patch: '16.21', rankScore: 6.5, win: 1, championId: 412, role: 'SUPPORT' },
+        { patch: '16.21', rankScore: 6.5, win: 0, championId: 412, role: 'MID' },
+        { patch: '16.21', rankScore: 6.5, win: 1, championId: 99, role: 'SUPPORT' },
+      ],
+      (db) => {
+        const rows = aggregateBaseline(db);
+        expect(requireRow(rows, 412, 'SUPPORT', 'DIAMOND').winsW).toBeCloseTo(1);
+        expect(requireRow(rows, 412, 'MID', 'DIAMOND').winsW).toBeCloseTo(0);
+        expect(requireRow(rows, 99, 'SUPPORT', 'DIAMOND').games).toBe(1);
+        expect(nEff(requireRow(rows, 412, 'MID', 'DIAMOND').gamesW, 1)).toBeCloseTo(1);
+      },
+    );
+  });
+
+  it('is idempotent across reruns', () => {
+    withSeededDb(
+      [
+        { patch: '16.20', rankScore: 6.5, win: 1 },
+        { patch: '16.21', rankScore: 5.5, win: 0 },
+      ],
+      (db) => {
+        const first = aggregateBaseline(db);
+        const second = aggregateBaseline(db);
+        expect(second).toEqual(first);
+        expect(db.prepare('SELECT COUNT(*) AS count FROM baseline').get()).toMatchObject({
+          count: first.length,
+        });
+      },
+    );
   });
 
   it('leaves baseline empty when there are no participants', () => {

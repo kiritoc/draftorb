@@ -264,6 +264,14 @@ Accepted by the owner on 2026-10-31. SPECS §5/§7 text derived from this decisi
 - Alternatives: duplicate the kernel in ETL (rejected: the two copies could drift apart); move the kernel to `@draftorb/shared` (deferred: a larger refactor outside T-016).
 - Consequences: ETL builds after engine. Engine must not import from ETL, which would create a cycle. Changes to the kernel change aggregated baselines, so the ETL must be re-run.
 
+### D-033 — Recency `patchIndex` and game rank bucket in ETL aggregation — PROPOSED
+
+- Context: SPECS §3 defines recency as `decay ^ (currentPatchIndex - patchIndex)` but does not define `patchIndex`. It also does not say how a match's `avg_rank_score` maps to a rank bucket. T-016 needs both.
+- Question: should a patch gap (no stored games on some patches) count as one decay step or as the real number of patches released in between?
+- Assumption: `patchIndex` is dense over the distinct stored patches (sorted numerically with `comparePatches`), up to and including the snapshot patch. The game bucket is `clamp(floor(avg_rank_score), 0, 7)`, i.e. the `RANK_BUCKET_ORDER` index.
+- Alternatives: index by real release order (needs a patch list, e.g. from Data Dragon versions); use the distance in minor versions (breaks across major versions).
+- Consequences: with gaps in the collected data, older patches decay less than real time would suggest. T-017 pair aggregation must use the same indexing so baselines and pairs stay consistent.
+
 ### Template
 
 ```

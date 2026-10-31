@@ -33,10 +33,10 @@
   "expected": {
     "recommendations": [
       { "championId": 2, "rank": 1, "reasons": [{ "type": "blind", "lowData": false }] },
-      { "championId": 1, "rank": 2, "reasons": [{ "type": "blind", "lowData": false }] },
-      { "championId": 4, "rank": 3, "warnings": ["offRole"] }
+      { "championId": 4, "rank": 2, "warnings": ["offRole"] },
+      { "championId": 1, "rank": 3, "reasons": [{ "type": "blind", "lowData": false }] }
     ],
-    "poolRecommendations": [{ "championId": 4, "rank": 3, "poolRank": 1 }],
+    "poolRecommendations": [{ "championId": 4, "rank": 2, "poolRank": 1 }],
     "poolUnavailable": [],
     "insufficientData": []
   }

@@ -302,10 +302,11 @@ export function recommend(
     poolRecommendations = [];
     poolUnavailable = [];
 
-    // poolUnavailable: check pool champions not in championIds (deduplicated)
+    // poolUnavailable: picked on the board, or not in championIds (deduplicated)
     for (const pid of poolSet) {
-      if (knownChampionSet.has(pid)) continue;
-      if (!championIdSet.has(pid)) {
+      if (knownChampionSet.has(pid)) {
+        poolUnavailable.push({ championId: pid, reason: 'picked' });
+      } else if (!championIdSet.has(pid)) {
         poolUnavailable.push({ championId: pid, reason: 'unknownChampion' });
       }
     }

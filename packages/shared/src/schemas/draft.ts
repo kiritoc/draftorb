@@ -60,7 +60,7 @@ export type InsufficientDataEntry = z.infer<typeof insufficientDataEntrySchema>;
 export const poolUnavailableEntrySchema = z
   .object({
     championId: championIdSchema,
-    reason: z.enum(['insufficientData', 'unknownChampion']),
+    reason: z.enum(['insufficientData', 'unknownChampion', 'picked']),
   })
   .strict();
 export type PoolUnavailableEntry = z.infer<typeof poolUnavailableEntrySchema>;

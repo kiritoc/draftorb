@@ -119,7 +119,7 @@ export function computeBlindSafety(
       weighted += share * term;
       if (term < minTerm) minTerm = term;
     }
-    // Worst case is taken per unseen role (SPECS §5, D-030).
+    // Worst case is taken per unseen role (SPECS §5).
     if (shareTotal > 0) total += weighted / shareTotal + BLIND_WORST_CASE_FACTOR * minTerm;
   }
 

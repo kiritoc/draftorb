@@ -1055,13 +1055,25 @@ describe('recommend: review coverage', () => {
     expect(rec1?.reasons.some((r) => r.type === 'blind')).toBe(false);
   });
 
-  it('pool champion already picked on the board is not scored or reported (D-030)', () => {
+  it('pool champion already picked on the board is not scored and is reported as picked', () => {
     const data = makeData({ champions: [1, 2, 200], roleProb: botRoleProb });
     const input = makeInput({ enemies: [{ championId: 200, role: 'SUPPORT' }], pool: [200] });
     const result = recommend(input, data);
     expect(result.recommendations.some((r) => r.championId === 200)).toBe(false);
     expect(result.poolRecommendations).toEqual([]);
-    expect(result.poolUnavailable).toEqual([]);
+    expect(result.poolUnavailable).toEqual([{ championId: 200, reason: 'picked' }]);
+  });
+
+  it('a lowData reason has level 0', () => {
+    const allyPairs = makeAllyPairs([
+      { championId: 1, allyId: 10, role: 'ADC', winsW: 10, gamesW: 10, gamesW2: 10 },
+    ]);
+    const data = makeData({ champions: [1, 10], roleProb: botRoleProb, allyPairs });
+    const input = makeInput({ allies: [{ championId: 10, role: 'ADC' }] });
+    const rec = recommend(input, data).recommendations.find((r) => r.championId === 1);
+    const synergy = rec?.reasons.find((r) => r.type === 'synergy');
+    expect(synergy?.lowData).toBe(true);
+    expect(synergy?.level).toBe(0);
   });
 
   it('pool never changes scores with enemies and an off-role pool champion', () => {
@@ -1323,14 +1335,28 @@ describe('recommend: review gap coverage', () => {
   });
 
   it('a low-influence enemy (TOP for SUPPORT) does not trigger a hard-counter warning', () => {
-    const roleProb = { ...botRoleProb, '300': { TOP: 1.0 } } as ChampionRoleProbabilities;
+    // Same moderate matchup (~53% vs p0 ~60%): about -7pp at full influence
+    // (enemy SUPPORT, warns), well under the threshold at TOP influence.
+    const roleProb = {
+      ...botRoleProb,
+      '300': { TOP: 1.0 },
+      '301': { SUPPORT: 1.0 },
+    } as ChampionRoleProbabilities;
     const enemyPairs = makeEnemyPairs([
-      { championId: 1, enemyId: 300, role: 'TOP', ...HIGH_GAMES, winsW: 5 },
+      { championId: 1, enemyId: 300, role: 'TOP', ...HIGH_GAMES, winsW: 26.5 },
+      { championId: 1, enemyId: 301, role: 'SUPPORT', ...HIGH_GAMES, winsW: 26.5 },
     ]);
-    const data = makeData({ champions: [1, 300], roleProb, enemyPairs });
-    const input = makeInput({ enemies: [{ championId: 300, role: 'TOP' }] });
-    const rec = recommend(input, data).recommendations.find((r) => r.championId === 1);
-    expect(rec?.warnings.some((w) => w.startsWith('countered by'))).toBe(false);
+    const data = makeData({ champions: [1, 300, 301], roleProb, enemyPairs });
+    const warnings = (enemy: { championId: ChampionId; role: Role }): string[] =>
+      recommend(makeInput({ enemies: [enemy] }), data).recommendations.find(
+        (r) => r.championId === 1,
+      )?.warnings ?? [];
+    expect(warnings({ championId: 301, role: 'SUPPORT' })).toContain(
+      'countered by enemy support 301',
+    );
+    expect(
+      warnings({ championId: 300, role: 'TOP' }).some((w) => w.startsWith('countered by')),
+    ).toBe(false);
   });
 
   it('a lowData enemy pair never triggers a hard-counter warning', () => {

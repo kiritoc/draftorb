@@ -281,13 +281,13 @@ export const DELTA_PP_DECIMALS = 2;
 export const MISSING_LANE_ID = -1;
 
 /**
- * Gates used to level comp/blind reasons, which have no sample (D-030): a
+ * Gates used to level comp/blind reasons, which have no sample (SPECS §5): a
  * nominal n_eff of 1 with both gates at 0, so only the deltaPp thresholds apply.
  */
 export const UNSAMPLED_LEVEL_NEFF = 1;
 export const UNSAMPLED_LEVEL_MIN_GAMES = 0;
 export const UNSAMPLED_LEVEL_HIGH_MIN_GAMES = 0;
-/** Positive comp/blind levels are capped at this level (D-030). */
+/** Positive comp/blind levels are capped at this level (SPECS §5). */
 export const UNSAMPLED_MAX_POSITIVE_LEVEL = 1;
 
 /** W_comp: scale applied to the comp-need bonus (SPECS §5). Prior. */

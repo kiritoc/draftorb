@@ -226,25 +226,6 @@ Owner decision 2026-10-29.
   - Keep `min(0)` and add a separate zero-check refinement — rejected in favor of the simpler `gt(0)`, which communicates intent at the value level.
 - Consequences: four test cases updated (zero-valued role map made sparse, duplicate pool id, manifest version pinning, zero-rejection negative test); `MANIFEST_SCHEMA_VERSION` re-exported from the package barrel. No engine or ETL code consumed these schemas yet (T-020/T-019 are not started), so no downstream breakage.
 
-### D-030 — T-023 engine assumptions: blind-safety trigger, pickShare proxy, comp/blind reasons, board-picked pool champions — PROPOSED
-
-- Context: Implementing SPECS §5 in T-023 left four points unspecified or not implementable with current exports.
-- Assumptions (implemented, pending owner review):
-  1. **Blind-safety trigger.** SPECS §5 says "blindPick or fewer than 2 lane enemies known". For 1v1 lane groups (TOP/MID/JUNGLE) one enemy completes the lane, so the engine runs blind safety when `blindPick` is true or any role of `laneGroup(myRole).enemies` is unknown. For bot lane this equals the spec rule.
-  2. **`pickShare(e)` proxy.** No pick-rate export exists yet, so `pickShare(e)` is approximated by `roleProb[e][role]` over unpicked champions above `ROLE_PROB_THRESHOLD`, normalized per unseen role. Missing or lowData matchups count as neutral (see 5). Tracked as B-026; replace when a pick-rate export lands.
-  3. **Comp/blind reason levels.** Comp and blind reasons have no sample size (`n = 0`, never lowData); their level is mapped directly from `deltaPp` with the L1/L2/L3 thresholds, positive values capped at L1 and negative levels unrestricted, independent of `minGames`/`highLevelMinGames`.
-  4. **lowData level 0.** SPECS §5 says a lowData reason has level 0, but `reasonLevelSchema` excludes 0, so the engine omits `level` (undefined) for lowData and sub-1pp reasons. Option for the owner: add 0 to the schema.
-  5. **Blind-safety details.** The worst-case penalty is taken per unseen role and summed; missing or lowData matchups count as neutral (term 0) with their full share, so a candidate is never rewarded for lacking data.
-  6. **Hard-counter warning** compares `deltaPp(logit(p0), s * conf * influence * pairTerm)` with `HARD_COUNTER_DELTA_PP`, so an uncertain inferred role or a low-influence enemy cannot trigger a full-strength warning.
-  7. **Comp uses all board allies**, including those dropped by role inference (comp is role-independent).
-  8. **Baseline `games` column.** T-023 adds the raw match count to the baseline export and migration 008 (shared schema change outside T-023 scope, needed by golden rule 8). T-016 must populate it (B-025).
-  9. **No comp need without allies.** With zero known allies, no need is reported (`compNeed = 0`) instead of rewarding every tag.
-  10. **`compNeed` ignores enemies** until T-025 (full comp model).
-  11. **Pool champion already picked on the board** is neither scored nor listed in `poolUnavailable` (the schema only allows `insufficientData | unknownChampion`). Option for the owner: add a `picked` reason.
-  12. **Lane key order.** `lane_vs`/`lane_full` lookups order opponents by `laneGroup(myRole).enemies` (SUPPORT: `[SUPPORT, ADC]`; ADC: `[ADC, SUPPORT]`); the partner is `laneGroup(myRole).allies[0]`. T-017 must export `opp1`/`opp2` in this order.
-  13. **Open items for the owner:** the baseline `games` column was added here rather than in T-016 (scope); `W_COMP`, `W_BLIND`, `BLIND_WORST_CASE_FACTOR`, `HARD_COUNTER_DELTA_PP` and `LANE_GROUPS` are module constants, not an injectable config (T-027.a needs them injectable); hard-counter warnings are English strings, not codes (move the text to the web `strings` module when the UI lands).
-- Consequences: T-024, T-025 and T-027.a revisit these; any change updates the T-023 tests.
-
 ### Template
 
 ```

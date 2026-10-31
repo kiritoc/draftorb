@@ -22,6 +22,7 @@ function toReasonLevel(levelNum: number): ReasonLevel | undefined {
     levelNum === -3 ||
     levelNum === -2 ||
     levelNum === -1 ||
+    levelNum === 0 ||
     levelNum === 1 ||
     levelNum === 2 ||
     levelNum === 3
@@ -82,7 +83,7 @@ export function buildReasons(
 
   // Comp and blind reasons have no sample of their own and are never lowData.
   // Map their delta directly (no fabricated n_eff): positive levels cap at L1,
-  // negative levels keep their full magnitude (D-030).
+  // negative levels keep their full magnitude (SPECS §5).
   const unsampledLevel = (d: number): ReasonLevel | undefined => {
     const level = mapDeltaPpToLevel(
       d,

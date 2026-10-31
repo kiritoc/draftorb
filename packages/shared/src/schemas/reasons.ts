@@ -22,6 +22,7 @@ export const reasonLevelSchema = z.union([
   z.literal(-3),
   z.literal(-2),
   z.literal(-1),
+  z.literal(0), // lowData or |deltaPp| < 1pp: no badge (SPECS §5)
   z.literal(1),
   z.literal(2),
   z.literal(3),

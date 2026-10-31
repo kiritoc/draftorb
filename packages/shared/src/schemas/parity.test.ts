@@ -70,7 +70,7 @@ describe('shared schema parity (D-011)', () => {
       rank: 1,
       poolRank: 1,
       reasons: [],
-      reliability: { games: 100, lowData: false },
+      reliability: { nEff: 100, lowData: false },
       warnings: [],
     });
     expect(result.success).toBe(true);
@@ -103,7 +103,7 @@ describe('shared schema parity (D-011)', () => {
           score: 0.7,
           rank: 1,
           reasons: [{ type: 'lane', with: [41, 34], lowData: false, n: 100.5 }],
-          reliability: { games: 150.3, lowData: false },
+          reliability: { nEff: 150.3, lowData: false },
           warnings: [],
         },
       ],
@@ -115,7 +115,7 @@ describe('shared schema parity (D-011)', () => {
           rank: 1,
           poolRank: 1,
           reasons: [],
-          reliability: { games: 150.3, lowData: false },
+          reliability: { nEff: 150.3, lowData: false },
           warnings: [],
         },
       ],

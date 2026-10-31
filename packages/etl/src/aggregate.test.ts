@@ -6,10 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { migrate, openDb } from './db';
 import { aggregateRoleProb, type RoleProbRow } from './aggregate';
 
-async function withSeededDb(
-  run: (dbPath: string) => Promise<void>,
-  seed = true,
-): Promise<void> {
+async function withSeededDb(run: (dbPath: string) => Promise<void>, seed = true): Promise<void> {
   const directory = mkdtempSync(join(tmpdir(), 'draftorb-aggregate-'));
   const dbPath = join(directory, 'test.sqlite');
   const originalDbPath = process.env.DRAFTORB_DB_PATH;
@@ -42,7 +39,7 @@ async function withSeededDb(
 
     let matchIndex = 0;
     const addGame = (puuid: string, championId: number, role: string, win: number): void => {
-      const matchId = `m${matchIndex += 1}`;
+      const matchId = `m${(matchIndex += 1)}`;
       insertMatch.run(matchId);
       insertParticipant.run(matchId, puuid, championId, role, win);
     };
@@ -152,20 +149,17 @@ describe('aggregateRoleProb', () => {
   });
 
   it('leaves role_prob empty when there are no participants', async () => {
-    await withSeededDb(
-      async (dbPath) => {
-        const db = openDb(dbPath);
-        try {
-          const rows = aggregateRoleProb(db);
-          expect(rows).toEqual([]);
-          expect(db.prepare('SELECT COUNT(*) AS count FROM role_prob').get()).toMatchObject({
-            count: 0,
-          });
-        } finally {
-          db.close();
-        }
-      },
-      false,
-    );
+    await withSeededDb(async (dbPath) => {
+      const db = openDb(dbPath);
+      try {
+        const rows = aggregateRoleProb(db);
+        expect(rows).toEqual([]);
+        expect(db.prepare('SELECT COUNT(*) AS count FROM role_prob').get()).toMatchObject({
+          count: 0,
+        });
+      } finally {
+        db.close();
+      }
+    }, false);
   });
 });

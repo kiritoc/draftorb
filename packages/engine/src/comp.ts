@@ -10,12 +10,7 @@
  * sufficient for T-023.
  */
 
-import type {
-  ChampionId,
-  ChampionTags,
-  ChampionTagsMap,
-  CompNeedCategory,
-} from '@draftorb/shared';
+import type { ChampionId, ChampionTags, ChampionTagsMap, CompNeedCategory } from '@draftorb/shared';
 import type { CompConfig } from './config.js';
 import { DEFAULT_COMP_CONFIG } from './config.js';
 

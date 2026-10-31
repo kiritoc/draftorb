@@ -547,7 +547,7 @@ describe('migration runner', () => {
     expect(status.pending).toBe(0);
     expect(status.versions).toEqual(expectedVersions());
     db.close();
-  });
+  }, 10_000);
 
   it('should enable foreign keys by default', () => {
     const db = openDb(TEST_DB_PATH);

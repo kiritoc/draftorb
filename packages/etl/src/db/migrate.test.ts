@@ -242,6 +242,7 @@ describe('migration runner', () => {
       '005_lane_null_unique',
       '006_nullable_rank_score',
       '007_matches_enriched',
+      '008_baseline_raw_games',
     ]);
     expect(migrate(db)).toEqual([]);
 

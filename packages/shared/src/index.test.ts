@@ -334,7 +334,7 @@ describe('shared schemas', () => {
   });
 
   it('validates role-keyed export tuple schemas', () => {
-    const baseline: BaselineEntry = [41, 'DIAMOND', 52.4, 100.0, 250.0];
+    const baseline: BaselineEntry = [41, 'DIAMOND', 52.4, 100.0, 250.0, 120];
     expect(baselineEntrySchema.parse(baseline)).toEqual(baseline);
 
     const allyPair = [41, 18, 'ADC', 'DIAMOND', 52.4, 100.0, 250.0] as const;
@@ -357,8 +357,12 @@ describe('shared schemas', () => {
   });
 
   it('rejects rankSchema values where rankBucketSchema is expected', () => {
-    expect(() => baselineEntrySchema.parse([41, 'MASTER' as Rank, 52.4, 100.0, 250.0])).toThrow();
-    expect(() => baselineEntrySchema.parse([41, 'MASTER_PLUS', 52.4, 100.0, 250.0])).not.toThrow();
+    expect(() =>
+      baselineEntrySchema.parse([41, 'MASTER' as Rank, 52.4, 100.0, 250.0, 120]),
+    ).toThrow();
+    expect(() =>
+      baselineEntrySchema.parse([41, 'MASTER_PLUS', 52.4, 100.0, 250.0, 120]),
+    ).not.toThrow();
   });
 
   it('validates champion pool storage envelope', () => {

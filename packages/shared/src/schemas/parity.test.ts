@@ -208,7 +208,14 @@ describe('shared schema parity (D-011)', () => {
     expect(shared.laneFullEntrySchema).toBeDefined();
     expect(shared.laneFullTableSchema).toBeDefined();
 
-    const baseline = shared.baselineEntrySchema.safeParse([41, 'DIAMOND', 52.4, 100.0, 250.0]);
+    const baseline = shared.baselineEntrySchema.safeParse([
+      41,
+      'DIAMOND',
+      52.4,
+      100.0,
+      250.0,
+      120,
+    ]);
     expect(baseline.success).toBe(true);
 
     const allyPair = shared.allyPairEntrySchema.safeParse([

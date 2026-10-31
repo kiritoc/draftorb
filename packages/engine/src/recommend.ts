@@ -249,8 +249,7 @@ export function recommend(
   // Exact score comparison: transitive and deterministic (pure float math on
   // identical inputs). Ties only on exactly equal scores, broken by championId.
   const sorted = [...scored].sort(
-    (a, b) =>
-      (a.score === b.score ? 0 : b.score > a.score ? 1 : -1) || a.championId - b.championId,
+    (a, b) => (a.score === b.score ? 0 : b.score > a.score ? 1 : -1) || a.championId - b.championId,
   );
 
   const recommendations: Recommendation[] = sorted.map((s, i) =>

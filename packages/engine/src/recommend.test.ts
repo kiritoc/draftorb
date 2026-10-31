@@ -1035,8 +1035,8 @@ describe('recommend: remaining review gaps', () => {
     });
     const input = makeInput({ allies: [{ championId: 77, role: 'ADC' }] });
     const score = (engage: number): number =>
-      recommend(input, data, DEFAULT_CONFIG, { ...DEFAULT_COMP_CONFIG, engage })
-        .recommendations[0]?.score ?? 0;
+      recommend(input, data, DEFAULT_CONFIG, { ...DEFAULT_COMP_CONFIG, engage }).recommendations[0]
+        ?.score ?? 0;
     expect(score(0.5)).toBeGreaterThan(score(0.1));
   });
 

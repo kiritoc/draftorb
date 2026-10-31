@@ -94,7 +94,7 @@ jobs:
 
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.head_ref }}
+          ref: ${{ github.event.pull_request.head.sha }}
           token: ${{ steps.app.outputs.token }}
 
       - uses: actions/download-artifact@v8
@@ -105,22 +105,43 @@ jobs:
       - name: Apply patch and push
         env:
           PATCH: ${{ runner.temp }}/format.patch
+          # Via env, never inline in the script (branch names can hold shell syntax).
+          HEAD_REF: ${{ github.head_ref }}
         run: |
           # Content edits only: --summary lists creates, deletes, renames,
           # copies and mode changes, and is empty otherwise.
           if [ -n "$(git apply --summary "$PATCH")" ]; then
             echo "::error::Patch contains structural changes"; exit 1
           fi
+
+          # Never touch .github or .git: the App's missing `workflows`
+          # permission only covers .github/workflows. -z avoids path quoting.
+          PATHS="$(git apply --numstat -z "$PATCH" | tr '\0' '\n' | cut -f3-)"
+          if grep -qiE '^\.git(hub)?(/|$)' <<< "$PATHS"; then
+            echo "::error::Patch touches .git or .github"; exit 1
+          fi
+
           git apply "$PATCH"
           git -c user.name=format-bot -c user.email="$BOT_EMAIL" \
             commit -a -m 'style: apply prettier'
-          git push || echo "::warning::Push rejected (branch moved); the next run will format"
+
+          # We are on the exact commit that was formatted: if the branch moved,
+          # the push is rejected and the next run takes over. Any other failure
+          # (auth, permissions) must fail the job.
+          if ! OUT="$(git push origin "HEAD:refs/heads/$HEAD_REF" 2>&1)"; then
+            echo "$OUT"
+            if grep -qE '\((fetch first|non-fast-forward)\)' <<< "$OUT"; then
+              echo "::warning::Branch moved; the next run will format"
+            else
+              exit 1
+            fi
+          fi
 
   lint:
     needs: [format, commit-format]
     # Format jobs are skipped on push/forks: still run (only a cancel stops us).
-    # If the bot pushed, the new run cancels this one (concurrency).
-    if: ${{ !cancelled() }}
+    # If the bot pushed, the push starts a new run: skip this one.
+    if: ${{ !cancelled() && needs.commit-format.result != 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -142,7 +163,7 @@ jobs:
 
   test:
     needs: [format, commit-format]
-    if: ${{ !cancelled() }}
+    if: ${{ !cancelled() && needs.commit-format.result != 'success' }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     strategy:

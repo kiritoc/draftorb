@@ -52,7 +52,7 @@ Use this to get a global "is the project heading in the right direction?" check 
 How to use:
 
 1. Provide the whole project first (concatenated files with their paths, or direct file access), then paste the prompt below.
-2. Replace `[N]` with the real number of files, so the AI can detect truncation.
+2. Replace `[N]` with the real number of files, so the AI can detect truncation (`git ls-files | wc -l`).
 3. Paste the resulting report (and the files it lists in Section 10) to the second reviewer. Ask the reviewer to verify the `[FACT]` claims against the excerpts before giving an opinion.
 
 ```

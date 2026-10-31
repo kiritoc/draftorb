@@ -23,7 +23,8 @@ export const COUNTERED_BY_WARNING = 'counteredBy';
 export const OFF_ROLE_WARNING = 'offRole';
 
 const COUNTERED_BY_PATTERN = new RegExp(
-  `^${COUNTERED_BY_WARNING}:(${roleSchema.options.join('|')}):\\d+$`,
+  // Champion id must be a positive integer (matches championIdSchema).
+  `^${COUNTERED_BY_WARNING}:(${roleSchema.options.join('|')}):[1-9]\\d*$`,
 );
 
 export const warningCodeSchema = z.union([

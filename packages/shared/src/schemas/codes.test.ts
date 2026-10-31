@@ -12,6 +12,11 @@ describe('warningCodeSchema', () => {
     expect(warningCodeSchema.safeParse('counteredBy:BOT:412').success).toBe(false);
     expect(warningCodeSchema.safeParse('counteredBy:SUPPORT:abc').success).toBe(false);
   });
+
+  it('rejects non-positive or zero-padded champion ids', () => {
+    expect(warningCodeSchema.safeParse('counteredBy:SUPPORT:0').success).toBe(false);
+    expect(warningCodeSchema.safeParse('counteredBy:SUPPORT:012').success).toBe(false);
+  });
 });
 
 describe('compNeedCategorySchema', () => {

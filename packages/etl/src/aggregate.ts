@@ -18,9 +18,8 @@ export interface RoleProbRow {
  * idempotent and safe to re-run.
  */
 export function latestPatch(db: Database.Database): string | undefined {
-  const row = db
-    .prepare('SELECT patch FROM matches ORDER BY created_at DESC LIMIT 1')
-    .get() as { patch: string } | undefined;
+  const row = db.prepare('SELECT patch FROM matches ORDER BY created_at DESC LIMIT 1').get() as
+    { patch: string } | undefined;
   return row?.patch;
 }
 

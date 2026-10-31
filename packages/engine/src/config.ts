@@ -260,6 +260,54 @@ export const DEFAULT_CONFIG: RankWeightingConfig = rankWeightingConfigSchema.par
  */
 export const ROLE_INFERENCE_EPS = 1e-4;
 
+// --- Recommendation config (SPECS §5) ---
+
+/** Role probability threshold to enter the candidate set (SPECS §5). */
+export const ROLE_PROB_THRESHOLD = 0.05;
+
+/** W_comp: scale applied to the comp-need bonus (SPECS §5). Prior. */
+export const W_COMP = 1.0;
+
+/** W_blind: scale applied to blindSafety(c) (SPECS §5). Prior. */
+export const W_BLIND = 1.0;
+
+/** Weight of the worst-case (min) matchup penalty inside blindSafety (SPECS §5). Prior. */
+export const BLIND_WORST_CASE_FACTOR = 0.5;
+
+/**
+ * A known enemy triggers a "countered by" warning when its shrunk pair term
+ * moves the baseline by at most this many percentage points (L3 negative).
+ */
+export const HARD_COUNTER_DELTA_PP = -4.5;
+
+/**
+ * Comp need weights (log-odds). Each value is the bonus contributed when the
+ * champion is the first on the team to provide that need. Priors calibrated
+ * by the D-023 backtest (T-027.a).
+ */
+export interface CompConfig {
+  readonly engage: number;
+  readonly peel: number;
+  readonly waveclear: number;
+  readonly poke: number;
+  readonly adDamage: number;
+  readonly apDamage: number;
+  readonly missingThreshold: number;
+  /** Minimum known allies before the AD/AP balance is evaluated. */
+  readonly minAlliesForDamageMix: number;
+}
+
+export const DEFAULT_COMP_CONFIG: CompConfig = Object.freeze({
+  engage: 0.1,
+  peel: 0.1,
+  waveclear: 0.08,
+  poke: 0.06,
+  adDamage: 0.1,
+  apDamage: 0.1,
+  missingThreshold: 0.5,
+  minAlliesForDamageMix: 3,
+});
+
 // --- Influence lookup ---
 
 export interface InfluenceOpts {

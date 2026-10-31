@@ -11,6 +11,8 @@
  */
 
 import type { ChampionId, ChampionTagsMap, Role } from '@draftorb/shared';
+import type { CompConfig } from './config.js';
+import { DEFAULT_COMP_CONFIG } from './config.js';
 
 export type CompNeedCategory = 'engage' | 'peel' | 'waveclear' | 'poke' | 'ad_damage' | 'ap_damage';
 
@@ -28,31 +30,6 @@ export interface TeamCompSnapshot {
   readonly enemies: readonly ChampionId[];
   readonly userRole: Role;
 }
-
-/**
- * Configuration for comp need weights (log-odds). Each value is the bonus
- * contributed when the champion is the first on the team to provide that need.
- * These are priors — calibrated by the D-023 backtest (T-027.a).
- */
-export interface CompConfig {
-  readonly engage: number;
-  readonly peel: number;
-  readonly waveclear: number;
-  readonly poke: number;
-  readonly adDamage: number;
-  readonly apDamage: number;
-  readonly missingThreshold: number;
-}
-
-export const DEFAULT_COMP_CONFIG: CompConfig = Object.freeze({
-  engage: 0.1,
-  peel: 0.1,
-  waveclear: 0.08,
-  poke: 0.06,
-  adDamage: 0.1,
-  apDamage: 0.1,
-  missingThreshold: 0.5,
-});
 
 /**
  * Compute the team's missing composition needs based on the known ally champions
@@ -94,7 +71,7 @@ export function teamMissingNeeds(
   if (!present.has('waveclear')) missing.add('waveclear');
   if (!present.has('poke')) missing.add('poke');
 
-  if (allyChampionIds.length >= 3 && hasAnyDamage) {
+  if (allyChampionIds.length >= config.minAlliesForDamageMix && hasAnyDamage) {
     const total = adChampions + apChampions;
     if (adChampions / total < config.missingThreshold) missing.add('ad_damage');
     if (apChampions / total < config.missingThreshold) missing.add('ap_damage');
@@ -137,7 +114,7 @@ export function computeCompNeed(
     }
   }
 
-  if (allyChampionIds.length >= 3 && missing.has('ad_damage')) {
+  if (allyChampionIds.length >= config.minAlliesForDamageMix && missing.has('ad_damage')) {
     const isAd = t.damageType === 'AD' || t.damageType === 'MIXED';
     if (isAd) {
       filled.push('ad_damage');
@@ -146,7 +123,7 @@ export function computeCompNeed(
     }
   }
 
-  if (allyChampionIds.length >= 3 && missing.has('ap_damage')) {
+  if (allyChampionIds.length >= config.minAlliesForDamageMix && missing.has('ap_damage')) {
     const isAp = t.damageType === 'AP' || t.damageType === 'MIXED';
     if (isAp) {
       filled.push('ap_damage');

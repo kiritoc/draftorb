@@ -6,7 +6,11 @@ Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATI
 
 | ID    | Sev | Area   | Title                                                                                                                                                      | Status | Found by/date                     | Ticket |
 | ----- | --- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | --------------------------------- | ------ |
+| B-025 | S3  | engine | `insufficientData.rawGames` and `reliability` use rounded `games_w` (weighted) because exports carry no raw match count                                     | OPEN   | T-023 review 2026-10-30           | –      |
+| B-026 | S3  | engine | `blindSafety` approximates `pickShare(e)` with roleProb (no pick-rate export); lowData reasons have no level 0 because `reasonLevelSchema` excludes 0         | OPEN   | T-023 review 2026-10-30           | –      |
 | B-021 | S3  | engine | `types: []` in engine/shared tsconfigs is circumvented by test files importing vitest, so the type-checker still resolves Node globals in production files | OPEN   | B-017 fix verification 2026-10-28 | –      |
+
+T-023 review (2026-10-30) fixed in-PR: blind safety firing on every 1v1 role, blind safety re-scoring known enemies, unknown pool ids being scored, role-inference failure dropping a whole team, raw-winrate hard-counter warning, missing `W_comp`/`W_blind`, engine magic numbers outside `config.ts`.
 
 No new bugs were identified during the D-016 formula confirmation; player discovery remains within the current ETL scope.
 

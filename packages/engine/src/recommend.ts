@@ -11,51 +11,50 @@
  */
 
 import type {
+  AllyPairTable,
   BaselineTable,
   ChampionId,
   ChampionRoleProbabilities,
   ChampionTagsMap,
-  ReasonLevel,
-  AllyPairTable,
-  EnemyPairTable,
-  LaneVsTable,
-  LaneFullTable,
   DraftInput,
   DraftResult,
+  EnemyPairTable,
+  LaneFullTable,
+  LaneVsTable,
   PoolUnavailableEntry,
-  RankBucket,
   Recommendation,
-  Role,
 } from '@draftorb/shared';
-
-import type { RankWeightingConfig } from './config.js';
-import type { CompConfig, CompNeedCategory } from './comp.js';
-
-import { DEFAULT_CONFIG, getInfluence, rankToBucket } from './config.js';
-import { nEff, toEquivalentCounts, sigmoid, logit } from './weighting.js';
+import type { CompConfig, RankWeightingConfig } from './config.js';
+import type { DataRow, LaneDelta } from './recommend-types.js';
+import type { ScoredCandidate } from './recommend-reasons.js';
 import {
-  baselineGate,
-  baselineLogOdds,
-  scorePair,
-  scoreLane,
-  deltaPp,
-  levelFromConfig,
-  isLowData,
-} from './levels.js';
-import { inferRoles } from './roles.js';
-import { computeCompNeed, DEFAULT_COMP_CONFIG } from './comp.js';
+  DEFAULT_COMP_CONFIG,
+  DEFAULT_CONFIG,
+  ROLE_PROB_THRESHOLD,
+  W_BLIND,
+  W_COMP,
+  rankToBucket,
+} from './config.js';
+import { sigmoid } from './weighting.js';
+import { baselineGate, baselineLogOdds, deltaPp, scoreLane } from './levels.js';
+import { computeCompNeed } from './comp.js';
+import { LANE_GROUPS } from './recommend-types.js';
+import {
+  indexBaselines,
+  indexLaneFull,
+  indexLaneVs,
+  indexPairs,
+  makeLaneFullKey,
+  makeLaneVsKey,
+} from './recommend-indexes.js';
+import { computeLaneGroup, resolveKnownSlots } from './recommend-slots.js';
+import { computeBlindSafety, hardCounterWarnings, scorePairs } from './recommend-terms.js';
+import { buildReasons, toRecommendation } from './recommend-reasons.js';
+
+export type { KnownSlot } from './recommend-types.js';
 
 /** Role-relative influence for a known slot, keyed by phase. */
 export type InfluencePhase = 'draft' | 'lane' | 'mid';
-
-/** A known slot augmented with its inferred role and confidence. */
-export interface KnownSlot {
-  readonly championId: ChampionId;
-  readonly role: Role;
-  readonly side: 'ally' | 'enemy';
-  readonly confidence: number;
-  readonly fixed: boolean;
-}
 
 /** Index lookups over exported data tables. */
 export interface RecommendData {
@@ -77,52 +76,21 @@ export interface RecommendData {
   readonly championIds: readonly ChampionId[];
 }
 
-/** Result of scoring one candidate champion. */
-interface ScoredCandidate {
-  readonly championId: ChampionId;
-  readonly score: number;
-  readonly logOdds: number;
-  readonly reasons: ReasonAccumulator[];
-  readonly baselineNEff: number;
-  readonly baselineRawGames: number;
-  readonly baselineWinsE: number;
-  readonly baselineGamesE: number;
-  readonly p0: number;
-  readonly offRole: boolean;
-  readonly warnings: string[];
-}
-
-/** Accumulator for reasons during scoring, before the final Reason is produced. */
-interface ReasonAccumulator {
-  readonly type: 'synergy' | 'counter' | 'lane' | 'comp' | 'blind';
-  readonly with: ChampionId[];
-  readonly deltaPp: number;
-  readonly n: number;
-  readonly lowData: boolean;
-  readonly level: ReasonLevel | undefined;
-}
-
 /**
- * Lane group configuration (SPECS §5, D-021).
- * - SUPPORT/ADC: bot lane (ally partner + 2 enemies)
- * - TOP/MID/JUNGLE: 1v1 (2 champions total, lane_full skipped)
+ * Shrink an exact lane context toward the running prediction (SPECS §5),
+ * scaled by `conf_lane`. Returns null when the context row is missing.
  */
-interface LaneGroup {
-  readonly allies: Role[];
-  readonly enemies: Role[];
-  readonly oneToOne: boolean;
+function applyLane(
+  row: DataRow | undefined,
+  logOdds: number,
+  confLane: number,
+  config: RankWeightingConfig,
+): LaneDelta | null {
+  if (!row) return null;
+  const result = scoreLane(row.winsE, row.gamesE, sigmoid(logOdds), config);
+  const term = confLane * result.term;
+  return { term, lowData: result.lowData, n: row.nE, deltaPp: deltaPp(logOdds, term) };
 }
-
-const LANE_GROUPS: Record<Role, LaneGroup> = {
-  SUPPORT: { allies: ['ADC'], enemies: ['SUPPORT', 'ADC'], oneToOne: false },
-  ADC: { allies: ['SUPPORT'], enemies: ['ADC', 'SUPPORT'], oneToOne: false },
-  TOP: { allies: [], enemies: ['TOP'], oneToOne: true },
-  MID: { allies: [], enemies: ['MID'], oneToOne: true },
-  JUNGLE: { allies: [], enemies: ['JUNGLE'], oneToOne: true },
-};
-
-/** Role probability threshold to enter the candidate set (SPECS §5). */
-export const ROLE_PROB_THRESHOLD = 0.05;
 
 /**
  * Recommend champions for a draft slot (SPECS §5-7).
@@ -139,49 +107,29 @@ export function recommend(
   config: RankWeightingConfig = DEFAULT_CONFIG,
   compConfig: CompConfig = DEFAULT_COMP_CONFIG,
 ): DraftResult {
-  const userBucket: RankBucket = rankToBucket(input.userRank);
-  const myRole: Role = input.userRole;
+  const userBucket = rankToBucket(input.userRank);
+  const myRole = input.userRole;
 
   // --- Build indexes over the data tables ---
   const baselineIdx = indexBaselines(data.baselines, userBucket);
-  const allyPairIdx = indexAllyPairs(data.allyPairs, userBucket);
-  const enemyPairIdx = indexEnemyPairs(data.enemyPairs, userBucket);
+  const allyPairIdx = indexPairs(data.allyPairs, userBucket);
+  const enemyPairIdx = indexPairs(data.enemyPairs, userBucket);
   const laneVsIdx = indexLaneVs(data.laneVs, userBucket);
   const laneFullIdx = indexLaneFull(data.laneFull, userBucket);
 
   // --- Infer roles for ally and enemy teams ---
-  const allyAssignment = input.allies.length > 0 ? inferRoles(input.allies, data.roleProb) : null;
-  const enemyAssignment =
-    input.enemies.length > 0 ? inferRoles(input.enemies, data.roleProb) : null;
-
-  const allySlots: KnownSlot[] = allyAssignment
-    ? allyAssignment.slots.map((s) => ({
-        championId: s.championId,
-        role: s.role,
-        side: 'ally',
-        confidence: s.confidence,
-        fixed: input.allies.find((a) => a.championId === s.championId)?.role !== undefined,
-      }))
-    : [];
-
-  const enemySlots: KnownSlot[] = enemyAssignment
-    ? enemyAssignment.slots.map((s) => ({
-        championId: s.championId,
-        role: s.role,
-        side: 'enemy',
-        confidence: s.confidence,
-        fixed: input.enemies.find((e) => e.championId === s.championId)?.role !== undefined,
-      }))
-    : [];
+  const allySlots = resolveKnownSlots(input.allies, 'ally', data.roleProb);
+  const enemySlots = resolveKnownSlots(input.enemies, 'enemy', data.roleProb);
 
   // --- Infer lane-group champions from known enemies/allies ---
   const laneGroup = LANE_GROUPS[myRole];
   const laneGroupInfo = computeLaneGroup(laneGroup, allySlots, enemySlots);
 
   // --- Build candidate set ---
+  // Exclude every picked champion from the input, independent of role inference.
   const knownChampionSet = new Set<ChampionId>([
-    ...allySlots.map((s) => s.championId),
-    ...enemySlots.map((s) => s.championId),
+    ...input.allies.map((s) => s.championId),
+    ...input.enemies.map((s) => s.championId),
   ]);
 
   const candidateIds = new Set<ChampionId>();
@@ -200,8 +148,11 @@ export function recommend(
   // already picked on the board are skipped.
   const pool = input.pool ?? [];
   const poolSet = new Set<ChampionId>(pool);
+  const championIdSet = new Set<ChampionId>(data.championIds);
   for (const id of pool) {
     if (knownChampionSet.has(id)) continue;
+    // Unknown ids are reported as poolUnavailable/unknownChampion, never scored.
+    if (!championIdSet.has(id)) continue;
     candidateIds.add(id);
   }
 
@@ -237,146 +188,94 @@ export function recommend(
     const pairInfo = scorePairs(
       c,
       myRole,
-      allySlots,
-      enemySlots,
+      [...allySlots, ...enemySlots],
       allyPairIdx,
       enemyPairIdx,
       p0,
       config,
     );
     let logOdds = x + config.s * pairInfo.sum;
-    const pairDeltas = pairInfo.deltas;
 
-    // --- Layer 2: lane_vs ---
-    let laneVsDelta: { term: number; lowData: boolean; n: number; deltaPp: number } | null = null;
-    let laneFullDelta: { term: number; lowData: boolean; n: number; deltaPp: number } | null = null;
+    // --- Layer 2: lane_vs (all lane-group enemies known) ---
+    const [enemy1, enemy2] = laneGroupInfo.enemies;
+    const laneEnemiesKnown = laneGroupInfo.enemiesKnown.length === laneGroup.enemies.length;
+    const laneVsDelta =
+      laneEnemiesKnown && enemy1
+        ? applyLane(
+            laneVsIdx.get(makeLaneVsKey(c, enemy1.championId, enemy2?.championId ?? -1)),
+            logOdds,
+            laneGroupInfo.confidence,
+            config,
+          )
+        : null;
+    if (laneVsDelta) logOdds += laneVsDelta.term;
 
-    const laneEnemiesKnown = laneGroup.enemies.every((role) =>
-      laneGroupInfo.enemies.some((s) => s.role === role),
-    );
-
-    if (laneEnemiesKnown && laneGroupInfo.enemies.length > 0) {
-      const enemy1 = laneGroupInfo.enemies[0];
-      const enemy2 = laneGroupInfo.enemies[1];
-      if (enemy1) {
-        const vsKey = makeLaneVsKey(c, enemy1.championId, enemy2 ? enemy2.championId : -1);
-        const row = laneVsIdx.get(vsKey);
-        if (row) {
-          const { winsE: we, gamesE: ge, nE: ne } = row;
-          const qVs = sigmoid(logOdds);
-          const result = scoreLane(we, ge, qVs, config);
-          const term = laneGroupInfo.confidence * result.term;
-          const dPp = deltaPp(logOdds, term);
-          logOdds += term;
-          laneVsDelta = {
-            term: result.term,
-            lowData: result.lowData,
-            n: ne,
-            deltaPp: dPp,
-          };
-        }
-      }
-    }
-
-    // --- Layer 3: lane_full (skipped for 1v1 lane groups like TOP) ---
-    const laneAlliesKnown = laneGroup.allies.every((role) =>
-      laneGroupInfo.allies.some((s) => s.role === role),
-    );
-
-    if (!laneGroup.oneToOne && laneEnemiesKnown && laneAlliesKnown) {
-      const partner = laneGroupInfo.allies[0];
-      const enemy1 = laneGroupInfo.enemies[0];
-      const enemy2 = laneGroupInfo.enemies[1];
-      if (partner && enemy1 && enemy2) {
-        const fullKey = makeLaneFullKey(
-          c,
-          partner.championId,
-          enemy1.championId,
-          enemy2.championId,
-        );
-        const row = laneFullIdx.get(fullKey);
-        if (row) {
-          const { winsE: we, gamesE: ge, nE: ne } = row;
-          const qFull = sigmoid(logOdds);
-          const result = scoreLane(we, ge, qFull, config);
-          const term = laneGroupInfo.confidence * result.term;
-          const dPp = deltaPp(logOdds, term);
-          logOdds += term;
-          laneFullDelta = {
-            term: result.term,
-            lowData: result.lowData,
-            n: ne,
-            deltaPp: dPp,
-          };
-        }
-      }
-    }
+    // --- Layer 3: lane_full (skipped for 1v1 lane groups) ---
+    const partner = laneGroupInfo.allies[0];
+    const laneFullDelta =
+      !laneGroup.oneToOne && laneEnemiesKnown && partner && enemy1 && enemy2
+        ? applyLane(
+            laneFullIdx.get(
+              makeLaneFullKey(c, partner.championId, enemy1.championId, enemy2.championId),
+            ),
+            logOdds,
+            laneGroupInfo.confidence,
+            config,
+          )
+        : null;
+    if (laneFullDelta) logOdds += laneFullDelta.term;
 
     // --- Layer 4: comp need ---
     const allyChampIds = allySlots.map((s) => s.championId);
     const compResult = computeCompNeed(c, allyChampIds, data.tags, compConfig);
-    let compDelta: { bonus: number; deltaPp: number } | null = null;
-    if (compResult.bonus !== 0) {
-      const dPp = deltaPp(logOdds, compResult.bonus);
-      logOdds += compResult.bonus;
-      compDelta = { bonus: compResult.bonus, deltaPp: dPp };
+    let compDeltaPp: number | null = null;
+    if (compResult.filled.length > 0 && compResult.bonus !== 0) {
+      const compTerm = W_COMP * compResult.bonus;
+      compDeltaPp = deltaPp(logOdds, compTerm);
+      logOdds += compTerm;
     }
 
-    // --- Layer 5: blind safety ---
-    let blindDelta: { term: number; deltaPp: number } | null = null;
-    if (input.blindPick || laneGroupInfo.enemiesKnown.length < 2) {
-      const rawTerm = computeBlindSafety(c, enemySlots, enemyPairIdx, p0, config);
+    // --- Layer 5: blind safety (blind pick or lane enemies still unknown) ---
+    let blindDeltaPp: number | null = null;
+    if (input.blindPick || !laneEnemiesKnown) {
+      const unknownLaneRoles = laneGroup.enemies.filter(
+        (role) => !laneGroupInfo.enemiesKnown.includes(role),
+      );
+      const rawTerm = computeBlindSafety(
+        c,
+        unknownLaneRoles,
+        knownChampionSet,
+        data.championIds,
+        data.roleProb,
+        enemyPairIdx,
+        p0,
+        config,
+      );
       if (rawTerm !== 0) {
-        const term = config.s * rawTerm;
-        const dPp = deltaPp(logOdds, term);
+        const term = W_BLIND * rawTerm;
+        blindDeltaPp = deltaPp(logOdds, term);
         logOdds += term;
-        blindDelta = { term: rawTerm, deltaPp: dPp };
       }
     }
 
-    // --- Compute final score ---
-    const score = sigmoid(logOdds);
-
-    // --- Build reasons ---
     const reasons = buildReasons(
-      c,
-      pairDeltas,
-      laneVsDelta,
-      laneFullDelta,
-      compResult,
-      compDelta,
-      blindDelta,
-      laneGroupInfo,
+      {
+        pairDeltas: pairInfo.deltas,
+        laneVs: laneVsDelta,
+        laneFull: laneFullDelta,
+        compDeltaPp,
+        blindDeltaPp,
+        laneGroupInfo,
+      },
       config,
     );
 
-    // --- Build warnings ---
-    const warnings: string[] = [];
-    if (isOffRole) {
-      warnings.push('offRole');
-    }
+    const warnings = [
+      ...(isOffRole ? ['offRole'] : []),
+      ...hardCounterWarnings(c, enemySlots, enemyPairIdx, p0, config),
+    ];
 
-    // Check for hard counters from known enemies
-    for (const enemy of enemySlots) {
-      const pairData = enemyPairIdx.get(makePairKey(c, enemy.championId, enemy.role, myRole));
-      if (pairData && pairData.gamesE > 0 && pairData.winsE / pairData.gamesE < 0.3) {
-        warnings.push(`countered by enemy ${enemy.role} ${enemy.championId}`);
-      }
-    }
-
-    scored.push({
-      championId: c,
-      score,
-      logOdds,
-      reasons,
-      baselineNEff: nE,
-      baselineRawGames: Math.round(baseRow.gamesW),
-      baselineWinsE: winsE,
-      baselineGamesE: gamesE,
-      p0,
-      offRole: isOffRole,
-      warnings,
-    });
+    scored.push({ championId: c, score: sigmoid(logOdds), reasons, baselineNEff: nE, warnings });
   }
 
   // --- Sort and rank ---
@@ -386,24 +285,9 @@ export function recommend(
     return a.championId - b.championId;
   });
 
-  const recommendations: Recommendation[] = sorted.map((s, i) => ({
-    championId: s.championId,
-    score: s.score,
-    rank: i + 1,
-    reasons: s.reasons.map((r) => ({
-      type: r.type,
-      with: r.with.length > 0 ? r.with : undefined,
-      level: r.level,
-      deltaPp: Math.round(r.deltaPp * 100) / 100,
-      n: Math.round(r.n),
-      lowData: r.lowData,
-    })),
-    reliability: {
-      games: s.baselineNEff,
-      lowData: isLowData(s.baselineNEff, config.minGames),
-    },
-    warnings: s.warnings,
-  }));
+  const recommendations: Recommendation[] = sorted.map((s, i) =>
+    toRecommendation(s, i + 1, config),
+  );
 
   // --- Pool recommendations ---
   let poolRecommendations: Recommendation[] | undefined;
@@ -413,19 +297,17 @@ export function recommend(
     poolRecommendations = [];
     poolUnavailable = [];
 
-    const champIdSet = new Set(data.championIds);
-
     // poolUnavailable: check pool champions not in championIds
     for (const pid of pool) {
       if (knownChampionSet.has(pid)) continue;
-      if (!champIdSet.has(pid)) {
+      if (!championIdSet.has(pid)) {
         poolUnavailable.push({ championId: pid, reason: 'unknownChampion' });
       }
     }
 
     // Check pool champions in insufficientData
     for (const pid of pool) {
-      if (!champIdSet.has(pid)) continue;
+      if (!championIdSet.has(pid)) continue;
       if (!scored.some((s) => s.championId === pid)) {
         const insuff = insufficientData.find((i) => i.championId === pid);
         if (insuff) {
@@ -441,25 +323,7 @@ export function recommend(
       if (!s) continue;
       if (poolSet.has(s.championId)) {
         poolRank++;
-        poolRecommendations.push({
-          championId: s.championId,
-          score: s.score,
-          rank: i + 1,
-          poolRank,
-          reasons: s.reasons.map((r) => ({
-            type: r.type,
-            with: r.with.length > 0 ? r.with : undefined,
-            level: r.level,
-            deltaPp: Math.round(r.deltaPp * 100) / 100,
-            n: Math.round(r.n),
-            lowData: r.lowData,
-          })),
-          reliability: {
-            games: s.baselineNEff,
-            lowData: isLowData(s.baselineNEff, config.minGames),
-          },
-          warnings: s.warnings,
-        });
+        poolRecommendations.push(toRecommendation(s, i + 1, config, poolRank));
       }
     }
   }
@@ -472,369 +336,3 @@ export function recommend(
   };
 }
 
-// --- Index builders ---
-
-interface BaselineRow {
-  readonly winsW: number;
-  readonly gamesW: number;
-  readonly gamesW2: number;
-  readonly winsE: number;
-  readonly gamesE: number;
-  readonly nE: number;
-}
-
-function indexBaselines(
-  baselines: BaselineTable,
-  bucket: RankBucket,
-): Map<ChampionId, BaselineRow> {
-  const map = new Map<ChampionId, BaselineRow>();
-  for (const row of baselines) {
-    const [c, rowBucket, winsW, gamesW, gamesW2] = row;
-    if (rowBucket !== bucket) continue;
-    const nE = nEff(gamesW, gamesW2);
-    const { winsE, gamesE } = toEquivalentCounts(winsW, gamesW, gamesW2);
-    map.set(c, { winsW, gamesW, gamesW2, winsE, gamesE, nE });
-  }
-  return map;
-}
-
-interface PairRow {
-  readonly winsW: number;
-  readonly gamesW: number;
-  readonly gamesW2: number;
-  readonly winsE: number;
-  readonly gamesE: number;
-  readonly nE: number;
-}
-
-function indexAllyPairs(allyPairs: AllyPairTable, bucket: RankBucket): Map<string, PairRow> {
-  const map = new Map<string, PairRow>();
-  for (const row of allyPairs) {
-    const [c, allyId, role, rowBucket, winsW, gamesW, gamesW2] = row;
-    if (rowBucket !== bucket) continue;
-    const nE = nEff(gamesW, gamesW2);
-    const { winsE, gamesE } = toEquivalentCounts(winsW, gamesW, gamesW2);
-    map.set(makePairKey(c, allyId, role, null), { winsW, gamesW, gamesW2, winsE, gamesE, nE });
-  }
-  return map;
-}
-
-function indexEnemyPairs(enemyPairs: EnemyPairTable, bucket: RankBucket): Map<string, PairRow> {
-  const map = new Map<string, PairRow>();
-  for (const row of enemyPairs) {
-    const [c, enemyId, role, rowBucket, winsW, gamesW, gamesW2] = row;
-    if (rowBucket !== bucket) continue;
-    const nE = nEff(gamesW, gamesW2);
-    const { winsE, gamesE } = toEquivalentCounts(winsW, gamesW, gamesW2);
-    map.set(makePairKey(c, enemyId, role, null), { winsW, gamesW, gamesW2, winsE, gamesE, nE });
-  }
-  return map;
-}
-
-interface LaneRow {
-  readonly winsW: number;
-  readonly gamesW: number;
-  readonly gamesW2: number;
-  readonly winsE: number;
-  readonly gamesE: number;
-  readonly nE: number;
-}
-
-function indexLaneVs(laneVs: LaneVsTable, bucket: RankBucket): Map<string, LaneRow> {
-  const map = new Map<string, LaneRow>();
-  for (const row of laneVs) {
-    const [c, opp1, opp2, rowBucket, winsW, gamesW, gamesW2] = row;
-    if (rowBucket !== bucket) continue;
-    const nE = nEff(gamesW, gamesW2);
-    const { winsE, gamesE } = toEquivalentCounts(winsW, gamesW, gamesW2);
-    const key = makeLaneVsKey(c, opp1, opp2 ?? -1);
-    map.set(key, { winsW, gamesW, gamesW2, winsE, gamesE, nE });
-  }
-  return map;
-}
-
-function indexLaneFull(laneFull: LaneFullTable, bucket: RankBucket): Map<string, LaneRow> {
-  const map = new Map<string, LaneRow>();
-  for (const row of laneFull) {
-    const [c, partner, opp1, opp2, rowBucket, winsW, gamesW, gamesW2] = row;
-    if (rowBucket !== bucket) continue;
-    const nE = nEff(gamesW, gamesW2);
-    const { winsE, gamesE } = toEquivalentCounts(winsW, gamesW, gamesW2);
-    const key = makeLaneFullKey(c, partner ?? -1, opp1, opp2 ?? -1);
-    map.set(key, { winsW, gamesW, gamesW2, winsE, gamesE, nE });
-  }
-  return map;
-}
-
-// --- Key helpers ---
-
-function makePairKey(c: ChampionId, other: ChampionId, role: Role, _myRole: Role | null): string {
-  return `${c}:${other}:${role}`;
-}
-
-/** Key for lane_vs lookups: championId + opponent IDs in lane-group role order. */
-function makeLaneVsKey(c: ChampionId, opp1: ChampionId, opp2: ChampionId): string {
-  return `${c}:${opp1}:${opp2}`;
-}
-
-/** Key for lane_full lookups: championId + partner + opponents in role order. */
-function makeLaneFullKey(
-  c: ChampionId,
-  partner: ChampionId,
-  opp1: ChampionId,
-  opp2: ChampionId,
-): string {
-  return `${c}:${partner}:${opp1}:${opp2}`;
-}
-
-// --- Lane group resolution ---
-
-interface LaneGroupInfo {
-  readonly allies: KnownSlot[];
-  readonly enemies: KnownSlot[];
-  readonly alliesKnown: Role[];
-  readonly enemiesKnown: Role[];
-  readonly confidence: number;
-}
-
-function computeLaneGroup(
-  laneGroup: LaneGroup,
-  allySlots: KnownSlot[],
-  enemySlots: KnownSlot[],
-): LaneGroupInfo {
-  const allyLg = allySlots.filter((s) => laneGroup.allies.includes(s.role));
-  const enemyLg = enemySlots.filter((s) => laneGroup.enemies.includes(s.role));
-
-  // Sort to canonical role order defined in laneGroup
-  const alliesSorted = allyLg
-    .slice()
-    .sort((a, b) => laneGroup.allies.indexOf(a.role) - laneGroup.allies.indexOf(b.role));
-  const enemiesSorted = enemyLg
-    .slice()
-    .sort((a, b) => laneGroup.enemies.indexOf(a.role) - laneGroup.enemies.indexOf(b.role));
-
-  const allyRoles = alliesSorted.map((s) => s.role);
-  const enemyRoles = enemiesSorted.map((s) => s.role);
-
-  let conf = 1;
-  for (const s of [...alliesSorted, ...enemiesSorted]) {
-    conf *= s.confidence;
-  }
-
-  return {
-    allies: alliesSorted,
-    enemies: enemiesSorted,
-    alliesKnown: allyRoles,
-    enemiesKnown: enemyRoles,
-    confidence: conf,
-  };
-}
-
-// --- Pair scoring ---
-
-interface PairScoreInfo {
-  readonly sum: number;
-  readonly deltas: PairDelta[];
-}
-
-interface PairDelta {
-  readonly side: 'ally' | 'enemy';
-  readonly role: Role;
-  readonly championId: ChampionId;
-  readonly confidence: number;
-  readonly influence: number;
-  readonly term: number;
-  readonly lowData: boolean;
-  readonly n: number;
-  readonly deltaPp: number;
-}
-
-function scorePairs(
-  c: ChampionId,
-  myRole: Role,
-  allySlots: KnownSlot[],
-  enemySlots: KnownSlot[],
-  allyIdx: Map<string, PairRow>,
-  enemyIdx: Map<string, PairRow>,
-  p0: number,
-  config: RankWeightingConfig,
-): PairScoreInfo {
-  const allSlots = [
-    ...allySlots.map((s) => ({ ...s, side: 'ally' as const })),
-    ...enemySlots.map((s) => ({ ...s, side: 'enemy' as const })),
-  ];
-
-  // Sort by descending influence; tie-break by championId ascending (SPECS §5, TICKETS.md T-026)
-  const sorted = allSlots
-    .map((s) => ({
-      slot: s,
-      influence: getInfluence(myRole, s.side, s.role, 'draft', config),
-    }))
-    .filter((entry) => entry.influence > 0)
-    .sort((a, b) => b.influence - a.influence || a.slot.championId - b.slot.championId);
-
-  const deltas: PairDelta[] = [];
-  let sum = 0;
-  let xRunning = logit(p0, config.eps);
-
-  for (const { slot, influence } of sorted) {
-    const key = makePairKey(c, slot.championId, slot.role, myRole);
-    const idx = slot.side === 'ally' ? allyIdx : enemyIdx;
-    const row = idx.get(key);
-    if (!row) continue;
-
-    const { winsE, gamesE, nE } = row;
-    const result = scorePair(winsE, gamesE, p0, config);
-
-    const term = result.term;
-    const lowData = result.lowData;
-    const weightedTerm = config.s * slot.confidence * influence * term;
-    const dPp = deltaPp(xRunning, weightedTerm);
-
-    sum += slot.confidence * influence * term;
-    xRunning += weightedTerm;
-
-    deltas.push({
-      side: slot.side,
-      role: slot.role,
-      championId: slot.championId,
-      confidence: slot.confidence,
-      influence,
-      term,
-      lowData,
-      n: nE,
-      deltaPp: dPp,
-    });
-  }
-
-  return { sum, deltas };
-}
-
-// --- Blind safety ---
-
-function computeBlindSafety(
-  c: ChampionId,
-  enemySlots: KnownSlot[],
-  enemyIdx: Map<string, PairRow>,
-  p0: number,
-  config: RankWeightingConfig,
-): number {
-  let sum = 0;
-  let count = 0;
-  let minTerm = Infinity;
-
-  for (const enemy of enemySlots) {
-    const key = makePairKey(c, enemy.championId, enemy.role, null);
-    const row = enemyIdx.get(key);
-    if (row) {
-      const { winsE: we, gamesE: ge } = row;
-      const result = scorePair(we, ge, p0, config);
-      sum += result.term;
-      count++;
-      if (result.term < minTerm) minTerm = result.term;
-    }
-  }
-
-  if (count === 0) return 0;
-
-  return sum / count + (minTerm === Infinity ? 0 : minTerm * 0.5);
-}
-
-function toReasonLevel(levelNum: number): ReasonLevel | undefined {
-  if (
-    levelNum === -3 ||
-    levelNum === -2 ||
-    levelNum === -1 ||
-    levelNum === 1 ||
-    levelNum === 2 ||
-    levelNum === 3
-  ) {
-    return levelNum;
-  }
-  return undefined;
-}
-
-// --- Reason builder ---
-
-function buildReasons(
-  _c: ChampionId,
-  pairDeltas: PairDelta[],
-  laneVsDelta: { term: number; lowData: boolean; n: number; deltaPp: number } | null,
-  laneFullDelta: { term: number; lowData: boolean; n: number; deltaPp: number } | null,
-  compResult: { bonus: number; reasons: readonly string[]; filled: readonly CompNeedCategory[] },
-  compDelta: { bonus: number; deltaPp: number } | null,
-  blindDelta: { term: number; deltaPp: number } | null,
-  laneGroupInfo: LaneGroupInfo,
-  config: RankWeightingConfig,
-): ReasonAccumulator[] {
-  const reasons: ReasonAccumulator[] = [];
-
-  // 1. Pairs (synergies and counters) in descending order of influence (ties by championId ascending)
-  for (const d of pairDeltas) {
-    const level = toReasonLevel(levelFromConfig(d.deltaPp, d.n, config));
-    reasons.push({
-      type: d.side === 'ally' ? 'synergy' : 'counter',
-      with: [d.championId],
-      deltaPp: d.deltaPp,
-      n: d.n,
-      lowData: d.lowData,
-      level,
-    });
-  }
-
-  // 2. Lane Vs
-  if (laneVsDelta) {
-    const level = toReasonLevel(levelFromConfig(laneVsDelta.deltaPp, laneVsDelta.n, config));
-    reasons.push({
-      type: 'lane',
-      with: laneGroupInfo.enemies.map((s) => s.championId),
-      deltaPp: laneVsDelta.deltaPp,
-      n: laneVsDelta.n,
-      lowData: laneVsDelta.lowData,
-      level,
-    });
-  }
-
-  // 3. Lane Full
-  if (laneFullDelta) {
-    const level = toReasonLevel(levelFromConfig(laneFullDelta.deltaPp, laneFullDelta.n, config));
-    reasons.push({
-      type: 'lane',
-      with: [
-        ...laneGroupInfo.allies.map((s) => s.championId),
-        ...laneGroupInfo.enemies.map((s) => s.championId),
-      ],
-      deltaPp: laneFullDelta.deltaPp,
-      n: laneFullDelta.n,
-      lowData: laneFullDelta.lowData,
-      level,
-    });
-  }
-
-  // 4. Comp needs
-  if (compResult.filled.length > 0 && compDelta) {
-    const level = toReasonLevel(levelFromConfig(compDelta.deltaPp, 0, config));
-    reasons.push({
-      type: 'comp',
-      with: [],
-      deltaPp: compDelta.deltaPp,
-      n: 0,
-      lowData: false,
-      level,
-    });
-  }
-
-  // 5. Blind safety
-  if (blindDelta !== null && blindDelta.term !== 0) {
-    reasons.push({
-      type: 'blind',
-      with: [],
-      deltaPp: blindDelta.deltaPp,
-      n: 0,
-      lowData: false,
-      level: undefined,
-    });
-  }
-
-  return reasons;
-}

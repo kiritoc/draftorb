@@ -751,6 +751,80 @@ describe('recommend: reasons', () => {
   });
 });
 
+describe('recommend: review regressions', () => {
+  it('TOP with known enemy and blindPick=false emits no blind reason', () => {
+    const roleProb = {
+      '1': { TOP: 1.0 },
+      '2': { TOP: 1.0 },
+      '300': { TOP: 1.0 },
+    } as ChampionRoleProbabilities;
+    const enemyPairs = makeEnemyPairs([
+      { championId: 1, enemyId: 300, role: 'TOP', ...HIGH_GAMES, winsW: 10 },
+    ]);
+    const data = makeData({ champions: [1, 2, 300], roleProb, enemyPairs });
+    const input = makeInput({ userRole: 'TOP', enemies: [{ championId: 300, role: 'TOP' }] });
+    const result = recommend(input, data);
+    for (const rec of result.recommendations) {
+      expect(rec.reasons.some((r) => r.type === 'blind')).toBe(false);
+    }
+  });
+
+  it('blind safety does not re-score a known enemy', () => {
+    const roleProb = {
+      '1': { SUPPORT: 1.0 },
+      '200': { SUPPORT: 1.0 },
+    } as ChampionRoleProbabilities;
+    const enemyPairs = makeEnemyPairs([
+      { championId: 1, enemyId: 200, role: 'SUPPORT', ...HIGH_GAMES, winsW: 10 },
+    ]);
+    const data = makeData({ champions: [1, 200], roleProb, enemyPairs });
+    const input = makeInput({ enemies: [{ championId: 200, role: 'SUPPORT' }] });
+    const rec = recommend(input, data).recommendations[0];
+    expect(rec?.reasons.some((r) => r.type === 'blind')).toBe(false);
+  });
+
+  it('blind safety ranks by unseen likely opponents', () => {
+    const roleProb = {
+      '1': { SUPPORT: 1.0 },
+      '2': { SUPPORT: 1.0 },
+      '201': { ADC: 1.0 },
+    } as ChampionRoleProbabilities;
+    const enemyPairs = makeEnemyPairs([
+      { championId: 1, enemyId: 201, role: 'ADC', ...HIGH_GAMES, winsW: 10 },
+      { championId: 2, enemyId: 201, role: 'ADC', ...HIGH_GAMES, winsW: 40 },
+    ]);
+    const data = makeData({ champions: [1, 2, 201], roleProb, enemyPairs });
+    const result = recommend(makeInput({ blindPick: true }), data);
+    expect(result.recommendations.map((r) => r.championId)).toEqual([2, 1]);
+    expect(result.recommendations[0]?.reasons.some((r) => r.type === 'blind')).toBe(true);
+  });
+
+  it('unknown pool id with a baseline row is never scored', () => {
+    const data = makeData({ champions: [1, 2], baselines: makeBaselines([1, 2, 999]) });
+    const result = recommend(makeInput({ pool: [999] }), data);
+    expect(result.recommendations.some((r) => r.championId === 999)).toBe(false);
+    expect(result.poolUnavailable?.[0]?.reason).toBe('unknownChampion');
+  });
+
+  it('keeps fixed-role allies when a teammate has no roleProb', () => {
+    const roleProb = {
+      '1': { SUPPORT: 1.0 },
+      '2': { SUPPORT: 1.0 },
+      '10': { ADC: 1.0, SUPPORT: 1.0 },
+    } as ChampionRoleProbabilities;
+    const allyPairs = makeAllyPairs([
+      { championId: 2, allyId: 10, role: 'ADC', ...HIGH_GAMES, winsW: 45 },
+    ]);
+    const data = makeData({ champions: [1, 2, 10, 77], roleProb, allyPairs });
+    const input = makeInput({ allies: [{ championId: 10, role: 'ADC' }, { championId: 77 }] });
+    const result = recommend(input, data);
+    const ids = result.recommendations.map((r) => r.championId);
+    expect(ids).not.toContain(10);
+    expect(ids).not.toContain(77);
+    expect(ids[0]).toBe(2);
+  });
+});
+
 describe('recommend: determinism', () => {
   it('same input produces identical output', () => {
     const champions: ChampionId[] = [1, 2, 3];

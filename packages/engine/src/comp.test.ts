@@ -3,7 +3,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { computeCompNeed, teamMissingNeeds, DEFAULT_COMP_CONFIG } from './comp.js';
+import { computeCompNeed, teamMissingNeeds } from './comp.js';
+import { DEFAULT_COMP_CONFIG } from './config.js';
 import type { ChampionId, ChampionTags, ChampionTagsMap } from '@draftorb/shared';
 
 function makeTags(entries: Record<number, Partial<ChampionTags>>): ChampionTagsMap {

@@ -1,0 +1,69 @@
+/**
+ * @draftorb/engine — Shared internal types for the recommendation engine.
+ */
+
+import type { ChampionId, ReasonLevel, Role } from '@draftorb/shared';
+
+/** A known slot augmented with its inferred role and confidence. */
+export interface KnownSlot {
+  readonly championId: ChampionId;
+  readonly role: Role;
+  readonly side: 'ally' | 'enemy';
+  readonly confidence: number;
+  readonly fixed: boolean;
+}
+
+/** Equivalent-count row built from an exported table (SPECS §5). */
+export interface DataRow {
+  readonly winsW: number;
+  readonly gamesW: number;
+  readonly gamesW2: number;
+  readonly winsE: number;
+  readonly gamesE: number;
+  readonly nE: number;
+}
+
+/** Accumulator for reasons during scoring, before the final Reason is produced. */
+export interface ReasonAccumulator {
+  readonly type: 'synergy' | 'counter' | 'lane' | 'comp' | 'blind';
+  readonly with: ChampionId[];
+  readonly deltaPp: number;
+  readonly n: number;
+  readonly lowData: boolean;
+  readonly level: ReasonLevel | undefined;
+}
+
+/** A lane-layer correction (lane_vs or lane_full). */
+export interface LaneDelta {
+  readonly term: number;
+  readonly lowData: boolean;
+  readonly n: number;
+  readonly deltaPp: number;
+}
+
+/**
+ * Lane group configuration (SPECS §5, D-021).
+ * - SUPPORT/ADC: bot lane (ally partner + 2 enemies)
+ * - TOP/MID/JUNGLE: 1v1 (lane_full skipped)
+ */
+export interface LaneGroup {
+  readonly allies: Role[];
+  readonly enemies: Role[];
+  readonly oneToOne: boolean;
+}
+
+export const LANE_GROUPS: Record<Role, LaneGroup> = {
+  SUPPORT: { allies: ['ADC'], enemies: ['SUPPORT', 'ADC'], oneToOne: false },
+  ADC: { allies: ['SUPPORT'], enemies: ['ADC', 'SUPPORT'], oneToOne: false },
+  TOP: { allies: [], enemies: ['TOP'], oneToOne: true },
+  MID: { allies: [], enemies: ['MID'], oneToOne: true },
+  JUNGLE: { allies: [], enemies: ['JUNGLE'], oneToOne: true },
+};
+
+export interface LaneGroupInfo {
+  readonly allies: KnownSlot[];
+  readonly enemies: KnownSlot[];
+  readonly alliesKnown: Role[];
+  readonly enemiesKnown: Role[];
+  readonly confidence: number;
+}

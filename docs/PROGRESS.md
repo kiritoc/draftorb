@@ -3,21 +3,21 @@
 ## Current status
 
 - Phase: 1 (Support / Diamond)
-- Current milestone: M0 Foundations (T-002.b DONE) and M1 ETL (in progress: T-014 DONE; T-015 DONE; T-016 DONE; T-017..T-019 TODO) -> M2 Engine (T-020..T-023 DONE)
+- Current milestone: M0 Foundations (T-002.b DONE) and M1 ETL (in progress: T-014 DONE; T-015/T-015.b DONE; T-016 DONE; T-017..T-019 TODO) -> M2 Engine (T-020..T-023 DONE)
 - Last updated: 2026-10-31 by Antigravity
 
 ## Epic status
 
-| Epic           | Status      | Notes                                                                                                    |
-| -------------- | ----------- | -------------------------------------------------------------------------------------------------------- |
-| E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b DONE                                                                          |
-| E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e, T-014, T-015 DONE; T-016..T-019 TODO |
-| E2 Engine      | IN PROGRESS | T-020 DONE; T-021 DONE; T-022 DONE; T-023 DONE                                                           |
-| E3 Web MVP     | NOT STARTED |                                                                                                          |
-| E4 Runes       | NOT STARTED |                                                                                                          |
-| E5 Items       | NOT STARTED |                                                                                                          |
-| E6 Live        | NOT STARTED |                                                                                                          |
-| E7 Vision      | NOT STARTED |                                                                                                          |
+| Epic           | Status      | Notes                                                                                                             |
+| -------------- | ----------- | ----------------------------------------------------------------------------------------------------------------- |
+| E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b DONE                                                                                   |
+| E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e, T-014, T-015, T-015.b DONE; T-016..T-019 TODO |
+| E2 Engine      | IN PROGRESS | T-020 DONE; T-021 DONE; T-022 DONE; T-023 DONE                                                                    |
+| E3 Web MVP     | NOT STARTED |                                                                                                                   |
+| E4 Runes       | NOT STARTED |                                                                                                                   |
+| E5 Items       | NOT STARTED |                                                                                                                   |
+| E6 Live        | NOT STARTED |                                                                                                                   |
+| E7 Vision      | NOT STARTED |                                                                                                                   |
 
 ## Data collection status
 
@@ -40,6 +40,21 @@ Earlier handoff (kept for history): B-017 done (engine and shared `"types": []` 
 ---
 
 ## Session log (newest first)
+
+### 2026-10-31 — Antigravity — Ticket T-015.b (Derive champion roles from role probabilities)
+
+- Done:
+  - **`packages/etl/src/derive-roles.ts`** (new): pure `deriveChampionRoles(roleProbabilities)` and `applyDerivedRoles(champions, roleProbabilities)`. Derives each champion's roles from observed role-probability entries (roles with probability > 0, canonical role order), keeping the Data Dragon tag bootstrap for champions without role-prob data (D-032, PROPOSED).
+  - **`packages/etl/src/derive-roles.test.ts`** (new, 8 tests): role derivation (single role, flex canonical order, input order independence, zero-prob exclusion, absent champions, empty map) and `applyDerivedRoles` (observed replaced, unobserved kept, empty map keeps bootstrap).
+  - **`packages/etl/src/ddragon.ts`** (edited): `transformChampions(rawData, roleProbabilities?)` — derived roles when role-prob data is passed, tag-based bootstrap fallback otherwise (backward compatible).
+  - **`packages/etl/src/ddragon.test.ts`** (edited): new test asserting role-prob derived roles override tag roles.
+  - **`packages/etl/src/commands/derive-roles.ts`** (new): `pnpm etl derive-roles [patch]` — reads `role_prob` from the local SQLite DB and rewrites `champions.json.roles` for `data/public/<patch>/champions.json` (tag bootstrap kept for unobserved champions); prints "no database at <path>" and exits 0 when the DB is missing; `DRAFTORB_PUBLIC_DIR` overrides the public data dir.
+  - **`packages/etl/src/commands/derive-roles.test.ts`** (new, 7 tests): missing DB, malformed patch, too many args, full rewrite + bootstrap fallback, empty `role_prob` leaves roles unchanged, missing `champions.json`, explicit patch argument.
+  - **`packages/etl/src/cli.ts`** (edited): registered `deriveRolesCommand`.
+  - **`packages/etl/src/index.ts`** (edited): exports `deriveChampionRoles` and `applyDerivedRoles`.
+  - **`docs/DECISIONS.md`** (edited): D-032 (PROPOSED) records the decision to keep `champions.json.roles` (required by the shared contract and DATA_MODEL.md) and derive its contents from role-prob where observed data exists.
+- Tests: `pnpm check` green (typecheck, lint: 0 errors, format: 0 errors; 618 tests across 44 files). No new bugs identified.
+- State left: **DONE (T-015.b)**. Next ETL ticket: T-017 (Aggregate pair tables, depends on T-016,T-011.b).
 
 ### 2026-10-31 — Antigravity — Ticket T-016 (Aggregate baselines)
 

@@ -274,6 +274,13 @@ Accepted by the owner on 2026-10-31. SPECS §5/§7 text derived from this decisi
 - Consequences: with gaps in the collected data, older patches decay less than real time would suggest. T-017 pair aggregation must use the same indexing so baselines and pairs stay consistent.
 - Owner decision 2026-10-31.
 
+### D-034 — Champion roles derived from role-prob data, `champions.json.roles` kept — PROPOSED
+
+- Context: `TICKETS.md` T-015.b says "replace the Data Dragon champion-tag bootstrap roles with roles derived from `role-prob.json`; remove `champions.json.roles`." However `championSchema.roles` is required (SPECS/shared), `champions.json` is documented as `id, name, icon, roles` in `DATA_MODEL.md`, and the tag-coverage validation (`packages/etl/src/tags.ts`) reads `champion.roles`. `role-prob.json` itself is not produced until T-019, so T-015.b can only derive roles from the SQLite `role_prob` table produced by T-015.
+- Assumption (T-015.b): keep `champions.json.roles` as a required field, but replace its source where observed data exists: roles are derived from `role_prob` (roles with observed probability, canonical order), falling back to the Data Dragon tag bootstrap for champions without role-prob data. Add a pure, tested `deriveChampionRoles` function and a `derive-roles` ETL command that rewrites `champions.json.roles` from `role_prob`. The Data Dragon tag mapping stays as the fallback and remains covered by its existing tests.
+- Alternatives: remove `roles` from `champions.json` and the shared schema. Rejected: breaks the shared contract, DATA_MODEL.md, and tag coverage; `role-prob.json` is a separate file that does not yet exist.
+- Consequences: `transformChampions` gains an optional `roleProbabilities` parameter (tag fallback when absent, backward compatible). `champions.json.roles` now reflects observed probabilities once `pnpm etl derive-roles` runs after `pnpm etl aggregate`.
+
 ### Template
 
 ```

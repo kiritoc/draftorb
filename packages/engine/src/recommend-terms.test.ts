@@ -89,6 +89,23 @@ describe('computeBlindSafety', () => {
     ).toBe(0);
   });
 
+  it('adds no worst-case bonus when every matchup is favorable', () => {
+    const goodIdx = indexPairs([[1, 201, 'ADC', 'DIAMOND', 45, 50, 0.1]], 'DIAMOND');
+    const t = termFor(goodIdx, makePairKey(1, 201, 'ADC'));
+    expect(t).toBeGreaterThan(0);
+    const actual = computeBlindSafety(
+      1,
+      ['ADC'],
+      new Set([202]),
+      ids,
+      roleProb,
+      goodIdx,
+      P0,
+      DEFAULT_CONFIG,
+    );
+    expect(actual).toBeCloseTo(t, 12);
+  });
+
   it('returns 0 when no champion can play the unseen role', () => {
     expect(computeBlindSafety(1, ['TOP'], new Set(), ids, roleProb, idx, P0, DEFAULT_CONFIG)).toBe(
       0,

@@ -45,7 +45,7 @@ Earlier handoff (kept for history): B-017 done (engine and shared `"types": []` 
 
 - Done:
   - **`packages/engine/src/recommend.ts`** (new): pure, deterministic recommendation engine implementing SPECS §5-7 for any `myRole`:
-    - Candidate enumeration via `roleProb >= ROLE_PROB_THRESHOLD` (0.05), plus user pool champions (D-024).
+    - Candidate enumeration via `roleProb >= rc.roleProbThreshold` (`DEFAULT_RECOMMEND_CONFIG`, default 0.05), plus user pool champions (D-024).
     - Baseline gate: excludes candidates with baseline `n_eff < minGames`, routing them to `insufficientData`.
     - Layer 1 (pairs): allies and enemies sorted by descending role influence with ties broken by ascending champion ID (SPECS §5, TICKETS.md T-026), shrunk toward `p0` with prior strength `k`.
     - Layer 2 (`lane_vs`): bot lane (SUPPORT/ADC) shrinks toward pair predictions `q = sigmoid(x)` once lane enemies are known; 1v1 lane groups (TOP, MID, JUNGLE) score 1v1 matchup.
@@ -56,7 +56,7 @@ Earlier handoff (kept for history): B-017 done (engine and shared `"types": []` 
     - Pool contract (D-024): `recommendations` is the complete overall ranking; `poolRecommendations` retains exact global rank and sequential `poolRank`; pool champions never modify candidate scores; missing baseline data maps to `poolUnavailable` (`insufficientData`) and `insufficientData`; unknown champion IDs map to `poolUnavailable` (`unknownChampion`); below-threshold pool picks receive `offRole` warning.
   - **`packages/engine/src/comp.ts`** and **`packages/engine/src/comp.test.ts`** (new): composition needs scoring from champion tags (engage, peel, waveclear, poke, damage balance).
   - **`packages/engine/src/golden.test.ts`** (new): pure golden test runner loading fixtures from `packages/engine/test/golden/*.json`.
-  - **Golden test fixtures** (8 scenarios in `packages/engine/test/golden/`):
+  - **Golden test fixtures** (12 scenarios in `packages/engine/test/golden/`; the 4 added in the owner review pass are listed below):
     - `ally_adc_synergy.json`: ally ADC pair synergy dominating recommendation.
     - `blind_pick_safe_supports.json`: blind pick mode with baseline and comp evaluation.
     - `enemy_counter.json`: enemy counter pick penalizing unfavorable matchup.
@@ -77,8 +77,8 @@ Earlier handoff (kept for history): B-017 done (engine and shared `"types": []` 
   - `packages/engine/test/golden/*.json` (8 fixtures)
   - `docs/TICKETS.md` (updated T-023 to DONE)
   - `docs/PROGRESS.md` (updated)
-- Tests: `pnpm check` green before the final review pass (25 files, 447 tests). The final pass adds 12 engine tests (5 review-gap tests plus 3 more in `packages/engine/src/recommend.test.ts` and 4 in the new `packages/engine/src/recommend-terms.test.ts`) and scales the hard-counter warning by influence; re-run `pnpm check` to confirm the new count.
-  - Owner review pass (2026-10-31, D-030 items 10-14): `RecommendData` moved to `@draftorb/shared`; recommendation weights, thresholds and lane groups now come from an injectable `RecommendConfig` (`DEFAULT_RECOMMEND_CONFIG`), the 4th argument of `recommend` (replaces `compConfig`; B-027 fixed); hard-counter warnings reuse the counter reason `deltaPp`; exact score ordering; `reliability.games` renamed `reliability.nEff`; `CompNeedResult.reasons` removed (codes only); duplicate championIds per team deduplicated. New golden fixtures: `adc_bot_lane_full`, `mid_lane_1v1_matchup`, `jungle_counter_and_lane`, `support_lane_full_decides` (12 total). Baseline before this pass: 31 files, 523 tests; re-run `pnpm check` to record the new count.
+- Tests: `pnpm check` green before the final review pass (25 files, 447 tests). The final pass adds 12 engine tests (5 review-gap tests plus 3 more in `packages/engine/src/recommend.test.ts` and 4 in the new `packages/engine/src/recommend-terms.test.ts`) and scales the hard-counter warning by influence.
+  - Owner review pass (2026-10-31, D-030 items 10-14): `RecommendData` moved to `@draftorb/shared`; recommendation weights, thresholds and lane groups now come from an injectable `RecommendConfig` (`DEFAULT_RECOMMEND_CONFIG`), the 4th argument of `recommend` (replaces `compConfig`; B-027 fixed); hard-counter warnings reuse the counter reason `deltaPp`; exact score ordering; `reliability.games` renamed `reliability.nEff`; `CompNeedResult.reasons` removed (codes only); duplicate championIds per team deduplicated. New golden fixtures: `adc_bot_lane_full`, `mid_lane_1v1_matchup`, `jungle_counter_and_lane`, `support_lane_full_decides` (12 total). Baseline before this pass: 31 files, 523 tests. Final state: `pnpm check` green in CI (test on ubuntu-latest and windows-latest, lint, format); the follow-up pass adds `packages/engine/src/recommend-edge.test.ts`.
 - State left: **DONE (T-023)**.
 - Next step: T-024 (Blind pick mode) or T-025 (Comp needs) or T-015 (Aggregate role probabilities in ETL).
 

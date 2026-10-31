@@ -19,10 +19,19 @@ export function resolveKnownSlots(
   side: 'ally' | 'enemy',
   roleProb: ChampionRoleProbabilities,
 ): KnownSlot[] {
-  // A champion can only be picked once per team: keep the first occurrence so
-  // lookups by championId below are unambiguous.
+  // A champion can only be picked once per team: keep one copy per championId
+  // so lookups below are unambiguous. A fixed-role copy wins over an unfixed
+  // one (an explicit role is stronger evidence), otherwise the first is kept.
+  const fixedIds = new Set<ChampionId>(
+    slots.filter((s) => s.role !== undefined).map((s) => s.championId),
+  );
   const seen = new Set<ChampionId>();
-  slots = slots.filter((s) => (seen.has(s.championId) ? false : (seen.add(s.championId), true)));
+  slots = slots.filter((s) => {
+    if (seen.has(s.championId)) return false;
+    if (s.role === undefined && fixedIds.has(s.championId)) return false;
+    seen.add(s.championId);
+    return true;
+  });
   if (slots.length === 0) return [];
   let source: ReadonlyArray<Slot> = slots;
   let resolved: RoleAssignment | null = inferRoles(slots, roleProb);

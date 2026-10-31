@@ -102,6 +102,8 @@ export function computeBlindSafety(
   for (const role of unknownRoles) {
     let shareTotal = 0;
     let weighted = 0;
+    // Starts at 0 on purpose: the worst-case term is a penalty only, so an
+    // all-favorable distribution gets no extra bonus (SPECS §5).
     let minTerm = 0;
     for (const e of championIds) {
       if (e === c || excluded.has(e)) continue;

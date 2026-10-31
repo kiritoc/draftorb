@@ -55,6 +55,13 @@ describe('resolveKnownSlots', () => {
     expect(slots.map((s) => s.championId)).toEqual([201]);
   });
 
+  it('keeps the fixed copy of a duplicated champion even when an unfixed copy comes first', () => {
+    // 999 has no roleProb: only its fixed role can place it.
+    expect(
+      resolveKnownSlots([{ championId: 999 }, { championId: 999, role: 'TOP' }], 'enemy', roleProb),
+    ).toEqual([{ championId: 999, role: 'TOP', side: 'enemy', confidence: 1, fixed: true }]);
+  });
+
   it('drops duplicated fixed roles and keeps unique fixed ones (D-030)', () => {
     const slots = resolveKnownSlots(
       [

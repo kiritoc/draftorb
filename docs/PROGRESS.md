@@ -45,12 +45,14 @@ Earlier handoff (kept for history): B-017 done (engine and shared `"types": []` 
 
 - Done:
   - **`packages/etl/src/aggregate.ts`** (new): `aggregateRoleProb(db)` computes `role_prob` rows from `participants` — per (champion, role): raw `games` count and `prob = games(champion, role) / sum_roles games(champion, role)`; sparse map (only observed pairs); probs sum to 1 per champion; idempotent (clears + rewrites in a transaction).
-  - **`packages/etl/src/commands/aggregate.ts`** (new): `pnpm etl aggregate` CLI command; prints "no database at <path>" and exits 0 when the DB is missing; rewrites `role_prob` in the local DB but never calls the Riot API. Optional `[patch]` argument (defaults to the patch of the most recent stored match); only that patch's participants are counted.
+  - **`packages/etl/src/commands/aggregate.ts`** (new): `pnpm etl aggregate` CLI command; prints "no database at <path>" and exits 0 when the DB is missing; rewrites `role_prob` in the local DB but never calls the Riot API. Optional `[patch]` argument (`major.minor`, malformed → usage error exit 2; defaults to the highest stored patch, numeric compare as in D-017); only that patch's participants are counted (D-031, PROPOSED). A patch with no participants leaves `role_prob` unchanged.
   - **`packages/etl/src/cli.ts`** (edited): registered `aggregateCommand`; removed `aggregate` from `PLANNED_COMMANDS` in `packages/etl/src/commands/shared.ts`.
   - **`packages/etl/src/index.ts`** (edited): exports `aggregateRoleProb` and `RoleProbRow`.
-  - **`packages/etl/src/aggregate.test.ts`** (new, 3 tests): probs sum to 1 per champion (Soraka 10/2 split → 0.833/0.167, Aatrox 4/4 → 1.0), idempotence, empty DB → empty `role_prob`.
+  - **`packages/etl/src/aggregate.test.ts`** (new, 8 tests): probs sum to 1 per champion (Soraka 10/2 split → 0.833/0.167, Aatrox 4/4 → 1.0), idempotence, target-patch filter, empty patch keeps existing rows, malformed patch rejected, numeric `latestPatch`, old-patch-only champion dropped, empty DB → empty `role_prob`.
+  - **`packages/etl/src/commands/aggregate.test.ts`** (new, 4 tests): missing DB message, usage errors (malformed patch, too many args), explicit patch argument.
+  - **`docs/DECISIONS.md`** (edited): D-031 (PROPOSED) records the single-patch choice vs SPECS §3 recency decay.
   - **`docs/SETUP.md`** (edited): `pnpm etl aggregate` moved from Planned to Implemented.
-- Tests: `pnpm vitest run packages/etl` green (16 files, 163 tests); `tsc --build` clean; `eslint` on changed files clean (0 errors).
+- Tests: re-run `pnpm check` after the review fixes (counts above not yet re-measured).
 - State left: **DONE (T-015)**. Next: T-016 (Aggregate baselines).
 
 ### 2026-10-30 — Antigravity — Ticket T-023 (Recommendation engine, role-generic)

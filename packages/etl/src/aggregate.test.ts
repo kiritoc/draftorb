@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { migrate, openDb } from './db';
-import { aggregateRoleProb, type RoleProbRow } from './aggregate';
+import { aggregateRoleProb, latestPatch, type RoleProbRow } from './aggregate';
 
 async function withSeededDb(run: (dbPath: string) => Promise<void>, seed = true): Promise<void> {
   const directory = mkdtempSync(join(tmpdir(), 'draftorb-aggregate-'));
@@ -172,6 +172,80 @@ describe('aggregateRoleProb', () => {
 
         const old = aggregateRoleProb(db, '16.20');
         expect(old).toEqual([{ championId: 266, role: 'MID', games: 1, prob: 1 }]);
+      } finally {
+        db.close();
+      }
+    });
+  });
+
+  it('keeps existing role_prob rows when the target patch has no participants', async () => {
+    await withSeededDb(async (dbPath) => {
+      const db = openDb(dbPath);
+      try {
+        const before = aggregateRoleProb(db);
+        expect(aggregateRoleProb(db, '99.1')).toEqual([]);
+        db.close();
+        expect(openAndRead(dbPath)).toHaveLength(before.length);
+      } finally {
+        if (db.open) db.close();
+      }
+    });
+  });
+
+  it('rejects a malformed patch without touching role_prob', async () => {
+    await withSeededDb(async (dbPath) => {
+      const db = openDb(dbPath);
+      try {
+        aggregateRoleProb(db);
+        expect(() => aggregateRoleProb(db, '16')).toThrow(/Invalid patch/);
+        expect(() => aggregateRoleProb(db, '16.21.1')).toThrow(/Invalid patch/);
+      } finally {
+        db.close();
+      }
+      expect(openAndRead(dbPath)).toHaveLength(3);
+    });
+  });
+
+  it('latestPatch compares major.minor numerically, not by created_at', async () => {
+    await withSeededDb(async (dbPath) => {
+      const db = openDb(dbPath);
+      try {
+        // 16.9 ingested later (newer created_at) must not beat 16.21 / 16.10.
+        const insert = db.prepare(
+          `INSERT INTO matches (
+            match_id, platform, patch, queue_id, duration, created_at, avg_rank_score
+          ) VALUES (?, 'euw1', ?, 420, 1800, 999, 6.5)`,
+        );
+        insert.run('late9', '16.9');
+        expect(latestPatch(db)).toBe('16.21');
+        insert.run('p10', '16.100');
+        expect(latestPatch(db)).toBe('16.100');
+      } finally {
+        db.close();
+      }
+    });
+  });
+
+  it('drops champions whose games are only on older patches', async () => {
+    await withSeededDb(async (dbPath) => {
+      const db = openDb(dbPath);
+      try {
+        db.prepare(
+          `INSERT INTO matches (
+            match_id, platform, patch, queue_id, duration, created_at, avg_rank_score
+          ) VALUES ('old2', 'euw1', '16.20', 420, 1800, 0, 6.5)`,
+        ).run();
+        db.prepare(
+          `INSERT INTO participants (
+            match_id, puuid, team_id, champion_id, role, win, rank_score,
+            champion_games, mastery_points, is_expert, keystone, primary_style,
+            sub_style, perks_json, items_json, kills, deaths, assists
+          ) VALUES (
+            'old2', 'old', 100, 99, 'MID', 1, null, 0, NULL, NULL, 8439, 8400, 8300, '{}', '[]', 0, 0, 0
+          )`,
+        ).run();
+        const rows = aggregateRoleProb(db);
+        expect(rows.find((r) => r.championId === 99)).toBeUndefined();
       } finally {
         db.close();
       }

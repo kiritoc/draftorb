@@ -3,7 +3,8 @@ import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 import { resolveRepoRoot } from '../config/paths';
-import { aggregateRoleProb } from '../aggregate';
+import { aggregateRoleProb, PATCH_PATTERN } from '../aggregate';
+import { UsageError } from '../cli-args';
 import { parsePositionals, type Command } from './shared';
 
 function resolveDbPath(): string {
@@ -13,6 +14,9 @@ function resolveDbPath(): string {
 
 async function runAggregate(args: string[]): Promise<void> {
   const [patch] = parsePositionals(args, 1, 'aggregate [patch]');
+  if (patch !== undefined && !PATCH_PATTERN.test(patch)) {
+    throw new UsageError(`Invalid patch "${patch}". Expected a format like "16.21".`);
+  }
   const dbPath = resolveDbPath();
 
   if (!existsSync(dbPath)) {
@@ -23,6 +27,12 @@ async function runAggregate(args: string[]): Promise<void> {
   const db = new Database(dbPath);
   try {
     const rows = aggregateRoleProb(db, patch);
+    if (rows.length === 0) {
+      console.log(
+        `No participants found${patch === undefined ? '' : ` for patch ${patch}`}; role_prob left unchanged.`,
+      );
+      return;
+    }
     console.log(`Aggregated role probabilities: ${rows.length} row(s) written to role_prob.`);
     for (const row of rows) {
       console.log(

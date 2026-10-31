@@ -7,6 +7,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { recommend, type RecommendData } from './recommend.js';
+import { DEFAULT_CONFIG } from './config.js';
 import type {
   AllyPairEntry,
   AllyPairTable,
@@ -1077,5 +1078,104 @@ describe('recommend: review coverage', () => {
       expect(other?.reasons).toEqual(rec.reasons);
     }
     expect(pooled.find((r) => r.championId === 99)?.warnings).toContain('offRole');
+  });
+});
+
+describe('recommend: second review fixes', () => {
+  const botRoleProb = {
+    '1': { SUPPORT: 1.0 },
+    '2': { SUPPORT: 1.0 },
+    '201': { ADC: 1.0 },
+    '202': { ADC: 1.0 },
+  } as ChampionRoleProbabilities;
+
+  it('caps positive blind levels at L1 even when highLevelMinGames equals minGames', () => {
+    const enemyPairs = makeEnemyPairs([
+      { championId: 1, enemyId: 201, role: 'ADC', ...HIGH_GAMES, winsW: 48 },
+    ]);
+    const data = makeData({ champions: [1, 201], roleProb: botRoleProb, enemyPairs });
+    const config = { ...DEFAULT_CONFIG, highLevelMinGames: DEFAULT_CONFIG.minGames };
+    const rec = recommend(makeInput({ blindPick: true }), data, config).recommendations[0];
+    const blind = rec?.reasons.find((r) => r.type === 'blind');
+    expect(blind).toBeDefined();
+    expect(blind?.level).toBe(1);
+  });
+
+  it('keeps negative blind levels when minGames is 0', () => {
+    const enemyPairs = makeEnemyPairs([
+      { championId: 1, enemyId: 201, role: 'ADC', ...HIGH_GAMES, winsW: 5 },
+    ]);
+    const data = makeData({ champions: [1, 201], roleProb: botRoleProb, enemyPairs });
+    const config = { ...DEFAULT_CONFIG, minGames: 0 };
+    const rec = recommend(makeInput({ blindPick: true }), data, config).recommendations[0];
+    expect(rec?.reasons.find((r) => r.type === 'blind')?.level).toBeLessThan(0);
+  });
+
+  it('missing blind matchups are neutral, not ignored', () => {
+    // Candidate 1 has a known bad matchup vs 201 and no data vs 202; the
+    // missing matchup must dilute the expected term rather than be skipped.
+    const enemyPairs = makeEnemyPairs([
+      { championId: 1, enemyId: 201, role: 'ADC', ...HIGH_GAMES, winsW: 10 },
+    ]);
+    const full = makeData({ champions: [1, 201], roleProb: botRoleProb, enemyPairs });
+    const diluted = makeData({ champions: [1, 201, 202], roleProb: botRoleProb, enemyPairs });
+    const blind = (d: RecommendData): number =>
+      recommend(makeInput({ blindPick: true }), d).recommendations[0]?.reasons.find(
+        (r) => r.type === 'blind',
+      )?.deltaPp ?? 0;
+    expect(blind(diluted)).toBeGreaterThan(blind(full));
+  });
+
+  it('deduplicates poolUnavailable entries', () => {
+    const data = makeData({ champions: [1, 2] });
+    const result = recommend(makeInput({ pool: [999, 999] }), data);
+    expect(result.poolUnavailable).toHaveLength(1);
+  });
+
+  it('comp uses allies whose role could not be inferred', () => {
+    const base = makeChampionTags([1, 2]);
+    const tags: ChampionTagsMap = {
+      ...base,
+      '77': {
+        championId: 77,
+        damageType: 'AD',
+        archetype: 'marksman',
+        hardEngage: false,
+        peel: false,
+        poke: false,
+        waveclear: false,
+        scaling: { early: false, mid: true, late: true },
+        range: 'RANGED',
+        ccCount: 0,
+      },
+    };
+    const data = makeData({ champions: [1, 2, 77], roleProb: botRoleProb, tags });
+    // 77 has no roleProb, so role inference drops it; its missing engage/peel
+    // must still create a comp need for candidates that provide them.
+    const result = recommend(makeInput({ allies: [{ championId: 77 }] }), data);
+    for (const rec of result.recommendations) {
+      expect(rec.reasons.some((r) => r.type === 'comp')).toBe(true);
+    }
+  });
+
+  it('ignores rows from other rank buckets', () => {
+    const baselines: BaselineTable = [
+      [1, 'DIAMOND', 30, 50, 0.1, 50],
+      [2, 'MASTER_PLUS', 45, 50, 0.1, 50],
+    ];
+    const data = makeData({ champions: [1, 2], baselines });
+    const result = recommend(makeInput(), data);
+    expect(result.recommendations.map((r) => r.championId)).toEqual([1]);
+    expect(result.insufficientData.map((i) => i.championId)).toEqual([2]);
+  });
+
+  it('pool-only candidates keep the rank order of the roleProb set', () => {
+    const roleProb = { ...botRoleProb, '99': { TOP: 1.0 } } as ChampionRoleProbabilities;
+    const data = makeData({ champions: [1, 2, 99], roleProb });
+    const base = recommend(makeInput(), data).recommendations;
+    const pooled = recommend(makeInput({ pool: [99] }), data).recommendations;
+    const order = (recs: typeof base): number[] =>
+      recs.filter((r) => r.championId !== 99).map((r) => r.championId);
+    expect(order(pooled)).toEqual(order(base));
   });
 });

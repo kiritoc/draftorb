@@ -100,29 +100,30 @@ export function computeBlindSafety(
   p0: number,
   config: RankWeightingConfig,
 ): number {
-  let expected = 0;
-  let minTerm = Infinity;
+  let total = 0;
 
   for (const role of unknownRoles) {
     let shareTotal = 0;
     let weighted = 0;
+    let minTerm = 0;
     for (const e of championIds) {
       if (e === c || excluded.has(e)) continue;
       const share = roleProb[e]?.[role];
       if (typeof share !== 'number' || share < ROLE_PROB_THRESHOLD) continue;
+      // Missing or lowData matchups count as neutral (term 0) with their full
+      // share, so a candidate is not rewarded for lacking data.
       const row = enemyIdx.get(makePairKey(c, e, role));
-      if (!row) continue;
-      const result = scorePair(row.winsE, row.gamesE, p0, config);
-      if (result.lowData) continue;
+      const result = row ? scorePair(row.winsE, row.gamesE, p0, config) : null;
+      const term = result && !result.lowData ? result.term : 0;
       shareTotal += share;
-      weighted += share * result.term;
-      if (result.term < minTerm) minTerm = result.term;
+      weighted += share * term;
+      if (term < minTerm) minTerm = term;
     }
-    if (shareTotal > 0) expected += weighted / shareTotal;
+    // Worst case is taken per unseen role (SPECS §5, D-030).
+    if (shareTotal > 0) total += weighted / shareTotal + BLIND_WORST_CASE_FACTOR * minTerm;
   }
 
-  const worst = minTerm === Infinity ? 0 : Math.min(0, minTerm);
-  return expected + BLIND_WORST_CASE_FACTOR * worst;
+  return total;
 }
 
 /**
@@ -143,7 +144,9 @@ export function hardCounterWarnings(
     if (!row) continue;
     const result = scorePair(row.winsE, row.gamesE, p0, config);
     if (result.lowData) continue;
-    if (deltaPp(x0, result.term) <= HARD_COUNTER_DELTA_PP) {
+    // Scale by the §4 role confidence so an uncertain inferred role cannot
+    // trigger a full-strength warning.
+    if (deltaPp(x0, enemy.confidence * result.term) <= HARD_COUNTER_DELTA_PP) {
       warnings.push(`countered by enemy ${enemy.role.toLowerCase()} ${enemy.championId}`);
     }
   }

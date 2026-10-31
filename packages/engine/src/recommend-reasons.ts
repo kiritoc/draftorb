@@ -7,7 +7,7 @@ import type { RankWeightingConfig } from './config.js';
 import type { LaneDelta, LaneGroupInfo, ReasonAccumulator } from './recommend-types.js';
 import type { PairDelta } from './recommend-terms.js';
 import { DELTA_PP_DECIMALS } from './config.js';
-import { isLowData, levelFromConfig } from './levels.js';
+import { isLowData, levelFromConfig, mapDeltaPpToLevel } from './levels.js';
 
 const DELTA_PP_SCALE = 10 ** DELTA_PP_DECIMALS;
 
@@ -75,10 +75,12 @@ export function buildReasons(
   }
 
   // Comp and blind reasons have no sample of their own and are never lowData.
-  // Level them at n_eff = minGames: passes the lowData gate but stays below
-  // highLevelMinGames, so positive levels cap at L1 (D-030).
-  const unsampledLevel = (d: number): ReasonLevel | undefined =>
-    toReasonLevel(levelFromConfig(d, config.minGames, config));
+  // Map their delta directly (no fabricated n_eff): positive levels cap at L1,
+  // negative levels keep their full magnitude (D-030).
+  const unsampledLevel = (d: number): ReasonLevel | undefined => {
+    const level = mapDeltaPpToLevel(d, 1, 0, 0);
+    return toReasonLevel(level > 0 ? Math.min(level, 1) : level);
+  };
 
   if (compDeltaPp !== null) {
     reasons.push({

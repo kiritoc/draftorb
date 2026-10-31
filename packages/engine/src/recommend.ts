@@ -55,9 +55,6 @@ import { buildReasons, toRecommendation } from './recommend-reasons.js';
 
 export type { KnownSlot } from './recommend-types.js';
 
-/** Role-relative influence for a known slot, keyed by phase. */
-export type InfluencePhase = 'draft' | 'lane' | 'mid';
-
 /** Index lookups over exported data tables. */
 export interface RecommendData {
   /** Baseline win rates per (championId, bucket) — role-specific. */
@@ -230,7 +227,8 @@ export function recommend(
     if (laneFullDelta) logOdds += laneFullDelta.term;
 
     // --- Layer 4: comp need ---
-    const allyChampIds = allySlots.map((s) => s.championId);
+    // Comp is role-independent: use every board ally, even if role inference dropped it.
+    const allyChampIds = input.allies.map((s) => s.championId);
     const compResult = computeCompNeed(c, allyChampIds, data.tags, compConfig);
     let compDeltaPp: number | null = null;
     if (compResult.filled.length > 0 && compResult.bonus !== 0) {
@@ -301,8 +299,8 @@ export function recommend(
     poolRecommendations = [];
     poolUnavailable = [];
 
-    // poolUnavailable: check pool champions not in championIds
-    for (const pid of pool) {
+    // poolUnavailable: check pool champions not in championIds (deduplicated)
+    for (const pid of poolSet) {
       if (knownChampionSet.has(pid)) continue;
       if (!championIdSet.has(pid)) {
         poolUnavailable.push({ championId: pid, reason: 'unknownChampion' });
@@ -310,7 +308,7 @@ export function recommend(
     }
 
     // Check pool champions in insufficientData
-    for (const pid of pool) {
+    for (const pid of poolSet) {
       if (!championIdSet.has(pid)) continue;
       if (!scored.some((s) => s.championId === pid)) {
         const insuff = insufficientData.find((i) => i.championId === pid);

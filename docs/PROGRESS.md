@@ -45,14 +45,17 @@ Earlier handoff (kept for history): B-017 done (engine and shared `"types": []` 
 
 - Done:
   - **`packages/etl/src/aggregate-baseline.ts`** (new): `aggregateBaseline(db)` computes `baseline` rows per (champion, my_role, user rank bucket) using the engine rank kernel (`combinedGameWeight` from `@draftorb/engine`). Each game contributes to every user bucket row weighted by `rankDistanceWeight * recencyFactor * reliabilityFactor`; accumulates `wins_w`, `games_w`, `games_w2`, `games` (raw count); clears and rewrites the table in a transaction (idempotent). Populates the `games` 6th column added by migration 008, resolving B-025/B-033.
-  - **`packages/etl/src/aggregate-baseline.test.ts`** (new, 12 tests): weighted counts and `n_eff` verified on toy data (uniform weight → n_eff = raw count; uneven recency weights → n_eff < raw count; out-of-window game contributes 0 weight; window edge kept; reliability down-weight; unknown participant rank uses match rank; snapshot patch filtering with numeric patch order; bucket clamping; champion/role keying; idempotent reruns; malformed patch preserves rows; empty DB → empty baseline).
+  - **`packages/etl/src/aggregate-baseline.test.ts`** (new, 11 tests): weighted counts and `n_eff` verified on toy data (uniform weight → n_eff = raw count; uneven recency weights → n_eff < raw count; out-of-window game contributes 0 weight; window edge kept; reliability down-weight; unknown participant rank uses match rank; bucket clamping; champion/role keying; idempotent reruns; snapshot older than all matches preserves rows; empty DB → empty baseline).
+  - **`packages/etl/src/aggregate-baseline-patch.test.ts`** (new, 3 tests): malformed patch throws and preserves rows; matches newer than the snapshot are excluded with numeric patch order; a snapshot patch with no stored games is the current patch for recency.
+  - **`packages/etl/src/aggregate-baseline-helpers.ts`** (new): shared toy-data seeding and temp-DB helpers for the baseline tests.
+  - **`packages/etl/src/commands/aggregate.test.ts`** (edited, 1 test): baselines are written even when the target patch has no participants (role_prob unchanged).
   - **`packages/etl/src/commands/aggregate.ts`** (edited): `pnpm etl aggregate` now also writes baseline rows; description updated.
   - **`packages/etl/src/index.ts`** (edited): exports `aggregateBaseline` and `BaselineRow`.
   - **`packages/etl/package.json`** (edited): added `@draftorb/engine` workspace dependency to reuse the engine rank kernel.
   - **`packages/etl/tsconfig.json`** (edited): added `../engine` project reference.
   - **`docs/SETUP.md`** (edited): `pnpm etl aggregate` description updated to include baselines.
-  - Review fixes: the game rank bucket now comes from `matches.avg_rank_score`, so participants with unknown rank still contribute; an optional `[patch]` argument excludes newer matches and sets recency relative to that patch (`aggregateBaseline(db, { patch })`); a malformed patch throws before the table is touched, so existing baselines are preserved. The ETL dependency on `@draftorb/engine` is recorded as D-032 (PROPOSED).
-- Tests: `pnpm check` green (typecheck, lint, format: 0 errors; 603 tests across 42 files, including the 12 baseline tests).
+  - Review fixes: the game rank bucket now comes from `matches.avg_rank_score`, so participants with unknown rank still contribute; an optional `[patch]` argument excludes newer matches and sets recency relative to that patch (`aggregateBaseline(db, { patch })`); a malformed patch throws before the table is touched, so existing baselines are preserved. The ETL dependency on `@draftorb/engine` is recorded as D-032 and the patch-index/bucket assumptions as D-033 (both ACCEPTED). When no game contributes, `baseline` is left unchanged and the CLI says so.
+- Tests: 614 tests across 43 files pass, including the 15 baseline tests (11 + 3 + 1 command test).
 - State left: **DONE (T-016)**. Resolved B-033 (renumbered from duplicate B-025, now FIXED). Next ETL ticket: T-017 (Aggregate pair tables).
 
 ### 2026-10-31 — Antigravity — Ticket T-015 (Aggregate role probabilities)

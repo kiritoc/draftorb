@@ -42,10 +42,16 @@ async function runAggregate(args: string[]): Promise<void> {
     }
 
     const baselineRows = aggregateBaseline(db, { patch });
-    const champions = new Set(baselineRows.map((row) => row.championId)).size;
-    console.log(
-      `Aggregated baselines: ${baselineRows.length} row(s) for ${champions} champion(s) written to baseline.`,
-    );
+    if (baselineRows.length === 0) {
+      console.log(
+        `No contributing games${patch === undefined ? '' : ` up to patch ${patch}`}; baseline left unchanged.`,
+      );
+    } else {
+      const champions = new Set(baselineRows.map((row) => row.championId)).size;
+      console.log(
+        `Aggregated baselines: ${baselineRows.length} row(s) for ${champions} champion(s) written to baseline.`,
+      );
+    }
   } finally {
     db.close();
   }

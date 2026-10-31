@@ -59,13 +59,14 @@ export type SupportPairTable = z.infer<typeof supportPairTableSchema>;
 /**
  * Baseline row: `[championId, bucket, wins_w, games_w, games_w2, games]`.
  * `games` is the raw (unweighted) match count, reported as `rawGames` in
- * `insufficientData`.
+ * `insufficientData`. It is optional until ETL populates it (B-025); a missing
+ * or 0 count is treated as unknown.
  */
 export const baselineEntrySchema = z.tuple([
   championIdSchema,
   rankBucketSchema,
   ...WEIGHTS,
-  z.number().int().nonnegative(), // games (raw match count)
+  z.number().int().nonnegative().optional(), // games (raw match count)
 ]);
 export type BaselineEntry = z.infer<typeof baselineEntrySchema>;
 

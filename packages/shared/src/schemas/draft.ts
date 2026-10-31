@@ -52,7 +52,8 @@ export const insufficientDataEntrySchema = z
   .object({
     championId: championIdSchema,
     nEff: z.number().nonnegative(),
-    rawGames: z.number().int().nonnegative(),
+    // Omitted when the raw match count is unknown (golden rule 8, B-025).
+    rawGames: z.number().int().nonnegative().optional(),
   })
   .strict();
 export type InsufficientDataEntry = z.infer<typeof insufficientDataEntrySchema>;

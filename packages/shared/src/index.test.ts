@@ -100,7 +100,7 @@ describe('shared schemas', () => {
         { type: 'synergy', with: [18], level: 1, deltaPp: 0.8, lowData: true },
       ],
       reliability: { games: 80.5, lowData: false },
-      warnings: ['countered by enemy support'],
+      warnings: ['counteredBy:SUPPORT:412'],
     };
 
     expect(recommendationSchema.parse(recommendation)).toEqual(recommendation);

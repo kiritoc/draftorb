@@ -19,9 +19,9 @@ import type {
   DraftInput,
   DraftResult,
   EnemyPairTable,
+  InsufficientDataEntry,
   LaneFullTable,
   LaneVsTable,
-  PoolUnavailableEntry,
   Recommendation,
 } from '@draftorb/shared';
 import type { CompConfig, RankWeightingConfig } from './config.js';
@@ -32,7 +32,6 @@ import {
   DEFAULT_COMP_CONFIG,
   DEFAULT_CONFIG,
   MISSING_LANE_ID,
-  ROLE_PROB_THRESHOLD,
   SCORE_TIE_EPSILON,
   W_BLIND,
   W_COMP,
@@ -53,6 +52,7 @@ import {
 import { computeLaneGroup, resolveKnownSlots } from './recommend-slots.js';
 import { computeBlindSafety, hardCounterWarnings, scorePairs } from './recommend-terms.js';
 import { buildReasons, toRecommendation } from './recommend-reasons.js';
+import { buildCandidateSet, buildPoolOutput, isBelowRoleThreshold } from './recommend-pool.js';
 
 export type { KnownSlot } from './recommend-types.js';
 
@@ -125,45 +125,23 @@ export function recommend(
   const laneGroup = LANE_GROUPS[myRole];
   const laneGroupInfo = computeLaneGroup(laneGroup, allySlots, enemySlots);
 
-  // --- Build candidate set ---
-  // Exclude every picked champion from the input, independent of role inference.
-  const knownChampionSet = new Set<ChampionId>([
-    ...input.allies.map((s) => s.championId),
-    ...input.enemies.map((s) => s.championId),
-  ]);
+  // --- Build candidate set (board picks excluded, pool champions added) ---
+  const candidateSet = buildCandidateSet(input, data.championIds, data.roleProb);
+  const knownChampionSet = candidateSet.picked;
 
-  const candidateIds = new Set<ChampionId>();
-  for (const id of data.championIds) {
-    // Skip champions already picked on the board (allies or enemies).
-    if (knownChampionSet.has(id)) continue;
-    const rp = data.roleProb[id];
-    if (!rp) continue;
-    const roleProb = rp[myRole];
-    if (typeof roleProb === 'number' && roleProb >= ROLE_PROB_THRESHOLD) {
-      candidateIds.add(id);
-    }
-  }
-
-  // Pool champions join the candidate set (may be off-role). Pool champions
-  // already picked on the board are skipped.
-  const pool = input.pool ?? [];
-  const poolSet = new Set<ChampionId>(pool);
-  const championIdSet = new Set<ChampionId>(data.championIds);
-  for (const id of pool) {
-    if (knownChampionSet.has(id)) continue;
-    // Unknown ids are reported as poolUnavailable/unknownChampion, never scored.
-    if (!championIdSet.has(id)) continue;
-    candidateIds.add(id);
-  }
+  // Comp is role-independent: use every board ally, even if role inference dropped it.
+  const allyChampIds = input.allies.map((s) => s.championId);
 
   // --- Score each candidate ---
   const scored: ScoredCandidate[] = [];
-  const insufficientData: { championId: ChampionId; nEff: number; rawGames: number }[] = [];
+  const insufficientData: InsufficientDataEntry[] = [];
 
-  for (const c of candidateIds) {
+  for (const c of candidateSet.candidates) {
     const baseRow = baselineIdx.get(c);
+    // rawGames is omitted when unknown (no row, or the export carries no count),
+    // so a missing count is never reported as a real 0 (golden rule 8).
     if (!baseRow) {
-      insufficientData.push({ championId: c, nEff: 0, rawGames: 0 });
+      insufficientData.push({ championId: c, nEff: 0 });
       continue;
     }
 
@@ -171,8 +149,12 @@ export function recommend(
 
     // Baseline gate: n_eff < minGames -> insufficientData
     if (!baselineGate(nE, config.minGames)) {
-      const rawGames = baseRow.rawGames ?? 0;
-      insufficientData.push({ championId: c, nEff: nE, rawGames });
+      const raw = baseRow.rawGames;
+      insufficientData.push({
+        championId: c,
+        nEff: nE,
+        ...(raw !== undefined && raw > 0 ? { rawGames: raw } : {}),
+      });
       continue;
     }
 
@@ -181,8 +163,8 @@ export function recommend(
     const x = baselineLogOdds(winsE, gamesE, config.k0, config.eps);
 
     // Determine if this is an off-role pool champion
-    const rp = data.roleProb[c];
-    const isOffRole = poolSet.has(c) && (!rp || !rp[myRole] || rp[myRole] < ROLE_PROB_THRESHOLD);
+    const isOffRole =
+      candidateSet.poolSet.has(c) && isBelowRoleThreshold(c, myRole, data.roleProb);
 
     // --- Layer 1: pairs ---
     const pairInfo = scorePairs(
@@ -230,8 +212,6 @@ export function recommend(
     if (laneFullDelta) logOdds += laneFullDelta.term;
 
     // --- Layer 4: comp need ---
-    // Comp is role-independent: use every board ally, even if role inference dropped it.
-    const allyChampIds = input.allies.map((s) => s.championId);
     const compResult = computeCompNeed(c, allyChampIds, data.tags, compConfig);
     let compDeltaPp: number | null = null;
     if (compResult.filled.length > 0 && compResult.bonus !== 0) {
@@ -294,50 +274,12 @@ export function recommend(
     toRecommendation(s, i + 1, config),
   );
 
-  // --- Pool recommendations ---
-  let poolRecommendations: Recommendation[] | undefined;
-  let poolUnavailable: PoolUnavailableEntry[] | undefined;
-
-  if (pool.length > 0) {
-    poolRecommendations = [];
-    poolUnavailable = [];
-
-    // poolUnavailable: picked on the board, or not in championIds (deduplicated)
-    for (const pid of poolSet) {
-      if (knownChampionSet.has(pid)) {
-        poolUnavailable.push({ championId: pid, reason: 'picked' });
-      } else if (!championIdSet.has(pid)) {
-        poolUnavailable.push({ championId: pid, reason: 'unknownChampion' });
-      }
-    }
-
-    // Check pool champions in insufficientData
-    for (const pid of poolSet) {
-      if (!championIdSet.has(pid)) continue;
-      if (!scored.some((s) => s.championId === pid)) {
-        const insuff = insufficientData.find((i) => i.championId === pid);
-        if (insuff) {
-          poolUnavailable.push({ championId: pid, reason: 'insufficientData' });
-        }
-      }
-    }
-
-    // poolRecommendations: in overall (sorted) order
-    let poolRank = 0;
-    for (let i = 0; i < sorted.length; i++) {
-      const s = sorted[i];
-      if (!s) continue;
-      if (poolSet.has(s.championId)) {
-        poolRank++;
-        poolRecommendations.push(toRecommendation(s, i + 1, config, poolRank));
-      }
-    }
-  }
-
+  // --- Pool recommendations (only for a non-empty pool, D-024) ---
   return {
     recommendations,
     insufficientData,
-    ...(poolRecommendations !== undefined ? { poolRecommendations } : {}),
-    ...(poolUnavailable !== undefined ? { poolUnavailable } : {}),
+    ...(candidateSet.poolSet.size > 0
+      ? buildPoolOutput(candidateSet, sorted, insufficientData, config)
+      : {}),
   };
 }

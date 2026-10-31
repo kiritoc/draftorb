@@ -7,6 +7,7 @@ import type { RankWeightingConfig } from './config.js';
 import type { DataRow, KnownSlot } from './recommend-types.js';
 import {
   BLIND_WORST_CASE_FACTOR,
+  COUNTERED_BY_WARNING,
   HARD_COUNTER_DELTA_PP,
   ROLE_PROB_THRESHOLD,
   getInfluence,
@@ -150,7 +151,8 @@ export function hardCounterWarnings(
     const influence = getInfluence(myRole, 'enemy', enemy.role, 'draft', config);
     const weighted = config.s * enemy.confidence * influence * result.term;
     if (deltaPp(x0, weighted) <= HARD_COUNTER_DELTA_PP) {
-      warnings.push(`countered by enemy ${enemy.role.toLowerCase()} ${enemy.championId}`);
+      // Machine code, not UI text: the web `strings` module renders it.
+      warnings.push(`${COUNTERED_BY_WARNING}:${enemy.role}:${enemy.championId}`);
     }
   }
   return warnings;

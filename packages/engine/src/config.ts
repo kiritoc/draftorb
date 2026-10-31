@@ -268,7 +268,12 @@ export const ROLE_PROB_THRESHOLD = 0.05;
 /** Prior win rate the baseline `p0` is shrunk toward (SPECS §5: k0 toward 0.5). */
 export const BASELINE_PRIOR_WINRATE = 0.5;
 
-/** Score differences at or below this are ties, broken by championId ascending. */
+/**
+ * Tie quantum: scores are bucketed by `Math.round(score / SCORE_TIE_EPSILON)`
+ * and equal buckets are ties, broken by championId ascending. Bucketing keeps
+ * the comparator transitive; two scores closer than the quantum may still fall
+ * in adjacent buckets (deterministic either way).
+ */
 export const SCORE_TIE_EPSILON = 1e-9;
 
 /** Decimal places kept on a reported reason `deltaPp`. */
@@ -304,6 +309,9 @@ export const BLIND_WORST_CASE_FACTOR = 0.5;
  * moves the baseline by at most this many percentage points (L3 negative).
  */
 export const HARD_COUNTER_DELTA_PP = -4.5;
+
+/** Warning code prefix: `counteredBy:<ROLE>:<championId>` (rendered by the UI `strings` module). */
+export const COUNTERED_BY_WARNING = 'counteredBy';
 
 /**
  * Comp need weights (log-odds). Each value is the bonus contributed when the

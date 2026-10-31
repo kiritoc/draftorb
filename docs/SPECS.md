@@ -54,6 +54,7 @@ Rank buckets for weighting (distinct from persisted `rank_score` in DATA_MODEL.m
 - Otherwise assign roles within a team by maximizing sum of log roleProb under constraint "one champion per role" (Hungarian algorithm / brute force, 5! = 120 permutations is fine).
 - Output also the **confidence** of each assignment (probability mass of the best assignment vs alternatives). Confidence scales how much that champion's synergy/counter terms count.
 - UI lets the user override a role; override = confidence 1.
+- If inference fails for a team, the engine keeps the largest greedily built resolvable subset (fixed slots first). If that fails too, only fixed slots are kept, and a fixed role used by two or more slots of the same team is dropped as ambiguous (D-030). Dropped slots lose only role-dependent effects (pairs, lane); they stay excluded from candidates and still count for comp.
 
 ## 5. Scoring a candidate `c` for `myRole` (Phase 1: `myRole` = SUPPORT)
 
@@ -73,11 +74,11 @@ if the enemy lane-group champions of laneGroup(myRole) are known:             //
 if laneGroup(myRole).allies is non-empty and known:                           // layer 3 (skipped for 1v1 lane groups (TOP, MID, JUNGLE), where lane_full would duplicate lane_vs)
   x += conf_lane * laneTerm(lane_full[c, laneGroup(myRole).allies, laneGroup(myRole).enemies], q = sigmoid(x))
 x += W_comp  * compNeed(c, allies, enemies)
-x += W_blind * blindSafety(c)                               // only if blindPick or few enemies known
+x += W_blind * blindSafety(c)                               // only if blindPick or any lane-group enemy role is unknown; scores unseen roles only (0 when the lane is fully known)
 P(c) = sigmoid(x);  score(c) = P(c)
 ```
 
-- `laneGroup(myRole)` (config, D-021): `SUPPORT`/`ADC` = the bot lane (me, ally lane partner, enemy support + enemy ADC); `TOP` = me vs enemy top; `MID` = me vs enemy mid; `JUNGLE` = me vs enemy jungle (1v1, `lane_full` skipped). A layer is skipped when one of its champions is unknown. `conf_lane` = product of the §4 confidences of the lane-group champions. Phase 1 populates only `myRole = SUPPORT`.
+- `laneGroup(myRole)` (config, D-021): `SUPPORT`/`ADC` = the bot lane (me, ally lane partner, enemy support + enemy ADC); `TOP` = me vs enemy top; `MID` = me vs enemy mid; `JUNGLE` = me vs enemy jungle (1v1, `lane_full` skipped). A layer is skipped when one of its champions is unknown. `conf_lane` = product of the §4 confidences of the lane-group champions of that layer: enemies only for `lane_vs`, allies and enemies for `lane_full` (D-030). Phase 1 populates only `myRole = SUPPORT`.
 - Baseline gate: if the candidate's baseline `n_eff < minGames`, it gets no score and no rank: it goes to `insufficientData` (§7) with `nEff` and `rawGames` (golden rule 8), not to the ranked `recommendations`. The `k0` shrinkage only guards near-perfect records that already passed this gate.
 - Every probability passed to `logit` is clamped to `[eps, 1 - eps]` (eps = 1e-4), so a perfect or empty record can never produce an infinite or NaN score.
 - `pairTerm(c, s) = logit((wins_e + k*p0)/(games_e + k)) - logit(p0)`, k = prior strength (default 40 equivalent games). Pair terms are summed and correlated (several can describe the same matchups), so the global scale `s` absorbs systematic over-counting and is fit on the validation window (T-027.a).
@@ -107,7 +108,7 @@ Validation (T-020): every cell defined and in [0, 1]; the opponent cell is the r
 - `compNeed`: from champion tags (see 6): reward filling missing needs (e.g. team has no engage, damage all AD...). Small weight in log-odds units, explained in UI. Only tagged board allies count as evidence (including allies whose role could not be inferred); with no tagged ally no need is reported. Enemies are ignored until T-025.
 - `blindSafety(c)`: expected term against the distribution of likely _unseen_ enemy lane opponents weighted by pick rate: `sum_e pickShare(e) * pairTerm(c, e)`, plus penalty for worst-case matchup (min term), both per unseen lane-group role and summed. Known enemies are excluded (the pair layer scores them); missing or lowData matchups count as neutral (term 0) with their full share. Used when blindPick = true or any role of `laneGroup(myRole).enemies` is unknown. Until a pick-rate export exists, `pickShare(e)` is approximated by normalized `roleProb[e][role]` (B-026).
 - Comp and blind reasons have no sample (`n = 0`, never lowData): their level comes from `deltaPp` alone, positive levels capped at L1, negative levels unrestricted.
-- Hard-counter warning ("countered by enemy <role> X"): when `deltaPp(logit(p0), s * conf * influence * pairTerm) <= -4.5` for a known, non-lowData enemy pair.
+- Hard-counter warning (code `counteredBy:<ROLE>:<championId>`, rendered by the web `strings` module): when `deltaPp(logit(p0), s * conf * influence * pairTerm) <= -4.5` for a known, non-lowData enemy pair.
 - Validation (D-023/T-027.a): every parameter in this section is a prior until a backtest passes — frozen temporal holdout, rolling validation for tuning, paired-bootstrap gate on log-loss vs the baseline-only model.
 
 ## 6. Manual data (tags)
@@ -122,12 +123,12 @@ Recommendation {
   championId, score, rank,       // rank = overall rank (global), also inside poolRecommendations
   poolRank?: number              // rank inside the user's pool (D-024); only set in poolRecommendations
   reasons: Reason[]    // {type:'synergy'|'counter'|'lane'|'comp'|'blind', with: ChampionId[]?, level:0|1|2|3|-1|-2|-3, deltaPp, n, lowData}
-  reliability: { games: number, lowData: boolean }
-  warnings: string[]   // e.g. "countered by enemy support X", "offRole" (pool champion rarely played in this role)
+  reliability: { games: number, lowData: boolean }  // games = baseline n_eff (real number, D-027), not raw matches
+  warnings: string[]   // codes, never UI text: "counteredBy:<ROLE>:<championId>", "offRole" (pool champion rarely played in this role)
 }
 DraftResult {
   recommendations: Recommendation[]                    // overall ranking: ALL scored candidates, never truncated by the engine (D-024)
-  insufficientData: { championId, nEff: number, rawGames: number }[]  // baseline n_eff < minGames (§5), unscored
+  insufficientData: { championId, nEff: number, rawGames?: number }[]  // baseline n_eff < minGames (§5), unscored; rawGames omitted when unknown (B-025)
   poolRecommendations?: Recommendation[]               // only when input.pool is non-empty: scored pool champions in overall order (`rank` = overall rank, `poolRank` = rank in the pool)
   poolUnavailable?: { championId, reason: 'insufficientData' | 'unknownChampion' | 'picked' }[]  // pool champions without a score (numbers live in insufficientData); 'picked' = already on the board
 }

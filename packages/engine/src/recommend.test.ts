@@ -1040,14 +1040,14 @@ describe('recommend: remaining review gaps', () => {
     expect(score(0.5)).toBeGreaterThan(score(0.1));
   });
 
-  it('a candidate without a baseline row reports nEff 0 and rawGames 0', () => {
+  it('a candidate without a baseline row reports nEff 0 and no rawGames', () => {
     const data = makeData({
       champions: [1, 2],
       baselines: makeBaselines([1]),
       roleProb: botRoleProb,
     });
     const entry = recommend(makeInput(), data).insufficientData.find((i) => i.championId === 2);
-    expect(entry).toEqual({ championId: 2, nEff: 0, rawGames: 0 });
+    expect(entry).toEqual({ championId: 2, nEff: 0 });
   });
 
   it('reports picked, unknownChampion and insufficientData together in poolUnavailable', () => {
@@ -1171,8 +1171,8 @@ describe('recommend: review coverage', () => {
     const result = recommend(input, data);
     const rec1 = result.recommendations.find((r) => r.championId === 1);
     const rec2 = result.recommendations.find((r) => r.championId === 2);
-    expect(rec1?.warnings).toContain('countered by enemy support 200');
-    expect(rec2?.warnings.some((w) => w.startsWith('countered by'))).toBe(false);
+    expect(rec1?.warnings).toContain('counteredBy:SUPPORT:200');
+    expect(rec2?.warnings.some((w) => w.startsWith('counteredBy:'))).toBe(false);
   });
 
   it('gives blind reasons a level', () => {
@@ -1486,8 +1486,8 @@ describe('recommend: review gap coverage', () => {
       const rec = recommend(input, data).recommendations.find((r) => r.championId === 1);
       return rec?.warnings ?? [];
     };
-    expect(warnings(true)).toContain('countered by enemy support 200');
-    expect(warnings(false).some((w) => w.startsWith('countered by'))).toBe(false);
+    expect(warnings(true)).toContain('counteredBy:SUPPORT:200');
+    expect(warnings(false).some((w) => w.startsWith('counteredBy:'))).toBe(false);
   });
 
   it('a low-influence enemy (TOP for SUPPORT) does not trigger a hard-counter warning', () => {
@@ -1508,10 +1508,10 @@ describe('recommend: review gap coverage', () => {
         (r) => r.championId === 1,
       )?.warnings ?? [];
     expect(warnings({ championId: 301, role: 'SUPPORT' })).toContain(
-      'countered by enemy support 301',
+      'counteredBy:SUPPORT:301',
     );
     expect(
-      warnings({ championId: 300, role: 'TOP' }).some((w) => w.startsWith('countered by')),
+      warnings({ championId: 300, role: 'TOP' }).some((w) => w.startsWith('counteredBy:')),
     ).toBe(false);
   });
 
@@ -1522,7 +1522,7 @@ describe('recommend: review gap coverage', () => {
     const data = makeData({ champions: [1, 200], roleProb: botRoleProb, enemyPairs });
     const input = makeInput({ enemies: [{ championId: 200, role: 'SUPPORT' }] });
     const rec = recommend(input, data).recommendations.find((r) => r.championId === 1);
-    expect(rec?.warnings.some((w) => w.startsWith('countered by'))).toBe(false);
+    expect(rec?.warnings.some((w) => w.startsWith('counteredBy:'))).toBe(false);
   });
 
   it('pool champion without any roleProb entry is scored with offRole', () => {
@@ -1660,5 +1660,123 @@ describe('recommend: review gap coverage', () => {
     const data = makeData({ champions: [1, 2], roleProb: botRoleProb });
     const result = recommend(makeInput({ pool: [1, 1] }), data);
     expect(result.poolRecommendations?.map((r) => r.championId)).toEqual([1]);
+  });
+});
+
+describe('recommend: review follow-up edge cases', () => {
+  const asRoleProb = (r: Record<string, Partial<Record<Role, number>>>) =>
+    r as ChampionRoleProbabilities;
+  const fixedBot = [
+    { championId: 200, role: 'SUPPORT' as Role },
+    { championId: 201, role: 'ADC' as Role },
+  ];
+
+  it('ADC lane_vs keys follow [enemy ADC, enemy SUPPORT]', () => {
+    const roleProb = asRoleProb({ '11': { ADC: 1 }, '200': { SUPPORT: 1 }, '201': { ADC: 1 } });
+    const input = makeInput({ userRole: 'ADC', enemies: fixedBot });
+    const lane = (laneVs: LaneVsTable) =>
+      recommend(input, makeData({ champions: [11, 200, 201], roleProb, laneVs }))
+        .recommendations.find((r) => r.championId === 11)
+        ?.reasons.find((r) => r.type === 'lane');
+    expect(lane([[11, 200, 201, 'DIAMOND', 45, 50, 0.1]])).toBeUndefined();
+    expect(lane([[11, 201, 200, 'DIAMOND', 45, 50, 0.1]])?.with).toEqual([201, 200]);
+  });
+
+  it('blindPick with a fully known lane adds no blind reason', () => {
+    const roleProb = asRoleProb({
+      '1': { SUPPORT: 1 },
+      '200': { SUPPORT: 1 },
+      '201': { ADC: 1 },
+      '202': { ADC: 1 },
+    });
+    const enemyPairs: EnemyPairTable = [[1, 202, 'ADC', 'DIAMOND', 10, 50, 0.1]];
+    const data = makeData({ champions: [1, 200, 201, 202], roleProb, enemyPairs });
+    const rec = recommend(makeInput({ blindPick: true, enemies: fixedBot }), data)
+      .recommendations.find((r) => r.championId === 1);
+    expect(rec?.reasons.some((r) => r.type === 'blind')).toBe(false);
+  });
+
+  it('lane_full is scaled by the product of partner and enemy confidences', () => {
+    const roleProb = asRoleProb({
+      '1': { SUPPORT: 1 },
+      '10': { ADC: 0.6, MID: 0.4 },
+      '200': { SUPPORT: 0.6, MID: 0.4 },
+      '201': { ADC: 1 },
+    });
+    const laneFull: LaneFullTable = [[1, 10, 200, 201, 'DIAMOND', 45, 50, 0.1]];
+    const data = makeData({ champions: [1, 10, 200, 201], roleProb, laneFull });
+    const delta = (enemyInferred: boolean): number => {
+      const enemies = enemyInferred
+        ? [{ championId: 200 }, { championId: 201, role: 'ADC' as Role }]
+        : fixedBot;
+      const input = makeInput({ allies: [{ championId: 10 }], enemies });
+      const rec = recommend(input, data).recommendations.find((r) => r.championId === 1);
+      const lane = rec?.reasons.find((r) => r.type === 'lane' && r.with?.length === 3);
+      return Math.abs(lane?.deltaPp ?? 0);
+    };
+    expect(delta(true)).toBeGreaterThan(0);
+    expect(delta(true)).toBeLessThan(delta(false));
+  });
+
+  it('reliability.games reports the baseline n_eff', () => {
+    const data = makeData({ champions: [1] });
+    const rec = recommend(makeInput(), data).recommendations[0];
+    expect(rec?.reliability.games).toBeCloseTo(50 ** 2 / 0.1, 6);
+    expect(rec?.reliability.lowData).toBe(false);
+  });
+
+  it('identical scores are ordered by championId', () => {
+    const roleProb = asRoleProb({ '4': { MID: 1 }, '7': { MID: 1 }, '9': { MID: 1 } });
+    const data = makeData({ champions: [9, 4, 7], roleProb });
+    const ids = recommend(makeInput({ userRole: 'MID' }), data).recommendations.map(
+      (r) => r.championId,
+    );
+    expect(ids).toEqual([4, 7, 9]);
+  });
+
+  it('omits rawGames when the baseline games column is 0 or absent', () => {
+    const baselines: BaselineTable = [
+      [1, 'DIAMOND', 5, 10, 10, 0],
+      [2, 'DIAMOND', 5, 10, 10],
+      [3, 'DIAMOND', 5, 10, 10, 12],
+    ];
+    const result = recommend(makeInput(), makeData({ champions: [1, 2, 3], baselines }));
+    const byId = (id: number) => result.insufficientData.find((i) => i.championId === id);
+    expect(byId(1)).not.toHaveProperty('rawGames');
+    expect(byId(2)).not.toHaveProperty('rawGames');
+    expect(byId(3)?.rawGames).toBe(12);
+  });
+
+  it('emits hard-counter warnings as codes', () => {
+    const roleProb = asRoleProb({ '1': { SUPPORT: 1 }, '200': { SUPPORT: 1 } });
+    const enemyPairs: EnemyPairTable = [[1, 200, 'SUPPORT', 'DIAMOND', 10, 50, 0.1]];
+    const data = makeData({ champions: [1, 200], roleProb, enemyPairs });
+    const input = makeInput({ enemies: [{ championId: 200, role: 'SUPPORT' }] });
+    expect(recommend(input, data).recommendations[0]?.warnings).toEqual([
+      'counteredBy:SUPPORT:200',
+    ]);
+  });
+
+  it('keeps every resolvable teammate when two unfixed picks conflict', () => {
+    // 300 and 301 can only play ADC, which 201 already fixes; 302 is a clean MID.
+    const roleProb = asRoleProb({
+      '1': { SUPPORT: 1 },
+      '201': { ADC: 1 },
+      '300': { ADC: 1 },
+      '301': { ADC: 1 },
+      '302': { MID: 1 },
+    });
+    const enemyPairs: EnemyPairTable = [[1, 302, 'MID', 'DIAMOND', 10, 50, 0.1]];
+    const data = makeData({ champions: [1, 201, 300, 301, 302], roleProb, enemyPairs });
+    const input = makeInput({
+      enemies: [
+        { championId: 201, role: 'ADC' },
+        { championId: 300 },
+        { championId: 301 },
+        { championId: 302 },
+      ],
+    });
+    const rec = recommend(input, data).recommendations.find((r) => r.championId === 1);
+    expect(rec?.reasons.find((r) => r.type === 'counter')?.with).toEqual([302]);
   });
 });

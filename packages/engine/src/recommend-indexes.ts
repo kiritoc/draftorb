@@ -47,9 +47,9 @@ export function indexBaselines(
   bucket: RankBucket,
 ): Map<ChampionId, DataRow> {
   const map = new Map<ChampionId, DataRow>();
-  for (const [c, rowBucket, winsW, gamesW, gamesW2] of baselines) {
+  for (const [c, rowBucket, winsW, gamesW, gamesW2, rawGames] of baselines) {
     if (rowBucket !== bucket) continue;
-    map.set(c, toRow(winsW, gamesW, gamesW2));
+    map.set(c, { ...toRow(winsW, gamesW, gamesW2), rawGames });
   }
   return map;
 }

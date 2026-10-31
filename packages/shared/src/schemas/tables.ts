@@ -56,7 +56,17 @@ export type SupportPairTable = z.infer<typeof supportPairTableSchema>;
 
 // --- Role-keyed export schemas (DATA_MODEL.md) ---
 
-export const baselineEntrySchema = z.tuple([championIdSchema, rankBucketSchema, ...WEIGHTS]);
+/**
+ * Baseline row: `[championId, bucket, wins_w, games_w, games_w2, games]`.
+ * `games` is the raw (unweighted) match count, reported as `rawGames` in
+ * `insufficientData`.
+ */
+export const baselineEntrySchema = z.tuple([
+  championIdSchema,
+  rankBucketSchema,
+  ...WEIGHTS,
+  z.number().int().nonnegative(), // games (raw match count)
+]);
 export type BaselineEntry = z.infer<typeof baselineEntrySchema>;
 
 export const baselineTableSchema = z.array(baselineEntrySchema);

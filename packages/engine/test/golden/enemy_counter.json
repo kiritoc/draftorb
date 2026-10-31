@@ -15,9 +15,9 @@
       "200": { "SUPPORT": 1.0 }
     },
     "baselines": [
-      [1, "DIAMOND", 30, 50, 0.1],
-      [2, "DIAMOND", 30, 50, 0.1],
-      [200, "DIAMOND", 30, 50, 0.1]
+      [1, "DIAMOND", 30, 50, 0.1, 50],
+      [2, "DIAMOND", 30, 50, 0.1, 50],
+      [200, "DIAMOND", 30, 50, 0.1, 50]
     ],
     "allyPairs": [],
     "enemyPairs": [

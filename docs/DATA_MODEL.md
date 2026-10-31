@@ -53,7 +53,7 @@ Notes: match ingestion persists the match row and its 10 participant rows in one
 Rank buckets: every `rank_bucket` column and every exported `bucket` field uses the 8 SPECS §3 rank buckets (IRON, BRONZE, SILVER, GOLD, PLATINUM, EMERALD, DIAMOND, MASTER_PLUS), not the 10 raw rank tiers. `MANIFEST.rankBuckets` mirrors this same 8-value list.
 
 - `role_prob(champion_id, role, games, prob)`
-- `baseline(champion_id, my_role, rank_bucket, wins_w, games_w, games_w2)` (weighted; `games_w2` = sum of squared weights for `n_eff`, SPECS §3)
+- `baseline(champion_id, my_role, rank_bucket, wins_w, games_w, games_w2, games)` (weighted; `games_w2` = sum of squared weights for `n_eff`, SPECS §3; `games` = raw unweighted match count)
 - `pair_ally(my_champion_id, my_role, other_champion_id, other_role, rank_bucket, wins_w, games_w, games_w2)`
 - `pair_enemy(my_champion_id, my_role, other_champion_id, other_role, rank_bucket, wins_w, games_w, games_w2)`
 - `lane_vs(my_champion_id, my_role, opp1_id, opp2_id, rank_bucket, wins_w, games_w, games_w2)` (D-021; `opp*_id` = enemy lane-group champions in role order, `opp2_id` NULL for 1v1 lane groups). SQLite PRIMARY KEY treats NULLs as distinct; uniqueness is enforced by the unique expression index `idx_lane_vs_unique` (migration 005) on `COALESCE(opp2_id, -1)`, so two rows with the same key and a NULL `opp2_id` conflict (-1 is never a valid champion id).
@@ -72,7 +72,7 @@ manifest.json          // { patch, generatedAt, region, rankBuckets: [the 8 §3 
 champions.json         // id, name, icon, roles
 items.json             // item catalog (from Data Dragon)
 role-prob.json         // { [championId]: { SUPPORT: 0.92, ... } } — sparse: a champion entry lists only the roles in which it has been observed with a non-zero probability (roles with games); absent roles are treated as 0. Each champion's probabilities sum to 1 (tolerance 1e-6). Note for T-002.b: in zod 4, `z.record(roleSchema, numberSchema)` requires every key in `roleSchema` to be present, so a sparse map must use `z.partialRecord(roleSchema, numberSchema)` (or equivalent) instead of `z.record`.
-roles/<ROLE>/baseline.json    // [championId, bucket, wins_w, games_w, games_w2]
+roles/<ROLE>/baseline.json    // [championId, bucket, wins_w, games_w, games_w2, games] (games = raw match count)
 roles/<ROLE>/ally-pairs.json  // [championId, allyId, role, bucket, wins_w, games_w, games_w2]
 roles/<ROLE>/enemy-pairs.json // [championId, enemyId, role, bucket, wins_w, games_w, games_w2]
 roles/<ROLE>/lane-vs.json     // [championId, opp1Id, opp2Id, bucket, wins_w, games_w, games_w2]

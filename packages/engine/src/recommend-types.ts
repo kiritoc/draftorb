@@ -21,6 +21,8 @@ export interface DataRow {
   readonly winsE: number;
   readonly gamesE: number;
   readonly nE: number;
+  /** Raw (unweighted) match count; set for baseline rows only. */
+  readonly rawGames?: number;
 }
 
 /** Accumulator for reasons during scoring, before the final Reason is produced. */

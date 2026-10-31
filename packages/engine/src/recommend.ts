@@ -171,7 +171,7 @@ export function recommend(
 
     // Baseline gate: n_eff < minGames -> insufficientData
     if (!baselineGate(nE, config.minGames)) {
-      const rawGames = Math.round(baseRow.gamesW);
+      const rawGames = baseRow.rawGames ?? 0;
       insufficientData.push({ championId: c, nEff: nE, rawGames });
       continue;
     }
@@ -198,7 +198,9 @@ export function recommend(
 
     // --- Layer 2: lane_vs (all lane-group enemies known) ---
     const [enemy1, enemy2] = laneGroupInfo.enemies;
-    const laneEnemiesKnown = laneGroupInfo.enemiesKnown.length === laneGroup.enemies.length;
+    const laneEnemiesKnown = laneGroup.enemies.every((role) =>
+      laneGroupInfo.enemiesKnown.includes(role),
+    );
     const laneVsDelta =
       laneEnemiesKnown && enemy1
         ? applyLane(

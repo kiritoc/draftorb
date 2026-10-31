@@ -23,8 +23,22 @@ export function resolveKnownSlots(
   let source: ReadonlyArray<Slot> = slots;
   let resolved: RoleAssignment | null = inferRoles(slots, roleProb);
   if (!resolved) {
-    source = slots.filter((s) => s.role !== undefined || roleProb[s.championId] !== undefined);
-    resolved = source.length > 0 ? inferRoles(source, roleProb) : null;
+    // Greedily grow a viable subset: start from fixed slots, then add each
+    // unfixed slot only if inference still succeeds with it included.
+    const fixedSlots = slots.filter((s) => s.role !== undefined);
+    let subset: Slot[] = [...fixedSlots];
+    let subsetResolved: RoleAssignment | null =
+      subset.length > 0 ? inferRoles(subset, roleProb) : null;
+    for (const s of slots) {
+      if (s.role !== undefined) continue;
+      const attempt = inferRoles([...subset, s], roleProb);
+      if (attempt) {
+        subset = [...subset, s];
+        subsetResolved = attempt;
+      }
+    }
+    source = subset;
+    resolved = subsetResolved;
   }
   if (!resolved) {
     return slots

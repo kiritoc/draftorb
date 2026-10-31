@@ -33,7 +33,7 @@ import type {
  * Each champion gets games_w=50, wins_w=30 (60% win rate) at the DIAMOND bucket.
  */
 function makeBaselines(champions: ChampionId[], bucket: RankBucket = 'DIAMOND'): BaselineTable {
-  return champions.map((c): BaselineEntry => [c, bucket, 30, 50, 0.1]);
+  return champions.map((c): BaselineEntry => [c, bucket, 30, 50, 0.1, 50]);
 }
 
 function makeAllyPairs(
@@ -214,8 +214,8 @@ describe('recommend: candidate set', () => {
   it('excludes champions with n_eff below minGames (insufficientData)', () => {
     const champions: ChampionId[] = [1, 2];
     const baselines: BaselineTable = [
-      [champions[0] ?? 1, 'DIAMOND', 5, 10, 10], // n_eff = 10, below 25
-      [champions[1] ?? 2, 'DIAMOND', 30, 50, 0.1], // n_eff = 25000, passes
+      [champions[0] ?? 1, 'DIAMOND', 5, 10, 10, 10], // n_eff = 10, below 25
+      [champions[1] ?? 2, 'DIAMOND', 30, 50, 0.1, 50], // n_eff = 25000, passes
     ];
     const data = makeData({ champions, baselines });
     const input = makeInput();
@@ -247,9 +247,9 @@ describe('recommend: sorting and ranking', () => {
   it('sorts recommendations descending by score', () => {
     const champions: ChampionId[] = [1, 2, 3];
     const baselines: BaselineTable = [
-      [1, 'DIAMOND', 40, 50, 0.1], // 80% win rate
-      [2, 'DIAMOND', 25, 50, 0.1], // 50% win rate
-      [3, 'DIAMOND', 10, 50, 0.1], // 20% win rate
+      [1, 'DIAMOND', 40, 50, 0.1, 50], // 80% win rate
+      [2, 'DIAMOND', 25, 50, 0.1, 50], // 50% win rate
+      [3, 'DIAMOND', 10, 50, 0.1, 50], // 20% win rate
     ];
     const data = makeData({ champions, baselines });
     const input = makeInput();
@@ -873,5 +873,69 @@ describe('recommend: no crash on edge cases', () => {
     const input = makeInput();
     const result = recommend(input, data);
     expect(result.recommendations).toHaveLength(0);
+  });
+});
+
+describe('recommend: rawGames', () => {
+  it('reports the exported raw match count, not the weighted sum', () => {
+    // 20 half-weight games: games_w = 10, games_w2 = 5, n_eff = 20 < 25.
+    const baselines: BaselineTable = [
+      [1, 'DIAMOND', 5, 10, 5, 20],
+      [2, 'DIAMOND', 30, 50, 0.1, 50],
+    ];
+    const data = makeData({ champions: [1, 2], baselines });
+    const result = recommend(makeInput(), data);
+    const entry = result.insufficientData.find((i) => i.championId === 1);
+    expect(entry?.rawGames).toBe(20);
+  });
+});
+
+describe('recommend: role-conflict regressions', () => {
+  it('keeps a resolvable teammate when another unfixed pick conflicts with a fixed role', () => {
+    const champions: ChampionId[] = [1, 2, 201, 202, 300];
+    const roleProb: ChampionRoleProbabilities = {
+      '1': { SUPPORT: 1.0 },
+      '2': { SUPPORT: 1.0 },
+      '201': { ADC: 1.0 },
+      '202': { ADC: 1.0 },
+      // Mostly TOP, but above the SUPPORT candidate threshold: it would be
+      // recommended if its known enemy slot were dropped.
+      '300': { TOP: 0.9, SUPPORT: 0.1 },
+    } as ChampionRoleProbabilities;
+    const data = makeData({ champions, roleProb });
+    const input = makeInput({
+      enemies: [{ championId: 201, role: 'ADC' }, { championId: 202 }, { championId: 300 }],
+    });
+
+    const result = recommend(input, data);
+    const ids = result.recommendations.map((r) => r.championId);
+    expect(ids).not.toContain(300);
+    expect(ids).toEqual(expect.arrayContaining([1, 2]));
+  });
+
+  it('does not treat duplicate fixed SUPPORT enemies as a complete bot lane', () => {
+    const champions: ChampionId[] = [1, 2, 200, 201];
+    const roleProb: ChampionRoleProbabilities = {
+      '1': { SUPPORT: 1.0 },
+      '2': { SUPPORT: 1.0 },
+      '200': { SUPPORT: 1.0 },
+      '201': { SUPPORT: 1.0 },
+    } as ChampionRoleProbabilities;
+    const laneVs = makeLaneVs([
+      { championId: 1, opp1Id: 200, opp2Id: 201, ...HIGH_GAMES, winsW: 45 },
+      { championId: 1, opp1Id: 201, opp2Id: 200, ...HIGH_GAMES, winsW: 45 },
+    ]);
+    const data = makeData({ champions, roleProb, laneVs });
+    const input = makeInput({
+      enemies: [
+        { championId: 200, role: 'SUPPORT' },
+        { championId: 201, role: 'SUPPORT' },
+      ],
+    });
+
+    const result = recommend(input, data);
+    const rec1 = result.recommendations.find((r) => r.championId === 1);
+    expect(rec1).toBeDefined();
+    expect(rec1?.reasons.some((r) => r.type === 'lane')).toBe(false);
   });
 });

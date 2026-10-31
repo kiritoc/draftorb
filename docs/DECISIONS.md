@@ -226,6 +226,18 @@ Owner decision 2026-10-29.
   - Keep `min(0)` and add a separate zero-check refinement — rejected in favor of the simpler `gt(0)`, which communicates intent at the value level.
 - Consequences: four test cases updated (zero-valued role map made sparse, duplicate pool id, manifest version pinning, zero-rejection negative test); `MANIFEST_SCHEMA_VERSION` re-exported from the package barrel. No engine or ETL code consumed these schemas yet (T-020/T-019 are not started), so no downstream breakage.
 
+### D-030 — T-023 engine assumptions: blind-safety trigger, pickShare proxy, comp/blind reasons, board-picked pool champions — PROPOSED
+
+- Context: Implementing SPECS §5 in T-023 left four points unspecified or not implementable with current exports.
+- Assumptions (implemented, pending owner review):
+  1. **Blind-safety trigger.** SPECS §5 says "blindPick or fewer than 2 lane enemies known". For 1v1 lane groups (TOP/MID/JUNGLE) one enemy completes the lane, so the engine runs blind safety when `blindPick` is true or any role of `laneGroup(myRole).enemies` is unknown. For bot lane this equals the spec rule.
+  2. **`pickShare(e)` proxy.** No pick-rate export exists yet, so `pickShare(e)` is approximated by `roleProb[e][role]` over unpicked champions above `ROLE_PROB_THRESHOLD`, normalized per unseen role. Lowdata matchups are skipped. Tracked as B-026; replace when a pick-rate export lands.
+  3. **Comp/blind reason levels.** Comp and blind reasons have no sample size; their level is computed from `deltaPp` with `n = 0`, so positive values cap at L1 (the `highLevelMinGames` gate). Negative levels are unrestricted.
+  4. **No comp need without allies.** With zero known allies, no need is reported (`compNeed = 0`) instead of rewarding every tag.
+  5. **`compNeed` ignores enemies** until T-025 (full comp model).
+  6. **Pool champion already picked on the board** is neither scored nor listed in `poolUnavailable` (the schema only allows `insufficientData | unknownChampion`). Option for the owner: add a `picked` reason.
+- Consequences: T-024, T-025 and T-027.a revisit these; any change updates the T-023 tests.
+
 ### Template
 
 ```

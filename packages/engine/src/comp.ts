@@ -10,7 +10,7 @@
  * sufficient for T-023.
  */
 
-import type { ChampionId, ChampionTagsMap, Role } from '@draftorb/shared';
+import type { ChampionId, ChampionTagsMap } from '@draftorb/shared';
 import type { CompConfig } from './config.js';
 import { DEFAULT_COMP_CONFIG } from './config.js';
 
@@ -25,12 +25,6 @@ export interface CompNeedResult {
   readonly filled: readonly CompNeedCategory[];
 }
 
-export interface TeamCompSnapshot {
-  readonly allies: readonly ChampionId[];
-  readonly enemies: readonly ChampionId[];
-  readonly userRole: Role;
-}
-
 /**
  * Compute the team's missing composition needs based on the known ally champions
  * (excluding the candidate `c` itself). Returns the categories the team lacks.
@@ -40,6 +34,10 @@ export function teamMissingNeeds(
   tags: ChampionTagsMap,
   config: CompConfig = DEFAULT_COMP_CONFIG,
 ): Set<CompNeedCategory> {
+  // No known allies: no evidence of any gap, so no need is reported (otherwise
+  // every candidate would get an identical, meaningless comp bonus).
+  if (allyChampionIds.length === 0) return new Set<CompNeedCategory>();
+
   const present = new Set<CompNeedCategory>();
   let adChampions = 0;
   let apChampions = 0;

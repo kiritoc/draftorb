@@ -6,7 +6,10 @@ import type { ChampionId, ReasonLevel, Recommendation } from '@draftorb/shared';
 import type { RankWeightingConfig } from './config.js';
 import type { LaneDelta, LaneGroupInfo, ReasonAccumulator } from './recommend-types.js';
 import type { PairDelta } from './recommend-terms.js';
+import { DELTA_PP_DECIMALS } from './config.js';
 import { isLowData, levelFromConfig } from './levels.js';
+
+const DELTA_PP_SCALE = 10 ** DELTA_PP_DECIMALS;
 
 function toReasonLevel(levelNum: number): ReasonLevel | undefined {
   if (
@@ -89,7 +92,7 @@ export function buildReasons(
       deltaPp: blindDeltaPp,
       n: 0,
       lowData: false,
-      level: undefined,
+      level: toReasonLevel(levelFromConfig(blindDeltaPp, 0, config)),
     });
   }
 
@@ -120,7 +123,7 @@ export function toRecommendation(
       type: r.type,
       with: r.with.length > 0 ? r.with : undefined,
       level: r.level,
-      deltaPp: Math.round(r.deltaPp * 100) / 100,
+      deltaPp: Math.round(r.deltaPp * DELTA_PP_SCALE) / DELTA_PP_SCALE,
       n: Math.round(r.n),
       lowData: r.lowData,
     })),

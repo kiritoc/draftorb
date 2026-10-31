@@ -28,9 +28,11 @@ import type { CompConfig, RankWeightingConfig } from './config.js';
 import type { DataRow, LaneDelta } from './recommend-types.js';
 import type { ScoredCandidate } from './recommend-reasons.js';
 import {
+  BASELINE_PRIOR_WINRATE,
   DEFAULT_COMP_CONFIG,
   DEFAULT_CONFIG,
   ROLE_PROB_THRESHOLD,
+  SCORE_TIE_EPSILON,
   W_BLIND,
   W_COMP,
   rankToBucket,
@@ -177,7 +179,7 @@ export function recommend(
     }
 
     // p0 = shrink(winsE, gamesE, k0, 0.5); baseline log-odds
-    const p0 = (winsE + config.k0 * 0.5) / (gamesE + config.k0);
+    const p0 = (winsE + config.k0 * BASELINE_PRIOR_WINRATE) / (gamesE + config.k0);
     const x = baselineLogOdds(winsE, gamesE, config.k0, config.eps);
 
     // Determine if this is an off-role pool champion
@@ -206,7 +208,7 @@ export function recommend(
         ? applyLane(
             laneVsIdx.get(makeLaneVsKey(c, enemy1.championId, enemy2?.championId ?? -1)),
             logOdds,
-            laneGroupInfo.confidence,
+            laneGroupInfo.enemyConfidence,
             config,
           )
         : null;
@@ -283,7 +285,7 @@ export function recommend(
   // --- Sort and rank ---
   const sorted = scored.sort((a, b) => {
     const diff = b.score - a.score;
-    if (Math.abs(diff) > 1e-9) return diff;
+    if (Math.abs(diff) > SCORE_TIE_EPSILON) return diff;
     return a.championId - b.championId;
   });
 

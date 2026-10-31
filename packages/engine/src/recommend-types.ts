@@ -2,7 +2,10 @@
  * @draftorb/engine — Shared internal types for the recommendation engine.
  */
 
-import type { ChampionId, ReasonLevel, Role } from '@draftorb/shared';
+import type { ChampionId, ReasonLevel, Recommendation, Role } from '@draftorb/shared';
+
+/** Reason type, derived from the shared output schema (never duplicated). */
+type ReasonType = Recommendation['reasons'][number]['type'];
 
 /** A known slot augmented with its inferred role and confidence. */
 export interface KnownSlot {
@@ -27,7 +30,7 @@ export interface DataRow {
 
 /** Accumulator for reasons during scoring, before the final Reason is produced. */
 export interface ReasonAccumulator {
-  readonly type: 'synergy' | 'counter' | 'lane' | 'comp' | 'blind';
+  readonly type: ReasonType;
   readonly with: ChampionId[];
   readonly deltaPp: number;
   readonly n: number;
@@ -67,5 +70,8 @@ export interface LaneGroupInfo {
   readonly enemies: KnownSlot[];
   readonly alliesKnown: Role[];
   readonly enemiesKnown: Role[];
+  /** conf_lane for lane_full: product over allies and enemies of the lane group. */
   readonly confidence: number;
+  /** conf_lane for lane_vs: product over the lane-group enemies only. */
+  readonly enemyConfidence: number;
 }

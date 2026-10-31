@@ -92,11 +92,11 @@
   },
   "expected": {
     "recommendations": [
-      { "championId": 1, "rank": 1, "reasons": [{ "type": "comp" }] },
-      { "championId": 2, "rank": 2, "reasons": [{ "type": "comp" }] },
-      { "championId": 4, "rank": 3, "reasons": [{ "type": "comp" }] },
-      { "championId": 3, "rank": 4, "reasons": [{ "type": "comp" }] },
-      { "championId": 5, "rank": 5, "reasons": [{ "type": "comp" }] }
+      { "championId": 1, "rank": 1 },
+      { "championId": 2, "rank": 2 },
+      { "championId": 4, "rank": 3 },
+      { "championId": 3, "rank": 4 },
+      { "championId": 5, "rank": 5 }
     ]
   }
 }

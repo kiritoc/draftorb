@@ -70,8 +70,10 @@ export function computeLaneGroup(
     .filter((s) => laneGroup.enemies.includes(s.role))
     .sort((a, b) => laneGroup.enemies.indexOf(a.role) - laneGroup.enemies.indexOf(b.role));
 
-  let confidence = 1;
-  for (const s of [...allies, ...enemies]) confidence *= s.confidence;
+  let enemyConfidence = 1;
+  for (const s of enemies) enemyConfidence *= s.confidence;
+  let confidence = enemyConfidence;
+  for (const s of allies) confidence *= s.confidence;
 
   return {
     allies,
@@ -79,5 +81,6 @@ export function computeLaneGroup(
     alliesKnown: allies.map((s) => s.role),
     enemiesKnown: enemies.map((s) => s.role),
     confidence,
+    enemyConfidence,
   };
 }

@@ -265,6 +265,15 @@ export const ROLE_INFERENCE_EPS = 1e-4;
 /** Role probability threshold to enter the candidate set (SPECS §5). */
 export const ROLE_PROB_THRESHOLD = 0.05;
 
+/** Prior win rate the baseline `p0` is shrunk toward (SPECS §5: k0 toward 0.5). */
+export const BASELINE_PRIOR_WINRATE = 0.5;
+
+/** Score differences at or below this are ties, broken by championId ascending. */
+export const SCORE_TIE_EPSILON = 1e-9;
+
+/** Decimal places kept on a reported reason `deltaPp`. */
+export const DELTA_PP_DECIMALS = 2;
+
 /** W_comp: scale applied to the comp-need bonus (SPECS §5). Prior. */
 export const W_COMP = 1.0;
 

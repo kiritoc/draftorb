@@ -92,6 +92,12 @@ describe('teamMissingNeeds', () => {
     expect(missing.has('ap_damage')).toBe(false);
   });
 
+  it('reports no missing needs when no ally is known', () => {
+    const tags = makeTags({ 1: { hardEngage: true } });
+    expect(teamMissingNeeds([], tags).size).toBe(0);
+    expect(computeCompNeed(1, [], tags).bonus).toBe(0);
+  });
+
   it('skips champions without tags gracefully', () => {
     const tags = makeTags({ 1: { hardEngage: true } });
     const missing = teamMissingNeeds([1, 2, 99], tags);

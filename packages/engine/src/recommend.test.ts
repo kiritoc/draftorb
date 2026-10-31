@@ -939,3 +939,143 @@ describe('recommend: role-conflict regressions', () => {
     expect(rec1?.reasons.some((r) => r.type === 'lane')).toBe(false);
   });
 });
+
+describe('recommend: review coverage', () => {
+  const botRoleProb = {
+    '1': { SUPPORT: 1.0 },
+    '2': { SUPPORT: 1.0 },
+    '10': { ADC: 1.0 },
+    '200': { SUPPORT: 1.0 },
+    '201': { ADC: 1.0 },
+  } as ChampionRoleProbabilities;
+
+  it('applies lane_full for a complete bot lane after lane_vs', () => {
+    const laneVs = makeLaneVs([
+      { championId: 1, opp1Id: 200, opp2Id: 201, ...HIGH_GAMES, winsW: 35 },
+    ]);
+    const laneFull = makeLaneFull([
+      { championId: 1, partnerId: 10, opp1Id: 200, opp2Id: 201, ...HIGH_GAMES, winsW: 45 },
+    ]);
+    const data = makeData({
+      champions: [1, 2, 10, 200, 201],
+      roleProb: botRoleProb,
+      laneVs,
+      laneFull,
+    });
+    const input = makeInput({
+      allies: [{ championId: 10, role: 'ADC' }],
+      enemies: [
+        { championId: 200, role: 'SUPPORT' },
+        { championId: 201, role: 'ADC' },
+      ],
+    });
+    const rec = recommend(input, data).recommendations.find((r) => r.championId === 1);
+    const lanes = rec?.reasons.filter((r) => r.type === 'lane') ?? [];
+    expect(lanes).toHaveLength(2);
+    expect(lanes[0]?.with).toEqual([200, 201]);
+    expect(lanes[1]?.with).toEqual([10, 200, 201]);
+  });
+
+  it('scales lane_vs by conf_lane when an enemy role is inferred', () => {
+    const laneVs = makeLaneVs([
+      { championId: 1, opp1Id: 200, opp2Id: 201, ...HIGH_GAMES, winsW: 45 },
+    ]);
+    const roleProb = {
+      ...botRoleProb,
+      '200': { SUPPORT: 0.6, MID: 0.4 },
+    } as ChampionRoleProbabilities;
+    const data = makeData({ champions: [1, 2, 10, 200, 201], roleProb, laneVs });
+    const laneDelta = (fixed: boolean): number => {
+      const input = makeInput({
+        enemies: [
+          fixed ? { championId: 200, role: 'SUPPORT' } : { championId: 200 },
+          { championId: 201, role: 'ADC' },
+        ],
+      });
+      const rec = recommend(input, data).recommendations.find((r) => r.championId === 1);
+      return Math.abs(rec?.reasons.find((r) => r.type === 'lane')?.deltaPp ?? 0);
+    };
+    const fixedDelta = laneDelta(true);
+    const inferredDelta = laneDelta(false);
+    expect(fixedDelta).toBeGreaterThan(0);
+    expect(inferredDelta).toBeGreaterThan(0);
+    expect(inferredDelta).toBeLessThan(fixedDelta);
+  });
+
+  it('warns when a known enemy hard-counters the candidate', () => {
+    const enemyPairs = makeEnemyPairs([
+      { championId: 1, enemyId: 200, role: 'SUPPORT', ...HIGH_GAMES, winsW: 10 },
+      { championId: 2, enemyId: 200, role: 'SUPPORT', ...HIGH_GAMES, winsW: 30 },
+    ]);
+    const data = makeData({ champions: [1, 2, 200], roleProb: botRoleProb, enemyPairs });
+    const input = makeInput({ enemies: [{ championId: 200, role: 'SUPPORT' }] });
+    const result = recommend(input, data);
+    const rec1 = result.recommendations.find((r) => r.championId === 1);
+    const rec2 = result.recommendations.find((r) => r.championId === 2);
+    expect(rec1?.warnings).toContain('countered by enemy support 200');
+    expect(rec2?.warnings.some((w) => w.startsWith('countered by'))).toBe(false);
+  });
+
+  it('gives blind reasons a level', () => {
+    const enemyPairs = makeEnemyPairs([
+      { championId: 1, enemyId: 201, role: 'ADC', ...HIGH_GAMES, winsW: 10 },
+    ]);
+    const data = makeData({ champions: [1, 201], roleProb: botRoleProb, enemyPairs });
+    const rec = recommend(makeInput({ blindPick: true }), data).recommendations[0];
+    const blind = rec?.reasons.find((r) => r.type === 'blind');
+    expect(blind).toBeDefined();
+    expect(blind?.level).toBeLessThan(0);
+  });
+
+  it('emits no comp reason when no ally is known', () => {
+    const data = makeData({ champions: [1, 2] });
+    for (const rec of recommend(makeInput(), data).recommendations) {
+      expect(rec.reasons.some((r) => r.type === 'comp')).toBe(false);
+    }
+  });
+
+  it('applies a 1v1 lane_vs for MID without blind safety', () => {
+    const roleProb = {
+      '1': { MID: 1.0 },
+      '2': { MID: 1.0 },
+      '300': { MID: 1.0 },
+    } as ChampionRoleProbabilities;
+    const laneVs = makeLaneVs([
+      { championId: 1, opp1Id: 300, opp2Id: null, ...HIGH_GAMES, winsW: 45 },
+    ]);
+    const data = makeData({ champions: [1, 2, 300], roleProb, laneVs });
+    const input = makeInput({ userRole: 'MID', enemies: [{ championId: 300, role: 'MID' }] });
+    const result = recommend(input, data);
+    expect(result.recommendations[0]?.championId).toBe(1);
+    const rec1 = result.recommendations[0];
+    expect(rec1?.reasons.filter((r) => r.type === 'lane')).toHaveLength(1);
+    expect(rec1?.reasons.some((r) => r.type === 'blind')).toBe(false);
+  });
+
+  it('pool champion already picked on the board is not scored or reported (D-030)', () => {
+    const data = makeData({ champions: [1, 2, 200], roleProb: botRoleProb });
+    const input = makeInput({ enemies: [{ championId: 200, role: 'SUPPORT' }], pool: [200] });
+    const result = recommend(input, data);
+    expect(result.recommendations.some((r) => r.championId === 200)).toBe(false);
+    expect(result.poolRecommendations).toEqual([]);
+    expect(result.poolUnavailable).toEqual([]);
+  });
+
+  it('pool never changes scores with enemies and an off-role pool champion', () => {
+    const roleProb = { ...botRoleProb, '99': { TOP: 1.0 } } as ChampionRoleProbabilities;
+    const enemyPairs = makeEnemyPairs([
+      { championId: 1, enemyId: 200, role: 'SUPPORT', ...HIGH_GAMES, winsW: 20 },
+      { championId: 99, enemyId: 200, role: 'SUPPORT', ...HIGH_GAMES, winsW: 40 },
+    ]);
+    const data = makeData({ champions: [1, 2, 99, 200], roleProb, enemyPairs });
+    const enemies = [{ championId: 200, role: 'SUPPORT' as Role }];
+    const base = recommend(makeInput({ enemies }), data).recommendations;
+    const pooled = recommend(makeInput({ enemies, pool: [99, 1] }), data).recommendations;
+    for (const rec of base) {
+      const other = pooled.find((r) => r.championId === rec.championId);
+      expect(other?.score).toBeCloseTo(rec.score, 12);
+      expect(other?.reasons).toEqual(rec.reasons);
+    }
+    expect(pooled.find((r) => r.championId === 99)?.warnings).toContain('offRole');
+  });
+});

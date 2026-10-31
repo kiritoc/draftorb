@@ -2,16 +2,22 @@
  * @draftorb/engine — Pair, blind-safety and hard-counter terms (SPECS §5).
  */
 
-import type { ChampionId, ChampionRoleProbabilities, Role } from '@draftorb/shared';
+import type { ChampionId, ChampionRoleProbabilities, Role, WarningCode } from '@draftorb/shared';
 import type { RankWeightingConfig } from './config.js';
 import type { DataRow, KnownSlot } from './recommend-types.js';
-import { COUNTERED_BY_WARNING, DEFAULT_RECOMMEND_CONFIG, getInfluence } from './config.js';
+import {
+  COUNTERED_BY_WARNING,
+  DEFAULT_RECOMMEND_CONFIG,
+  DRAFT_PHASE,
+  getInfluence,
+} from './config.js';
 import { deltaPp, scorePair } from './levels.js';
 import { makePairKey } from './recommend-indexes.js';
+import { roundDeltaPp } from './recommend-reasons.js';
 import { logit } from './weighting.js';
 
 export interface PairDelta {
-  readonly side: 'ally' | 'enemy';
+  readonly side: KnownSlot['side'];
   readonly role: Role;
   readonly championId: ChampionId;
   readonly confidence: number;
@@ -43,7 +49,7 @@ export function scorePairs(
   const ordered = slots
     .map((slot) => ({
       slot,
-      influence: getInfluence(myRole, slot.side, slot.role, 'draft', config),
+      influence: getInfluence(myRole, slot.side, slot.role, DRAFT_PHASE, config),
     }))
     .filter((e) => e.influence > 0)
     .sort((a, b) => b.influence - a.influence || a.slot.championId - b.slot.championId);
@@ -97,18 +103,67 @@ export function computeBlindSafety(
   roleProbThreshold: number = DEFAULT_RECOMMEND_CONFIG.roleProbThreshold,
   worstCaseFactor: number = DEFAULT_RECOMMEND_CONFIG.blindWorstCaseFactor,
 ): number {
+  const opponents = blindOpponents(
+    unknownRoles,
+    excluded,
+    championIds,
+    roleProb,
+    roleProbThreshold,
+  );
+  return blindSafetyFromOpponents(c, opponents, enemyIdx, p0, config, worstCaseFactor);
+}
+
+export interface BlindOpponent {
+  readonly championId: ChampionId;
+  readonly share: number;
+}
+
+/**
+ * Likely unseen opponents per unknown role. Candidate-independent, so
+ * `recommend` builds it once per draft; championIds are deduplicated so a
+ * repeated id never counts twice in the share distribution.
+ */
+export function blindOpponents(
+  unknownRoles: readonly Role[],
+  excluded: ReadonlySet<ChampionId>,
+  championIds: readonly ChampionId[],
+  roleProb: ChampionRoleProbabilities,
+  roleProbThreshold: number = DEFAULT_RECOMMEND_CONFIG.roleProbThreshold,
+): ReadonlyMap<Role, readonly BlindOpponent[]> {
+  const unique = [...new Set(championIds)];
+  const out = new Map<Role, BlindOpponent[]>();
+  for (const role of unknownRoles) {
+    const list: BlindOpponent[] = [];
+    for (const e of unique) {
+      if (excluded.has(e)) continue;
+      const share = roleProb[e]?.[role];
+      if (typeof share !== 'number' || share < roleProbThreshold) continue;
+      list.push({ championId: e, share });
+    }
+    out.set(role, list);
+  }
+  return out;
+}
+
+/** blindSafety(c) over a precomputed opponent distribution (see `blindOpponents`). */
+export function blindSafetyFromOpponents(
+  c: ChampionId,
+  opponents: ReadonlyMap<Role, readonly BlindOpponent[]>,
+  enemyIdx: Map<string, DataRow>,
+  p0: number,
+  config: RankWeightingConfig,
+  worstCaseFactor: number = DEFAULT_RECOMMEND_CONFIG.blindWorstCaseFactor,
+): number {
   let total = 0;
 
-  for (const role of unknownRoles) {
+  for (const [role, list] of opponents) {
     let shareTotal = 0;
     let weighted = 0;
     // Starts at 0 on purpose: the worst-case term is a penalty only, so an
     // all-favorable distribution gets no extra bonus (SPECS §5).
     let minTerm = 0;
-    for (const e of championIds) {
-      if (e === c || excluded.has(e)) continue;
-      const share = roleProb[e]?.[role];
-      if (typeof share !== 'number' || share < roleProbThreshold) continue;
+    for (const { championId: e, share } of list) {
+      if (e === c) continue;
       // Missing or lowData matchups count as neutral (term 0) with their full
       // share, so a candidate is not rewarded for lacking data.
       const row = enemyIdx.get(makePairKey(c, e, role));
@@ -128,13 +183,15 @@ export function computeBlindSafety(
 /**
  * "countered by" warnings, derived from the layer-1 enemy pair deltas so the
  * warning uses exactly the `deltaPp` shown in the matching `counter` reason
- * (same running log-odds, conf, influence and s). lowData pairs never warn.
+ * (same running log-odds, conf, influence and s). The threshold is compared
+ * against the *rounded* delta so the warning matches the displayed reason.
+ * lowData pairs never warn.
  */
 export function hardCounterWarnings(
   pairDeltas: readonly PairDelta[],
   thresholdPp: number = DEFAULT_RECOMMEND_CONFIG.hardCounterDeltaPp,
-): string[] {
+): WarningCode[] {
   return pairDeltas
-    .filter((d) => d.side === 'enemy' && !d.lowData && d.deltaPp <= thresholdPp)
+    .filter((d) => d.side === 'enemy' && !d.lowData && roundDeltaPp(d.deltaPp) <= thresholdPp)
     .map((d) => `${COUNTERED_BY_WARNING}:${d.role}:${d.championId}`);
 }

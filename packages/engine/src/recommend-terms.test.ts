@@ -9,6 +9,22 @@ import { indexPairs, makePairKey } from './recommend-indexes.js';
 import { scorePair } from './levels.js';
 import type { KnownSlot } from './recommend-types.js';
 import { computeBlindSafety, hardCounterWarnings, scorePairs } from './recommend-terms.js';
+import type { PairDelta } from './recommend-terms.js';
+import { roundDeltaPp } from './recommend-reasons.js';
+
+function deltaAt(deltaPp: number): PairDelta {
+  return {
+    side: 'enemy',
+    role: 'SUPPORT',
+    championId: 200,
+    confidence: 1,
+    influence: 1,
+    term: 0,
+    lowData: false,
+    n: 25000,
+    deltaPp,
+  };
+}
 
 const BLIND_WORST_CASE_FACTOR = DEFAULT_RECOMMEND_CONFIG.blindWorstCaseFactor;
 
@@ -106,6 +122,21 @@ describe('computeBlindSafety', () => {
     expect(actual).toBeCloseTo(t, 12);
   });
 
+  it('counts a duplicated championId only once', () => {
+    const once = computeBlindSafety(1, ['ADC'], new Set(), ids, roleProb, idx, P0, DEFAULT_CONFIG);
+    const dup = computeBlindSafety(
+      1,
+      ['ADC'],
+      new Set(),
+      [...ids, 201, 201],
+      roleProb,
+      idx,
+      P0,
+      DEFAULT_CONFIG,
+    );
+    expect(dup).toBe(once);
+  });
+
   it('returns 0 when no champion can play the unseen role', () => {
     expect(computeBlindSafety(1, ['TOP'], new Set(), ids, roleProb, idx, P0, DEFAULT_CONFIG)).toBe(
       0,
@@ -177,9 +208,18 @@ describe('hardCounterWarnings', () => {
     const { deltas } = scorePairs(1, 'SUPPORT', slots, allyIdx, enemyIdx, P0, DEFAULT_CONFIG);
     const counter = deltas.find((d) => d.side === 'enemy');
     if (!counter) throw new Error('missing counter delta');
-    // Threshold just above / below the reported delta flips the warning.
-    expect(hardCounterWarnings(deltas, counter.deltaPp)).toHaveLength(1);
-    expect(hardCounterWarnings(deltas, counter.deltaPp - 1e-9)).toHaveLength(0);
+    // Threshold at / one step below the reported (rounded) delta flips the warning.
+    const shown = roundDeltaPp(counter.deltaPp);
+    expect(hardCounterWarnings(deltas, shown)).toHaveLength(1);
+    expect(hardCounterWarnings(deltas, shown - 0.01)).toHaveLength(0);
+  });
+
+  it('compares the rounded delta, so warning and displayed reason agree', () => {
+    const d = { ...deltaAt(-4.497) };
+    // Displayed as -4.5 -> warns at the -4.5 threshold.
+    expect(hardCounterWarnings([d], -4.5)).toEqual(['counteredBy:SUPPORT:200']);
+    // Displayed as -4.49 -> no warning.
+    expect(hardCounterWarnings([deltaAt(-4.494)], -4.5)).toEqual([]);
   });
 
   it('never warns for ally pairs', () => {

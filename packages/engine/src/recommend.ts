@@ -40,7 +40,12 @@ import {
   makeLaneVsKey,
 } from './recommend-indexes.js';
 import { computeLaneGroup, resolveKnownSlots } from './recommend-slots.js';
-import { computeBlindSafety, hardCounterWarnings, scorePairs } from './recommend-terms.js';
+import {
+  blindOpponents,
+  blindSafetyFromOpponents,
+  hardCounterWarnings,
+  scorePairs,
+} from './recommend-terms.js';
 import { buildReasons, toRecommendation } from './recommend-reasons.js';
 import { buildCandidateSet, buildPoolOutput, isBelowRoleThreshold } from './recommend-pool.js';
 
@@ -110,6 +115,22 @@ export function recommend(
   // Comp is role-independent: use every board ally, even if role inference dropped it.
   const allyChampIds = input.allies.map((s) => s.championId);
 
+  // Blind-safety opponent distribution is candidate-independent: build it once.
+  const laneEnemiesKnown = laneGroup.enemies.every((role) =>
+    laneGroupInfo.enemiesKnown.includes(role),
+  );
+  const unknownLaneRoles = laneGroup.enemies.filter(
+    (role) => !laneGroupInfo.enemiesKnown.includes(role),
+  );
+  const blindApplies = input.blindPick || !laneEnemiesKnown;
+  const opponents = blindOpponents(
+    blindApplies ? unknownLaneRoles : [],
+    knownChampionSet,
+    data.championIds,
+    data.roleProb,
+    rc.roleProbThreshold,
+  );
+
   // --- Score each candidate ---
   const scored: ScoredCandidate[] = [];
   const insufficientData: InsufficientDataEntry[] = [];
@@ -159,9 +180,6 @@ export function recommend(
 
     // --- Layer 2: lane_vs (all lane-group enemies known) ---
     const [enemy1, enemy2] = laneGroupInfo.enemies;
-    const laneEnemiesKnown = laneGroup.enemies.every((role) =>
-      laneGroupInfo.enemiesKnown.includes(role),
-    );
     const laneVsDelta =
       laneEnemiesKnown && enemy1
         ? applyLane(
@@ -202,20 +220,13 @@ export function recommend(
 
     // --- Layer 5: blind safety (blind pick or lane enemies still unknown) ---
     let blindDeltaPp: number | null = null;
-    if (input.blindPick || !laneEnemiesKnown) {
-      const unknownLaneRoles = laneGroup.enemies.filter(
-        (role) => !laneGroupInfo.enemiesKnown.includes(role),
-      );
-      const rawTerm = computeBlindSafety(
+    if (blindApplies) {
+      const rawTerm = blindSafetyFromOpponents(
         c,
-        unknownLaneRoles,
-        knownChampionSet,
-        data.championIds,
-        data.roleProb,
+        opponents,
         enemyPairIdx,
         p0,
         config,
-        rc.roleProbThreshold,
         rc.blindWorstCaseFactor,
       );
       const term = rc.wBlind * rawTerm;

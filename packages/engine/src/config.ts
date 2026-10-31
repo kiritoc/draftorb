@@ -268,6 +268,9 @@ export const BASELINE_PRIOR_WINRATE = 0.5;
 /** Decimal places kept on a reported reason `deltaPp`. */
 export const DELTA_PP_DECIMALS = 2;
 
+/** Influence-matrix phase used by the draft recommendation layer. */
+export const DRAFT_PHASE = 'draft' as const;
+
 /**
  * Lookup-key placeholder for an absent lane id (`opp2`/`partner` in 1v1 lane
  * groups); matches the `COALESCE(..., -1)` used by the lane unique indexes.

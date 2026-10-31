@@ -10,7 +10,12 @@
  * sufficient for T-023.
  */
 
-import type { ChampionId, ChampionTagsMap, CompNeedCategory } from '@draftorb/shared';
+import type {
+  ChampionId,
+  ChampionTags,
+  ChampionTagsMap,
+  CompNeedCategory,
+} from '@draftorb/shared';
 import type { CompConfig } from './config.js';
 import { DEFAULT_COMP_CONFIG } from './config.js';
 
@@ -23,12 +28,15 @@ export interface CompNeedResult {
   readonly filled: readonly CompNeedCategory[];
 }
 
-/** Allies that have a tag entry; untagged allies carry no comp evidence. */
-function taggedAllyIds(
+/** Tag entries of the allies; untagged allies carry no comp evidence. */
+function taggedAllies(
   allyChampionIds: ReadonlyArray<ChampionId>,
   tags: ChampionTagsMap,
-): ChampionId[] {
-  return allyChampionIds.filter((id) => tags[id] !== undefined);
+): ChampionTags[] {
+  return allyChampionIds.flatMap((id) => {
+    const t = tags[id];
+    return t ? [t] : [];
+  });
 }
 
 /**
@@ -43,16 +51,14 @@ export function teamMissingNeeds(
   // Only tagged allies are evidence. With no tagged ally there is no evidence
   // of any gap, so no need is reported (otherwise every candidate would get an
   // identical, meaningless comp bonus).
-  const taggedAllies = taggedAllyIds(allyChampionIds, tags);
-  if (taggedAllies.length === 0) return new Set<CompNeedCategory>();
+  const allyTags = taggedAllies(allyChampionIds, tags);
+  if (allyTags.length === 0) return new Set<CompNeedCategory>();
 
   const present = new Set<CompNeedCategory>();
   let adChampions = 0;
   let apChampions = 0;
 
-  for (const id of taggedAllies) {
-    const t = tags[id];
-    if (!t) continue;
+  for (const t of allyTags) {
     if (t.hardEngage) present.add('engage');
     if (t.peel) present.add('peel');
     if (t.waveclear) present.add('waveclear');
@@ -68,7 +74,7 @@ export function teamMissingNeeds(
   if (!present.has('poke')) missing.add('poke');
 
   const total = adChampions + apChampions;
-  if (taggedAllies.length >= config.minAlliesForDamageMix && total > 0) {
+  if (allyTags.length >= config.minAlliesForDamageMix && total > 0) {
     if (adChampions / total < config.missingThreshold) missing.add('ad_damage');
     if (apChampions / total < config.missingThreshold) missing.add('ap_damage');
   }

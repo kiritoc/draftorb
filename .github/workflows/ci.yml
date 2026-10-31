@@ -1,5 +1,10 @@
 name: CI
 
+# Setup for auto-format (optional): GitHub App with Contents: read & write on
+# this repo, repo variable FORMAT_BOT_APP_ID, secret FORMAT_BOT_PRIVATE_KEY.
+# Without the variable the `format` job is skipped.
+# After the bot pushes, run `git pull --rebase` before pushing again.
+
 on:
   push:
     branches: [main]
@@ -8,90 +13,31 @@ on:
 permissions:
   contents: read
 
+# PRs: cancel superseded runs. main: let every commit finish.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # Untrusted: runs PR-controlled code with no secrets and a read-only token.
+  # Runs first. If it pushes a fix, the push starts a new run of this workflow
+  # which cancels this one (concurrency), so lint/test never run on stale code.
   format:
-    # Only same-repo PRs; fork PRs have no secrets and are covered by format:check.
-    # On push events pull_request is empty, so this is false there too.
-    # Dependabot runs lack the app secret, and bot commits block its rebases.
+    # Same-repo PRs only; forks and Dependabot have no access to the app secret.
     if: >-
+      vars.FORMAT_BOT_APP_ID != '' &&
+      github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
-      github.actor != 'dependabot[bot]'
+      github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    permissions:
-      contents: read
-    outputs:
-      changed: ${{ steps.diff.outputs.changed }}
-
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ github.head_ref }}
-          persist-credentials: false
-
-      - uses: pnpm/action-setup@v6
-        with:
-          run_install: false
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - run: pnpm install --frozen-lockfile --ignore-scripts
-      # Workflows are never auto-formatted (bot must not edit .github); format them locally.
-      - run: pnpm prettier --write . '!.github/**'
-
-      - name: Create patch
-        id: diff
-        run: |
-          git diff --binary -- . ':!.github' > format.patch
-          # Bot commit = our subject + git-auto-commit-action's default committer.
-          LAST="$(git log -1 --format='%cn|%s')"
-          if [ -s format.patch ] && [ "$LAST" = 'github-actions[bot]|style: apply prettier' ]; then
-            # Prettier is not stable on its own output: don't push again, let check fail.
-            echo "::warning::Still unformatted after the bot's commit; not committing again"
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          elif [ -s format.patch ]; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - uses: actions/upload-artifact@v7
-        if: steps.diff.outputs.changed == 'true'
-        with:
-          name: format-patch
-          path: format.patch
-          retention-days: 1
-
-  # Trusted: only applies the patch and pushes; never runs PR code.
-  # Setup: a GitHub App installed on this repo with Contents: read & write.
-  # Set repo variable FORMAT_BOT_APP_ID and secret FORMAT_BOT_PRIVATE_KEY.
-  # Without them this job fails and `check` reports the format issues instead.
-  # Contributors: after the bot pushes, run `git pull --rebase` before pushing again.
-  commit-format:
-    needs: format
-    if: needs.format.outputs.changed == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
     permissions: {}
-    outputs:
-      changed: ${{ steps.commit.outputs.changes_detected }}
-
     steps:
-      - name: Create app token
-        id: app
+      # An App token (unlike GITHUB_TOKEN) makes the push trigger CI again.
+      - id: app
         uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ vars.FORMAT_BOT_APP_ID }}
           private-key: ${{ secrets.FORMAT_BOT_PRIVATE_KEY }}
-          # Least privilege: this repo only, contents:write only.
           repositories: ${{ github.event.repository.name }}
           permission-contents: write
 
@@ -100,82 +46,76 @@ jobs:
           ref: ${{ github.head_ref }}
           token: ${{ steps.app.outputs.token }}
 
-      - uses: actions/download-artifact@v8
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
-          name: format-patch
-          path: ${{ runner.temp }}
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --ignore-scripts
 
-      - name: Apply patch
+      - name: Format and push
         env:
-          PATCH: ${{ runner.temp }}/format.patch
+          BOT_EMAIL: format-bot@users.noreply.github.com
         run: |
-          # Prettier only edits files in place: reject creates, deletes, renames, copies.
-          if grep -qE '^((new|deleted) file mode|(rename|copy) (from|to) |(---|\+\+\+) /dev/null)' "$PATCH"; then
-            echo "::error::Patch adds, deletes, renames or copies files"; exit 1
-          fi
-          # git apply refuses paths outside the repo by default.
-          git apply --check "$PATCH"
-          git apply "$PATCH"
-          # Every change must be a modification of a tracked file outside .github.
-          # Includes untracked files, so a sneaked-in new file is caught too.
-          # Odd filenames (e.g. with newlines) only cause a rejection, never a bypass.
-          STATUS="$(git status --porcelain -z --untracked-files=all | tr '\0' '\n')"
-          if printf '%s\n' "$STATUS" | grep -qvE '^ M ' || printf '%s\n' "$STATUS" | grep -qE '^ M \.github/'; then
-            echo "::error::Patch adds files or touches .github"; exit 1
+          # Never loop: stop if the bot's own commit is already the tip.
+          if [ "$(git log -1 --format=%ce)" = "$BOT_EMAIL" ]; then
+            echo "Tip is the bot's commit; nothing to do"
+            exit 0
           fi
 
-      - name: Commit formatting changes
-        id: commit
-        uses: stefanzweifel/git-auto-commit-action@v7
+          # .github is excluded: the App has no `workflows` permission,
+          # so a push touching workflow files would be rejected.
+          pnpm prettier --write . '!.github/**'
+
+          if git diff --quiet; then
+            echo "Already formatted"
+            exit 0
+          fi
+
+          git -c user.name=format-bot -c user.email="$BOT_EMAIL" \
+            commit -a -m 'style: apply prettier'
+          git push || echo "::warning::Push rejected (branch moved); the next run will format"
+
+  lint:
+    needs: format
+    # `format` is skipped on push/forks: still run (only a cancel stops us).
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
         with:
-          # The format job matches this subject + the github-actions[bot] committer.
-          commit_message: 'style: apply prettier'
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Run all three so every problem shows up in one go.
+      - run: pnpm format:check
+      - run: pnpm lint
+        if: ${{ !cancelled() }}
+      - run: pnpm typecheck
+        if: ${{ !cancelled() }}
 
-  check:
-    needs: [format, commit-format]
-    # Run when format was skipped (push/fork) or made no change.
-    # Skip when format pushed a commit: that push starts a new run.
-    if: ${{ !cancelled() && needs.commit-format.outputs.changed != 'true' }}
+  test:
+    needs: format
+    if: ${{ !cancelled() }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        node-version: [22]
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
-          run_install: false
-
-      - name: Setup Node
-        uses: actions/setup-node@v7
-        with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 22
           cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Typecheck
-        if: matrix.os == 'ubuntu-latest'
-        run: pnpm typecheck
-
-      - name: Lint
-        if: matrix.os == 'ubuntu-latest' && !cancelled()
-        run: pnpm lint
-
-      - name: Format check
-        if: matrix.os == 'ubuntu-latest' && !cancelled()
-        run: pnpm format:check
-
-      - name: Test
-        if: ${{ !cancelled() }}
-        run: pnpm test
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test

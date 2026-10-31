@@ -46,7 +46,10 @@ export function scorePairs(
   config: RankWeightingConfig,
 ): PairScoreInfo {
   const ordered = slots
-    .map((slot) => ({ slot, influence: getInfluence(myRole, slot.side, slot.role, 'draft', config) }))
+    .map((slot) => ({
+      slot,
+      influence: getInfluence(myRole, slot.side, slot.role, 'draft', config),
+    }))
     .filter((e) => e.influence > 0)
     .sort((a, b) => b.influence - a.influence || a.slot.championId - b.slot.championId);
 

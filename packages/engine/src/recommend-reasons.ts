@@ -35,7 +35,10 @@ export interface ReasonInputs {
  * Reasons in canonical order (SPECS §5): pairs by descending influence, then
  * lane_vs, lane_full, comp, blind.
  */
-export function buildReasons(inputs: ReasonInputs, config: RankWeightingConfig): ReasonAccumulator[] {
+export function buildReasons(
+  inputs: ReasonInputs,
+  config: RankWeightingConfig,
+): ReasonAccumulator[] {
   const { pairDeltas, laneVs, laneFull, compDeltaPp, blindDeltaPp, laneGroupInfo } = inputs;
   const reasons: ReasonAccumulator[] = [];
 

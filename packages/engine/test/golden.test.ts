@@ -13,6 +13,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
+import { z } from 'zod';
 import { recommend, type RecommendData } from '../src/recommend.js';
 import type { DraftInput, DraftResult } from '@draftorb/shared';
 import { draftInputSchema, recommendDataSchema } from '@draftorb/shared';
@@ -47,6 +48,41 @@ interface GoldenFixture {
   };
 }
 
+// Strict: a misspelled key (e.g. `lowdata`) must fail instead of skipping an assertion.
+const idRank = { championId: z.number().int().positive(), rank: z.number().int().positive() };
+const expectedSchema = z
+  .object({
+    recommendations: z.array(
+      z
+        .object({
+          ...idRank,
+          reasons: z
+            .array(
+              z
+                .object({
+                  type: z.string(),
+                  lowData: z.boolean().optional(),
+                  level: z.number().int().optional(),
+                })
+                .strict(),
+            )
+            .optional(),
+          warnings: z.array(z.string()).optional(),
+        })
+        .strict(),
+    ),
+    poolRecommendations: z
+      .array(z.object({ ...idRank, poolRank: z.number().int().positive().optional() }).strict())
+      .optional(),
+    poolUnavailable: z
+      .array(z.object({ championId: z.number().int().positive(), reason: z.string() }).strict())
+      .optional(),
+    insufficientData: z
+      .array(z.object({ championId: z.number().int().positive() }).strict())
+      .optional(),
+  })
+  .strict() satisfies z.ZodType<GoldenFixture['expected']>;
+
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const goldenDir = join(__dirname, 'golden');
 
@@ -65,7 +101,7 @@ for (const file of fixtureFiles) {
     name: obj.name,
     input: draftInputSchema.parse(obj.input),
     data: recommendDataSchema.parse(obj.data),
-    expected: obj.expected as GoldenFixture['expected'],
+    expected: expectedSchema.parse(obj.expected),
   };
 
   describe(`golden: ${fixture.name}`, () => {

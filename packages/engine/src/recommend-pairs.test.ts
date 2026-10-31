@@ -7,7 +7,7 @@ import type { BaselineTable, ChampionId, ChampionTagsMap, Role } from '@draftorb
 import { recommend } from './recommend.js';
 import { DEFAULT_CONFIG, DEFAULT_RECOMMEND_CONFIG } from './config.js';
 import { indexBaselines, indexPairs, makePairKey } from './recommend-indexes.js';
-import { baselineLogOdds, deltaPp, scorePair } from './levels.js';
+import { baselineLogOdds, baselinePrior, deltaPp, scorePair } from './levels.js';
 import {
   BOT_ROLE_PROB,
   HIGH_GAMES,
@@ -57,7 +57,7 @@ describe('recommend: pair terms', () => {
     const pair = indexPairs(allyPairs, 'DIAMOND').get(makePairKey(1, 10, 'ADC'));
     if (!base || !pair) throw new Error('missing rows');
     const cfg = DEFAULT_CONFIG;
-    const p0 = (base.winsE + cfg.k0 * 0.5) / (base.gamesE + cfg.k0);
+    const p0 = baselinePrior(base.winsE, base.gamesE, cfg.k0);
     const x0 = baselineLogOdds(base.winsE, base.gamesE, cfg.k0, cfg.eps);
     const term = cfg.s * scorePair(pair.winsE, pair.gamesE, p0, cfg).term;
     expect(rec?.reasons.map((r) => r.type)).toEqual(['synergy']);

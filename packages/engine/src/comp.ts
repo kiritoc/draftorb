@@ -86,8 +86,9 @@ export function computeCompNeed(
   allyChampionIds: ReadonlyArray<ChampionId>,
   tags: ChampionTagsMap,
   config: CompConfig = DEFAULT_COMP_CONFIG,
+  /** Precomputed `teamMissingNeeds` (candidate-independent); computed when omitted. */
+  missing: ReadonlySet<CompNeedCategory> = teamMissingNeeds(allyChampionIds, tags, config),
 ): CompNeedResult {
-  const missing = teamMissingNeeds(allyChampionIds, tags, config);
   const t = tags[c];
   const filled: CompNeedCategory[] = [];
   let bonus = 0;

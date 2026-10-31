@@ -227,7 +227,8 @@ describe('recommend: comp need', () => {
         ...DEFAULT_RECOMMEND_CONFIG,
         comp: { ...DEFAULT_COMP_CONFIG, engage },
       }).recommendations[0]?.score ?? 0;
-    expect(score(0.5)).toBeGreaterThan(score(0.1));
+    const base = DEFAULT_COMP_CONFIG.engage;
+    expect(score(base * 5)).toBeGreaterThan(score(base));
   });
 
   it('caps a positive comp delta >= 2pp at L1', () => {

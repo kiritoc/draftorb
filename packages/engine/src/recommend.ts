@@ -21,7 +21,6 @@ import type { RankWeightingConfig, RecommendConfig } from './config.js';
 import type { DataRow, LaneDelta } from './recommend-types.js';
 import type { ScoredCandidate } from './recommend-reasons.js';
 import {
-  BASELINE_PRIOR_WINRATE,
   DEFAULT_CONFIG,
   DEFAULT_RECOMMEND_CONFIG,
   MISSING_LANE_ID,
@@ -29,8 +28,8 @@ import {
   rankToBucket,
 } from './config.js';
 import { sigmoid } from './weighting.js';
-import { baselineGate, baselineLogOdds, deltaPp, scoreLane } from './levels.js';
-import { computeCompNeed } from './comp.js';
+import { baselineGate, baselineLogOdds, baselinePrior, deltaPp, scoreLane } from './levels.js';
+import { computeCompNeed, teamMissingNeeds } from './comp.js';
 import {
   indexBaselines,
   indexLaneFull,
@@ -114,6 +113,8 @@ export function recommend(
 
   // Comp is role-independent: use every board ally, even if role inference dropped it.
   const allyChampIds = input.allies.map((s) => s.championId);
+  // Missing needs depend only on the allies: compute once per draft.
+  const missingNeeds = teamMissingNeeds(allyChampIds, data.tags, rc.comp);
 
   // Blind-safety opponent distribution is candidate-independent: build it once.
   const laneEnemiesKnown = laneGroup.enemies.every((role) =>
@@ -158,7 +159,7 @@ export function recommend(
     }
 
     // p0 = shrink(winsE, gamesE, k0, 0.5); baseline log-odds
-    const p0 = (winsE + config.k0 * BASELINE_PRIOR_WINRATE) / (gamesE + config.k0);
+    const p0 = baselinePrior(winsE, gamesE, config.k0);
     const x = baselineLogOdds(winsE, gamesE, config.k0, config.eps);
 
     // Determine if this is an off-role pool champion
@@ -210,7 +211,7 @@ export function recommend(
     if (laneFullDelta) logOdds += laneFullDelta.term;
 
     // --- Layer 4: comp need ---
-    const compResult = computeCompNeed(c, allyChampIds, data.tags, rc.comp);
+    const compResult = computeCompNeed(c, allyChampIds, data.tags, rc.comp, missingNeeds);
     let compDeltaPp: number | null = null;
     // A filled need with a 0 weight (or wComp = 0) adds nothing and gets no reason.
     const compTerm = rc.wComp * compResult.bonus;

@@ -74,6 +74,12 @@ export function buildReasons(
     });
   }
 
+  // Comp and blind reasons have no sample of their own and are never lowData.
+  // Level them at n_eff = minGames: passes the lowData gate but stays below
+  // highLevelMinGames, so positive levels cap at L1 (D-030).
+  const unsampledLevel = (d: number): ReasonLevel | undefined =>
+    toReasonLevel(levelFromConfig(d, config.minGames, config));
+
   if (compDeltaPp !== null) {
     reasons.push({
       type: 'comp',
@@ -81,7 +87,7 @@ export function buildReasons(
       deltaPp: compDeltaPp,
       n: 0,
       lowData: false,
-      level: toReasonLevel(levelFromConfig(compDeltaPp, 0, config)),
+      level: unsampledLevel(compDeltaPp),
     });
   }
 
@@ -92,7 +98,7 @@ export function buildReasons(
       deltaPp: blindDeltaPp,
       n: 0,
       lowData: false,
-      level: toReasonLevel(levelFromConfig(blindDeltaPp, 0, config)),
+      level: unsampledLevel(blindDeltaPp),
     });
   }
 

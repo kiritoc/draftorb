@@ -3,7 +3,13 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import type { ChampionTags, ChampionTagsMap, EnemyPairTable, RecommendData, Role } from '@draftorb/shared';
+import type {
+  ChampionTags,
+  ChampionTagsMap,
+  EnemyPairTable,
+  RecommendData,
+  Role,
+} from '@draftorb/shared';
 import { recommend } from './recommend.js';
 import { DEFAULT_COMP_CONFIG, DEFAULT_CONFIG, DEFAULT_RECOMMEND_CONFIG } from './config.js';
 import {
@@ -49,7 +55,11 @@ describe('recommend: blind safety triggers', () => {
   it.each<Role>(['ADC', 'MID', 'JUNGLE'])(
     'applies for %s when the lane enemy is unknown and blindPick is false',
     (role) => {
-      const roleProb = asRoleProb({ '11': { [role]: 1 }, '12': { [role]: 1 }, '201': { [role]: 1 } });
+      const roleProb = asRoleProb({
+        '11': { [role]: 1 },
+        '12': { [role]: 1 },
+        '201': { [role]: 1 },
+      });
       const enemyPairs = makeEnemyPairs([
         { championId: 11, enemyId: 201, role, ...HIGH_GAMES, winsW: 10 },
       ]);
@@ -105,8 +115,10 @@ describe('recommend: blind safety triggers', () => {
     const roleProb = asRoleProb({ ...BOT_ROLE_PROB, '202': { ADC: 1 } });
     const enemyPairs: EnemyPairTable = [[1, 202, 'ADC', 'DIAMOND', 10, 50, 0.1]];
     const data = makeData({ champions: [1, 200, 201, 202], roleProb, enemyPairs });
-    const rec = recommend(makeInput({ blindPick: true, enemies: FIXED_BOT }), data)
-      .recommendations.find((r) => r.championId === 1);
+    const rec = recommend(
+      makeInput({ blindPick: true, enemies: FIXED_BOT }),
+      data,
+    ).recommendations.find((r) => r.championId === 1);
     expect(blindOf(rec)).toBeUndefined();
   });
 });
@@ -161,14 +173,16 @@ describe('recommend: comp need', () => {
   it('uses a tagged ally whose role could not be inferred', () => {
     const tags: ChampionTagsMap = { ...makeChampionTags([1, 2]), '77': noUtilityTag(77) };
     const data = makeData({ champions: [1, 2, 77], roleProb: BOT_ROLE_PROB, tags });
-    for (const rec of recommend(makeInput({ allies: [{ championId: 77 }] }), data).recommendations) {
+    for (const rec of recommend(makeInput({ allies: [{ championId: 77 }] }), data)
+      .recommendations) {
       expect(hasComp(rec)).toBe(true);
     }
   });
 
   it('an unresolved, untagged ally creates no comp reason', () => {
     const data = makeData({ champions: [1, 2, 77], roleProb: BOT_ROLE_PROB });
-    for (const rec of recommend(makeInput({ allies: [{ championId: 77 }] }), data).recommendations) {
+    for (const rec of recommend(makeInput({ allies: [{ championId: 77 }] }), data)
+      .recommendations) {
       expect(hasComp(rec)).toBe(false);
     }
   });
@@ -209,8 +223,12 @@ describe('recommend: comp need', () => {
 
   it('caps a positive comp delta >= 2pp at L1', () => {
     const rc = { ...DEFAULT_RECOMMEND_CONFIG, wComp: 5 };
-    const comp = recommend(fixedAlly77, withNoUtilityAlly(), DEFAULT_CONFIG, rc)
-      .recommendations[0]?.reasons.find((r) => r.type === 'comp');
+    const comp = recommend(
+      fixedAlly77,
+      withNoUtilityAlly(),
+      DEFAULT_CONFIG,
+      rc,
+    ).recommendations[0]?.reasons.find((r) => r.type === 'comp');
     expect(comp?.deltaPp).toBeGreaterThanOrEqual(2);
     expect(comp?.level).toBe(1);
   });

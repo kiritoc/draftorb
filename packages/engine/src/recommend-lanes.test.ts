@@ -37,7 +37,12 @@ describe('recommend: bot lane', () => {
     const laneFull = makeLaneFull([
       { championId: 1, partnerId: 10, opp1Id: 200, opp2Id: 201, ...HIGH_GAMES, winsW: 45 },
     ]);
-    const data = makeData({ champions: [1, 10, 200, 201], roleProb: BOT_ROLE_PROB, laneVs, laneFull });
+    const data = makeData({
+      champions: [1, 10, 200, 201],
+      roleProb: BOT_ROLE_PROB,
+      laneVs,
+      laneFull,
+    });
     const input = makeInput({ allies: [{ championId: 10, role: 'ADC' }], enemies: FIXED_BOT });
     const rec = recommend(input, data).recommendations.find((r) => r.championId === 1);
     expect(laneReasons(rec).map((l) => l.with)).toEqual([
@@ -53,7 +58,12 @@ describe('recommend: bot lane', () => {
     const laneFull = makeLaneFull([
       { championId: 11, partnerId: 20, opp1Id: 201, opp2Id: 200, ...HIGH_GAMES, winsW: 45 },
     ]);
-    const data = makeData({ champions: [11, 20, 200, 201], roleProb: BOT_ROLE_PROB, laneVs, laneFull });
+    const data = makeData({
+      champions: [11, 20, 200, 201],
+      roleProb: BOT_ROLE_PROB,
+      laneVs,
+      laneFull,
+    });
     const input = makeInput({
       userRole: 'ADC',
       allies: [{ championId: 20, role: 'SUPPORT' }],
@@ -96,7 +106,9 @@ describe('recommend: lane key order (contract for T-017)', () => {
 
   it('SUPPORT keys follow [enemy SUPPORT, enemy ADC]', () => {
     expect(laneFor('SUPPORT', 1, [[1, 201, 200, 'DIAMOND', 45, 50, 0.1]])).toBeUndefined();
-    expect(laneFor('SUPPORT', 1, [[1, 200, 201, 'DIAMOND', 45, 50, 0.1]])?.with).toEqual([200, 201]);
+    expect(laneFor('SUPPORT', 1, [[1, 200, 201, 'DIAMOND', 45, 50, 0.1]])?.with).toEqual([
+      200, 201,
+    ]);
   });
 
   it('ADC keys follow [enemy ADC, enemy SUPPORT]', () => {
@@ -111,7 +123,12 @@ describe('recommend: conf_lane', () => {
   it('lane_vs ignores the ally partner confidence while lane_full includes it', () => {
     const laneVs: LaneVsTable = [[1, 200, 201, 'DIAMOND', 45, 50, 0.1]];
     const laneFull: LaneFullTable = [[1, 10, 200, 201, 'DIAMOND', 45, 50, 0.1]];
-    const data = makeData({ champions: [1, 10, 200, 201], roleProb: partnerFlex, laneVs, laneFull });
+    const data = makeData({
+      champions: [1, 10, 200, 201],
+      roleProb: partnerFlex,
+      laneVs,
+      laneFull,
+    });
     const lanes = (fixed: boolean) =>
       laneReasons(
         recommend(
@@ -157,8 +174,10 @@ describe('recommend: conf_lane', () => {
       const enemies = enemyInferred
         ? [{ championId: 200 }, { championId: 201, role: 'ADC' as Role }]
         : FIXED_BOT;
-      const rec = recommend(makeInput({ allies: [{ championId: 10 }], enemies }), data)
-        .recommendations.find((r) => r.championId === 1);
+      const rec = recommend(
+        makeInput({ allies: [{ championId: 10 }], enemies }),
+        data,
+      ).recommendations.find((r) => r.championId === 1);
       return Math.abs(laneReasons(rec).find((l) => l.with?.length === 3)?.deltaPp ?? 0);
     };
     expect(delta(true)).toBeGreaterThan(0);
@@ -176,7 +195,10 @@ describe('recommend: 1v1 lanes', () => {
       { championId: 1, partnerId: null, opp1Id: 300, opp2Id: null, ...HIGH_GAMES, winsW: 5 },
     ]);
     const data = makeData({ champions: [1, 2, 300], roleProb, laneVs, laneFull });
-    const result = recommend(makeInput({ userRole: role, enemies: [{ championId: 300, role }] }), data);
+    const result = recommend(
+      makeInput({ userRole: role, enemies: [{ championId: 300, role }] }),
+      data,
+    );
     const rec = result.recommendations[0];
     expect(rec?.championId).toBe(1);
     expect(laneReasons(rec).map((l) => l.with)).toEqual([[300]]);
@@ -244,13 +266,19 @@ describe('recommend: role conflicts (D-030)', () => {
     ['without', []],
     ['with', [{ championId: 202, role: 'ADC' as Role }]],
   ])('duplicate fixed SUPPORT enemies %s a fixed ADC never form a lane', (_label, extra) => {
-    const data = makeData({ champions: [1, 200, 201, 202], roleProb: supSupRoleProb, laneVs: swappedLaneVs });
+    const data = makeData({
+      champions: [1, 200, 201, 202],
+      roleProb: supSupRoleProb,
+      laneVs: swappedLaneVs,
+    });
     const enemies = [
       { championId: 200, role: 'SUPPORT' as Role },
       { championId: 201, role: 'SUPPORT' as Role },
       ...extra,
     ];
-    const rec = recommend(makeInput({ enemies }), data).recommendations.find((r) => r.championId === 1);
+    const rec = recommend(makeInput({ enemies }), data).recommendations.find(
+      (r) => r.championId === 1,
+    );
     expect(laneReasons(rec)).toEqual([]);
   });
 
@@ -265,15 +293,23 @@ describe('recommend: role conflicts (D-030)', () => {
       { championId: 201, role: 'SUPPORT' as Role },
       { championId: 202, role: 'ADC' as Role },
     ];
-    const rec = recommend(makeInput({ enemies }), data).recommendations.find((r) => r.championId === 1);
+    const rec = recommend(makeInput({ enemies }), data).recommendations.find(
+      (r) => r.championId === 1,
+    );
     expect(rec?.reasons.filter((r) => r.type === 'counter').map((r) => r.with)).toEqual([[202]]);
   });
 
   it('a fixed duplicate after an unfixed copy keeps its known matchup', () => {
     // 300 has no roleProb: only the fixed copy can place it.
     const enemyPairs: EnemyPairTable = [[1, 300, 'SUPPORT', 'DIAMOND', 10, 50, 0.1]];
-    const data = makeData({ champions: [1, 300], roleProb: asRoleProb({ '1': { SUPPORT: 1 } }), enemyPairs });
-    const input = makeInput({ enemies: [{ championId: 300 }, { championId: 300, role: 'SUPPORT' }] });
+    const data = makeData({
+      champions: [1, 300],
+      roleProb: asRoleProb({ '1': { SUPPORT: 1 } }),
+      enemyPairs,
+    });
+    const input = makeInput({
+      enemies: [{ championId: 300 }, { championId: 300, role: 'SUPPORT' }],
+    });
     const rec = recommend(input, data).recommendations.find((r) => r.championId === 1);
     expect(rec?.reasons.filter((r) => r.type === 'counter')).toHaveLength(1);
   });

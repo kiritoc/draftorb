@@ -121,7 +121,10 @@ export function makeRoleProb(
 }
 
 /** A tag entry; defaults to an engage/peel/waveclear MIXED tank. */
-export function makeTag(championId: ChampionId, overrides: Partial<ChampionTags> = {}): ChampionTags {
+export function makeTag(
+  championId: ChampionId,
+  overrides: Partial<ChampionTags> = {},
+): ChampionTags {
   return {
     championId,
     damageType: 'MIXED',

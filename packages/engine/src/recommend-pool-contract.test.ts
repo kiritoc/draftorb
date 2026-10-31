@@ -16,7 +16,8 @@ import {
   makeInput,
 } from './recommend-test-utils.js';
 
-const ids = (recs: Array<{ championId: ChampionId }>): ChampionId[] => recs.map((r) => r.championId);
+const ids = (recs: Array<{ championId: ChampionId }>): ChampionId[] =>
+  recs.map((r) => r.championId);
 
 describe('recommend: pool lists', () => {
   it('poolRecommendations is an ordered subsequence with global rank and poolRank', () => {
@@ -38,7 +39,9 @@ describe('recommend: pool lists', () => {
 
   it('deduplicates repeated pool ids', () => {
     const data = makeData({ champions: [1, 2], roleProb: BOT_ROLE_PROB });
-    expect(ids(recommend(makeInput({ pool: [1, 1] }), data).poolRecommendations ?? [])).toEqual([1]);
+    expect(ids(recommend(makeInput({ pool: [1, 1] }), data).poolRecommendations ?? [])).toEqual([
+      1,
+    ]);
     expect(recommend(makeInput({ pool: [999, 999] }), data).poolUnavailable).toHaveLength(1);
   });
 });
@@ -70,7 +73,10 @@ describe('recommend: pool champions that cannot be scored', () => {
       [1, 'DIAMOND', 30, 50, 0.1, 50],
       [99, 'DIAMOND', 5, 10, 10, 10],
     ];
-    const result = recommend(makeInput({ pool: [99] }), makeData({ champions: [1, 99], roleProb, baselines }));
+    const result = recommend(
+      makeInput({ pool: [99] }),
+      makeData({ champions: [1, 99], roleProb, baselines }),
+    );
     expect(ids(result.recommendations)).not.toContain(99);
     expect(result.poolUnavailable).toEqual([{ championId: 99, reason: 'insufficientData' }]);
     expect(result.poolRecommendations).toEqual([]);
@@ -99,9 +105,14 @@ describe('recommend: pool champions that cannot be scored', () => {
       [200, 'DIAMOND', 30, 50, 0.1, 50],
     ];
     const data = makeData({ champions: [1, 2, 200], baselines, roleProb: BOT_ROLE_PROB });
-    const input = makeInput({ enemies: [{ championId: 200, role: 'SUPPORT' }], pool: [1, 2, 200, 999] });
+    const input = makeInput({
+      enemies: [{ championId: 200, role: 'SUPPORT' }],
+      pool: [1, 2, 200, 999],
+    });
     const result = recommend(input, data);
-    const unavailable = [...(result.poolUnavailable ?? [])].sort((a, b) => a.championId - b.championId);
+    const unavailable = [...(result.poolUnavailable ?? [])].sort(
+      (a, b) => a.championId - b.championId,
+    );
     expect(unavailable).toEqual([
       { championId: 2, reason: 'insufficientData' },
       { championId: 200, reason: 'picked' },
@@ -114,9 +125,14 @@ describe('recommend: pool champions that cannot be scored', () => {
 describe('recommend: off-role pool champions', () => {
   it('are scored with an offRole warning, with or without a roleProb entry', () => {
     const roleProb = asRoleProb({ ...BOT_ROLE_PROB, '3': { TOP: 1 } });
-    const result = recommend(makeInput({ pool: [3, 88] }), makeData({ champions: [1, 2, 3, 88], roleProb }));
+    const result = recommend(
+      makeInput({ pool: [3, 88] }),
+      makeData({ champions: [1, 2, 3, 88], roleProb }),
+    );
     for (const id of [3, 88]) {
-      expect(result.recommendations.find((r) => r.championId === id)?.warnings).toContain('offRole');
+      expect(result.recommendations.find((r) => r.championId === id)?.warnings).toContain(
+        'offRole',
+      );
     }
     expect(ids(result.poolRecommendations ?? []).sort((a, b) => a - b)).toEqual([3, 88]);
   });

@@ -157,7 +157,13 @@ describe('recommend: reasons', () => {
       ],
     });
     const rec = recommend(input, data).recommendations[0];
-    expect(rec?.reasons.map((r) => r.type)).toEqual(['synergy', 'counter', 'counter', 'lane', 'comp']);
+    expect(rec?.reasons.map((r) => r.type)).toEqual([
+      'synergy',
+      'counter',
+      'counter',
+      'lane',
+      'comp',
+    ]);
     expect(rec?.reasons.slice(0, 3).map((r) => r.with)).toEqual([[10], [100], [201]]);
   });
 });
@@ -170,7 +176,13 @@ describe('recommend: hard-counter warnings', () => {
     rc = DEFAULT_RECOMMEND_CONFIG,
   ): string[] => {
     const enemyPairs = makeEnemyPairs([
-      { championId: 1, enemyId: enemy.championId, role: enemy.role ?? 'SUPPORT', ...HIGH_GAMES, winsW },
+      {
+        championId: 1,
+        enemyId: enemy.championId,
+        role: enemy.role ?? 'SUPPORT',
+        ...HIGH_GAMES,
+        winsW,
+      },
     ]);
     const data = makeData({ champions: [1, enemy.championId], roleProb, enemyPairs });
     return (
@@ -207,8 +219,10 @@ describe('recommend: hard-counter warnings', () => {
       { championId: 1, enemyId: 200, role: 'SUPPORT', winsW: 0, gamesW: 10, gamesW2: 10 },
     ]);
     const data = makeData({ champions: [1, 200], roleProb: BOT_ROLE_PROB, enemyPairs });
-    const rec = recommend(makeInput({ enemies: [{ championId: 200, role: 'SUPPORT' }] }), data)
-      .recommendations.find((r) => r.championId === 1);
+    const rec = recommend(
+      makeInput({ enemies: [{ championId: 200, role: 'SUPPORT' }] }),
+      data,
+    ).recommendations.find((r) => r.championId === 1);
     expect(hasCounter(rec?.warnings ?? [])).toBe(false);
   });
 
@@ -224,7 +238,9 @@ describe('recommend: hard-counter warnings', () => {
       { championId: 1, enemyId: 200, role: 'SUPPORT', ...HIGH_GAMES, winsW: 10 },
     ]);
     const data = makeData({ champions: [1, 2, 200], roleProb: BOT_ROLE_PROB, enemyPairs });
-    const input = makeInput({ enemies: [{ championId: 200, role: 'SUPPORT' }, { championId: 200 }] });
+    const input = makeInput({
+      enemies: [{ championId: 200, role: 'SUPPORT' }, { championId: 200 }],
+    });
     const rec = recommend(input, data).recommendations.find((r) => r.championId === 1);
     expect(rec?.reasons.filter((r) => r.type === 'counter')).toHaveLength(1);
     expect(rec?.warnings).toEqual(['counteredBy:SUPPORT:200']);

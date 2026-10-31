@@ -10,6 +10,7 @@
  * Callers provide data via `RecommendData` — the engine never reads files.
  */
 
+import { DRAFT_RESULT_SCHEMA_VERSION } from '@draftorb/shared';
 import type {
   DraftInput,
   DraftResult,
@@ -271,6 +272,7 @@ export function recommend(
 
   // --- Pool recommendations (only for a non-empty pool, D-024) ---
   return {
+    schemaVersion: DRAFT_RESULT_SCHEMA_VERSION,
     recommendations,
     insufficientData,
     ...(candidateSet.poolSet.size > 0

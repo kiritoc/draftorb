@@ -8,7 +8,13 @@ import { DEFAULT_CONFIG, DEFAULT_RECOMMEND_CONFIG, getInfluence } from './config
 import { indexPairs, makePairKey } from './recommend-indexes.js';
 import { scorePair } from './levels.js';
 import type { KnownSlot } from './recommend-types.js';
-import { computeBlindSafety, hardCounterWarnings, scorePairs } from './recommend-terms.js';
+import {
+  blindOpponents,
+  blindSafetyFromOpponents,
+  computeBlindSafety,
+  hardCounterWarnings,
+  scorePairs,
+} from './recommend-terms.js';
 import type { PairDelta } from './recommend-terms.js';
 import { roundDeltaPp } from './recommend-reasons.js';
 
@@ -135,6 +141,20 @@ describe('computeBlindSafety', () => {
       DEFAULT_CONFIG,
     );
     expect(dup).toBe(once);
+  });
+
+  it('matches the precomputed path used by recommend (blindOpponents + FromOpponents)', () => {
+    const roles = ['SUPPORT', 'ADC'] as const;
+    const opponents = blindOpponents(roles, new Set(), ids, roleProb);
+    expect(blindSafetyFromOpponents(1, opponents, idx, P0, DEFAULT_CONFIG)).toBe(
+      computeBlindSafety(1, roles, new Set(), ids, roleProb, idx, P0, DEFAULT_CONFIG),
+    );
+  });
+
+  it('never counts the candidate as its own opponent', () => {
+    const selfIdx = indexPairs([[201, 201, 'ADC', 'DIAMOND', 0, 50, 0.1]], 'DIAMOND');
+    const opponents = blindOpponents(['ADC'], new Set(), [201], roleProb);
+    expect(blindSafetyFromOpponents(201, opponents, selfIdx, P0, DEFAULT_CONFIG)).toBe(0);
   });
 
   it('returns 0 when no champion can play the unseen role', () => {

@@ -72,7 +72,7 @@ manifest.json          // { patch, generatedAt, region, rankBuckets: [the 8 §3 
 champions.json         // id, name, icon, roles
 items.json             // item catalog (from Data Dragon)
 role-prob.json         // { [championId]: { SUPPORT: 0.92, ... } } — sparse: a champion entry lists only the roles in which it has been observed with a non-zero probability (roles with games); absent roles are treated as 0. Each champion's probabilities sum to 1 (tolerance 1e-6). Note for T-002.b: in zod 4, `z.record(roleSchema, numberSchema)` requires every key in `roleSchema` to be present, so a sparse map must use `z.partialRecord(roleSchema, numberSchema)` (or equivalent) instead of `z.record`.
-roles/<ROLE>/baseline.json    // [championId, bucket, wins_w, games_w, games_w2, games] (games = raw match count)
+roles/<ROLE>/baseline.json    // [championId, bucket, wins_w, games_w, games_w2, games] (games = raw match count; manifest schemaVersion 2)
 roles/<ROLE>/ally-pairs.json  // [championId, allyId, role, bucket, wins_w, games_w, games_w2]
 roles/<ROLE>/enemy-pairs.json // [championId, enemyId, role, bucket, wins_w, games_w, games_w2]
 roles/<ROLE>/lane-vs.json     // [championId, opp1Id, opp2Id, bucket, wins_w, games_w, games_w2]

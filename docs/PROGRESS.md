@@ -55,8 +55,9 @@ Earlier handoff (kept for history): B-017 done (engine and shared `"types": []` 
     - Reason generation: reasons emitted in canonical order (pairs by descending influence, ties by championId, then `lane_vs`, `lane_full`, `comp`, `blind`), with level mapping and `lowData` flags.
     - Pool contract (D-024): `recommendations` is the complete overall ranking; `poolRecommendations` retains exact global rank and sequential `poolRank`; pool champions never modify candidate scores; missing baseline data maps to `poolUnavailable` (`insufficientData`) and `insufficientData`; unknown champion IDs map to `poolUnavailable` (`unknownChampion`); below-threshold pool picks receive `offRole` warning.
   - **`packages/engine/src/comp.ts`** and **`packages/engine/src/comp.test.ts`** (new): composition needs scoring from champion tags (engage, peel, waveclear, poke, damage balance).
-  - **`packages/engine/test/golden.test.ts`** (new): golden test runner (zod-validated fixtures) loading fixtures from `packages/engine/test/golden/*.json`.
-  - **Golden test fixtures** (14 scenarios in `packages/engine/test/golden/`):
+  - **`packages/engine/test/golden.test.ts`** (new): golden test runner loading fixtures from `packages/engine/test/golden/*.json` (`input`/`data` validated with the shared zod schemas, `expected` with a strict hand-rolled checker).
+  - **Golden test fixtures** (15 scenarios in `packages/engine/test/golden/`):
+    - `pool_offrole_blind_pick.json`: blind pick with an off-role pool champion (`offRole`, `poolRank`, empty `poolUnavailable`).
     - `ally_adc_synergy.json`: ally ADC pair synergy dominating recommendation.
     - `blind_pick_safe_supports.json`: blind pick mode with baseline and comp evaluation.
     - `enemy_counter.json`: enemy counter pick penalizing unfavorable matchup.
@@ -71,7 +72,7 @@ Earlier handoff (kept for history): B-017 done (engine and shared `"types": []` 
     - `mid_lane_1v1_matchup.json`: MID 1v1 `lane_vs` decides the ranking.
     - `jungle_counter_and_lane.json`: JUNGLE counter pair plus 1v1 `lane_vs`, with a `counteredBy` warning.
     - `support_lane_full_decides.json`: identical `lane_vs`, `lane_full` decides the SUPPORT ranking.
-  - **`packages/engine/src/recommend.test.ts`** (new): candidate enumeration, baseline gate, score ranking, sequential ranks, tie-breaking by champion ID, pair synergies and counters, bot lane vs and 1v1 lane full skipping, pool contract (score invariance, subsequence order, insufficientData, unknownChampion, offRole, roleProb-set relative order preservation), reason reference validity, reason ordering, determinism, edge cases.
+  - **`packages/engine/src/recommend-*.test.ts`** (new, split by feature: ranking, pairs, lanes, role-conflicts, blind-comp, pool-contract): candidate enumeration, baseline gate, score ranking, sequential ranks, tie-breaking by champion ID, pair synergies and counters, bot lane vs and 1v1 lane full skipping, pool contract (score invariance, subsequence order, insufficientData, unknownChampion, offRole, roleProb-set relative order preservation), reason reference validity, reason ordering, determinism, edge cases.
   - **`packages/engine/src/index.ts`** (updated): exported `./comp.js` and `./recommend.js`.
 - Files touched:
   - `packages/engine/src/recommend.ts` (new)
@@ -88,7 +89,7 @@ Earlier handoff (kept for history): B-017 done (engine and shared `"types": []` 
   - `packages/shared/src/schemas/{tables,draft,reasons}.ts`, `packages/shared/src/index.ts` (updated)
   - `packages/etl/migrations/008_baseline_raw_games.sql` (new) and `packages/etl/src/db/migrate.test.ts` (updated)
   - `vitest.config.ts` and `package.json` (golden tests included in test and typecheck runs)
-  - `packages/engine/test/golden/*.json` (14 fixtures)
+  - `packages/engine/test/golden/*.json` (15 fixtures)
   - `docs/TICKETS.md` (updated T-023 to DONE)
   - `docs/PROGRESS.md` (updated)
 - Tests: `pnpm check` green before the final review pass (25 files, 447 tests). The final pass adds 12 engine tests (5 review-gap tests plus 3 more in the feature-split `packages/engine/src/recommend-*.test.ts` files and 4 in the new `packages/engine/src/recommend-terms.test.ts`) and scales the hard-counter warning by influence.

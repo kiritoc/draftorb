@@ -7,7 +7,11 @@
  */
 
 export { z } from './schemas/core.js';
-export { SHARED_VERSION, MANIFEST_SCHEMA_VERSION } from './schemas/core.js';
+export {
+  SHARED_VERSION,
+  MANIFEST_SCHEMA_VERSION,
+  DRAFT_RESULT_SCHEMA_VERSION,
+} from './schemas/core.js';
 
 export {
   roleSchema,

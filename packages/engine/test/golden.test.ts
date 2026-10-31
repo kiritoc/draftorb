@@ -159,13 +159,15 @@ for (const file of fixtureFiles) {
         if (!rec) continue;
 
         if (expected.reasons) {
-          // Each expected reason consumes the next unused actual reason of the
-          // same type, so repeated types (e.g. two counters) are all checked.
-          const used = new Set<number>();
+          // Expected reasons must appear in canonical order (an ordered
+          // subsequence): each one matches the next actual reason of its type
+          // after the previous match, so repeated types and order are checked.
+          let cursor = 0;
           for (const expReason of expected.reasons) {
-            const idx = rec.reasons.findIndex((r, i) => !used.has(i) && r.type === expReason.type);
-            expect(idx).toBeGreaterThanOrEqual(0);
-            used.add(idx);
+            const offset = rec.reasons.slice(cursor).findIndex((r) => r.type === expReason.type);
+            expect(offset).toBeGreaterThanOrEqual(0);
+            const idx = cursor + offset;
+            cursor = idx + 1;
             const matchingReason = rec.reasons[idx];
             expect(matchingReason).toBeDefined();
 
@@ -207,6 +209,12 @@ for (const file of fixtureFiles) {
 
       if (fixture.expected.poolUnavailable) {
         expect(result.poolUnavailable).toBeDefined();
+        // Exact set: an extra or duplicated entry must fail the fixture.
+        const key = (u: { championId: number; reason: string }): string =>
+          `${u.championId}:${u.reason}`;
+        expect((result.poolUnavailable ?? []).map(key).sort()).toEqual(
+          fixture.expected.poolUnavailable.map(key).sort(),
+        );
         for (const expUnavail of fixture.expected.poolUnavailable) {
           const entry = result.poolUnavailable?.find((u) => u.championId === expUnavail.championId);
           expect(entry).toBeDefined();

@@ -244,6 +244,7 @@ Owner decision 2026-10-29.
   12. **Ranking ties.** Scores are compared exactly; only exactly equal scores tie, broken by championId ascending.
   13. **`reliability.nEff`.** Renamed from `reliability.games`: it is the baseline n_eff, never a raw game count (golden rule 8).
   14. **Injectable config.** All recommendation weights/thresholds/lane groups live in `RecommendConfig` (`DEFAULT_RECOMMEND_CONFIG`, `packages/engine/src/config.ts`), passed as the 4th argument of `recommend` (fixes B-027). `RecommendData` lives in `@draftorb/shared`.
+  15. **Versioned contracts.** `DraftResult.schemaVersion` (`DRAFT_RESULT_SCHEMA_VERSION`, starts at 1) is required and bumped on every breaking output change (items 9, 13, `picked`, level 0 are v1). `MANIFEST_SCHEMA_VERSION` is bumped to 2 for the 6th baseline column; loaders reject other versions. Unknown values are omitted, never `null` or `0`.
 - Alternatives: block T-023 until pick-rate data and the backtest exist. Rejected: it would stall E2.
 - Consequences: these values live in `DEFAULT_RECOMMEND_CONFIG` (`packages/engine/src/config.ts`) and are injectable. Any change to the defaults requires the D-023 backtest.
 

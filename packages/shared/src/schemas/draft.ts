@@ -11,7 +11,7 @@
 
 import { z } from 'zod';
 
-import { championIdSchema, rankSchema, roleSchema } from './core.js';
+import { DRAFT_RESULT_SCHEMA_VERSION, championIdSchema, rankSchema, roleSchema } from './core.js';
 import { recommendationSchema } from './reasons.js';
 
 export const slotSchema = z
@@ -68,6 +68,7 @@ export type PoolUnavailableEntry = z.infer<typeof poolUnavailableEntrySchema>;
 
 export const draftResultSchema = z
   .object({
+    schemaVersion: z.literal(DRAFT_RESULT_SCHEMA_VERSION),
     recommendations: z.array(recommendationSchema),
     insufficientData: z.array(insufficientDataEntrySchema),
     poolRecommendations: z.array(recommendationSchema).optional(),

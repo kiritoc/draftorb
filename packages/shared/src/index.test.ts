@@ -217,7 +217,7 @@ describe('shared schemas', () => {
       rankBuckets: ['DIAMOND'],
       roles: ['SUPPORT'],
       files: [{ path: 'champions.json' }],
-      schemaVersion: 1,
+      schemaVersion: 2,
     };
     expect(manifestSchema.parse(manifest)).toEqual(manifest);
   });
@@ -382,6 +382,7 @@ describe('shared schemas', () => {
 
   it('validates DraftResult with insufficientData and pool recommendations', () => {
     const result: DraftResult = {
+      schemaVersion: 1,
       recommendations: [
         {
           championId: 41,
@@ -410,6 +411,7 @@ describe('shared schemas', () => {
 
     expect(() =>
       draftResultSchema.parse({
+        schemaVersion: 1,
         recommendations: [],
         insufficientData: [{ championId: 54, nEff: 12.5, rawGames: 20 }],
       }),
@@ -417,6 +419,7 @@ describe('shared schemas', () => {
 
     expect(() =>
       draftResultSchema.parse({
+        schemaVersion: 1,
         recommendations: [],
         insufficientData: [{ championId: 54, nEff: 12.5, rawGames: 20 }],
         poolUnavailable: [{ championId: 999, reason: 'bogus' }],

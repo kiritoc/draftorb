@@ -257,20 +257,22 @@ Accepted by the owner on 2026-10-31. SPECS §5/§7 text derived from this decisi
 - Alternatives: decay-weighted counts across the D-017 window (more data early in a patch, but role shifts from a patch change linger; `games` would become weighted and would need `games_w2`). Rejected for now pending owner review.
 - Consequences: early in a new patch `role_prob` may rest on few games; consumers should check `games` before trusting a probability (golden rule 8). Switching to decay later only changes `packages/etl/src/aggregate.ts` and its tests.
 
-### D-032 — `@draftorb/engine` workspace dependency for ETL baseline aggregation — PROPOSED
+### D-032 — `@draftorb/engine` workspace dependency for ETL baseline aggregation — ACCEPTED
 
 - Context: T-016 must weight baseline games with the engine rank kernel (SPECS §3) so that aggregation-time weights match query-time logic.
 - Decision: `@draftorb/etl` depends on `@draftorb/engine` (`workspace:*`, internal, no new third-party code or license) and imports `combinedGameWeight`, `bucketIndex`, `RANK_BUCKET_ORDER` and `DEFAULT_CONFIG`. `packages/etl/tsconfig.json` references `../engine`.
 - Alternatives: duplicate the kernel in ETL (rejected: the two copies could drift apart); move the kernel to `@draftorb/shared` (deferred: a larger refactor outside T-016).
 - Consequences: ETL builds after engine. Engine must not import from ETL, which would create a cycle. Changes to the kernel change aggregated baselines, so the ETL must be re-run.
+- Owner decision 2026-10-31.
 
-### D-033 — Recency `patchIndex` and game rank bucket in ETL aggregation — PROPOSED
+### D-033 — Recency `patchIndex` and game rank bucket in ETL aggregation — ACCEPTED
 
 - Context: SPECS §3 defines recency as `decay ^ (currentPatchIndex - patchIndex)` but does not define `patchIndex`. It also does not say how a match's `avg_rank_score` maps to a rank bucket. T-016 needs both.
 - Question: should a patch gap (no stored games on some patches) count as one decay step or as the real number of patches released in between?
-- Assumption: `patchIndex` is dense over the distinct stored patches (sorted numerically with `comparePatches`), up to and including the snapshot patch. The game bucket is `clamp(floor(avg_rank_score), 0, 7)`, i.e. the `RANK_BUCKET_ORDER` index.
+- Decision: `patchIndex` is dense over the distinct stored patches (sorted numerically with `comparePatches`), up to and including the snapshot patch. The game bucket is `clamp(floor(avg_rank_score), 0, 7)`, i.e. the `RANK_BUCKET_ORDER` index. The snapshot patch is promoted to `currentPatchIndex` even when not yet stored, so recency is measured from it.
 - Alternatives: index by real release order (needs a patch list, e.g. from Data Dragon versions); use the distance in minor versions (breaks across major versions).
 - Consequences: with gaps in the collected data, older patches decay less than real time would suggest. T-017 pair aggregation must use the same indexing so baselines and pairs stay consistent.
+- Owner decision 2026-10-31.
 
 ### Template
 

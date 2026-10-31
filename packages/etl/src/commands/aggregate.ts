@@ -32,13 +32,13 @@ async function runAggregate(args: string[]): Promise<void> {
       console.log(
         `No participants found${patch === undefined ? '' : ` for patch ${patch}`}; role_prob left unchanged.`,
       );
-      return;
-    }
-    console.log(`Aggregated role probabilities: ${rows.length} row(s) written to role_prob.`);
-    for (const row of rows) {
-      console.log(
-        `  champion ${row.championId} ${row.role}: games=${row.games} prob=${(row.prob * 100).toFixed(2)}%`,
-      );
+    } else {
+      console.log(`Aggregated role probabilities: ${rows.length} row(s) written to role_prob.`);
+      for (const row of rows) {
+        console.log(
+          `  champion ${row.championId} ${row.role}: games=${row.games} prob=${(row.prob * 100).toFixed(2)}%`,
+        );
+      }
     }
 
     const baselineRows = aggregateBaseline(db, { patch });

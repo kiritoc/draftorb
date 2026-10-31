@@ -284,11 +284,11 @@ export function recommend(
   }
 
   // --- Sort and rank ---
-  const sorted = [...scored].sort((a, b) => {
-    const diff = b.score - a.score;
-    if (Math.abs(diff) > SCORE_TIE_EPSILON) return diff;
-    return a.championId - b.championId;
-  });
+  // Quantize scores so the tie rule is transitive (a pairwise epsilon is not).
+  const tieKey = (score: number): number => Math.round(score / SCORE_TIE_EPSILON);
+  const sorted = [...scored].sort(
+    (a, b) => tieKey(b.score) - tieKey(a.score) || a.championId - b.championId,
+  );
 
   const recommendations: Recommendation[] = sorted.map((s, i) =>
     toRecommendation(s, i + 1, config),

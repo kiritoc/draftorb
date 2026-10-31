@@ -41,8 +41,15 @@ export function resolveKnownSlots(
     resolved = subsetResolved;
   }
   if (!resolved) {
+    // Fixed roles that appear more than once are ambiguous (D-030): drop them so
+    // they cannot form a fake complete lane or displace the real opponent.
+    const roleCounts = new Map<Role, number>();
+    for (const s of slots) {
+      if (s.role !== undefined) roleCounts.set(s.role, (roleCounts.get(s.role) ?? 0) + 1);
+    }
     return slots
       .filter((s): s is Slot & { role: Role } => s.role !== undefined)
+      .filter((s) => roleCounts.get(s.role) === 1)
       .map((s) => ({ championId: s.championId, role: s.role, side, confidence: 1, fixed: true }));
   }
   return resolved.slots.map((s) => ({

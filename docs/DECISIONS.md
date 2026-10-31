@@ -226,6 +226,23 @@ Owner decision 2026-10-29.
   - Keep `min(0)` and add a separate zero-check refinement — rejected in favor of the simpler `gt(0)`, which communicates intent at the value level.
 - Consequences: four test cases updated (zero-valued role map made sparse, duplicate pool id, manifest version pinning, zero-rejection negative test); `MANIFEST_SCHEMA_VERSION` re-exported from the package barrel. No engine or ETL code consumed these schemas yet (T-020/T-019 are not started), so no downstream breakage.
 
+### D-030 — T-023 scoring assumptions — ACCEPTED
+
+- Context: SPECS §5 leaves several T-023 parameters and behaviors open. Golden rule 9 requires each assumption to be recorded.
+- Decision:
+  1. **Blind pick share.** No pick-rate export exists yet, so `blindSafety` approximates `pickShare(e)` with normalized `roleProb[e][role]` over the remaining champions (B-026).
+  2. **Blind trigger.** Blind safety applies when `blindPick` is true or any role of `laneGroup(myRole).enemies` is unknown. It scores only the unseen roles, so a known enemy is never counted twice. Missing or lowData matchups count as neutral (term 0) with their full share.
+  3. **Weights (priors, T-027.a tunes them).** `W_COMP = 1.0`, `W_BLIND = 1.0`, `BLIND_WORST_CASE_FACTOR = 0.5` (worst-case term, taken per unseen role), and comp weights from `DEFAULT_COMP_CONFIG`.
+  4. **Hard-counter warning.** Shown when `deltaPp(logit(p0), s * conf * influence * pairTerm) <= HARD_COUNTER_DELTA_PP` (-4.5, the L3-negative boundary) for a known, non-lowData enemy pair.
+  5. **Unsampled levels.** Comp and blind reasons have `n = 0` and are never lowData. Their level comes from `deltaPp` alone, with positive levels capped at L1 and negative levels unrestricted. lowData reasons get level 0.
+  6. **`conf_lane`.** `lane_vs` is scaled by the product of the lane-group enemy confidences only (the ally partner is not part of that context). `lane_full` uses the product over allies and enemies.
+  7. **`compNeed` ignores enemies until T-025.** Only tagged board allies count as evidence, including allies whose role could not be inferred.
+  8. **Ambiguous fixed roles.** When role inference fails and two or more slots on a team are fixed to the same role, those slots are dropped from role-dependent layers (pairs and lane), so they cannot form a fake complete lane.
+- Alternatives: block T-023 until pick-rate data and the backtest exist. Rejected: it would stall E2.
+- Consequences: these constants live in `packages/engine/src/config.ts`. Making them injectable is tracked by B-027. Any change to them requires the D-023 backtest.
+
+Owner decision 2026-10-31.
+
 ### Template
 
 ```

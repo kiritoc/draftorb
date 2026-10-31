@@ -144,7 +144,7 @@ export function toRecommendation(
       with: r.with.length > 0 ? r.with : undefined,
       level: r.level,
       deltaPp: Math.round(r.deltaPp * DELTA_PP_SCALE) / DELTA_PP_SCALE,
-      n: Math.round(r.n),
+      n: r.n, // n_eff is a real number (D-027)
       lowData: r.lowData,
     })),
     reliability: {

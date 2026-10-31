@@ -250,6 +250,13 @@ Owner decision 2026-10-29.
 
 Accepted by the owner on 2026-10-31. SPECS §5/§7 text derived from this decision is normative.
 
+### D-031 — `role_prob` counts a single patch, no recency decay — PROPOSED
+
+- Context: SPECS §3 applies recency decay `decay^(currentPatchIndex - gamePatchIndex)` at aggregation time and D-017 keeps older patches for that purpose. §3 names draft probabilities (pairs, matchups, baselines) but not `role_prob`, and DATA_MODEL.md says aggregated tables are "recomputed per patch". T-015 had to choose between single-patch counts and decay-weighted counts across patches.
+- Assumption (T-015): `aggregateRoleProb` counts only participants of one target patch (default: highest stored patch, numeric major.minor compare as in D-017). `role_prob` has no `patch` column and holds one patch at a time. A target patch with no participants leaves the table unchanged; a malformed patch is a usage error.
+- Alternatives: decay-weighted counts across the D-017 window (more data early in a patch, but role shifts from a patch change linger; `games` would become weighted and would need `games_w2`). Rejected for now pending owner review.
+- Consequences: early in a new patch `role_prob` may rest on few games; consumers should check `games` before trusting a probability (golden rule 8). Switching to decay later only changes `packages/etl/src/aggregate.ts` and its tests.
+
 ### Template
 
 ```

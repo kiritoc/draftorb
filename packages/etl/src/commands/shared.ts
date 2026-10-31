@@ -82,7 +82,6 @@ export function parseVersion(value: string | undefined): string | undefined {
 }
 
 export const PLANNED_COMMANDS = [
-  { name: 'aggregate', description: 'Compute aggregated tables' },
   { name: 'export', description: 'Write versioned JSON and manifest' },
 ] as const;
 

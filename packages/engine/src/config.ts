@@ -313,6 +313,9 @@ export const HARD_COUNTER_DELTA_PP = -4.5;
 /** Warning code prefix: `counteredBy:<ROLE>:<championId>` (rendered by the UI `strings` module). */
 export const COUNTERED_BY_WARNING = 'counteredBy';
 
+/** Warning code for a pool champion below the roleProb threshold (D-024). */
+export const OFF_ROLE_WARNING = 'offRole';
+
 /**
  * Comp need weights (log-odds). Each value is the bonus contributed when the
  * champion is the first on the team to provide that need. Priors calibrated

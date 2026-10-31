@@ -32,6 +32,7 @@ import {
   DEFAULT_COMP_CONFIG,
   DEFAULT_CONFIG,
   MISSING_LANE_ID,
+  OFF_ROLE_WARNING,
   SCORE_TIE_EPSILON,
   W_BLIND,
   W_COMP,
@@ -255,7 +256,7 @@ export function recommend(
     );
 
     const warnings = [
-      ...(isOffRole ? ['offRole'] : []),
+      ...(isOffRole ? [OFF_ROLE_WARNING] : []),
       ...hardCounterWarnings(c, myRole, enemySlots, enemyPairIdx, p0, config),
     ];
 

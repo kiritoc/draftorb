@@ -4,10 +4,11 @@
 
 import { describe, it, expect } from 'vitest';
 import type { ChampionRoleProbabilities, EnemyPairTable } from '@draftorb/shared';
-import { BLIND_WORST_CASE_FACTOR, DEFAULT_CONFIG } from './config.js';
+import { BLIND_WORST_CASE_FACTOR, DEFAULT_CONFIG, getInfluence } from './config.js';
 import { indexPairs, makePairKey } from './recommend-indexes.js';
 import { scorePair } from './levels.js';
-import { computeBlindSafety } from './recommend-terms.js';
+import type { KnownSlot } from './recommend-types.js';
+import { computeBlindSafety, hardCounterWarnings, scorePairs } from './recommend-terms.js';
 
 const P0 = 0.6;
 
@@ -79,9 +80,75 @@ describe('computeBlindSafety', () => {
     expect(actual).toBe(0);
   });
 
+  it('ignores opponents below the role-probability threshold', () => {
+    const lowShare = { '201': { ADC: 0.04, MID: 0.96 } } as ChampionRoleProbabilities;
+    expect(
+      computeBlindSafety(1, ['ADC'], new Set(), [1, 201], lowShare, idx, P0, DEFAULT_CONFIG),
+    ).toBe(0);
+  });
+
   it('returns 0 when no champion can play the unseen role', () => {
     expect(computeBlindSafety(1, ['TOP'], new Set(), ids, roleProb, idx, P0, DEFAULT_CONFIG)).toBe(
       0,
     );
+  });
+});
+
+function known(championId: number, role: KnownSlot['role'], side: KnownSlot['side']): KnownSlot {
+  return { championId, role, side, confidence: 1, fixed: true };
+}
+
+describe('scorePairs', () => {
+  const enemyIdx = indexPairs(
+    [
+      [1, 200, 'SUPPORT', 'DIAMOND', 10, 50, 0.1],
+      [1, 201, 'ADC', 'DIAMOND', 10, 50, 0.1],
+    ],
+    'DIAMOND',
+  );
+  const allyIdx = indexPairs([[1, 10, 'ADC', 'DIAMOND', 40, 50, 0.1]], 'DIAMOND');
+
+  it('orders by descending influence, then championId, and skips missing rows', () => {
+    const slots = [
+      known(201, 'ADC', 'enemy'),
+      known(200, 'SUPPORT', 'enemy'),
+      known(10, 'ADC', 'ally'),
+      known(999, 'MID', 'enemy'),
+    ];
+    const { deltas } = scorePairs(1, 'SUPPORT', slots, allyIdx, enemyIdx, P0, DEFAULT_CONFIG);
+    const influence = (s: KnownSlot): number =>
+      getInfluence('SUPPORT', s.side, s.role, 'draft', DEFAULT_CONFIG);
+    const expected = slots
+      .slice(0, 3)
+      .sort((a, b) => influence(b) - influence(a) || a.championId - b.championId)
+      .map((s) => s.championId);
+    expect(deltas.map((d) => d.championId)).toEqual(expected);
+  });
+
+  it('sums confidence * influence * term', () => {
+    const slot = { ...known(200, 'SUPPORT', 'enemy'), confidence: 0.5 };
+    const { sum } = scorePairs(1, 'SUPPORT', [slot], allyIdx, enemyIdx, P0, DEFAULT_CONFIG);
+    const inf = getInfluence('SUPPORT', 'enemy', 'SUPPORT', 'draft', DEFAULT_CONFIG);
+    expect(sum).toBeCloseTo(0.5 * inf * termFor(enemyIdx, makePairKey(1, 200, 'SUPPORT')), 12);
+  });
+});
+
+describe('hardCounterWarnings', () => {
+  it('warns for a strong counter and stays silent for lowData or missing rows', () => {
+    const enemyIdx = indexPairs(
+      [
+        [1, 200, 'SUPPORT', 'DIAMOND', 10, 50, 0.1],
+        [1, 201, 'ADC', 'DIAMOND', 0, 10, 10],
+      ],
+      'DIAMOND',
+    );
+    const enemies = [
+      known(200, 'SUPPORT', 'enemy'),
+      known(201, 'ADC', 'enemy'),
+      known(202, 'MID', 'enemy'),
+    ];
+    expect(hardCounterWarnings(1, 'SUPPORT', enemies, enemyIdx, P0, DEFAULT_CONFIG)).toEqual([
+      'counteredBy:SUPPORT:200',
+    ]);
   });
 });

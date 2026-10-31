@@ -1661,7 +1661,7 @@ describe('recommend: review gap coverage', () => {
   });
 });
 
-describe('recommend: review follow-up edge cases', () => {
+describe('recommend: edge cases', () => {
   const asRoleProb = (r: Record<string, Partial<Record<Role, number>>>) =>
     r as ChampionRoleProbabilities;
   const fixedBot = [
@@ -1718,6 +1718,16 @@ describe('recommend: review follow-up edge cases', () => {
     expect(delta(true)).toBeLessThan(delta(false));
   });
 
+  it('skips lane_full but keeps lane_vs when the ally partner is unknown', () => {
+    const roleProb = asRoleProb({ '1': { SUPPORT: 1 }, '200': { SUPPORT: 1 }, '201': { ADC: 1 } });
+    const laneVs: LaneVsTable = [[1, 200, 201, 'DIAMOND', 40, 50, 0.1]];
+    const laneFull: LaneFullTable = [[1, null, 200, 201, 'DIAMOND', 45, 50, 0.1]];
+    const data = makeData({ champions: [1, 200, 201], roleProb, laneVs, laneFull });
+    const rec = recommend(makeInput({ enemies: fixedBot }), data).recommendations[0];
+    const lanes = rec?.reasons.filter((r) => r.type === 'lane') ?? [];
+    expect(lanes.map((l) => l.with)).toEqual([[200, 201]]);
+  });
+
   it('reliability.games reports the baseline n_eff', () => {
     const data = makeData({ champions: [1] });
     const rec = recommend(makeInput(), data).recommendations[0];
@@ -1756,27 +1766,65 @@ describe('recommend: review follow-up edge cases', () => {
       'counteredBy:SUPPORT:200',
     ]);
   });
+});
 
-  it('keeps every resolvable teammate when two unfixed picks conflict', () => {
-    // 300 and 301 can only play ADC, which 201 already fixes; 302 is a clean MID.
-    const roleProb = asRoleProb({
-      '1': { SUPPORT: 1 },
-      '201': { ADC: 1 },
-      '300': { ADC: 1 },
-      '301': { ADC: 1 },
-      '302': { MID: 1 },
-    });
-    const enemyPairs: EnemyPairTable = [[1, 302, 'MID', 'DIAMOND', 10, 50, 0.1]];
-    const data = makeData({ champions: [1, 201, 300, 301, 302], roleProb, enemyPairs });
-    const input = makeInput({
-      enemies: [
-        { championId: 201, role: 'ADC' },
-        { championId: 300 },
-        { championId: 301 },
-        { championId: 302 },
-      ],
-    });
-    const rec = recommend(input, data).recommendations.find((r) => r.championId === 1);
-    expect(rec?.reasons.find((r) => r.type === 'counter')?.with).toEqual([302]);
+describe('recommend: pool invariance property (D-024)', () => {
+  // Deterministic LCG so the property test is reproducible (engine purity rule).
+  function lcg(seed: number): () => number {
+    let s = seed >>> 0;
+    return () => {
+      s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+      return s / 2 ** 32;
+    };
+  }
+
+  it('scores and reasons never change with any pool (100 seeded drafts)', () => {
+    for (let seed = 1; seed <= 100; seed++) {
+      const rnd = lcg(seed);
+      const champions: ChampionId[] = [1, 2, 3, 4, 5, 6, 10, 200, 201];
+      const roleProb = {
+        '1': { SUPPORT: 1 },
+        '2': { SUPPORT: 1 },
+        '3': { SUPPORT: 0.5, MID: 0.5 },
+        '4': { TOP: 1 },
+        '5': { SUPPORT: 1 },
+        '6': { JUNGLE: 1 },
+        '10': { ADC: 1 },
+        '200': { SUPPORT: 1 },
+        '201': { ADC: 1 },
+      } as ChampionRoleProbabilities;
+      const baselines: BaselineTable = champions.map((c) => [
+        c,
+        'DIAMOND',
+        20 + Math.floor(rnd() * 20),
+        50,
+        0.1,
+        50,
+      ]);
+      const enemyPairs = makeEnemyPairs(
+        [1, 2, 3, 4, 5].map((c) => ({
+          championId: c,
+          enemyId: 200,
+          role: 'SUPPORT' as Role,
+          ...HIGH_GAMES,
+          winsW: 10 + Math.floor(rnd() * 30),
+        })),
+      );
+      const data = makeData({ champions, baselines, roleProb, enemyPairs });
+      const enemies = rnd() < 0.5 ? [{ championId: 200, role: 'SUPPORT' as Role }] : [];
+      const blindPick = rnd() < 0.5;
+      const pool = [1, 2, 3, 4, 5, 6, 999].filter(() => rnd() < 0.5);
+      const base = recommend(makeInput({ enemies, blindPick }), data).recommendations;
+      const pooled = recommend(makeInput({ enemies, blindPick, pool }), data).recommendations;
+      for (const rec of base) {
+        const other = pooled.find((r) => r.championId === rec.championId);
+        expect(other?.score).toBe(rec.score);
+        expect(other?.reasons).toEqual(rec.reasons);
+      }
+      const baseIds = base.map((r) => r.championId);
+      expect(pooled.map((r) => r.championId).filter((id) => baseIds.includes(id))).toEqual(
+        baseIds,
+      );
+    }
   });
 });

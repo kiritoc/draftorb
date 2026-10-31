@@ -310,7 +310,7 @@ describe('migration runner', () => {
       ) VALUES (1, 'TOP', NULL, 10, 5, 'DIAMOND', 1, 1, 1)`,
     ).run();
     expect(db.prepare('SELECT COUNT(*) AS count FROM _migrations').get()).toMatchObject({
-      count: 7,
+      count: 8,
     });
     db.close();
   });

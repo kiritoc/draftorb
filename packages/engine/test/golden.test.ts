@@ -78,7 +78,9 @@ const strictObject =
     if (typeof v !== 'object' || v === null || Array.isArray(v)) fail(p, 'expected an object');
     const o = v as Record<string, unknown>;
     for (const k of Object.keys(o)) {
-      if (!(k in required) && !(k in optional)) fail(`${p}.${k}`, 'unknown key');
+      if (!Object.hasOwn(required, k) && !Object.hasOwn(optional, k)) {
+        fail(`${p}.${k}`, 'unknown key');
+      }
     }
     for (const [k, c] of Object.entries(required)) c(o[k], `${p}.${k}`);
     for (const [k, c] of Object.entries(optional)) if (o[k] !== undefined) c(o[k], `${p}.${k}`);

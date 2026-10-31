@@ -51,8 +51,8 @@ Earlier handoff (kept for history): B-017 done (engine and shared `"types": []` 
   - **`packages/etl/package.json`** (edited): added `@draftorb/engine` workspace dependency to reuse the engine rank kernel.
   - **`packages/etl/tsconfig.json`** (edited): added `../engine` project reference.
   - **`docs/SETUP.md`** (edited): `pnpm etl aggregate` description updated to include baselines.
-  - Review fixes: the game rank bucket now comes from `matches.avg_rank_score`, so participants with unknown rank still contribute; an optional `[patch]` argument excludes newer matches and sets recency relative to that patch (`aggregateBaseline(db, { patch })`). The ETL dependency on `@draftorb/engine` is recorded as D-032 (PROPOSED).
-- Tests: `pnpm check` green (typecheck, lint, format: 0 errors; 594 tests across 41 files, including the 3 new baseline tests).
+  - Review fixes: the game rank bucket now comes from `matches.avg_rank_score`, so participants with unknown rank still contribute; an optional `[patch]` argument excludes newer matches and sets recency relative to that patch (`aggregateBaseline(db, { patch })`); a malformed patch throws before the table is touched, so existing baselines are preserved. The ETL dependency on `@draftorb/engine` is recorded as D-032 (PROPOSED).
+- Tests: `pnpm check` green (typecheck, lint, format: 0 errors; 603 tests across 42 files, including the 4 baseline tests).
 - State left: **DONE (T-016)**. Resolved B-033 (renumbered from duplicate B-025, now FIXED). Next ETL ticket: T-017 (Aggregate pair tables).
 
 ### 2026-10-31 — Antigravity — Ticket T-015 (Aggregate role probabilities)

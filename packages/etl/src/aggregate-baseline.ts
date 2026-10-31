@@ -27,6 +27,7 @@ import {
   combinedGameWeight,
   type RankWeightingConfig,
 } from '@draftorb/engine';
+import { PATCH_PATTERN } from './aggregate';
 import { comparePatches } from './matches-store';
 
 export interface BaselineRow {
@@ -50,6 +51,9 @@ export function aggregateBaseline(
   options: AggregateBaselineOptions = {},
 ): BaselineRow[] {
   const config = options.config ?? DEFAULT_CONFIG;
+  if (options.patch !== undefined && !PATCH_PATTERN.test(options.patch)) {
+    throw new Error(`Invalid patch "${options.patch}". Expected a format like "16.21".`);
+  }
 
   const allRows = db
     .prepare(

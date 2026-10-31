@@ -174,6 +174,23 @@ describe('aggregateBaseline', () => {
     });
   });
 
+  it('rejects a malformed snapshot patch and preserves existing baselines', () => {
+    withFreshDb((dbPath) => {
+      seedBasic(dbPath);
+      const db = openDb(dbPath);
+      try {
+        const before = aggregateBaseline(db);
+        expect(before.length).toBeGreaterThan(0);
+        expect(() => aggregateBaseline(db, { patch: 'bad' })).toThrow(/Invalid patch/);
+        expect(db.prepare('SELECT COUNT(*) AS count FROM baseline').get()).toMatchObject({
+          count: before.length,
+        });
+      } finally {
+        db.close();
+      }
+    });
+  });
+
   it('leaves baseline empty when there are no participants', () => {
     withFreshDb((dbPath) => {
       const db = openDb(dbPath);

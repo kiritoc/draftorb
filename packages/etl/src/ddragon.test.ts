@@ -74,6 +74,35 @@ describe('ddragon ETL utilities', () => {
     });
   });
 
+  it('derives champion roles from role-prob data when provided, keeping tag roles otherwise', () => {
+    const raw = {
+      Nami: {
+        id: 'Nami',
+        key: '267',
+        name: 'Nami',
+        image: { full: 'Nami.png' },
+        tags: ['Support', 'Mage'],
+      },
+      Thresh: {
+        id: 'Thresh',
+        key: '412',
+        name: 'Thresh',
+        image: { full: 'Thresh.png' },
+        tags: ['Support', 'Fighter'],
+      },
+    };
+    const roleProb = {
+      '267': { MID: 0.6, SUPPORT: 0.4 },
+      '412': { SUPPORT: 1 },
+    };
+    const transformed = transformChampions(raw, roleProb);
+    const nami = Object.values(transformed).find((champion) => champion.id === 267);
+    const thresh = Object.values(transformed).find((champion) => champion.id === 412);
+    expect(nami?.roles).toEqual(['MID', 'SUPPORT']);
+    expect(thresh?.roles).toEqual(['SUPPORT']);
+    expect(championsMapSchema.parse(transformed)).toEqual(transformed);
+  });
+
   it('transforms raw item payloads, filters blank names, and passes zod validation', () => {
     const raw = {
       '1001': {

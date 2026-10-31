@@ -9,12 +9,15 @@ import { defaultPublicDataDir } from './config/paths';
 import {
   type ChampionsMap,
   championsMapSchema,
+  type ChampionRoleProbabilities,
   type ItemsMap,
   itemsMapSchema,
   type Role,
   type RuneTrees,
   runeTreesSchema,
 } from '@draftorb/shared';
+
+import { deriveChampionRoles } from './derive-roles';
 
 const DDRAGON_BASE = 'https://ddragon.leagueoflegends.com';
 
@@ -112,20 +115,31 @@ export function mapChampionTagsToRoles(tags: readonly string[] | undefined): Rol
 
 /**
  * Transforms raw champion dictionary from Data Dragon into a validated ChampionsMap.
+ *
+ * When `roleProbabilities` is provided (observed `role_prob` data), each
+ * champion's roles are derived from the observed probabilities, replacing the
+ * Data Dragon champion-tag bootstrap hint. Champions without role-prob data
+ * keep their tag-derived roles.
  */
-export function transformChampions(rawData: Record<string, RawDDragonChampion>): ChampionsMap {
+export function transformChampions(
+  rawData: Record<string, RawDDragonChampion>,
+  roleProbabilities?: ChampionRoleProbabilities,
+): ChampionsMap {
   const champions: Record<string, unknown> = {};
+  const derivedRoles =
+    roleProbabilities === undefined ? undefined : deriveChampionRoles(roleProbabilities);
 
   for (const rawChamp of Object.values(rawData)) {
     const id = parseInt(rawChamp.key, 10);
     if (isNaN(id) || id <= 0) {
       continue;
     }
+    const roles = derivedRoles?.[String(id)] ?? mapChampionTagsToRoles(rawChamp.tags);
     const champion = {
       id,
       name: rawChamp.name,
       icon: rawChamp.image?.full ?? `${rawChamp.id}.png`,
-      roles: mapChampionTagsToRoles(rawChamp.tags),
+      roles,
     };
     champions[String(id)] = champion;
   }

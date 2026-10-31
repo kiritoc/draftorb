@@ -113,6 +113,8 @@ export { enrichParticipants, type EnrichmentOptions, type EnrichmentSummary } fr
 
 export { aggregateRoleProb, type RoleProbRow } from './aggregate';
 
+export { applyDerivedRoles, deriveChampionRoles } from './derive-roles';
+
 export { aggregateBaseline, type BaselineRow } from './aggregate-baseline';
 
 export {

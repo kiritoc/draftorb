@@ -10,11 +10,11 @@
  * sufficient for T-023.
  */
 
-import type { ChampionId, ChampionTagsMap } from '@draftorb/shared';
+import type { ChampionId, ChampionTagsMap, CompNeedCategory } from '@draftorb/shared';
 import type { CompConfig } from './config.js';
 import { DEFAULT_COMP_CONFIG } from './config.js';
 
-export type CompNeedCategory = 'engage' | 'peel' | 'waveclear' | 'poke' | 'ad_damage' | 'ap_damage';
+export type { CompNeedCategory } from '@draftorb/shared';
 
 export interface CompNeedResult {
   /** Log-odds bonus for this champion filling missing needs of the team. */
@@ -100,8 +100,8 @@ export function computeCompNeed(
     ['peel', t.peel, config.peel],
     ['waveclear', t.waveclear, config.waveclear],
     ['poke', t.poke, config.poke],
-    ['ad_damage', t.damageType === 'AD' || t.damageType === 'MIXED', config.adDamage],
-    ['ap_damage', t.damageType === 'AP' || t.damageType === 'MIXED', config.apDamage],
+    ['ad_damage', t.damageType === 'AD' || t.damageType === 'MIXED', config.ad_damage],
+    ['ap_damage', t.damageType === 'AP' || t.damageType === 'MIXED', config.ap_damage],
   ];
 
   for (const [cat, has, weight] of categoryMap) {

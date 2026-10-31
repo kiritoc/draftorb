@@ -288,11 +288,8 @@ export const UNSAMPLED_MAX_POSITIVE_LEVEL = 1;
 export const REASON_LEVEL_MIN = -3;
 export const REASON_LEVEL_MAX = 3;
 
-/** Warning code prefix: `counteredBy:<ROLE>:<championId>` (rendered by the UI `strings` module). */
-export const COUNTERED_BY_WARNING = 'counteredBy';
-
-/** Warning code for a pool champion below the roleProb threshold (D-024). */
-export const OFF_ROLE_WARNING = 'offRole';
+/** Warning codes are defined in @draftorb/shared (single source of truth). */
+export { COUNTERED_BY_WARNING, OFF_ROLE_WARNING } from '@draftorb/shared';
 
 /**
  * Comp need weights (log-odds). Each value is the bonus contributed when the
@@ -304,8 +301,9 @@ export interface CompConfig {
   readonly peel: number;
   readonly waveclear: number;
   readonly poke: number;
-  readonly adDamage: number;
-  readonly apDamage: number;
+  // Keys match the CompNeedCategory codes (snake_case, owner decision).
+  readonly ad_damage: number;
+  readonly ap_damage: number;
   readonly missingThreshold: number;
   /** Minimum known allies before the AD/AP balance is evaluated. */
   readonly minAlliesForDamageMix: number;
@@ -316,8 +314,8 @@ export const DEFAULT_COMP_CONFIG: CompConfig = Object.freeze({
   peel: 0.1,
   waveclear: 0.08,
   poke: 0.06,
-  adDamage: 0.1,
-  apDamage: 0.1,
+  ad_damage: 0.1,
+  ap_damage: 0.1,
   missingThreshold: 0.5,
   minAlliesForDamageMix: 3,
 });

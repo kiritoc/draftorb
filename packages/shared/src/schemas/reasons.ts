@@ -14,6 +14,7 @@
 import { z } from 'zod';
 
 import { championIdSchema } from './core.js';
+import { warningCodeSchema } from './codes.js';
 
 export const reasonTypeSchema = z.enum(['synergy', 'counter', 'lane', 'comp', 'blind']);
 export type ReasonType = z.infer<typeof reasonTypeSchema>;
@@ -58,7 +59,7 @@ export const recommendationSchema = z
     poolRank: z.number().int().positive().optional(),
     reasons: z.array(reasonSchema),
     reliability: reliabilitySchema,
-    warnings: z.array(z.string().min(1)),
+    warnings: z.array(warningCodeSchema),
   })
   .strict();
 export type Recommendation = z.infer<typeof recommendationSchema>;

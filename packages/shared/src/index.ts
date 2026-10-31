@@ -60,6 +60,14 @@ export type {
   DraftResult,
 } from './schemas/draft.js';
 
+export {
+  compNeedCategorySchema,
+  warningCodeSchema,
+  COUNTERED_BY_WARNING,
+  OFF_ROLE_WARNING,
+} from './schemas/codes.js';
+export type { CompNeedCategory, WarningCode } from './schemas/codes.js';
+
 export { recommendDataSchema } from './schemas/recommend-data.js';
 export type { RecommendData } from './schemas/recommend-data.js';
 

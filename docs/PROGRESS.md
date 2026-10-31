@@ -69,12 +69,14 @@ Earlier handoff (kept for history): B-017 done (engine and shared `"types": []` 
   - **`packages/engine/src/index.ts`** (updated): exported `./comp.js` and `./recommend.js`.
 - Files touched:
   - `packages/engine/src/recommend.ts` (new)
-  - `packages/engine/src/recommend.test.ts` (new)
+  - `packages/engine/src/recommend.ts` split into `recommend-{indexes,slots,terms,reasons,pool,types}.ts`
+  - `packages/engine/src/recommend-*.test.ts` (new: ranking, pairs, lanes, role-conflicts, blind-comp, pool, pool-contract, indexes, slots, reasons, terms, types)
+  - `packages/engine/src/recommend-test-utils.ts` (new, test-only builders)
   - `packages/engine/src/comp.ts` (new)
   - `packages/engine/src/comp.test.ts` (new)
   - `packages/engine/src/golden.test.ts` (new)
   - `packages/engine/src/index.ts` (updated)
-  - `packages/engine/test/golden/*.json` (8 fixtures)
+  - `packages/engine/test/golden/*.json` (12 fixtures)
   - `docs/TICKETS.md` (updated T-023 to DONE)
   - `docs/PROGRESS.md` (updated)
 - Tests: `pnpm check` green before the final review pass (25 files, 447 tests). The final pass adds 12 engine tests (5 review-gap tests plus 3 more in `packages/engine/src/recommend.test.ts` and 4 in the new `packages/engine/src/recommend-terms.test.ts`) and scales the hard-counter warning by influence.

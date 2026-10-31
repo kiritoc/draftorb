@@ -173,7 +173,7 @@ describe('computeCompNeed', () => {
       DEFAULT_COMP_CONFIG.peel +
       DEFAULT_COMP_CONFIG.waveclear +
       DEFAULT_COMP_CONFIG.poke +
-      DEFAULT_COMP_CONFIG.apDamage;
+      DEFAULT_COMP_CONFIG.ap_damage;
     expect(result.bonus).toBeCloseTo(expected, 10);
   });
 

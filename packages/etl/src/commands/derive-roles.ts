@@ -6,7 +6,7 @@ import type { ChampionRoleProbabilities, ChampionsMap, Role } from '@draftorb/sh
 
 import { defaultPublicDataDir, resolveRepoRoot } from '../config/paths';
 import { applyDerivedRoles } from '../derive-roles';
-import { latestPatch, PATCH_PATTERN } from '../aggregate';
+import { computeRoleProb, latestPatch, PATCH_PATTERN } from '../aggregate';
 import { UsageError } from '../cli-args';
 import { log, parsePositionals, type Command } from './shared';
 
@@ -33,11 +33,9 @@ export async function runDeriveRoles(args: string[]): Promise<void> {
   try {
     targetPatch = patch ?? latestPatch(db);
     if (targetPatch !== undefined) {
-      rows = db.prepare(`SELECT champion_id AS championId, role, prob FROM role_prob`).all() as {
-        championId: number;
-        role: string;
-        prob: number;
-      }[];
+      // Compute for the target patch directly: `role_prob` has no patch column
+      // and may hold another patch's aggregation.
+      rows = computeRoleProb(db, targetPatch);
     }
   } finally {
     db.close();
@@ -61,9 +59,21 @@ export async function runDeriveRoles(args: string[]): Promise<void> {
     return;
   }
 
-  const champions = JSON.parse(readFileSync(championsPath, 'utf8')) as unknown;
+  // Fallback roles must come from an unmodified source: snapshot the
+  // tag-bootstrap catalog on first run (or after `static` rewrote it) and
+  // always derive from that snapshot.
+  const bootstrapPath = join(publicDir, targetPatch, 'champions.bootstrap.json');
+  const current = readFileSync(championsPath, 'utf8');
+  const marker = join(publicDir, targetPatch, 'champions.derived.json');
+  const staticRewrote = !existsSync(marker) || readFileSync(marker, 'utf8') !== current;
+  if (!existsSync(bootstrapPath) || staticRewrote) {
+    writeFileSync(bootstrapPath, current, 'utf-8');
+  }
+  const champions = JSON.parse(readFileSync(bootstrapPath, 'utf8')) as unknown;
   const updated = applyDerivedRoles(champions as ChampionsMap, roleProbabilities);
-  writeFileSync(championsPath, JSON.stringify(updated, null, 2), 'utf-8');
+  const serialized = JSON.stringify(updated, null, 2);
+  writeFileSync(championsPath, serialized, 'utf-8');
+  writeFileSync(marker, serialized, 'utf-8');
 
   log.info(
     `Derived champion roles from role-prob data for ${Object.keys(updated).length} champions -> ${championsPath}`,

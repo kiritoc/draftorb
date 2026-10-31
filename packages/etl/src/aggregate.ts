@@ -42,6 +42,32 @@ export function latestPatch(db: Database.Database): string | undefined {
  * left untouched so a typo cannot wipe the existing table.
  */
 export function aggregateRoleProb(db: Database.Database, patch?: string): RoleProbRow[] {
+  const result = computeRoleProb(db, patch);
+
+  if (result.length === 0) {
+    return result;
+  }
+
+  const clear = db.prepare('DELETE FROM role_prob');
+  const insert = db.prepare(
+    'INSERT INTO role_prob (champion_id, role, games, prob) VALUES (?, ?, ?, ?)',
+  );
+  const write = db.transaction(() => {
+    clear.run();
+    for (const row of result) {
+      insert.run(row.championId, row.role, row.games, row.prob);
+    }
+  });
+  write.immediate();
+
+  return result;
+}
+
+/**
+ * Computes role probabilities for `patch` (default: `latestPatch`) from stored
+ * participants without touching the `role_prob` table.
+ */
+export function computeRoleProb(db: Database.Database, patch?: string): RoleProbRow[] {
   if (patch !== undefined && !PATCH_PATTERN.test(patch)) {
     throw new Error(`Invalid patch "${patch}". Expected a format like "16.21".`);
   }
@@ -73,22 +99,5 @@ export function aggregateRoleProb(db: Database.Database, patch?: string): RolePr
     const prob = total > 0 ? row.games / total : 0;
     result.push({ championId: row.championId, role: row.role, games: row.games, prob });
   }
-
-  if (result.length === 0) {
-    return result;
-  }
-
-  const clear = db.prepare('DELETE FROM role_prob');
-  const insert = db.prepare(
-    'INSERT INTO role_prob (champion_id, role, games, prob) VALUES (?, ?, ?, ?)',
-  );
-  const write = db.transaction(() => {
-    clear.run();
-    for (const row of result) {
-      insert.run(row.championId, row.role, row.games, row.prob);
-    }
-  });
-  write.immediate();
-
   return result;
 }

@@ -2,7 +2,7 @@ name: CI
 
 # Setup for auto-format (optional): GitHub App with Contents: read & write on
 # this repo, repo variable FORMAT_BOT_APP_ID, secret FORMAT_BOT_PRIVATE_KEY.
-# Without the variable the `format` job is skipped.
+# Without the variable the format jobs are skipped.
 # After the bot pushes, run `git pull --rebase` before pushing again.
 
 on:
@@ -13,14 +13,17 @@ on:
 permissions:
   contents: read
 
+env:
+  BOT_EMAIL: format-bot@users.noreply.github.com
+
 # PRs: cancel superseded runs. main: let every commit finish.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # Runs first. If it pushes a fix, the push starts a new run of this workflow
-  # which cancels this one (concurrency), so lint/test never run on stale code.
+  # UNTRUSTED: runs project code (dependencies, prettier config/plugins).
+  # No secrets, read-only token, no persisted credentials.
   format:
     # Same-repo PRs only; forks and Dependabot have no access to the app secret.
     if: >-
@@ -30,6 +33,54 @@ jobs:
       github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Format and create patch
+        id: diff
+        run: |
+          # Never loop: stop if the bot's own commit is already the tip.
+          if [ "$(git log -1 --format=%ce)" = "$BOT_EMAIL" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # .github is excluded: the App has no `workflows` permission,
+          # so a push touching workflow files would be rejected anyway.
+          pnpm prettier --write . '!.github/**'
+          git diff --binary --no-ext-diff > format.patch
+          if [ -s format.patch ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/upload-artifact@v7
+        if: steps.diff.outputs.changed == 'true'
+        with:
+          name: format-patch
+          path: format.patch
+          if-no-files-found: error
+          retention-days: 1
+
+  # TRUSTED: holds the write token but only runs git, never project code.
+  commit-format:
+    needs: format
+    if: needs.format.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions: {}
     steps:
       # An App token (unlike GITHUB_TOKEN) makes the push trigger CI again.
@@ -46,39 +97,29 @@ jobs:
           ref: ${{ github.head_ref }}
           token: ${{ steps.app.outputs.token }}
 
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
+      - uses: actions/download-artifact@v8
         with:
-          node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile --ignore-scripts
+          name: format-patch
+          path: ${{ runner.temp }}
 
-      - name: Format and push
+      - name: Apply patch and push
         env:
-          BOT_EMAIL: format-bot@users.noreply.github.com
+          PATCH: ${{ runner.temp }}/format.patch
         run: |
-          # Never loop: stop if the bot's own commit is already the tip.
-          if [ "$(git log -1 --format=%ce)" = "$BOT_EMAIL" ]; then
-            echo "Tip is the bot's commit; nothing to do"
-            exit 0
+          # Content edits only: --summary lists creates, deletes, renames,
+          # copies and mode changes, and is empty otherwise.
+          if [ -n "$(git apply --summary "$PATCH")" ]; then
+            echo "::error::Patch contains structural changes"; exit 1
           fi
-
-          # .github is excluded: the App has no `workflows` permission,
-          # so a push touching workflow files would be rejected.
-          pnpm prettier --write . '!.github/**'
-
-          if git diff --quiet; then
-            echo "Already formatted"
-            exit 0
-          fi
-
+          git apply "$PATCH"
           git -c user.name=format-bot -c user.email="$BOT_EMAIL" \
             commit -a -m 'style: apply prettier'
           git push || echo "::warning::Push rejected (branch moved); the next run will format"
 
   lint:
-    needs: format
-    # `format` is skipped on push/forks: still run (only a cancel stops us).
+    needs: [format, commit-format]
+    # Format jobs are skipped on push/forks: still run (only a cancel stops us).
+    # If the bot pushed, the new run cancels this one (concurrency).
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -100,7 +141,7 @@ jobs:
         if: ${{ !cancelled() }}
 
   test:
-    needs: format
+    needs: [format, commit-format]
     if: ${{ !cancelled() }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15

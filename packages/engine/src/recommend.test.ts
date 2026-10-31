@@ -1822,9 +1822,7 @@ describe('recommend: pool invariance property (D-024)', () => {
         expect(other?.reasons).toEqual(rec.reasons);
       }
       const baseIds = base.map((r) => r.championId);
-      expect(pooled.map((r) => r.championId).filter((id) => baseIds.includes(id))).toEqual(
-        baseIds,
-      );
+      expect(pooled.map((r) => r.championId).filter((id) => baseIds.includes(id))).toEqual(baseIds);
     }
   });
 });

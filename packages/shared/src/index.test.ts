@@ -99,8 +99,8 @@ describe('shared schemas', () => {
         { type: 'lane', with: [41, 34], level: 2, deltaPp: 1.5, n: 120.5, lowData: false },
         { type: 'synergy', with: [18], level: 1, deltaPp: 0.8, lowData: true },
       ],
-      reliability: { games: 80.5, lowData: false },
-      warnings: ['countered by enemy support'],
+      reliability: { nEff: 80.5, lowData: false },
+      warnings: ['counteredBy:SUPPORT:412'],
     };
 
     expect(recommendationSchema.parse(recommendation)).toEqual(recommendation);
@@ -134,7 +134,7 @@ describe('shared schemas', () => {
         score: 12.5,
         rank: 1,
         reasons: [{ type: 'synergy', with: 18 }],
-        reliability: { games: 80, lowData: false },
+        reliability: { nEff: 80, lowData: false },
         warnings: [],
       }),
     ).toThrow();
@@ -147,7 +147,7 @@ describe('shared schemas', () => {
       rank: 1,
       poolRank: 1,
       reasons: [],
-      reliability: { games: 80, lowData: false },
+      reliability: { nEff: 80, lowData: false },
       warnings: [],
     };
     expect(recommendationSchema.parse(rec)).toEqual(rec);
@@ -217,7 +217,7 @@ describe('shared schemas', () => {
       rankBuckets: ['DIAMOND'],
       roles: ['SUPPORT'],
       files: [{ path: 'champions.json' }],
-      schemaVersion: 1,
+      schemaVersion: 2,
     };
     expect(manifestSchema.parse(manifest)).toEqual(manifest);
   });
@@ -334,7 +334,7 @@ describe('shared schemas', () => {
   });
 
   it('validates role-keyed export tuple schemas', () => {
-    const baseline: BaselineEntry = [41, 'DIAMOND', 52.4, 100.0, 250.0];
+    const baseline: BaselineEntry = [41, 'DIAMOND', 52.4, 100.0, 250.0, 120];
     expect(baselineEntrySchema.parse(baseline)).toEqual(baseline);
 
     const allyPair = [41, 18, 'ADC', 'DIAMOND', 52.4, 100.0, 250.0] as const;
@@ -357,8 +357,12 @@ describe('shared schemas', () => {
   });
 
   it('rejects rankSchema values where rankBucketSchema is expected', () => {
-    expect(() => baselineEntrySchema.parse([41, 'MASTER' as Rank, 52.4, 100.0, 250.0])).toThrow();
-    expect(() => baselineEntrySchema.parse([41, 'MASTER_PLUS', 52.4, 100.0, 250.0])).not.toThrow();
+    expect(() =>
+      baselineEntrySchema.parse([41, 'MASTER' as Rank, 52.4, 100.0, 250.0, 120]),
+    ).toThrow();
+    expect(() =>
+      baselineEntrySchema.parse([41, 'MASTER_PLUS', 52.4, 100.0, 250.0, 120]),
+    ).not.toThrow();
   });
 
   it('validates champion pool storage envelope', () => {
@@ -378,13 +382,14 @@ describe('shared schemas', () => {
 
   it('validates DraftResult with insufficientData and pool recommendations', () => {
     const result: DraftResult = {
+      schemaVersion: 1,
       recommendations: [
         {
           championId: 41,
           score: 0.72,
           rank: 1,
           reasons: [{ type: 'synergy', with: [18], level: 2, n: 120.5, lowData: false }],
-          reliability: { games: 150.3, lowData: false },
+          reliability: { nEff: 150.3, lowData: false },
           warnings: [],
         },
       ],
@@ -396,7 +401,7 @@ describe('shared schemas', () => {
           rank: 1,
           poolRank: 1,
           reasons: [],
-          reliability: { games: 150.3, lowData: false },
+          reliability: { nEff: 150.3, lowData: false },
           warnings: [],
         },
       ],
@@ -406,6 +411,7 @@ describe('shared schemas', () => {
 
     expect(() =>
       draftResultSchema.parse({
+        schemaVersion: 1,
         recommendations: [],
         insufficientData: [{ championId: 54, nEff: 12.5, rawGames: 20 }],
       }),
@@ -413,6 +419,7 @@ describe('shared schemas', () => {
 
     expect(() =>
       draftResultSchema.parse({
+        schemaVersion: 1,
         recommendations: [],
         insufficientData: [{ championId: 54, nEff: 12.5, rawGames: 20 }],
         poolUnavailable: [{ championId: 999, reason: 'bogus' }],

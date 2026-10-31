@@ -23,7 +23,8 @@ describe('shared schema parity (D-011)', () => {
     expect(shared.damageTypeSchema).toBeDefined();
     expect(shared.championRangeSchema).toBeDefined();
     expect(shared.SHARED_VERSION).toBeDefined();
-    expect(shared.MANIFEST_SCHEMA_VERSION).toBe(1);
+    expect(shared.MANIFEST_SCHEMA_VERSION).toBe(2);
+    expect(shared.DRAFT_RESULT_SCHEMA_VERSION).toBe(1);
   });
 
   it('exports rankBucketSchema with exactly the 8 SPECS §3 buckets', () => {
@@ -70,7 +71,7 @@ describe('shared schema parity (D-011)', () => {
       rank: 1,
       poolRank: 1,
       reasons: [],
-      reliability: { games: 100, lowData: false },
+      reliability: { nEff: 100, lowData: false },
       warnings: [],
     });
     expect(result.success).toBe(true);
@@ -91,19 +92,33 @@ describe('shared schema parity (D-011)', () => {
   it('exports DraftResult with insufficientData, poolRecommendations, poolUnavailable', () => {
     expect(shared.draftResultSchema).toBeDefined();
     const minimal = shared.draftResultSchema.safeParse({
+      schemaVersion: 1,
       recommendations: [],
       insufficientData: [{ championId: 41, nEff: 12.5, rawGames: 20 }],
     });
     expect(minimal.success).toBe(true);
 
+    // A missing or mismatched version must fail loudly.
+    expect(
+      shared.draftResultSchema.safeParse({ recommendations: [], insufficientData: [] }).success,
+    ).toBe(false);
+    expect(
+      shared.draftResultSchema.safeParse({
+        schemaVersion: 2,
+        recommendations: [],
+        insufficientData: [],
+      }).success,
+    ).toBe(false);
+
     const full = shared.draftResultSchema.safeParse({
+      schemaVersion: 1,
       recommendations: [
         {
           championId: 41,
           score: 0.7,
           rank: 1,
           reasons: [{ type: 'lane', with: [41, 34], lowData: false, n: 100.5 }],
-          reliability: { games: 150.3, lowData: false },
+          reliability: { nEff: 150.3, lowData: false },
           warnings: [],
         },
       ],
@@ -115,7 +130,7 @@ describe('shared schema parity (D-011)', () => {
           rank: 1,
           poolRank: 1,
           reasons: [],
-          reliability: { games: 150.3, lowData: false },
+          reliability: { nEff: 150.3, lowData: false },
           warnings: [],
         },
       ],
@@ -157,14 +172,15 @@ describe('shared schema parity (D-011)', () => {
       rankBuckets: ['DIAMOND'],
       roles: ['SUPPORT'],
       files: [{ path: 'champions.json' }],
-      schemaVersion: 1,
+      schemaVersion: 2,
     });
     expect(manifest.success).toBe(true);
-    expect(manifest.data).toMatchObject({ schemaVersion: 1 });
+    expect(manifest.data).toMatchObject({ schemaVersion: 2 });
+    // v1 exports (5-column baselines) are rejected.
     expect(() =>
       shared.manifestSchema.parse({
         ...manifest.data,
-        schemaVersion: 2,
+        schemaVersion: 1,
       }),
     ).toThrow();
   });
@@ -208,7 +224,7 @@ describe('shared schema parity (D-011)', () => {
     expect(shared.laneFullEntrySchema).toBeDefined();
     expect(shared.laneFullTableSchema).toBeDefined();
 
-    const baseline = shared.baselineEntrySchema.safeParse([41, 'DIAMOND', 52.4, 100.0, 250.0]);
+    const baseline = shared.baselineEntrySchema.safeParse([41, 'DIAMOND', 52.4, 100.0, 250.0, 120]);
     expect(baseline.success).toBe(true);
 
     const allyPair = shared.allyPairEntrySchema.safeParse([

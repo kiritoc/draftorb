@@ -218,8 +218,15 @@ export function baselineGate(nEff: number, minGames: number): boolean {
  * Clamped to `[eps, 1 - eps]` to avoid ±Infinity.
  */
 export function baselineLogOdds(winsE: number, gamesE: number, k0: number, eps: number): number {
-  const p0 = shrink(winsE, gamesE, k0, 0.5);
-  return clampedLogit(p0, eps);
+  return clampedLogit(baselinePrior(winsE, gamesE, k0), eps);
+}
+
+/**
+ * Baseline win probability `p0 = (winsE + k0 * 0.5) / (gamesE + k0)` (SPECS §5),
+ * the prior the pair layer shrinks toward. Single source for `p0`.
+ */
+export function baselinePrior(winsE: number, gamesE: number, k0: number): number {
+  return shrink(winsE, gamesE, k0, 0.5);
 }
 
 /**

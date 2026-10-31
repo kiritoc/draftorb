@@ -3,7 +3,7 @@
  *
  * Defines the `Reason` type (with `with` as ChampionId[] per B-011, the `lane`
  * reason type, `lowData` flag, and `n_eff` as a real number), `Reliability`
- * (games = n_eff), and `Recommendation` (with optional `poolRank` per D-024).
+ * (`nEff` = baseline n_eff), and `Recommendation` (with optional `poolRank` per D-024).
  *
  * `Reason.lowData` is a required boolean: the engine always emits it. It is
  * `true` when the reason's supporting term has `n_eff < minGames` (the term
@@ -14,6 +14,7 @@
 import { z } from 'zod';
 
 import { championIdSchema } from './core.js';
+import { warningCodeSchema } from './codes.js';
 
 export const reasonTypeSchema = z.enum(['synergy', 'counter', 'lane', 'comp', 'blind']);
 export type ReasonType = z.infer<typeof reasonTypeSchema>;
@@ -22,6 +23,7 @@ export const reasonLevelSchema = z.union([
   z.literal(-3),
   z.literal(-2),
   z.literal(-1),
+  z.literal(0), // lowData or |deltaPp| < 1pp: no badge (SPECS §5)
   z.literal(1),
   z.literal(2),
   z.literal(3),
@@ -42,7 +44,8 @@ export type Reason = z.infer<typeof reasonSchema>;
 
 export const reliabilitySchema = z
   .object({
-    games: z.number().nonnegative(),
+    // Baseline effective sample size (real number, D-027), never a raw game count.
+    nEff: z.number().nonnegative(),
     lowData: z.boolean(),
   })
   .strict();
@@ -56,7 +59,7 @@ export const recommendationSchema = z
     poolRank: z.number().int().positive().optional(),
     reasons: z.array(reasonSchema),
     reliability: reliabilitySchema,
-    warnings: z.array(z.string().min(1)),
+    warnings: z.array(warningCodeSchema),
   })
   .strict();
 export type Recommendation = z.infer<typeof recommendationSchema>;

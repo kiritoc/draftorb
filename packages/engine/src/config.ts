@@ -260,6 +260,123 @@ export const DEFAULT_CONFIG: RankWeightingConfig = rankWeightingConfigSchema.par
  */
 export const ROLE_INFERENCE_EPS = 1e-4;
 
+// --- Recommendation config (SPECS §5) ---
+
+/** Prior win rate the baseline `p0` is shrunk toward (SPECS §5: k0 toward 0.5). */
+export const BASELINE_PRIOR_WINRATE = 0.5;
+
+/** Decimal places kept on a reported reason `deltaPp`. */
+export const DELTA_PP_DECIMALS = 2;
+
+/** Influence-matrix phase used by the draft recommendation layer. */
+export const DRAFT_PHASE = 'draft' as const;
+
+/**
+ * Lookup-key placeholder for an absent lane id (`opp2`/`partner` in 1v1 lane
+ * groups); matches the `COALESCE(..., -1)` used by the lane unique indexes.
+ */
+export const MISSING_LANE_ID = -1;
+
+/**
+ * Gates used to level comp/blind reasons, which have no sample (SPECS §5): a
+ * nominal n_eff of 1 with both gates at 0, so only the deltaPp thresholds apply.
+ */
+export const UNSAMPLED_LEVEL_NEFF = 1;
+export const UNSAMPLED_LEVEL_MIN_GAMES = 0;
+export const UNSAMPLED_LEVEL_HIGH_MIN_GAMES = 0;
+/** Positive comp/blind levels are capped at this level (SPECS §5). */
+export const UNSAMPLED_MAX_POSITIVE_LEVEL = 1;
+
+/** Valid reason levels (SPECS §5/§7), mirrors `reasonLevelSchema`. */
+export const REASON_LEVEL_MIN = -3;
+export const REASON_LEVEL_MAX = 3;
+
+/** Warning codes are defined in @draftorb/shared (single source of truth). */
+export { COUNTERED_BY_WARNING, OFF_ROLE_WARNING } from '@draftorb/shared';
+
+/**
+ * Comp need weights (log-odds). Each value is the bonus contributed when the
+ * champion is the first on the team to provide that need. Priors calibrated
+ * by the D-023 backtest (T-027.a).
+ */
+export interface CompConfig {
+  readonly engage: number;
+  readonly peel: number;
+  readonly waveclear: number;
+  readonly poke: number;
+  // Keys match the CompNeedCategory codes (snake_case, owner decision).
+  readonly ad_damage: number;
+  readonly ap_damage: number;
+  readonly missingThreshold: number;
+  /** Minimum known allies before the AD/AP balance is evaluated. */
+  readonly minAlliesForDamageMix: number;
+}
+
+export const DEFAULT_COMP_CONFIG: CompConfig = Object.freeze({
+  engage: 0.1,
+  peel: 0.1,
+  waveclear: 0.08,
+  poke: 0.06,
+  ad_damage: 0.1,
+  ap_damage: 0.1,
+  missingThreshold: 0.5,
+  minAlliesForDamageMix: 3,
+});
+
+/**
+ * Lane group configuration (SPECS §5, D-021).
+ * - SUPPORT/ADC: bot lane (ally partner + 2 enemies, in lookup-key order)
+ * - TOP/MID/JUNGLE: 1v1 (lane_full skipped)
+ */
+export interface LaneGroup {
+  readonly allies: readonly Role[];
+  readonly enemies: readonly Role[];
+  readonly oneToOne: boolean;
+}
+
+export const DEFAULT_LANE_GROUPS: Readonly<Record<Role, LaneGroup>> = Object.freeze({
+  SUPPORT: { allies: ['ADC'], enemies: ['SUPPORT', 'ADC'], oneToOne: false },
+  ADC: { allies: ['SUPPORT'], enemies: ['ADC', 'SUPPORT'], oneToOne: false },
+  TOP: { allies: [], enemies: ['TOP'], oneToOne: true },
+  MID: { allies: [], enemies: ['MID'], oneToOne: true },
+  JUNGLE: { allies: [], enemies: ['JUNGLE'], oneToOne: true },
+});
+
+/**
+ * Recommendation-layer config (SPECS §5, D-030). Injected into `recommend`
+ * so the T-027.a backtest can tune every weight (fixes B-027).
+ */
+export interface RecommendConfig {
+  /** Role probability threshold to enter the candidate set. */
+  readonly roleProbThreshold: number;
+  /**
+   * Minimum roleProb share for a champion to count as a likely unseen blind
+   * opponent. Separate from `roleProbThreshold` so tuning one never moves the other.
+   */
+  readonly blindOpponentMinShare: number;
+  /** W_comp: scale applied to the comp-need bonus. Prior. */
+  readonly wComp: number;
+  /** W_blind: scale applied to blindSafety(c). Prior. */
+  readonly wBlind: number;
+  /** Weight of the worst-case (min) matchup penalty inside blindSafety. Prior. */
+  readonly blindWorstCaseFactor: number;
+  /** A known enemy pair reason at or below this deltaPp warns `counteredBy` (L3 negative). */
+  readonly hardCounterDeltaPp: number;
+  readonly laneGroups: Readonly<Record<Role, LaneGroup>>;
+  readonly comp: CompConfig;
+}
+
+export const DEFAULT_RECOMMEND_CONFIG: RecommendConfig = Object.freeze({
+  roleProbThreshold: 0.05,
+  blindOpponentMinShare: 0.05,
+  wComp: 1.0,
+  wBlind: 1.0,
+  blindWorstCaseFactor: 0.5,
+  hardCounterDeltaPp: -4.5,
+  laneGroups: DEFAULT_LANE_GROUPS,
+  comp: DEFAULT_COMP_CONFIG,
+});
+
 // --- Influence lookup ---
 
 export interface InfluenceOpts {

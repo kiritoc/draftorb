@@ -1,0 +1,40 @@
+{
+  "name": "adc_blind_pick",
+  "input": {
+    "userRank": "DIAMOND",
+    "userRole": "ADC",
+    "allies": [],
+    "enemies": [],
+    "blindPick": true
+  },
+  "data": {
+    "championIds": [11, 12, 200, 201],
+    "roleProb": {
+      "11": { "ADC": 1.0 },
+      "12": { "ADC": 1.0 },
+      "200": { "SUPPORT": 1.0 },
+      "201": { "ADC": 1.0 }
+    },
+    "baselines": [
+      [11, "DIAMOND", 30, 50, 0.1, 50],
+      [12, "DIAMOND", 30, 50, 0.1, 50],
+      [201, "DIAMOND", 30, 50, 0.1, 50]
+    ],
+    "allyPairs": [],
+    "enemyPairs": [
+      [11, 200, "SUPPORT", "DIAMOND", 40, 50, 0.1],
+      [12, 200, "SUPPORT", "DIAMOND", 10, 50, 0.1]
+    ],
+    "laneVs": [],
+    "laneFull": [],
+    "tags": {}
+  },
+  "expected": {
+    "recommendations": [
+      { "championId": 11, "rank": 1, "reasons": [{ "type": "blind", "lowData": false }] },
+      { "championId": 201, "rank": 2 },
+      { "championId": 12, "rank": 3, "reasons": [{ "type": "blind", "lowData": false }] }
+    ],
+    "insufficientData": []
+  }
+}

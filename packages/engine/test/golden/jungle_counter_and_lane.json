@@ -1,0 +1,54 @@
+{
+  "name": "jungle_counter_and_lane",
+  "input": {
+    "userRank": "DIAMOND",
+    "userRole": "JUNGLE",
+    "allies": [],
+    "enemies": [{ "championId": 300, "role": "JUNGLE" }],
+    "blindPick": false
+  },
+  "data": {
+    "championIds": [1, 2, 300],
+    "roleProb": {
+      "1": { "JUNGLE": 1.0 },
+      "2": { "JUNGLE": 1.0 },
+      "300": { "JUNGLE": 1.0 }
+    },
+    "baselines": [
+      [1, "DIAMOND", 30, 50, 0.1, 50],
+      [2, "DIAMOND", 30, 50, 0.1, 50]
+    ],
+    "allyPairs": [],
+    "enemyPairs": [
+      [1, 300, "JUNGLE", "DIAMOND", 40, 50, 0.1],
+      [2, 300, "JUNGLE", "DIAMOND", 20, 50, 0.1]
+    ],
+    "laneVs": [
+      [1, 300, null, "DIAMOND", 40, 50, 0.1],
+      [2, 300, null, "DIAMOND", 20, 50, 0.1]
+    ],
+    "laneFull": [],
+    "tags": {}
+  },
+  "expected": {
+    "recommendations": [
+      {
+        "championId": 1,
+        "rank": 1,
+        "reasons": [
+          { "type": "counter", "lowData": false },
+          { "type": "lane", "lowData": false }
+        ]
+      },
+      {
+        "championId": 2,
+        "rank": 2,
+        "reasons": [
+          { "type": "counter", "lowData": false },
+          { "type": "lane", "lowData": false }
+        ],
+        "warnings": ["counteredBy:JUNGLE:300"]
+      }
+    ]
+  }
+}

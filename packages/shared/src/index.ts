@@ -7,7 +7,11 @@
  */
 
 export { z } from './schemas/core.js';
-export { SHARED_VERSION, MANIFEST_SCHEMA_VERSION } from './schemas/core.js';
+export {
+  SHARED_VERSION,
+  MANIFEST_SCHEMA_VERSION,
+  DRAFT_RESULT_SCHEMA_VERSION,
+} from './schemas/core.js';
 
 export {
   roleSchema,
@@ -59,6 +63,17 @@ export type {
   PoolUnavailableEntry,
   DraftResult,
 } from './schemas/draft.js';
+
+export {
+  compNeedCategorySchema,
+  warningCodeSchema,
+  COUNTERED_BY_WARNING,
+  OFF_ROLE_WARNING,
+} from './schemas/codes.js';
+export type { CompNeedCategory, WarningCode } from './schemas/codes.js';
+
+export { recommendDataSchema } from './schemas/recommend-data.js';
+export type { RecommendData } from './schemas/recommend-data.js';
 
 export { playerStateSchema, gameStateSchema } from './schemas/game.js';
 export type { PlayerState, GameState } from './schemas/game.js';

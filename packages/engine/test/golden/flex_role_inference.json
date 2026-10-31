@@ -1,0 +1,82 @@
+{
+  "name": "flex_role_inference",
+  "input": {
+    "userRank": "DIAMOND",
+    "userRole": "SUPPORT",
+    "allies": [],
+    "enemies": [{ "championId": 50 }],
+    "blindPick": false
+  },
+  "data": {
+    "championIds": [1, 2, 50],
+    "roleProb": {
+      "1": { "SUPPORT": 1.0 },
+      "2": { "SUPPORT": 1.0 },
+      "50": { "MID": 0.8, "SUPPORT": 0.2 }
+    },
+    "baselines": [
+      [1, "DIAMOND", 30, 50, 0.1, 50],
+      [2, "DIAMOND", 30, 50, 0.1, 50],
+      [50, "DIAMOND", 30, 50, 0.1, 50]
+    ],
+    "allyPairs": [],
+    "enemyPairs": [
+      [1, 50, "MID", "DIAMOND", 40, 50, 0.1],
+      [2, 50, "MID", "DIAMOND", 20, 50, 0.1]
+    ],
+    "laneVs": [],
+    "laneFull": [],
+    "tags": {
+      "1": {
+        "championId": 1,
+        "damageType": "AP",
+        "archetype": "enchanter",
+        "hardEngage": false,
+        "peel": true,
+        "poke": true,
+        "waveclear": false,
+        "scaling": { "early": false, "mid": true, "late": true },
+        "range": "RANGED",
+        "ccCount": 1
+      },
+      "2": {
+        "championId": 2,
+        "damageType": "AP",
+        "archetype": "enchanter",
+        "hardEngage": false,
+        "peel": true,
+        "poke": true,
+        "waveclear": false,
+        "scaling": { "early": false, "mid": true, "late": true },
+        "range": "RANGED",
+        "ccCount": 1
+      },
+      "50": {
+        "championId": 50,
+        "damageType": "AP",
+        "archetype": "mage",
+        "hardEngage": true,
+        "peel": false,
+        "poke": true,
+        "waveclear": true,
+        "scaling": { "early": false, "mid": true, "late": true },
+        "range": "RANGED",
+        "ccCount": 2
+      }
+    }
+  },
+  "expected": {
+    "recommendations": [
+      {
+        "championId": 1,
+        "rank": 1,
+        "reasons": [{ "type": "counter", "lowData": false }]
+      },
+      {
+        "championId": 2,
+        "rank": 2,
+        "reasons": [{ "type": "counter", "lowData": false }]
+      }
+    ]
+  }
+}

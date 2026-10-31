@@ -1,0 +1,108 @@
+{
+  "name": "top_lane_1v1_matchup",
+  "input": {
+    "userRank": "DIAMOND",
+    "userRole": "TOP",
+    "allies": [{ "championId": 50, "role": "JUNGLE" }],
+    "enemies": [{ "championId": 100, "role": "TOP" }],
+    "blindPick": false
+  },
+  "data": {
+    "championIds": [1, 2, 50, 100],
+    "roleProb": {
+      "1": { "TOP": 1.0 },
+      "2": { "TOP": 1.0 },
+      "50": { "JUNGLE": 1.0 },
+      "100": { "TOP": 1.0 }
+    },
+    "baselines": [
+      [1, "DIAMOND", 30, 50, 0.1, 50],
+      [2, "DIAMOND", 30, 50, 0.1, 50],
+      [50, "DIAMOND", 30, 50, 0.1, 50],
+      [100, "DIAMOND", 30, 50, 0.1, 50]
+    ],
+    "allyPairs": [
+      [1, 50, "JUNGLE", "DIAMOND", 30, 50, 0.1],
+      [2, 50, "JUNGLE", "DIAMOND", 30, 50, 0.1]
+    ],
+    "enemyPairs": [
+      [1, 100, "TOP", "DIAMOND", 40, 50, 0.1],
+      [2, 100, "TOP", "DIAMOND", 20, 50, 0.1]
+    ],
+    "laneVs": [
+      [1, 100, null, "DIAMOND", 40, 50, 0.1],
+      [2, 100, null, "DIAMOND", 20, 50, 0.1]
+    ],
+    "laneFull": [[1, 50, 100, null, "DIAMOND", 10, 50, 0.1]],
+    "tags": {
+      "1": {
+        "championId": 1,
+        "damageType": "AD",
+        "archetype": "fighter",
+        "hardEngage": true,
+        "peel": false,
+        "poke": false,
+        "waveclear": true,
+        "scaling": { "early": false, "mid": true, "late": true },
+        "range": "MELEE",
+        "ccCount": 2
+      },
+      "2": {
+        "championId": 2,
+        "damageType": "AD",
+        "archetype": "fighter",
+        "hardEngage": false,
+        "peel": false,
+        "poke": false,
+        "waveclear": true,
+        "scaling": { "early": true, "mid": true, "late": false },
+        "range": "MELEE",
+        "ccCount": 1
+      },
+      "50": {
+        "championId": 50,
+        "damageType": "AP",
+        "archetype": "assassin",
+        "hardEngage": false,
+        "peel": false,
+        "poke": false,
+        "waveclear": true,
+        "scaling": { "early": false, "mid": true, "late": true },
+        "range": "MELEE",
+        "ccCount": 1
+      },
+      "100": {
+        "championId": 100,
+        "damageType": "AD",
+        "archetype": "tank",
+        "hardEngage": true,
+        "peel": true,
+        "poke": false,
+        "waveclear": true,
+        "scaling": { "early": false, "mid": true, "late": true },
+        "range": "MELEE",
+        "ccCount": 2
+      }
+    }
+  },
+  "expected": {
+    "recommendations": [
+      {
+        "championId": 1,
+        "rank": 1,
+        "reasons": [
+          { "type": "counter", "lowData": false },
+          { "type": "lane", "lowData": false }
+        ]
+      },
+      {
+        "championId": 2,
+        "rank": 2,
+        "reasons": [
+          { "type": "counter", "lowData": false },
+          { "type": "lane", "lowData": false }
+        ]
+      }
+    ]
+  }
+}

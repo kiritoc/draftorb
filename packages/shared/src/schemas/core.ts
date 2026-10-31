@@ -11,8 +11,18 @@ export { z };
 
 export const SHARED_VERSION = '0.0.1' as const;
 
-/** Agreed schema version for the role-keyed manifest layout (DATA_MODEL.md §Exported JSON). */
-export const MANIFEST_SCHEMA_VERSION = 1;
+/**
+ * Agreed schema version for the exported JSON layout (DATA_MODEL.md §Exported JSON).
+ * Bumped on every export format change. v2: 6th baseline column `games` (T-023, B-025).
+ */
+export const MANIFEST_SCHEMA_VERSION = 2;
+
+/**
+ * Version of the engine output contract (`DraftResult`, SPECS §7). Bumped on every
+ * breaking change so consumers fail loudly instead of misreading fields.
+ * v1: `reliability.nEff`, optional `rawGames`, `picked` pool reason, level 0 (D-030).
+ */
+export const DRAFT_RESULT_SCHEMA_VERSION = 1;
 
 export const roleSchema = z.enum(['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT']);
 export type Role = z.infer<typeof roleSchema>;

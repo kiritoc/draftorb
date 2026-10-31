@@ -11,7 +11,7 @@
 
 import { z } from 'zod';
 
-import { championIdSchema, rankSchema, roleSchema } from './core.js';
+import { DRAFT_RESULT_SCHEMA_VERSION, championIdSchema, rankSchema, roleSchema } from './core.js';
 import { recommendationSchema } from './reasons.js';
 
 export const slotSchema = z
@@ -52,7 +52,8 @@ export const insufficientDataEntrySchema = z
   .object({
     championId: championIdSchema,
     nEff: z.number().nonnegative(),
-    rawGames: z.number().int().nonnegative(),
+    // Omitted when the raw match count is unknown (golden rule 8, B-025).
+    rawGames: z.number().int().nonnegative().optional(),
   })
   .strict();
 export type InsufficientDataEntry = z.infer<typeof insufficientDataEntrySchema>;
@@ -60,13 +61,14 @@ export type InsufficientDataEntry = z.infer<typeof insufficientDataEntrySchema>;
 export const poolUnavailableEntrySchema = z
   .object({
     championId: championIdSchema,
-    reason: z.enum(['insufficientData', 'unknownChampion']),
+    reason: z.enum(['insufficientData', 'unknownChampion', 'picked']),
   })
   .strict();
 export type PoolUnavailableEntry = z.infer<typeof poolUnavailableEntrySchema>;
 
 export const draftResultSchema = z
   .object({
+    schemaVersion: z.literal(DRAFT_RESULT_SCHEMA_VERSION),
     recommendations: z.array(recommendationSchema),
     insufficientData: z.array(insufficientDataEntrySchema),
     poolRecommendations: z.array(recommendationSchema).optional(),

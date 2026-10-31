@@ -21,6 +21,7 @@ All code, comments, docs, commit messages, tickets, bug reports, logs, error mes
 ## Tests
 
 - Vitest, file `*.test.ts` next to source. See TESTING.md.
+- Exception: tests that need Node APIs (file I/O, e.g. the engine golden runner) live in `packages/<pkg>/test/` so they never sit next to pure engine sources (golden rule 3). They have their own `tsconfig.json` and are type-checked by `pnpm typecheck`.
 
 ## React/Web
 

@@ -174,10 +174,8 @@ for (const file of fixtureFiles) {
   });
 }
 
-if (fixtureFiles.length === 0) {
-  describe('golden: fixtures', () => {
-    it('no fixtures found', () => {
-      expect(true).toBe(true);
-    });
+describe('golden: fixtures', () => {
+  it('finds at least one fixture (a broken path must not pass silently)', () => {
+    expect(fixtureFiles.length).toBeGreaterThan(0);
   });
-}
+});

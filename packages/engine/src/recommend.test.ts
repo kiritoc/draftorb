@@ -8,6 +8,8 @@
 import { describe, it, expect } from 'vitest';
 import { recommend, type RecommendData } from './recommend.js';
 import { DEFAULT_CONFIG } from './config.js';
+import { indexBaselines, indexPairs, makePairKey } from './recommend-indexes.js';
+import { baselineLogOdds, deltaPp, scorePair } from './levels.js';
 import type {
   AllyPairEntry,
   AllyPairTable,
@@ -1318,6 +1320,158 @@ describe('recommend: review gap coverage', () => {
     };
     expect(warnings(true)).toContain('countered by enemy support 200');
     expect(warnings(false).some((w) => w.startsWith('countered by'))).toBe(false);
+  });
+
+  it('a low-influence enemy (TOP for SUPPORT) does not trigger a hard-counter warning', () => {
+    const roleProb = { ...botRoleProb, '300': { TOP: 1.0 } } as ChampionRoleProbabilities;
+    const enemyPairs = makeEnemyPairs([
+      { championId: 1, enemyId: 300, role: 'TOP', ...HIGH_GAMES, winsW: 5 },
+    ]);
+    const data = makeData({ champions: [1, 300], roleProb, enemyPairs });
+    const input = makeInput({ enemies: [{ championId: 300, role: 'TOP' }] });
+    const rec = recommend(input, data).recommendations.find((r) => r.championId === 1);
+    expect(rec?.warnings.some((w) => w.startsWith('countered by'))).toBe(false);
+  });
+
+  it('a lowData enemy pair never triggers a hard-counter warning', () => {
+    const enemyPairs = makeEnemyPairs([
+      { championId: 1, enemyId: 200, role: 'SUPPORT', winsW: 0, gamesW: 10, gamesW2: 10 },
+    ]);
+    const data = makeData({ champions: [1, 200], roleProb: botRoleProb, enemyPairs });
+    const input = makeInput({ enemies: [{ championId: 200, role: 'SUPPORT' }] });
+    const rec = recommend(input, data).recommendations.find((r) => r.championId === 1);
+    expect(rec?.warnings.some((w) => w.startsWith('countered by'))).toBe(false);
+  });
+
+  it('pool champion without any roleProb entry is scored with offRole', () => {
+    const data = makeData({ champions: [1, 2, 88], roleProb: botRoleProb });
+    const result = recommend(makeInput({ pool: [88] }), data);
+    const rec = result.recommendations.find((r) => r.championId === 88);
+    expect(rec?.warnings).toContain('offRole');
+    expect(result.poolRecommendations?.map((r) => r.championId)).toEqual([88]);
+  });
+
+  it('pool champion below the gate reports nEff and rawGames in insufficientData', () => {
+    const baselines: BaselineTable = [
+      [1, 'DIAMOND', 30, 50, 0.1, 50],
+      [2, 'DIAMOND', 5, 10, 10, 12],
+    ];
+    const data = makeData({ champions: [1, 2], roleProb: botRoleProb, baselines });
+    const result = recommend(makeInput({ pool: [2] }), data);
+    const entry = result.insufficientData.find((i) => i.championId === 2);
+    expect(entry?.nEff).toBeCloseTo(10, 5);
+    expect(entry?.rawGames).toBe(12);
+    expect(result.poolUnavailable).toEqual([{ championId: 2, reason: 'insufficientData' }]);
+  });
+
+  it('TOP with a matching lane_full row still emits exactly one lane reason (lane_vs)', () => {
+    const roleProb = {
+      '1': { TOP: 1.0 },
+      '300': { TOP: 1.0 },
+      '301': { JUNGLE: 1.0 },
+    } as ChampionRoleProbabilities;
+    const laneVs = makeLaneVs([
+      { championId: 1, opp1Id: 300, opp2Id: null, ...HIGH_GAMES, winsW: 40 },
+    ]);
+    const laneFull = makeLaneFull([
+      { championId: 1, partnerId: null, opp1Id: 300, opp2Id: null, ...HIGH_GAMES, winsW: 5 },
+    ]);
+    const data = makeData({ champions: [1, 300, 301], roleProb, laneVs, laneFull });
+    const input = makeInput({
+      userRole: 'TOP',
+      allies: [{ championId: 301, role: 'JUNGLE' }],
+      enemies: [{ championId: 300, role: 'TOP' }],
+    });
+    const rec = recommend(input, data).recommendations.find((r) => r.championId === 1);
+    const lanes = rec?.reasons.filter((r) => r.type === 'lane') ?? [];
+    expect(lanes).toHaveLength(1);
+    expect(lanes[0]?.with).toEqual([300]);
+  });
+
+  it('reports exact score and synergy deltaPp per SPECS §5', () => {
+    const baselines: BaselineTable = [[1, 'DIAMOND', 30, 50, 0.1, 50]];
+    const allyPairs = makeAllyPairs([
+      { championId: 1, allyId: 10, role: 'ADC', ...HIGH_GAMES, winsW: 40 },
+    ]);
+    const data = makeData({ champions: [1, 10], roleProb: botRoleProb, baselines, allyPairs });
+    const input = makeInput({ allies: [{ championId: 10, role: 'ADC' }] });
+    const rec = recommend(input, data).recommendations[0];
+
+    const base = indexBaselines(baselines, 'DIAMOND').get(1);
+    const pair = indexPairs(allyPairs, 'DIAMOND').get(makePairKey(1, 10, 'ADC'));
+    if (!base || !pair) throw new Error('missing rows');
+    const cfg = DEFAULT_CONFIG;
+    const p0 = (base.winsE + cfg.k0 * 0.5) / (base.gamesE + cfg.k0);
+    const x0 = baselineLogOdds(base.winsE, base.gamesE, cfg.k0, cfg.eps);
+    const term = cfg.s * 1 * 1.0 * scorePair(pair.winsE, pair.gamesE, p0, cfg).term;
+    const expectedDelta = Math.round(deltaPp(x0, term) * 100) / 100;
+
+    expect(rec?.reasons.map((r) => r.type)).toEqual(['synergy']);
+    expect(rec?.reasons[0]?.deltaPp).toBe(expectedDelta);
+    expect(rec?.score).toBeCloseTo(1 / (1 + Math.exp(-(x0 + term))), 12);
+  });
+
+  it('lane_vs key order follows laneGroup(myRole).enemies (contract for T-017)', () => {
+    // SUPPORT expects [enemy SUPPORT, enemy ADC]; a reversed row must not match.
+    const reversed = makeLaneVs([
+      { championId: 1, opp1Id: 201, opp2Id: 200, ...HIGH_GAMES, winsW: 45 },
+    ]);
+    const data = makeData({ champions: [1, 200, 201], roleProb: botRoleProb, laneVs: reversed });
+    const input = makeInput({
+      enemies: [
+        { championId: 200, role: 'SUPPORT' },
+        { championId: 201, role: 'ADC' },
+      ],
+    });
+    const rec = recommend(input, data).recommendations.find((r) => r.championId === 1);
+    expect(rec?.reasons.some((r) => r.type === 'lane')).toBe(false);
+
+    const ordered = makeLaneVs([
+      { championId: 1, opp1Id: 200, opp2Id: 201, ...HIGH_GAMES, winsW: 45 },
+    ]);
+    const data2 = makeData({ champions: [1, 200, 201], roleProb: botRoleProb, laneVs: ordered });
+    const rec2 = recommend(input, data2).recommendations.find((r) => r.championId === 1);
+    expect(rec2?.reasons.find((r) => r.type === 'lane')?.with).toEqual([200, 201]);
+  });
+
+  it('applies the AD/AP damage-mix need with MIXED allies counted on both sides', () => {
+    const mk = (id: number, damageType: ChampionTags['damageType']): ChampionTags => ({
+      championId: id,
+      damageType,
+      archetype: 'fighter',
+      hardEngage: true,
+      peel: true,
+      poke: true,
+      waveclear: true,
+      scaling: { early: false, mid: true, late: true },
+      range: 'MELEE',
+      ccCount: 1,
+    });
+    const tags: ChampionTagsMap = {
+      '1': mk(1, 'AP'),
+      '2': mk(2, 'AD'),
+      '10': mk(10, 'AD'),
+      '11': mk(11, 'AD'),
+      '20': mk(20, 'MIXED'),
+    };
+    const roleProb = {
+      ...botRoleProb,
+      '20': { MID: 1.0 },
+    } as ChampionRoleProbabilities;
+    const data = makeData({ champions: [1, 2, 10, 11, 20], roleProb, tags });
+    // AD side: 10, 11, 20 (MIXED) = 3; AP side: 20 = 1 -> AP share 0.25 < 0.5.
+    const input = makeInput({
+      allies: [
+        { championId: 10, role: 'ADC' },
+        { championId: 11, role: 'TOP' },
+        { championId: 20, role: 'MID' },
+      ],
+    });
+    const result = recommend(input, data);
+    const ap = result.recommendations.find((r) => r.championId === 1);
+    const ad = result.recommendations.find((r) => r.championId === 2);
+    expect(ap?.reasons.some((r) => r.type === 'comp')).toBe(true);
+    expect(ad?.reasons.some((r) => r.type === 'comp')).toBe(false);
   });
 
   it('deduplicates poolRecommendations for a repeated pool id', () => {

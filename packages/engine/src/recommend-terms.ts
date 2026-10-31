@@ -132,6 +132,7 @@ export function computeBlindSafety(
  */
 export function hardCounterWarnings(
   c: ChampionId,
+  myRole: Role,
   enemySlots: readonly KnownSlot[],
   enemyIdx: Map<string, DataRow>,
   p0: number,
@@ -144,9 +145,11 @@ export function hardCounterWarnings(
     if (!row) continue;
     const result = scorePair(row.winsE, row.gamesE, p0, config);
     if (result.lowData) continue;
-    // Scale by the §4 role confidence so an uncertain inferred role cannot
-    // trigger a full-strength warning.
-    if (deltaPp(x0, enemy.confidence * result.term) <= HARD_COUNTER_DELTA_PP) {
+    // Scale exactly like the layer-1 contribution (conf * influence * s) so a
+    // low-influence or uncertain-role enemy cannot trigger a full-strength warning.
+    const influence = getInfluence(myRole, 'enemy', enemy.role, 'draft', config);
+    const weighted = config.s * enemy.confidence * influence * result.term;
+    if (deltaPp(x0, weighted) <= HARD_COUNTER_DELTA_PP) {
       warnings.push(`countered by enemy ${enemy.role.toLowerCase()} ${enemy.championId}`);
     }
   }

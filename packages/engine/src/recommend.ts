@@ -277,7 +277,7 @@ export function recommend(
 
     const warnings = [
       ...(isOffRole ? ['offRole'] : []),
-      ...hardCounterWarnings(c, enemySlots, enemyPairIdx, p0, config),
+      ...hardCounterWarnings(c, myRole, enemySlots, enemyPairIdx, p0, config),
     ];
 
     scored.push({ championId: c, score: sigmoid(logOdds), reasons, baselineNEff: nE, warnings });

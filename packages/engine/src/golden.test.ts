@@ -101,11 +101,14 @@ for (const file of fixtureFiles) {
         if (!rec) continue;
 
         if (expected.reasons) {
-          const actualTypes = rec.reasons.map((r) => r.type);
+          // Each expected reason consumes the next unused actual reason of the
+          // same type, so repeated types (e.g. two counters) are all checked.
+          const used = new Set<number>();
           for (const expReason of expected.reasons) {
-            expect(actualTypes).toContain(expReason.type);
-
-            const matchingReason = rec.reasons.find((r) => r.type === expReason.type);
+            const idx = rec.reasons.findIndex((r, i) => !used.has(i) && r.type === expReason.type);
+            expect(idx).toBeGreaterThanOrEqual(0);
+            used.add(idx);
+            const matchingReason = rec.reasons[idx];
             expect(matchingReason).toBeDefined();
 
             if (matchingReason && expReason.lowData !== undefined) {

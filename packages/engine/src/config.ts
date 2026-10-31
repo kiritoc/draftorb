@@ -274,6 +274,22 @@ export const SCORE_TIE_EPSILON = 1e-9;
 /** Decimal places kept on a reported reason `deltaPp`. */
 export const DELTA_PP_DECIMALS = 2;
 
+/**
+ * Lookup-key placeholder for an absent lane id (`opp2`/`partner` in 1v1 lane
+ * groups); matches the `COALESCE(..., -1)` used by the lane unique indexes.
+ */
+export const MISSING_LANE_ID = -1;
+
+/**
+ * Gates used to level comp/blind reasons, which have no sample (D-030): a
+ * nominal n_eff of 1 with both gates at 0, so only the deltaPp thresholds apply.
+ */
+export const UNSAMPLED_LEVEL_NEFF = 1;
+export const UNSAMPLED_LEVEL_MIN_GAMES = 0;
+export const UNSAMPLED_LEVEL_HIGH_MIN_GAMES = 0;
+/** Positive comp/blind levels are capped at this level (D-030). */
+export const UNSAMPLED_MAX_POSITIVE_LEVEL = 1;
+
 /** W_comp: scale applied to the comp-need bonus (SPECS §5). Prior. */
 export const W_COMP = 1.0;
 

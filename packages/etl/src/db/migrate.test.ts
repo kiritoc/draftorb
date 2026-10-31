@@ -315,6 +315,45 @@ describe('migration runner', () => {
     db.close();
   });
 
+  it('upgrades a 001-007 database with migration 008 and defaults baseline.games to 0', () => {
+    const db = openDb(':memory:');
+    db.exec(`
+      CREATE TABLE _migrations (
+        version TEXT PRIMARY KEY,
+        applied_at INTEGER NOT NULL
+      )
+    `);
+    const priorVersions = expectedVersions().filter((v) => v < '008_baseline_raw_games');
+    for (const version of priorVersions) {
+      db.exec(readFileSync(join(MIGRATIONS_DIR, `${version}.sql`), 'utf8'));
+      db.prepare('INSERT INTO _migrations (version, applied_at) VALUES (?, ?)').run(version, 1);
+    }
+    db.prepare(
+      `INSERT INTO baseline (
+        champion_id, my_role, rank_bucket, wins_w, games_w, games_w2
+      ) VALUES (1, 'SUPPORT', 'DIAMOND', 3, 5, 5)`,
+    ).run();
+
+    expect(migrate(db)).toEqual(['008_baseline_raw_games']);
+    expect(migrate(db)).toEqual([]);
+
+    const columns = db.prepare('PRAGMA table_info(baseline)').all() as {
+      name: string;
+      notnull: number;
+      dflt_value: string | null;
+    }[];
+    const games = columns.filter((c) => c.name === 'games');
+    expect(games).toHaveLength(1);
+    expect(games[0]?.notnull).toBe(1);
+    expect(games[0]?.dflt_value).toBe('0');
+
+    const row = db.prepare('SELECT games FROM baseline WHERE champion_id = 1').get() as
+      | { games: number }
+      | undefined;
+    expect(row?.games).toBe(0);
+    db.close();
+  });
+
   it('backfills NULL checksums and rejects an applied migration with a changed checksum', () => {
     const db = openDb(':memory:');
     migrate(db);

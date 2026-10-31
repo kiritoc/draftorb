@@ -25,6 +25,14 @@ export interface CompNeedResult {
   readonly filled: readonly CompNeedCategory[];
 }
 
+/** Allies that have a tag entry; untagged allies carry no comp evidence. */
+function taggedAllyIds(
+  allyChampionIds: ReadonlyArray<ChampionId>,
+  tags: ChampionTagsMap,
+): ChampionId[] {
+  return allyChampionIds.filter((id) => tags[id] !== undefined);
+}
+
 /**
  * Compute the team's missing composition needs based on the known ally champions
  * (excluding the candidate `c` itself). Returns the categories the team lacks.
@@ -34,16 +42,18 @@ export function teamMissingNeeds(
   tags: ChampionTagsMap,
   config: CompConfig = DEFAULT_COMP_CONFIG,
 ): Set<CompNeedCategory> {
-  // No known allies: no evidence of any gap, so no need is reported (otherwise
-  // every candidate would get an identical, meaningless comp bonus).
-  if (allyChampionIds.length === 0) return new Set<CompNeedCategory>();
+  // Only tagged allies are evidence. With no tagged ally there is no evidence
+  // of any gap, so no need is reported (otherwise every candidate would get an
+  // identical, meaningless comp bonus).
+  const taggedAllies = taggedAllyIds(allyChampionIds, tags);
+  if (taggedAllies.length === 0) return new Set<CompNeedCategory>();
 
   const present = new Set<CompNeedCategory>();
   let adChampions = 0;
   let apChampions = 0;
   let hasAnyDamage = false;
 
-  for (const id of allyChampionIds) {
+  for (const id of taggedAllies) {
     const t = tags[id];
     if (!t) continue;
     if (t.hardEngage) present.add('engage');
@@ -69,7 +79,7 @@ export function teamMissingNeeds(
   if (!present.has('waveclear')) missing.add('waveclear');
   if (!present.has('poke')) missing.add('poke');
 
-  if (allyChampionIds.length >= config.minAlliesForDamageMix && hasAnyDamage) {
+  if (taggedAllies.length >= config.minAlliesForDamageMix && hasAnyDamage) {
     const total = adChampions + apChampions;
     if (adChampions / total < config.missingThreshold) missing.add('ad_damage');
     if (apChampions / total < config.missingThreshold) missing.add('ap_damage');
@@ -112,7 +122,9 @@ export function computeCompNeed(
     }
   }
 
-  if (allyChampionIds.length >= config.minAlliesForDamageMix && missing.has('ad_damage')) {
+  const taggedCount = taggedAllyIds(allyChampionIds, tags).length;
+
+  if (taggedCount >= config.minAlliesForDamageMix && missing.has('ad_damage')) {
     const isAd = t.damageType === 'AD' || t.damageType === 'MIXED';
     if (isAd) {
       filled.push('ad_damage');
@@ -121,7 +133,7 @@ export function computeCompNeed(
     }
   }
 
-  if (allyChampionIds.length >= config.minAlliesForDamageMix && missing.has('ap_damage')) {
+  if (taggedCount >= config.minAlliesForDamageMix && missing.has('ap_damage')) {
     const isAp = t.damageType === 'AP' || t.damageType === 'MIXED';
     if (isAp) {
       filled.push('ap_damage');

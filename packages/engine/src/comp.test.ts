@@ -40,13 +40,16 @@ describe('teamMissingNeeds', () => {
     expect(missing.has('engage')).toBe(false);
   });
 
-  it('detects all missing needs when allies have no tags', () => {
-    const tags = makeTags({});
-    const missing = teamMissingNeeds([1, 2], tags);
-    expect(missing.has('engage')).toBe(true);
-    expect(missing.has('peel')).toBe(true);
-    expect(missing.has('waveclear')).toBe(true);
-    expect(missing.has('poke')).toBe(true);
+  it('reports no missing needs when no ally has tags', () => {
+    const tags = makeTags({ 5: { hardEngage: true } });
+    expect(teamMissingNeeds([1, 2], tags).size).toBe(0);
+    expect(computeCompNeed(5, [1, 2], tags).bonus).toBe(0);
+  });
+
+  it('ignores untagged allies for the damage-mix ally count', () => {
+    const tags = makeTags({ 1: { damageType: 'AD' }, 2: { damageType: 'AD' } });
+    const missing = teamMissingNeeds([1, 2, 99], tags);
+    expect(missing.has('ap_damage')).toBe(false);
   });
 
   it('does not check damage mix with fewer than 3 allies', () => {

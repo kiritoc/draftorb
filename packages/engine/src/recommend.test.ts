@@ -1179,3 +1179,150 @@ describe('recommend: second review fixes', () => {
     expect(order(pooled)).toEqual(order(base));
   });
 });
+
+describe('recommend: review gap coverage', () => {
+  const botRoleProb = {
+    '1': { SUPPORT: 1.0 },
+    '2': { SUPPORT: 1.0 },
+    '10': { ADC: 1.0 },
+    '11': { ADC: 1.0 },
+    '20': { SUPPORT: 1.0 },
+    '200': { SUPPORT: 1.0 },
+    '201': { ADC: 1.0 },
+  } as ChampionRoleProbabilities;
+
+  it('an unresolved, untagged ally creates no comp reason', () => {
+    const data = makeData({ champions: [1, 2, 77], roleProb: botRoleProb });
+    const result = recommend(makeInput({ allies: [{ championId: 77 }] }), data);
+    for (const rec of result.recommendations) {
+      expect(rec.reasons.some((r) => r.type === 'comp')).toBe(false);
+    }
+  });
+
+  it('a lowData pair term adds exactly 0 to the score', () => {
+    const lowPair = makeAllyPairs([
+      { championId: 1, allyId: 10, role: 'ADC', winsW: 10, gamesW: 10, gamesW2: 10 },
+    ]);
+    const input = makeInput({ allies: [{ championId: 10, role: 'ADC' }] });
+    const champions: ChampionId[] = [1, 10];
+    const tags = makeChampionTags(champions);
+    const withRow = recommend(
+      input,
+      makeData({ champions, roleProb: botRoleProb, tags, allyPairs: lowPair }),
+    );
+    const without = recommend(input, makeData({ champions, roleProb: botRoleProb, tags }));
+    const a = withRow.recommendations.find((r) => r.championId === 1);
+    const b = without.recommendations.find((r) => r.championId === 1);
+    expect(a?.score).toBe(b?.score);
+    const synergy = a?.reasons.find((r) => r.type === 'synergy');
+    expect(synergy?.lowData).toBe(true);
+    expect(synergy?.deltaPp).toBe(0);
+  });
+
+  it('applies lane_full for ADC with the ally SUPPORT as partner', () => {
+    const laneVs = makeLaneVs([
+      { championId: 11, opp1Id: 201, opp2Id: 200, ...HIGH_GAMES, winsW: 30 },
+    ]);
+    const laneFull = makeLaneFull([
+      { championId: 11, partnerId: 20, opp1Id: 201, opp2Id: 200, ...HIGH_GAMES, winsW: 45 },
+    ]);
+    const data = makeData({
+      champions: [11, 20, 200, 201],
+      roleProb: botRoleProb,
+      laneVs,
+      laneFull,
+    });
+    const input = makeInput({
+      userRole: 'ADC',
+      allies: [{ championId: 20, role: 'SUPPORT' }],
+      enemies: [
+        { championId: 200, role: 'SUPPORT' },
+        { championId: 201, role: 'ADC' },
+      ],
+    });
+    const rec = recommend(input, data).recommendations.find((r) => r.championId === 11);
+    const lanes = rec?.reasons.filter((r) => r.type === 'lane') ?? [];
+    expect(lanes).toHaveLength(2);
+    expect(lanes[1]?.with).toEqual([20, 201, 200]);
+  });
+
+  it('applies a 1v1 lane_vs for JUNGLE and skips lane_full', () => {
+    const roleProb = {
+      '1': { JUNGLE: 1.0 },
+      '300': { JUNGLE: 1.0 },
+    } as ChampionRoleProbabilities;
+    const laneVs = makeLaneVs([
+      { championId: 1, opp1Id: 300, opp2Id: null, ...HIGH_GAMES, winsW: 45 },
+    ]);
+    const data = makeData({ champions: [1, 300], roleProb, laneVs });
+    const enemies = [{ championId: 300, role: 'JUNGLE' as Role }];
+    const input = makeInput({ userRole: 'JUNGLE', enemies });
+    const rec = recommend(input, data).recommendations[0];
+    expect(rec?.reasons.filter((r) => r.type === 'lane')).toHaveLength(1);
+  });
+
+  it('falls back to L1 for a large positive pair delta below highLevelMinGames', () => {
+    // n_eff = 50^2 / 50 = 50: above minGames (25), below highLevelMinGames (100).
+    const allyPairs = makeAllyPairs([
+      { championId: 1, allyId: 10, role: 'ADC', winsW: 45, gamesW: 50, gamesW2: 50 },
+    ]);
+    const data = makeData({ champions: [1, 10], roleProb: botRoleProb, allyPairs });
+    const input = makeInput({ allies: [{ championId: 10, role: 'ADC' }] });
+    const rec = recommend(input, data).recommendations[0];
+    const synergy = rec?.reasons.find((r) => r.type === 'synergy');
+    expect(synergy?.deltaPp).toBeGreaterThan(4.5);
+    expect(synergy?.level).toBe(1);
+  });
+
+  it('a perfect baseline record yields a finite score', () => {
+    const baselines: BaselineTable = [[1, 'DIAMOND', 50, 50, 0.1, 50]];
+    const data = makeData({ champions: [1], baselines, roleProb: botRoleProb });
+    const score = recommend(makeInput(), data).recommendations[0]?.score;
+    expect(Number.isFinite(score)).toBe(true);
+  });
+
+  it('applies lane_vs alone when the lane_full row is missing', () => {
+    const laneVs = makeLaneVs([
+      { championId: 1, opp1Id: 200, opp2Id: 201, ...HIGH_GAMES, winsW: 40 },
+    ]);
+    const data = makeData({ champions: [1, 10, 200, 201], roleProb: botRoleProb, laneVs });
+    const input = makeInput({
+      allies: [{ championId: 10, role: 'ADC' }],
+      enemies: [
+        { championId: 200, role: 'SUPPORT' },
+        { championId: 201, role: 'ADC' },
+      ],
+    });
+    const rec = recommend(input, data).recommendations.find((r) => r.championId === 1);
+    const lanes = rec?.reasons.filter((r) => r.type === 'lane') ?? [];
+    expect(lanes).toHaveLength(1);
+    expect(lanes[0]?.with).toEqual([200, 201]);
+  });
+
+  it('an inferred enemy role weakens the hard-counter warning', () => {
+    // p0 ~ 0.60 and the pair win rate ~ 0.53: the full-strength delta is about
+    // -7pp (warns), scaled by confidence 0.6 it is about -4.2pp (no warning).
+    const enemyPairs = makeEnemyPairs([
+      { championId: 1, enemyId: 200, role: 'SUPPORT', ...HIGH_GAMES, winsW: 26.5 },
+    ]);
+    const roleProb = {
+      ...botRoleProb,
+      '200': { SUPPORT: 0.6, MID: 0.4 },
+    } as ChampionRoleProbabilities;
+    const data = makeData({ champions: [1, 200], roleProb, enemyPairs });
+    const warnings = (fixed: boolean): string[] => {
+      const enemy = fixed ? { championId: 200, role: 'SUPPORT' as Role } : { championId: 200 };
+      const input = makeInput({ enemies: [enemy] });
+      const rec = recommend(input, data).recommendations.find((r) => r.championId === 1);
+      return rec?.warnings ?? [];
+    };
+    expect(warnings(true)).toContain('countered by enemy support 200');
+    expect(warnings(false).some((w) => w.startsWith('countered by'))).toBe(false);
+  });
+
+  it('deduplicates poolRecommendations for a repeated pool id', () => {
+    const data = makeData({ champions: [1, 2], roleProb: botRoleProb });
+    const result = recommend(makeInput({ pool: [1, 1] }), data);
+    expect(result.poolRecommendations?.map((r) => r.championId)).toEqual([1]);
+  });
+});

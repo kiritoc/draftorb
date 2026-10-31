@@ -13,6 +13,7 @@ import type {
   Role,
 } from '@draftorb/shared';
 import type { DataRow } from './recommend-types.js';
+import { MISSING_LANE_ID } from './config.js';
 import { nEff, toEquivalentCounts } from './weighting.js';
 
 function toRow(winsW: number, gamesW: number, gamesW2: number): DataRow {
@@ -72,7 +73,7 @@ export function indexLaneVs(laneVs: LaneVsTable, bucket: RankBucket): Map<string
   const map = new Map<string, DataRow>();
   for (const [c, opp1, opp2, rowBucket, winsW, gamesW, gamesW2] of laneVs) {
     if (rowBucket !== bucket) continue;
-    map.set(makeLaneVsKey(c, opp1, opp2 ?? -1), toRow(winsW, gamesW, gamesW2));
+    map.set(makeLaneVsKey(c, opp1, opp2 ?? MISSING_LANE_ID), toRow(winsW, gamesW, gamesW2));
   }
   return map;
 }
@@ -82,7 +83,10 @@ export function indexLaneFull(laneFull: LaneFullTable, bucket: RankBucket): Map<
   const map = new Map<string, DataRow>();
   for (const [c, partner, opp1, opp2, rowBucket, winsW, gamesW, gamesW2] of laneFull) {
     if (rowBucket !== bucket) continue;
-    map.set(makeLaneFullKey(c, partner ?? -1, opp1, opp2 ?? -1), toRow(winsW, gamesW, gamesW2));
+    map.set(
+      makeLaneFullKey(c, partner ?? MISSING_LANE_ID, opp1, opp2 ?? MISSING_LANE_ID),
+      toRow(winsW, gamesW, gamesW2),
+    );
   }
   return map;
 }

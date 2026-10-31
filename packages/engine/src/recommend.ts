@@ -31,6 +31,7 @@ import {
   BASELINE_PRIOR_WINRATE,
   DEFAULT_COMP_CONFIG,
   DEFAULT_CONFIG,
+  MISSING_LANE_ID,
   ROLE_PROB_THRESHOLD,
   SCORE_TIE_EPSILON,
   W_BLIND,
@@ -203,7 +204,9 @@ export function recommend(
     const laneVsDelta =
       laneEnemiesKnown && enemy1
         ? applyLane(
-            laneVsIdx.get(makeLaneVsKey(c, enemy1.championId, enemy2?.championId ?? -1)),
+            laneVsIdx.get(
+              makeLaneVsKey(c, enemy1.championId, enemy2?.championId ?? MISSING_LANE_ID),
+            ),
             logOdds,
             laneGroupInfo.enemyConfidence,
             config,
@@ -281,7 +284,7 @@ export function recommend(
   }
 
   // --- Sort and rank ---
-  const sorted = scored.sort((a, b) => {
+  const sorted = [...scored].sort((a, b) => {
     const diff = b.score - a.score;
     if (Math.abs(diff) > SCORE_TIE_EPSILON) return diff;
     return a.championId - b.championId;

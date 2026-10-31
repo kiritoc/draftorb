@@ -58,12 +58,12 @@ Next ETL ticket: **T-015** (Aggregate role probabilities, depends on T-014).
     - `ally_adc_synergy.json`: ally ADC pair synergy dominating recommendation.
     - `blind_pick_safe_supports.json`: blind pick mode with baseline and comp evaluation.
     - `enemy_counter.json`: enemy counter pick penalizing unfavorable matchup.
-    - `low_data_flag.json`: low data pair term flagged `lowData: true` with zero delta contribution.
+    - `low_data_flag.json`: low data pair term flagged `lowData: true` (zero contribution is asserted in `recommend.test.ts`).
     - `pool_recommendations_order.json`: personal pool preserves overall recommendation order with `poolRank`.
     - `top_lane_1v1_matchup.json`: non-support role (TOP) consuming influence matrix and `laneGroup(TOP)` (1v1, `lane_full` skipped).
     - `pool_unavailable_and_offrole.json`: pool handling with unknown champions, insufficient data, and `offRole` warnings.
     - `flex_role_inference.json`: enemy flex pick evaluated with role inference confidence weighting.
-  - **`packages/engine/src/recommend.test.ts`** (new, 25 tests): candidate enumeration, baseline gate, score ranking, sequential ranks, tie-breaking by champion ID, pair synergies and counters, bot lane vs and 1v1 lane full skipping, pool contract (score invariance, subsequence order, insufficientData, unknownChampion, offRole, roleProb-set relative order preservation), reason reference validity, reason ordering, determinism, edge cases.
+  - **`packages/engine/src/recommend.test.ts`** (new): candidate enumeration, baseline gate, score ranking, sequential ranks, tie-breaking by champion ID, pair synergies and counters, bot lane vs and 1v1 lane full skipping, pool contract (score invariance, subsequence order, insufficientData, unknownChampion, offRole, roleProb-set relative order preservation), reason reference validity, reason ordering, determinism, edge cases.
   - **`packages/engine/src/index.ts`** (updated): exported `./comp.js` and `./recommend.js`.
 - Files touched:
   - `packages/engine/src/recommend.ts` (new)
@@ -75,7 +75,7 @@ Next ETL ticket: **T-015** (Aggregate role probabilities, depends on T-014).
   - `packages/engine/test/golden/*.json` (8 fixtures)
   - `docs/TICKETS.md` (updated T-023 to DONE)
   - `docs/PROGRESS.md` (updated)
-- Tests: `pnpm check` — green (25 test files, 412 tests passed; typecheck, eslint, prettier format check, vitest all passing cleanly).
+- Tests: `pnpm check` must be re-run after the review fixes (untagged-ally comp fix, config constants, added gap-coverage tests); counts not recorded here.
 - State left: **DONE (T-023)**.
 - Next step: T-024 (Blind pick mode) or T-025 (Comp needs) or T-015 (Aggregate role probabilities in ETL).
 

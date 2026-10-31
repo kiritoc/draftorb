@@ -6,7 +6,13 @@ import type { ChampionId, ReasonLevel, Recommendation } from '@draftorb/shared';
 import type { RankWeightingConfig } from './config.js';
 import type { LaneDelta, LaneGroupInfo, ReasonAccumulator } from './recommend-types.js';
 import type { PairDelta } from './recommend-terms.js';
-import { DELTA_PP_DECIMALS } from './config.js';
+import {
+  DELTA_PP_DECIMALS,
+  UNSAMPLED_LEVEL_HIGH_MIN_GAMES,
+  UNSAMPLED_LEVEL_MIN_GAMES,
+  UNSAMPLED_LEVEL_NEFF,
+  UNSAMPLED_MAX_POSITIVE_LEVEL,
+} from './config.js';
 import { isLowData, levelFromConfig, mapDeltaPpToLevel } from './levels.js';
 
 const DELTA_PP_SCALE = 10 ** DELTA_PP_DECIMALS;
@@ -78,8 +84,13 @@ export function buildReasons(
   // Map their delta directly (no fabricated n_eff): positive levels cap at L1,
   // negative levels keep their full magnitude (D-030).
   const unsampledLevel = (d: number): ReasonLevel | undefined => {
-    const level = mapDeltaPpToLevel(d, 1, 0, 0);
-    return toReasonLevel(level > 0 ? Math.min(level, 1) : level);
+    const level = mapDeltaPpToLevel(
+      d,
+      UNSAMPLED_LEVEL_NEFF,
+      UNSAMPLED_LEVEL_MIN_GAMES,
+      UNSAMPLED_LEVEL_HIGH_MIN_GAMES,
+    );
+    return toReasonLevel(level > 0 ? Math.min(level, UNSAMPLED_MAX_POSITIVE_LEVEL) : level);
   };
 
   if (compDeltaPp !== null) {

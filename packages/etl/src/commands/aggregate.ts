@@ -41,7 +41,7 @@ async function runAggregate(args: string[]): Promise<void> {
       );
     }
 
-    const baselineRows = aggregateBaseline(db);
+    const baselineRows = aggregateBaseline(db, { patch });
     console.log(`Aggregated baselines: ${baselineRows.length} row(s) written to baseline.`);
     for (const row of baselineRows) {
       console.log(
@@ -55,7 +55,7 @@ async function runAggregate(args: string[]): Promise<void> {
 
 export const aggregateCommand: Command = {
   name: 'aggregate',
-  usage: 'aggregate',
+  usage: 'aggregate [patch]',
   description: 'Compute aggregated tables (role probabilities and rank-weighted baselines)',
   run: runAggregate,
 };

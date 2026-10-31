@@ -257,6 +257,13 @@ Accepted by the owner on 2026-10-31. SPECS §5/§7 text derived from this decisi
 - Alternatives: decay-weighted counts across the D-017 window (more data early in a patch, but role shifts from a patch change linger; `games` would become weighted and would need `games_w2`). Rejected for now pending owner review.
 - Consequences: early in a new patch `role_prob` may rest on few games; consumers should check `games` before trusting a probability (golden rule 8). Switching to decay later only changes `packages/etl/src/aggregate.ts` and its tests.
 
+### D-032 — `@draftorb/engine` workspace dependency for ETL baseline aggregation — PROPOSED
+
+- Context: T-016 must weight baseline games with the engine rank kernel (SPECS §3) so that aggregation-time weights match query-time logic.
+- Decision: `@draftorb/etl` depends on `@draftorb/engine` (`workspace:*`, internal, no new third-party code or license) and imports `combinedGameWeight`, `bucketIndex`, `RANK_BUCKET_ORDER` and `DEFAULT_CONFIG`. `packages/etl/tsconfig.json` references `../engine`.
+- Alternatives: duplicate the kernel in ETL (rejected: the two copies could drift apart); move the kernel to `@draftorb/shared` (deferred: a larger refactor outside T-016).
+- Consequences: ETL builds after engine. Engine must not import from ETL, which would create a cycle. Changes to the kernel change aggregated baselines, so the ETL must be re-run.
+
 ### Template
 
 ```

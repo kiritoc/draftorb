@@ -41,6 +41,8 @@ export interface BaselineRow {
 
 export interface AggregateBaselineOptions {
   config?: RankWeightingConfig;
+  /** Snapshot patch: newer matches are excluded and recency is relative to it. */
+  patch?: string;
 }
 
 export function aggregateBaseline(
@@ -49,13 +51,13 @@ export function aggregateBaseline(
 ): BaselineRow[] {
   const config = options.config ?? DEFAULT_CONFIG;
 
-  const rows = db
+  const allRows = db
     .prepare(
       `SELECT
          p.champion_id AS championId,
          p.role AS myRole,
          p.win AS win,
-         p.rank_score AS rankScore,
+         m.avg_rank_score AS rankScore,
          m.patch AS patch,
          m.rank_known_count AS rankKnownCount
        FROM participants p
@@ -70,6 +72,12 @@ export function aggregateBaseline(
     rankKnownCount: number;
   }>;
 
+  const snapshotPatch = options.patch;
+  const rows =
+    snapshotPatch === undefined
+      ? allRows
+      : allRows.filter((row) => comparePatches(row.patch, snapshotPatch) <= 0);
+
   if (rows.length === 0) {
     const clear = db.prepare('DELETE FROM baseline');
     const write = db.transaction(() => {
@@ -80,7 +88,9 @@ export function aggregateBaseline(
   }
 
   // Patch -> numeric index, sorted so newer patches have higher indices.
-  const patches = [...new Set(rows.map((row) => row.patch))].sort(comparePatches);
+  const patchSet = new Set(rows.map((row) => row.patch));
+  if (snapshotPatch !== undefined) patchSet.add(snapshotPatch);
+  const patches = [...patchSet].sort(comparePatches);
   const patchIndex = new Map<string, number>();
   patches.forEach((patch, i) => {
     patchIndex.set(patch, i);

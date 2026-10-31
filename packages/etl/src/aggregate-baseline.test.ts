@@ -13,7 +13,7 @@ function seedBasic(dbPath: string): void {
   const insertMatch = db.prepare(
     `INSERT INTO matches (
       match_id, platform, patch, queue_id, duration, created_at, avg_rank_score, rank_known_count
-    ) VALUES (?, 'euw1', ?, 420, 1800, 1, 6.5, ?)`,
+    ) VALUES (?, 'euw1', ?, 420, 1800, 1, ?, ?)`,
   );
   const insertParticipant = db.prepare(
     `INSERT INTO participants (
@@ -31,7 +31,7 @@ function seedBasic(dbPath: string): void {
     win: number,
   ): void => {
     const matchId = `m${(matchIndex += 1)}`;
-    insertMatch.run(matchId, patch, rankKnownCount);
+    insertMatch.run(matchId, patch, rankScore, rankKnownCount);
     insertParticipant.run(matchId, `p${matchIndex}`, 412, win, rankScore);
   };
 

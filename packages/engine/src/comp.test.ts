@@ -111,7 +111,10 @@ describe('teamMissingNeeds', () => {
 
 describe('computeCompNeed', () => {
   it('returns bonus for filling missing engage', () => {
-    const tags = makeTags({ 1: { hardEngage: true, peel: false, poke: false, waveclear: false } });
+    const tags = makeTags({
+      1: { hardEngage: true, peel: false, poke: false, waveclear: false },
+      2: { hardEngage: false },
+    });
     const result = computeCompNeed(1, [2], tags);
     expect(result.filled).toContain('engage');
     expect(result.bonus).toBeCloseTo(DEFAULT_COMP_CONFIG.engage, 10);

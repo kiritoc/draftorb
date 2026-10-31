@@ -167,6 +167,10 @@ export function aggregateBaseline(
     });
   }
 
+  // No contributing games (empty DB or a snapshot older than every stored match):
+  // keep existing baselines, matching aggregateRoleProb's "left unchanged" behavior.
+  if (result.length === 0) return result;
+
   const clear = db.prepare('DELETE FROM baseline');
   const insert = db.prepare(
     `INSERT INTO baseline (

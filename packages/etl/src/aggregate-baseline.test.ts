@@ -183,6 +183,17 @@ describe('aggregateBaseline', () => {
     });
   });
 
+  it('preserves existing baselines when the snapshot predates all stored matches', () => {
+    withSeededDb([{ patch: '16.21', rankScore: 6.5, win: 1 }], (db) => {
+      const before = aggregateBaseline(db);
+      expect(before.length).toBeGreaterThan(0);
+      expect(aggregateBaseline(db, { patch: '16.1' })).toEqual([]);
+      expect(db.prepare('SELECT COUNT(*) AS count FROM baseline').get()).toMatchObject({
+        count: before.length,
+      });
+    });
+  });
+
   it('leaves baseline empty when there are no participants', () => {
     withFreshDb((dbPath) => {
       const db = openDb(dbPath);

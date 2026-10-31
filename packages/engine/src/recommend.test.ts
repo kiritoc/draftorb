@@ -7,7 +7,8 @@
 
 import { describe, it, expect } from 'vitest';
 import { recommend, type RecommendData } from './recommend.js';
-import { DEFAULT_COMP_CONFIG, DEFAULT_CONFIG } from './config.js';
+import { DEFAULT_COMP_CONFIG, DEFAULT_CONFIG, DEFAULT_RECOMMEND_CONFIG } from './config.js';
+import { draftResultSchema } from '@draftorb/shared';
 import { indexBaselines, indexPairs, makePairKey } from './recommend-indexes.js';
 import { baselineLogOdds, deltaPp, scorePair } from './levels.js';
 import type {
@@ -1035,8 +1036,10 @@ describe('recommend: remaining review gaps', () => {
     });
     const input = makeInput({ allies: [{ championId: 77, role: 'ADC' }] });
     const score = (engage: number): number =>
-      recommend(input, data, DEFAULT_CONFIG, { ...DEFAULT_COMP_CONFIG, engage }).recommendations[0]
-        ?.score ?? 0;
+      recommend(input, data, DEFAULT_CONFIG, {
+        ...DEFAULT_RECOMMEND_CONFIG,
+        comp: { ...DEFAULT_COMP_CONFIG, engage },
+      }).recommendations[0]?.score ?? 0;
     expect(score(0.5)).toBeGreaterThan(score(0.1));
   });
 
@@ -1728,10 +1731,10 @@ describe('recommend: edge cases', () => {
     expect(lanes.map((l) => l.with)).toEqual([[200, 201]]);
   });
 
-  it('reliability.games reports the baseline n_eff', () => {
+  it('reliability.nEff reports the baseline n_eff', () => {
     const data = makeData({ champions: [1] });
     const rec = recommend(makeInput(), data).recommendations[0];
-    expect(rec?.reliability.games).toBeCloseTo(50 ** 2 / 0.1, 6);
+    expect(rec?.reliability.nEff).toBeCloseTo(50 ** 2 / 0.1, 6);
     expect(rec?.reliability.lowData).toBe(false);
   });
 
@@ -1824,5 +1827,155 @@ describe('recommend: pool invariance property (D-024)', () => {
       const baseIds = base.map((r) => r.championId);
       expect(pooled.map((r) => r.championId).filter((id) => baseIds.includes(id))).toEqual(baseIds);
     }
+  });
+});
+
+describe('recommend: review fixes (final pass)', () => {
+  const botRoleProb = {
+    '1': { SUPPORT: 1.0 },
+    '2': { SUPPORT: 1.0 },
+    '10': { ADC: 1.0 },
+    '200': { SUPPORT: 1.0 },
+    '201': { ADC: 1.0 },
+    '202': { ADC: 1.0 },
+    '300': { MID: 1.0 },
+    '301': { JUNGLE: 1.0 },
+  } as ChampionRoleProbabilities;
+
+  it('off-role pool champion below the baseline gate is insufficientData, never scored', () => {
+    const roleProb = { ...botRoleProb, '99': { TOP: 1.0 } } as ChampionRoleProbabilities;
+    const baselines: BaselineTable = [
+      [1, 'DIAMOND', 30, 50, 0.1, 50],
+      [99, 'DIAMOND', 5, 10, 10, 10],
+    ];
+    const data = makeData({ champions: [1, 99], roleProb, baselines });
+    const result = recommend(makeInput({ pool: [99] }), data);
+    expect(result.recommendations.some((r) => r.championId === 99)).toBe(false);
+    expect(result.poolUnavailable).toEqual([{ championId: 99, reason: 'insufficientData' }]);
+    expect(result.poolRecommendations).toEqual([]);
+  });
+
+  it('a duplicated championId on one team is resolved once', () => {
+    const enemyPairs = makeEnemyPairs([
+      { championId: 1, enemyId: 200, role: 'SUPPORT', ...HIGH_GAMES, winsW: 10 },
+    ]);
+    const data = makeData({ champions: [1, 2, 200], roleProb: botRoleProb, enemyPairs });
+    const input = makeInput({
+      enemies: [{ championId: 200, role: 'SUPPORT' }, { championId: 200 }],
+    });
+    const rec = recommend(input, data).recommendations.find((r) => r.championId === 1);
+    expect(rec?.reasons.filter((r) => r.type === 'counter')).toHaveLength(1);
+    expect(rec?.warnings).toEqual(['counteredBy:SUPPORT:200']);
+  });
+
+  it('duplicate fixed ally ADCs never form a lane_full partner (D-030)', () => {
+    const laneFull = makeLaneFull([
+      { championId: 1, partnerId: 10, opp1Id: 200, opp2Id: 201, ...HIGH_GAMES, winsW: 45 },
+    ]);
+    const roleProb = { ...botRoleProb, '11': { ADC: 1.0 } } as ChampionRoleProbabilities;
+    const data = makeData({ champions: [1, 10, 11, 200, 201], roleProb, laneFull });
+    const input = makeInput({
+      allies: [
+        { championId: 10, role: 'ADC' },
+        { championId: 11, role: 'ADC' },
+      ],
+      enemies: [
+        { championId: 200, role: 'SUPPORT' },
+        { championId: 201, role: 'ADC' },
+      ],
+    });
+    const rec = recommend(input, data).recommendations.find((r) => r.championId === 1);
+    expect(rec?.reasons.some((r) => r.type === 'lane' && r.with?.length === 3)).toBe(false);
+  });
+
+  it('a positive comp delta >= 2pp is capped at L1 through recommend', () => {
+    const noUtility: ChampionTags = {
+      championId: 77,
+      damageType: 'AD',
+      archetype: 'marksman',
+      hardEngage: false,
+      peel: false,
+      poke: false,
+      waveclear: false,
+      scaling: { early: false, mid: true, late: true },
+      range: 'RANGED',
+      ccCount: 0,
+    };
+    const data = makeData({
+      champions: [1, 77],
+      roleProb: { ...botRoleProb, '77': { ADC: 1.0 } } as ChampionRoleProbabilities,
+      tags: { ...makeChampionTags([1]), '77': noUtility },
+    });
+    const input = makeInput({ allies: [{ championId: 77, role: 'ADC' }] });
+    const rc = { ...DEFAULT_RECOMMEND_CONFIG, wComp: 5 };
+    const comp = recommend(input, data, DEFAULT_CONFIG, rc).recommendations[0]?.reasons.find(
+      (r) => r.type === 'comp',
+    );
+    expect(comp?.deltaPp).toBeGreaterThanOrEqual(2);
+    expect(comp?.level).toBe(1);
+  });
+
+  it('a filled need with zero weight emits no comp reason', () => {
+    const data = makeData({ champions: [1, 77], roleProb: botRoleProb });
+    const input = makeInput({ allies: [{ championId: 77 }] });
+    const rc = { ...DEFAULT_RECOMMEND_CONFIG, wComp: 0 };
+    for (const rec of recommend(input, data, DEFAULT_CONFIG, rc).recommendations) {
+      expect(rec.reasons.some((r) => r.type === 'comp')).toBe(false);
+    }
+  });
+
+  it('injected roleProbThreshold, wBlind and hardCounterDeltaPp are honored', () => {
+    const enemyPairs = makeEnemyPairs([
+      { championId: 1, enemyId: 201, role: 'ADC', ...HIGH_GAMES, winsW: 10 },
+      { championId: 1, enemyId: 200, role: 'SUPPORT', ...HIGH_GAMES, winsW: 26.5 },
+    ]);
+    const data = makeData({ champions: [1, 2, 200, 201], roleProb: botRoleProb, enemyPairs });
+    const blindOff = { ...DEFAULT_RECOMMEND_CONFIG, wBlind: 0 };
+    const blindRec = recommend(makeInput({ blindPick: true }), data, DEFAULT_CONFIG, blindOff);
+    expect(blindRec.recommendations[0]?.reasons.some((r) => r.type === 'blind')).toBe(false);
+
+    const strict = { ...DEFAULT_RECOMMEND_CONFIG, hardCounterDeltaPp: -50 };
+    const enemies = [{ championId: 200, role: 'SUPPORT' as Role }];
+    const rec = recommend(makeInput({ enemies }), data, DEFAULT_CONFIG, strict).recommendations[0];
+    expect(rec?.warnings.some((w) => w.startsWith('counteredBy:'))).toBe(false);
+
+    const high = { ...DEFAULT_RECOMMEND_CONFIG, roleProbThreshold: 1.1 };
+    expect(recommend(makeInput(), data, DEFAULT_CONFIG, high).recommendations).toEqual([]);
+  });
+
+  it('nearly equal scores are ordered by score, not bucketed', () => {
+    const baselines: BaselineTable = [
+      [1, 'DIAMOND', 30, 50, 0.1, 50],
+      [2, 'DIAMOND', 30.0000001, 50, 0.1, 50],
+    ];
+    const data = makeData({ champions: [1, 2], roleProb: botRoleProb, baselines });
+    expect(recommend(makeInput(), data).recommendations.map((r) => r.championId)).toEqual([2, 1]);
+  });
+
+  it('every DraftResult round-trips through the shared zod schema', () => {
+    const baselines: BaselineTable = [
+      [1, 'DIAMOND', 30, 50, 0.1, 50],
+      [2, 'DIAMOND', 5, 10, 10],
+      [202, 'DIAMOND', 30, 50, 0.1, 50],
+    ];
+    const allyPairs = makeAllyPairs([
+      { championId: 1, allyId: 10, role: 'ADC', winsW: 10, gamesW: 10, gamesW2: 10 },
+    ]);
+    const data = makeData({
+      champions: [1, 2, 10, 200, 202],
+      roleProb: botRoleProb,
+      baselines,
+      allyPairs,
+    });
+    const input = makeInput({
+      allies: [{ championId: 10, role: 'ADC' }],
+      enemies: [{ championId: 200, role: 'SUPPORT' }],
+      pool: [1, 2, 200, 999],
+    });
+    const result = recommend(input, data);
+    expect(draftResultSchema.parse(result)).toEqual(result);
+    expect(result.recommendations[0]?.reasons.some((r) => r.level === 0)).toBe(true);
+    expect(result.poolUnavailable?.some((u) => u.reason === 'picked')).toBe(true);
+    expect(result.insufficientData.find((i) => i.championId === 2)).not.toHaveProperty('rawGames');
   });
 });

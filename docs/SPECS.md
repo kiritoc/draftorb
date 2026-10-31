@@ -108,7 +108,7 @@ Validation (T-020): every cell defined and in [0, 1]; the opponent cell is the r
 - `compNeed`: from champion tags (see 6): reward filling missing needs (e.g. team has no engage, damage all AD...). Small weight in log-odds units, explained in UI. Only tagged board allies count as evidence (including allies whose role could not be inferred); with no tagged ally no need is reported. Enemies are ignored until T-025.
 - `blindSafety(c)`: expected term against the distribution of likely _unseen_ enemy lane opponents weighted by pick rate: `sum_e pickShare(e) * pairTerm(c, e)`, plus penalty for worst-case matchup (min term), both per unseen lane-group role and summed. Known enemies are excluded (the pair layer scores them); missing or lowData matchups count as neutral (term 0) with their full share. Used when blindPick = true or any role of `laneGroup(myRole).enemies` is unknown. Until a pick-rate export exists, `pickShare(e)` is approximated by normalized `roleProb[e][role]` (B-026).
 - Comp and blind reasons have no sample (`n = 0`, never lowData): their level comes from `deltaPp` alone, positive levels capped at L1, negative levels unrestricted.
-- Hard-counter warning (code `counteredBy:<ROLE>:<championId>`, rendered by the web `strings` module): when `deltaPp(logit(p0), s * conf * influence * pairTerm) <= -4.5` for a known, non-lowData enemy pair.
+- Hard-counter warning (code `counteredBy:<ROLE>:<championId>`, rendered by the web `strings` module): when the layer-1 `counter` reason `deltaPp` of a known, non-lowData enemy pair is `<= -4.5` (same value as the reason, D-030).
 - Validation (D-023/T-027.a): every parameter in this section is a prior until a backtest passes — frozen temporal holdout, rolling validation for tuning, paired-bootstrap gate on log-loss vs the baseline-only model.
 
 ## 6. Manual data (tags)
@@ -123,7 +123,7 @@ Recommendation {
   championId, score, rank,       // rank = overall rank (global), also inside poolRecommendations
   poolRank?: number              // rank inside the user's pool (D-024); only set in poolRecommendations
   reasons: Reason[]    // {type:'synergy'|'counter'|'lane'|'comp'|'blind', with: ChampionId[]?, level:0|1|2|3|-1|-2|-3, deltaPp, n, lowData}
-  reliability: { games: number, lowData: boolean }  // games = baseline n_eff (real number, D-027), not raw matches
+  reliability: { nEff: number, lowData: boolean }  // baseline n_eff (real number, D-027), never a raw match count (D-030)
   warnings: string[]   // codes, never UI text: "counteredBy:<ROLE>:<championId>", "offRole" (pool champion rarely played in this role)
 }
 DraftResult {

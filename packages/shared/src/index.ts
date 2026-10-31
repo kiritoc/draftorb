@@ -60,6 +60,9 @@ export type {
   DraftResult,
 } from './schemas/draft.js';
 
+export { recommendDataSchema } from './schemas/recommend-data.js';
+export type { RecommendData } from './schemas/recommend-data.js';
+
 export { playerStateSchema, gameStateSchema } from './schemas/game.js';
 export type { PlayerState, GameState } from './schemas/game.js';
 

@@ -2,7 +2,7 @@
  * @draftorb/engine — Known-slot and lane-group resolution (SPECS §4-5).
  */
 
-import type { ChampionRoleProbabilities, Role, Slot } from '@draftorb/shared';
+import type { ChampionId, ChampionRoleProbabilities, Role, Slot } from '@draftorb/shared';
 import type { RoleAssignment } from './roles.js';
 import type { KnownSlot, LaneGroup, LaneGroupInfo } from './recommend-types.js';
 import { inferRoles } from './roles.js';
@@ -19,6 +19,10 @@ export function resolveKnownSlots(
   side: 'ally' | 'enemy',
   roleProb: ChampionRoleProbabilities,
 ): KnownSlot[] {
+  // A champion can only be picked once per team: keep the first occurrence so
+  // lookups by championId below are unambiguous.
+  const seen = new Set<ChampionId>();
+  slots = slots.filter((s) => (seen.has(s.championId) ? false : (seen.add(s.championId), true)));
   if (slots.length === 0) return [];
   let source: ReadonlyArray<Slot> = slots;
   let resolved: RoleAssignment | null = inferRoles(slots, roleProb);

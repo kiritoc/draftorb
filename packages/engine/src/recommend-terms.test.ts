@@ -4,11 +4,13 @@
 
 import { describe, it, expect } from 'vitest';
 import type { ChampionRoleProbabilities, EnemyPairTable } from '@draftorb/shared';
-import { BLIND_WORST_CASE_FACTOR, DEFAULT_CONFIG, getInfluence } from './config.js';
+import { DEFAULT_CONFIG, DEFAULT_RECOMMEND_CONFIG, getInfluence } from './config.js';
 import { indexPairs, makePairKey } from './recommend-indexes.js';
 import { scorePair } from './levels.js';
 import type { KnownSlot } from './recommend-types.js';
 import { computeBlindSafety, hardCounterWarnings, scorePairs } from './recommend-terms.js';
+
+const BLIND_WORST_CASE_FACTOR = DEFAULT_RECOMMEND_CONFIG.blindWorstCaseFactor;
 
 const P0 = 0.6;
 
@@ -134,21 +136,45 @@ describe('scorePairs', () => {
 });
 
 describe('hardCounterWarnings', () => {
+  const enemyIdx = indexPairs(
+    [
+      [1, 200, 'SUPPORT', 'DIAMOND', 10, 50, 0.1],
+      [1, 201, 'ADC', 'DIAMOND', 0, 10, 10],
+    ],
+    'DIAMOND',
+  );
+  const allyIdx = indexPairs([[1, 10, 'ADC', 'DIAMOND', 50, 50, 0.1]], 'DIAMOND');
+
   it('warns for a strong counter and stays silent for lowData or missing rows', () => {
-    const enemyIdx = indexPairs(
-      [
-        [1, 200, 'SUPPORT', 'DIAMOND', 10, 50, 0.1],
-        [1, 201, 'ADC', 'DIAMOND', 0, 10, 10],
-      ],
-      'DIAMOND',
-    );
     const enemies = [
       known(200, 'SUPPORT', 'enemy'),
       known(201, 'ADC', 'enemy'),
       known(202, 'MID', 'enemy'),
     ];
-    expect(hardCounterWarnings(1, 'SUPPORT', enemies, enemyIdx, P0, DEFAULT_CONFIG)).toEqual([
-      'counteredBy:SUPPORT:200',
-    ]);
+    const { deltas } = scorePairs(1, 'SUPPORT', enemies, allyIdx, enemyIdx, P0, DEFAULT_CONFIG);
+    expect(hardCounterWarnings(deltas)).toEqual(['counteredBy:SUPPORT:200']);
+  });
+
+  it('uses the same deltaPp as the counter reason (running log-odds)', () => {
+    const slots = [known(10, 'ADC', 'ally'), known(200, 'SUPPORT', 'enemy')];
+    const { deltas } = scorePairs(1, 'SUPPORT', slots, allyIdx, enemyIdx, P0, DEFAULT_CONFIG);
+    const counter = deltas.find((d) => d.side === 'enemy');
+    if (!counter) throw new Error('missing counter delta');
+    // Threshold just above / below the reported delta flips the warning.
+    expect(hardCounterWarnings(deltas, counter.deltaPp)).toHaveLength(1);
+    expect(hardCounterWarnings(deltas, counter.deltaPp - 1e-9)).toHaveLength(0);
+  });
+
+  it('never warns for ally pairs', () => {
+    const { deltas } = scorePairs(
+      1,
+      'SUPPORT',
+      [known(10, 'ADC', 'ally')],
+      allyIdx,
+      enemyIdx,
+      P0,
+      DEFAULT_CONFIG,
+    );
+    expect(hardCounterWarnings(deltas, 100)).toEqual([]);
   });
 });

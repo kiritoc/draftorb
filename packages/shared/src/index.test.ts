@@ -99,7 +99,7 @@ describe('shared schemas', () => {
         { type: 'lane', with: [41, 34], level: 2, deltaPp: 1.5, n: 120.5, lowData: false },
         { type: 'synergy', with: [18], level: 1, deltaPp: 0.8, lowData: true },
       ],
-      reliability: { games: 80.5, lowData: false },
+      reliability: { nEff: 80.5, lowData: false },
       warnings: ['counteredBy:SUPPORT:412'],
     };
 
@@ -134,7 +134,7 @@ describe('shared schemas', () => {
         score: 12.5,
         rank: 1,
         reasons: [{ type: 'synergy', with: 18 }],
-        reliability: { games: 80, lowData: false },
+        reliability: { nEff: 80, lowData: false },
         warnings: [],
       }),
     ).toThrow();
@@ -147,7 +147,7 @@ describe('shared schemas', () => {
       rank: 1,
       poolRank: 1,
       reasons: [],
-      reliability: { games: 80, lowData: false },
+      reliability: { nEff: 80, lowData: false },
       warnings: [],
     };
     expect(recommendationSchema.parse(rec)).toEqual(rec);
@@ -388,7 +388,7 @@ describe('shared schemas', () => {
           score: 0.72,
           rank: 1,
           reasons: [{ type: 'synergy', with: [18], level: 2, n: 120.5, lowData: false }],
-          reliability: { games: 150.3, lowData: false },
+          reliability: { nEff: 150.3, lowData: false },
           warnings: [],
         },
       ],
@@ -400,7 +400,7 @@ describe('shared schemas', () => {
           rank: 1,
           poolRank: 1,
           reasons: [],
-          reliability: { games: 150.3, lowData: false },
+          reliability: { nEff: 150.3, lowData: false },
           warnings: [],
         },
       ],

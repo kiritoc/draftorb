@@ -118,7 +118,7 @@ describe('computeCompNeed', () => {
     const result = computeCompNeed(1, [2], tags);
     expect(result.filled).toContain('engage');
     expect(result.bonus).toBeCloseTo(DEFAULT_COMP_CONFIG.engage, 10);
-    expect(result.reasons).toContain('engage');
+    expect(result).not.toHaveProperty('reasons');
   });
 
   it('returns zero bonus when no needs are missing', () => {

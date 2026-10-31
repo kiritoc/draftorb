@@ -231,19 +231,23 @@ Owner decision 2026-10-29.
 - Context: SPECS §5 leaves several T-023 parameters and behaviors open. Golden rule 9 requires each assumption to be recorded.
 - Decision:
   1. **Blind pick share.** No pick-rate export exists yet, so `blindSafety` approximates `pickShare(e)` with normalized `roleProb[e][role]` over the remaining champions (B-026).
-  2. **Blind trigger.** Blind safety applies when `blindPick` is true or any role of `laneGroup(myRole).enemies` is unknown. It scores only the unseen roles, so a known enemy is never counted twice; with `blindPick` true and the lane fully known it contributes nothing. Missing or lowData matchups count as neutral (term 0) with their full share.
+  2. **Blind trigger (owner-requested change to SPECS §5, previously "fewer than 2 lane enemies known").** Blind safety applies when `blindPick` is true or any role of `laneGroup(myRole).enemies` is unknown. It scores only the unseen roles, so a known enemy is never counted twice; with `blindPick` true and the lane fully known it contributes nothing. Missing or lowData matchups count as neutral (term 0) with their full share.
   3. **Weights (priors, T-027.a tunes them).** `W_COMP = 1.0`, `W_BLIND = 1.0`, `BLIND_WORST_CASE_FACTOR = 0.5` (worst-case term, taken per unseen role), and comp weights from `DEFAULT_COMP_CONFIG`.
-  4. **Hard-counter warning.** Shown when `deltaPp(logit(p0), s * conf * influence * pairTerm) <= HARD_COUNTER_DELTA_PP` (-4.5, the L3-negative boundary) for a known, non-lowData enemy pair.
+  4. **Hard-counter warning.** Shown when the `counter` reason `deltaPp` of a known, non-lowData enemy pair is `<= hardCounterDeltaPp` (-4.5, the L3-negative boundary).
   5. **Unsampled levels.** Comp and blind reasons have `n = 0` and are never lowData. Their level comes from `deltaPp` alone, with positive levels capped at L1 and negative levels unrestricted. lowData reasons get level 0.
   6. **`conf_lane`.** `lane_vs` is scaled by the product of the lane-group enemy confidences only (the ally partner is not part of that context). `lane_full` uses the product over allies and enemies.
   7. **`compNeed` ignores enemies until T-025.** Only tagged board allies count as evidence, including allies whose role could not be inferred.
   8. **Ambiguous fixed roles.** When role inference fails and two or more slots on a team are fixed to the same role, those slots are dropped from role-dependent layers (pairs and lane), so they cannot form a fake complete lane.
   9. **Unknown raw counts.** `insufficientData.rawGames` and the 6th baseline column are optional; a missing or 0 count is omitted rather than reported (golden rule 8, B-025).
-  10. **Warnings are codes.** `counteredBy:<ROLE>:<championId>` and `offRole`; UI text lives in the web `strings` module.
+  10. **Warnings are codes.** `counteredBy:<ROLE>:<championId>` and `offRole`; UI text lives in the web `strings` module. Comp needs are exposed only as `filled` category codes.
+  11. **Hard-counter delta = reason delta.** The warning uses the `deltaPp` of the layer-1 `counter` reason (running log-odds), so warning and reason never disagree.
+  12. **Ranking ties.** Scores are compared exactly; only exactly equal scores tie, broken by championId ascending.
+  13. **`reliability.nEff`.** Renamed from `reliability.games`: it is the baseline n_eff, never a raw game count (golden rule 8).
+  14. **Injectable config.** All recommendation weights/thresholds/lane groups live in `RecommendConfig` (`DEFAULT_RECOMMEND_CONFIG`, `packages/engine/src/config.ts`), passed as the 4th argument of `recommend` (fixes B-027). `RecommendData` lives in `@draftorb/shared`.
 - Alternatives: block T-023 until pick-rate data and the backtest exist. Rejected: it would stall E2.
-- Consequences: these constants live in `packages/engine/src/config.ts`. Making them injectable is tracked by B-027. Any change to them requires the D-023 backtest.
+- Consequences: these values live in `DEFAULT_RECOMMEND_CONFIG` (`packages/engine/src/config.ts`) and are injectable. Any change to the defaults requires the D-023 backtest.
 
-Owner decision 2026-10-31.
+Accepted by the owner on 2026-10-31. SPECS §5/§7 text derived from this decision is normative.
 
 ### Template
 

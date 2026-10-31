@@ -46,24 +46,9 @@ export interface LaneDelta {
   readonly deltaPp: number;
 }
 
-/**
- * Lane group configuration (SPECS §5, D-021).
- * - SUPPORT/ADC: bot lane (ally partner + 2 enemies)
- * - TOP/MID/JUNGLE: 1v1 (lane_full skipped)
- */
-export interface LaneGroup {
-  readonly allies: Role[];
-  readonly enemies: Role[];
-  readonly oneToOne: boolean;
-}
-
-export const LANE_GROUPS: Record<Role, LaneGroup> = {
-  SUPPORT: { allies: ['ADC'], enemies: ['SUPPORT', 'ADC'], oneToOne: false },
-  ADC: { allies: ['SUPPORT'], enemies: ['ADC', 'SUPPORT'], oneToOne: false },
-  TOP: { allies: [], enemies: ['TOP'], oneToOne: true },
-  MID: { allies: [], enemies: ['MID'], oneToOne: true },
-  JUNGLE: { allies: [], enemies: ['JUNGLE'], oneToOne: true },
-};
+// Lane groups are config (SPECS §5, D-021): defined in config.ts, re-exported here.
+export type { LaneGroup } from './config.js';
+export { DEFAULT_LANE_GROUPS as LANE_GROUPS } from './config.js';
 
 export interface LaneGroupInfo {
   readonly allies: KnownSlot[];

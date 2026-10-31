@@ -19,9 +19,7 @@ export type CompNeedCategory = 'engage' | 'peel' | 'waveclear' | 'poke' | 'ad_da
 export interface CompNeedResult {
   /** Log-odds bonus for this champion filling missing needs of the team. */
   readonly bonus: number;
-  /** Human-readable description of what need was filled (for UI explanation). */
-  readonly reasons: readonly string[];
-  /** The categories of needs this champion can fill that the team is missing. */
+  /** The categories (machine codes; the web `strings` module renders them) of needs this champion can fill that the team is missing. */
   readonly filled: readonly CompNeedCategory[];
 }
 
@@ -51,7 +49,6 @@ export function teamMissingNeeds(
   const present = new Set<CompNeedCategory>();
   let adChampions = 0;
   let apChampions = 0;
-  let hasAnyDamage = false;
 
   for (const id of taggedAllies) {
     const t = tags[id];
@@ -60,17 +57,8 @@ export function teamMissingNeeds(
     if (t.peel) present.add('peel');
     if (t.waveclear) present.add('waveclear');
     if (t.poke) present.add('poke');
-    if (t.damageType === 'AD') {
-      hasAnyDamage = true;
-      adChampions++;
-    } else if (t.damageType === 'AP') {
-      hasAnyDamage = true;
-      apChampions++;
-    } else if (t.damageType === 'MIXED') {
-      hasAnyDamage = true;
-      adChampions++;
-      apChampions++;
-    }
+    if (t.damageType === 'AD' || t.damageType === 'MIXED') adChampions++;
+    if (t.damageType === 'AP' || t.damageType === 'MIXED') apChampions++;
   }
 
   const missing = new Set<CompNeedCategory>();
@@ -79,8 +67,8 @@ export function teamMissingNeeds(
   if (!present.has('waveclear')) missing.add('waveclear');
   if (!present.has('poke')) missing.add('poke');
 
-  if (taggedAllies.length >= config.minAlliesForDamageMix && hasAnyDamage) {
-    const total = adChampions + apChampions;
+  const total = adChampions + apChampions;
+  if (taggedAllies.length >= config.minAlliesForDamageMix && total > 0) {
     if (adChampions / total < config.missingThreshold) missing.add('ad_damage');
     if (apChampions / total < config.missingThreshold) missing.add('ap_damage');
   }
@@ -100,47 +88,28 @@ export function computeCompNeed(
   const missing = teamMissingNeeds(allyChampionIds, tags, config);
   const t = tags[c];
   const filled: CompNeedCategory[] = [];
-  const reasons: string[] = [];
   let bonus = 0;
 
   if (!t) {
-    return { bonus: 0, reasons, filled };
+    return { bonus: 0, filled };
   }
 
-  const categoryMap: Array<[CompNeedCategory, boolean, number, string]> = [
-    ['engage', t.hardEngage, config.engage, 'engage'],
-    ['peel', t.peel, config.peel, 'peel'],
-    ['waveclear', t.waveclear, config.waveclear, 'waveclear'],
-    ['poke', t.poke, config.poke, 'poke'],
+  // ad_damage/ap_damage are only ever missing once the damage-mix gate passed.
+  const categoryMap: Array<[CompNeedCategory, boolean, number]> = [
+    ['engage', t.hardEngage, config.engage],
+    ['peel', t.peel, config.peel],
+    ['waveclear', t.waveclear, config.waveclear],
+    ['poke', t.poke, config.poke],
+    ['ad_damage', t.damageType === 'AD' || t.damageType === 'MIXED', config.adDamage],
+    ['ap_damage', t.damageType === 'AP' || t.damageType === 'MIXED', config.apDamage],
   ];
 
-  for (const [cat, has, weight, label] of categoryMap) {
+  for (const [cat, has, weight] of categoryMap) {
     if (has && missing.has(cat)) {
       filled.push(cat);
       bonus += weight;
-      reasons.push(label);
     }
   }
 
-  const taggedCount = taggedAllyIds(allyChampionIds, tags).length;
-
-  if (taggedCount >= config.minAlliesForDamageMix && missing.has('ad_damage')) {
-    const isAd = t.damageType === 'AD' || t.damageType === 'MIXED';
-    if (isAd) {
-      filled.push('ad_damage');
-      bonus += config.adDamage;
-      reasons.push('ad damage');
-    }
-  }
-
-  if (taggedCount >= config.minAlliesForDamageMix && missing.has('ap_damage')) {
-    const isAp = t.damageType === 'AP' || t.damageType === 'MIXED';
-    if (isAp) {
-      filled.push('ap_damage');
-      bonus += config.apDamage;
-      reasons.push('ap damage');
-    }
-  }
-
-  return { bonus, reasons, filled };
+  return { bonus, filled };
 }

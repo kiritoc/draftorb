@@ -3,7 +3,7 @@
  *
  * Defines the `Reason` type (with `with` as ChampionId[] per B-011, the `lane`
  * reason type, `lowData` flag, and `n_eff` as a real number), `Reliability`
- * (games = n_eff), and `Recommendation` (with optional `poolRank` per D-024).
+ * (`nEff` = baseline n_eff), and `Recommendation` (with optional `poolRank` per D-024).
  *
  * `Reason.lowData` is a required boolean: the engine always emits it. It is
  * `true` when the reason's supporting term has `n_eff < minGames` (the term
@@ -43,7 +43,8 @@ export type Reason = z.infer<typeof reasonSchema>;
 
 export const reliabilitySchema = z
   .object({
-    games: z.number().nonnegative(),
+    // Baseline effective sample size (real number, D-027), never a raw game count.
+    nEff: z.number().nonnegative(),
     lowData: z.boolean(),
   })
   .strict();

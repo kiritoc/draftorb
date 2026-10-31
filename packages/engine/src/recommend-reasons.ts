@@ -8,6 +8,8 @@ import type { LaneDelta, LaneGroupInfo, ReasonAccumulator } from './recommend-ty
 import type { PairDelta } from './recommend-terms.js';
 import {
   DELTA_PP_DECIMALS,
+  REASON_LEVEL_MAX,
+  REASON_LEVEL_MIN,
   UNSAMPLED_LEVEL_HIGH_MIN_GAMES,
   UNSAMPLED_LEVEL_MIN_GAMES,
   UNSAMPLED_LEVEL_NEFF,
@@ -17,19 +19,12 @@ import { isLowData, levelFromConfig, mapDeltaPpToLevel } from './levels.js';
 
 const DELTA_PP_SCALE = 10 ** DELTA_PP_DECIMALS;
 
+function isReasonLevel(n: number): n is ReasonLevel {
+  return Number.isInteger(n) && n >= REASON_LEVEL_MIN && n <= REASON_LEVEL_MAX;
+}
+
 function toReasonLevel(levelNum: number): ReasonLevel | undefined {
-  if (
-    levelNum === -3 ||
-    levelNum === -2 ||
-    levelNum === -1 ||
-    levelNum === 0 ||
-    levelNum === 1 ||
-    levelNum === 2 ||
-    levelNum === 3
-  ) {
-    return levelNum;
-  }
-  return undefined;
+  return isReasonLevel(levelNum) ? levelNum : undefined;
 }
 
 export interface ReasonInputs {
@@ -148,7 +143,7 @@ export function toRecommendation(
       lowData: r.lowData,
     })),
     reliability: {
-      games: s.baselineNEff,
+      nEff: s.baselineNEff,
       lowData: isLowData(s.baselineNEff, config.minGames),
     },
     warnings: s.warnings,

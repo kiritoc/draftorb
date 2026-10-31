@@ -262,19 +262,8 @@ export const ROLE_INFERENCE_EPS = 1e-4;
 
 // --- Recommendation config (SPECS §5) ---
 
-/** Role probability threshold to enter the candidate set (SPECS §5). */
-export const ROLE_PROB_THRESHOLD = 0.05;
-
 /** Prior win rate the baseline `p0` is shrunk toward (SPECS §5: k0 toward 0.5). */
 export const BASELINE_PRIOR_WINRATE = 0.5;
-
-/**
- * Tie quantum: scores are bucketed by `Math.round(score / SCORE_TIE_EPSILON)`
- * and equal buckets are ties, broken by championId ascending. Bucketing keeps
- * the comparator transitive; two scores closer than the quantum may still fall
- * in adjacent buckets (deterministic either way).
- */
-export const SCORE_TIE_EPSILON = 1e-9;
 
 /** Decimal places kept on a reported reason `deltaPp`. */
 export const DELTA_PP_DECIMALS = 2;
@@ -295,20 +284,9 @@ export const UNSAMPLED_LEVEL_HIGH_MIN_GAMES = 0;
 /** Positive comp/blind levels are capped at this level (SPECS §5). */
 export const UNSAMPLED_MAX_POSITIVE_LEVEL = 1;
 
-/** W_comp: scale applied to the comp-need bonus (SPECS §5). Prior. */
-export const W_COMP = 1.0;
-
-/** W_blind: scale applied to blindSafety(c) (SPECS §5). Prior. */
-export const W_BLIND = 1.0;
-
-/** Weight of the worst-case (min) matchup penalty inside blindSafety (SPECS §5). Prior. */
-export const BLIND_WORST_CASE_FACTOR = 0.5;
-
-/**
- * A known enemy triggers a "countered by" warning when its shrunk pair term
- * moves the baseline by at most this many percentage points (L3 negative).
- */
-export const HARD_COUNTER_DELTA_PP = -4.5;
+/** Valid reason levels (SPECS §5/§7), mirrors `reasonLevelSchema`. */
+export const REASON_LEVEL_MIN = -3;
+export const REASON_LEVEL_MAX = 3;
 
 /** Warning code prefix: `counteredBy:<ROLE>:<championId>` (rendered by the UI `strings` module). */
 export const COUNTERED_BY_WARNING = 'counteredBy';
@@ -342,6 +320,54 @@ export const DEFAULT_COMP_CONFIG: CompConfig = Object.freeze({
   apDamage: 0.1,
   missingThreshold: 0.5,
   minAlliesForDamageMix: 3,
+});
+
+/**
+ * Lane group configuration (SPECS §5, D-021).
+ * - SUPPORT/ADC: bot lane (ally partner + 2 enemies, in lookup-key order)
+ * - TOP/MID/JUNGLE: 1v1 (lane_full skipped)
+ */
+export interface LaneGroup {
+  readonly allies: readonly Role[];
+  readonly enemies: readonly Role[];
+  readonly oneToOne: boolean;
+}
+
+export const DEFAULT_LANE_GROUPS: Readonly<Record<Role, LaneGroup>> = Object.freeze({
+  SUPPORT: { allies: ['ADC'], enemies: ['SUPPORT', 'ADC'], oneToOne: false },
+  ADC: { allies: ['SUPPORT'], enemies: ['ADC', 'SUPPORT'], oneToOne: false },
+  TOP: { allies: [], enemies: ['TOP'], oneToOne: true },
+  MID: { allies: [], enemies: ['MID'], oneToOne: true },
+  JUNGLE: { allies: [], enemies: ['JUNGLE'], oneToOne: true },
+});
+
+/**
+ * Recommendation-layer config (SPECS §5, D-030). Injected into `recommend`
+ * so the T-027.a backtest can tune every weight (fixes B-027).
+ */
+export interface RecommendConfig {
+  /** Role probability threshold to enter the candidate set. */
+  readonly roleProbThreshold: number;
+  /** W_comp: scale applied to the comp-need bonus. Prior. */
+  readonly wComp: number;
+  /** W_blind: scale applied to blindSafety(c). Prior. */
+  readonly wBlind: number;
+  /** Weight of the worst-case (min) matchup penalty inside blindSafety. Prior. */
+  readonly blindWorstCaseFactor: number;
+  /** A known enemy pair reason at or below this deltaPp warns `counteredBy` (L3 negative). */
+  readonly hardCounterDeltaPp: number;
+  readonly laneGroups: Readonly<Record<Role, LaneGroup>>;
+  readonly comp: CompConfig;
+}
+
+export const DEFAULT_RECOMMEND_CONFIG: RecommendConfig = Object.freeze({
+  roleProbThreshold: 0.05,
+  wComp: 1.0,
+  wBlind: 1.0,
+  blindWorstCaseFactor: 0.5,
+  hardCounterDeltaPp: -4.5,
+  laneGroups: DEFAULT_LANE_GROUPS,
+  comp: DEFAULT_COMP_CONFIG,
 });
 
 // --- Influence lookup ---

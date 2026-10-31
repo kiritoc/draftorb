@@ -5,13 +5,7 @@
 import type { ChampionId, ChampionRoleProbabilities, Role } from '@draftorb/shared';
 import type { RankWeightingConfig } from './config.js';
 import type { DataRow, KnownSlot } from './recommend-types.js';
-import {
-  BLIND_WORST_CASE_FACTOR,
-  COUNTERED_BY_WARNING,
-  HARD_COUNTER_DELTA_PP,
-  ROLE_PROB_THRESHOLD,
-  getInfluence,
-} from './config.js';
+import { COUNTERED_BY_WARNING, DEFAULT_RECOMMEND_CONFIG, getInfluence } from './config.js';
 import { deltaPp, scorePair } from './levels.js';
 import { makePairKey } from './recommend-indexes.js';
 import { logit } from './weighting.js';
@@ -100,6 +94,8 @@ export function computeBlindSafety(
   enemyIdx: Map<string, DataRow>,
   p0: number,
   config: RankWeightingConfig,
+  roleProbThreshold: number = DEFAULT_RECOMMEND_CONFIG.roleProbThreshold,
+  worstCaseFactor: number = DEFAULT_RECOMMEND_CONFIG.blindWorstCaseFactor,
 ): number {
   let total = 0;
 
@@ -110,7 +106,7 @@ export function computeBlindSafety(
     for (const e of championIds) {
       if (e === c || excluded.has(e)) continue;
       const share = roleProb[e]?.[role];
-      if (typeof share !== 'number' || share < ROLE_PROB_THRESHOLD) continue;
+      if (typeof share !== 'number' || share < roleProbThreshold) continue;
       // Missing or lowData matchups count as neutral (term 0) with their full
       // share, so a candidate is not rewarded for lacking data.
       const row = enemyIdx.get(makePairKey(c, e, role));
@@ -121,39 +117,22 @@ export function computeBlindSafety(
       if (term < minTerm) minTerm = term;
     }
     // Worst case is taken per unseen role (SPECS §5).
-    if (shareTotal > 0) total += weighted / shareTotal + BLIND_WORST_CASE_FACTOR * minTerm;
+    if (shareTotal > 0) total += weighted / shareTotal + worstCaseFactor * minTerm;
   }
 
   return total;
 }
 
 /**
- * "countered by" warnings from known enemies, using the shrunk, lowData-gated
- * pair term rather than the raw win rate.
+ * "countered by" warnings, derived from the layer-1 enemy pair deltas so the
+ * warning uses exactly the `deltaPp` shown in the matching `counter` reason
+ * (same running log-odds, conf, influence and s). lowData pairs never warn.
  */
 export function hardCounterWarnings(
-  c: ChampionId,
-  myRole: Role,
-  enemySlots: readonly KnownSlot[],
-  enemyIdx: Map<string, DataRow>,
-  p0: number,
-  config: RankWeightingConfig,
+  pairDeltas: readonly PairDelta[],
+  thresholdPp: number = DEFAULT_RECOMMEND_CONFIG.hardCounterDeltaPp,
 ): string[] {
-  const warnings: string[] = [];
-  const x0 = logit(p0, config.eps);
-  for (const enemy of enemySlots) {
-    const row = enemyIdx.get(makePairKey(c, enemy.championId, enemy.role));
-    if (!row) continue;
-    const result = scorePair(row.winsE, row.gamesE, p0, config);
-    if (result.lowData) continue;
-    // Scale exactly like the layer-1 contribution (conf * influence * s) so a
-    // low-influence or uncertain-role enemy cannot trigger a full-strength warning.
-    const influence = getInfluence(myRole, 'enemy', enemy.role, 'draft', config);
-    const weighted = config.s * enemy.confidence * influence * result.term;
-    if (deltaPp(x0, weighted) <= HARD_COUNTER_DELTA_PP) {
-      // Machine code, not UI text: the web `strings` module renders it.
-      warnings.push(`${COUNTERED_BY_WARNING}:${enemy.role}:${enemy.championId}`);
-    }
-  }
-  return warnings;
+  return pairDeltas
+    .filter((d) => d.side === 'enemy' && !d.lowData && d.deltaPp <= thresholdPp)
+    .map((d) => `${COUNTERED_BY_WARNING}:${d.role}:${d.championId}`);
 }

@@ -78,6 +78,7 @@ Earlier handoff (kept for history): B-017 done (engine and shared `"types": []` 
   - `docs/TICKETS.md` (updated T-023 to DONE)
   - `docs/PROGRESS.md` (updated)
 - Tests: `pnpm check` green before the final review pass (25 files, 447 tests). The final pass adds 12 engine tests (5 review-gap tests plus 3 more in `packages/engine/src/recommend.test.ts` and 4 in the new `packages/engine/src/recommend-terms.test.ts`) and scales the hard-counter warning by influence; re-run `pnpm check` to confirm the new count.
+  - Owner review pass (2026-10-31, D-030 items 10-14): `RecommendData` moved to `@draftorb/shared`; recommendation weights, thresholds and lane groups now come from an injectable `RecommendConfig` (`DEFAULT_RECOMMEND_CONFIG`), the 4th argument of `recommend` (replaces `compConfig`; B-027 fixed); hard-counter warnings reuse the counter reason `deltaPp`; exact score ordering; `reliability.games` renamed `reliability.nEff`; `CompNeedResult.reasons` removed (codes only); duplicate championIds per team deduplicated. New golden fixtures: `adc_bot_lane_full`, `mid_lane_1v1_matchup`, `jungle_counter_and_lane`, `support_lane_full_decides` (12 total). Baseline before this pass: 31 files, 523 tests; re-run `pnpm check` to record the new count.
 - State left: **DONE (T-023)**.
 - Next step: T-024 (Blind pick mode) or T-025 (Comp needs) or T-015 (Aggregate role probabilities in ETL).
 

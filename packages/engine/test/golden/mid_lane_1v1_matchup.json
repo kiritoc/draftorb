@@ -1,0 +1,36 @@
+{
+  "name": "mid_lane_1v1_matchup",
+  "input": {
+    "userRank": "DIAMOND",
+    "userRole": "MID",
+    "allies": [],
+    "enemies": [{ "championId": 300, "role": "MID" }],
+    "blindPick": false
+  },
+  "data": {
+    "championIds": [1, 2, 300],
+    "roleProb": {
+      "1": { "MID": 1.0 },
+      "2": { "MID": 1.0 },
+      "300": { "MID": 1.0 }
+    },
+    "baselines": [
+      [1, "DIAMOND", 30, 50, 0.1, 50],
+      [2, "DIAMOND", 30, 50, 0.1, 50]
+    ],
+    "allyPairs": [],
+    "enemyPairs": [],
+    "laneVs": [
+      [1, 300, null, "DIAMOND", 20, 50, 0.1],
+      [2, 300, null, "DIAMOND", 40, 50, 0.1]
+    ],
+    "laneFull": [],
+    "tags": {}
+  },
+  "expected": {
+    "recommendations": [
+      { "championId": 2, "rank": 1, "reasons": [{ "type": "lane", "lowData": false }] },
+      { "championId": 1, "rank": 2, "reasons": [{ "type": "lane", "lowData": false }] }
+    ]
+  }
+}

@@ -13,7 +13,7 @@ import type {
 } from '@draftorb/shared';
 import type { RankWeightingConfig } from './config.js';
 import type { ScoredCandidate } from './recommend-reasons.js';
-import { ROLE_PROB_THRESHOLD } from './config.js';
+import { DEFAULT_RECOMMEND_CONFIG } from './config.js';
 import { toRecommendation } from './recommend-reasons.js';
 
 export interface CandidateSet {
@@ -29,19 +29,21 @@ export function isBelowRoleThreshold(
   c: ChampionId,
   myRole: Role,
   roleProb: ChampionRoleProbabilities,
+  threshold: number = DEFAULT_RECOMMEND_CONFIG.roleProbThreshold,
 ): boolean {
   const p = roleProb[c]?.[myRole];
-  return typeof p !== 'number' || p < ROLE_PROB_THRESHOLD;
+  return typeof p !== 'number' || p < threshold;
 }
 
 /**
- * Candidates = champions with `roleProb[c][myRole] >= ROLE_PROB_THRESHOLD`
+ * Candidates = champions with `roleProb[c][myRole] >= roleProbThreshold`
  * plus every known pool champion; board picks are never candidates.
  */
 export function buildCandidateSet(
   input: DraftInput,
   championIds: readonly ChampionId[],
   roleProb: ChampionRoleProbabilities,
+  threshold: number = DEFAULT_RECOMMEND_CONFIG.roleProbThreshold,
 ): CandidateSet {
   const picked = new Set<ChampionId>([
     ...input.allies.map((s) => s.championId),
@@ -52,7 +54,7 @@ export function buildCandidateSet(
   const candidates = new Set<ChampionId>();
   for (const id of championIds) {
     if (picked.has(id)) continue;
-    if (!isBelowRoleThreshold(id, input.userRole, roleProb)) candidates.add(id);
+    if (!isBelowRoleThreshold(id, input.userRole, roleProb, threshold)) candidates.add(id);
   }
   for (const id of poolSet) {
     // Unknown ids are reported as poolUnavailable/unknownChampion, never scored.

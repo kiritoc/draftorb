@@ -123,7 +123,7 @@ describe('toRecommendation', () => {
     const rec = toRecommendation(scored, 3, DEFAULT_CONFIG);
     expect(rec.rank).toBe(3);
     expect(rec).not.toHaveProperty('poolRank');
-    expect(rec.reliability).toEqual({ games: 10, lowData: true });
+    expect(rec.reliability).toEqual({ nEff: 10, lowData: true });
     expect(rec.warnings).toEqual(['offRole']);
     expect(toRecommendation(scored, 3, DEFAULT_CONFIG, 1).poolRank).toBe(1);
   });

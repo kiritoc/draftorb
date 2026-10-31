@@ -11,37 +11,26 @@
  */
 
 import type {
-  AllyPairTable,
-  BaselineTable,
-  ChampionId,
-  ChampionRoleProbabilities,
-  ChampionTagsMap,
   DraftInput,
   DraftResult,
-  EnemyPairTable,
   InsufficientDataEntry,
-  LaneFullTable,
-  LaneVsTable,
   Recommendation,
+  RecommendData,
 } from '@draftorb/shared';
-import type { CompConfig, RankWeightingConfig } from './config.js';
+import type { RankWeightingConfig, RecommendConfig } from './config.js';
 import type { DataRow, LaneDelta } from './recommend-types.js';
 import type { ScoredCandidate } from './recommend-reasons.js';
 import {
   BASELINE_PRIOR_WINRATE,
-  DEFAULT_COMP_CONFIG,
   DEFAULT_CONFIG,
+  DEFAULT_RECOMMEND_CONFIG,
   MISSING_LANE_ID,
   OFF_ROLE_WARNING,
-  SCORE_TIE_EPSILON,
-  W_BLIND,
-  W_COMP,
   rankToBucket,
 } from './config.js';
 import { sigmoid } from './weighting.js';
 import { baselineGate, baselineLogOdds, deltaPp, scoreLane } from './levels.js';
 import { computeCompNeed } from './comp.js';
-import { LANE_GROUPS } from './recommend-types.js';
 import {
   indexBaselines,
   indexLaneFull,
@@ -56,26 +45,8 @@ import { buildReasons, toRecommendation } from './recommend-reasons.js';
 import { buildCandidateSet, buildPoolOutput, isBelowRoleThreshold } from './recommend-pool.js';
 
 export type { KnownSlot } from './recommend-types.js';
-
-/** Index lookups over exported data tables. */
-export interface RecommendData {
-  /** Baseline win rates per (championId, bucket) — role-specific. */
-  readonly baselines: BaselineTable;
-  /** Ally pair data per (championId, allyId, role, bucket). */
-  readonly allyPairs: AllyPairTable;
-  /** Enemy pair data per (championId, enemyId, role, bucket). */
-  readonly enemyPairs: EnemyPairTable;
-  /** Lane-vs data per (championId, opp1Id, opp2Id, bucket). */
-  readonly laneVs: LaneVsTable;
-  /** Lane-full data per (championId, partnerId, opp1Id, opp2Id, bucket). */
-  readonly laneFull: LaneFullTable;
-  /** Role probability map: championId -> { role: prob }. */
-  readonly roleProb: ChampionRoleProbabilities;
-  /** Champion tags for comp needs. */
-  readonly tags: ChampionTagsMap;
-  /** Champions list for candidate enumeration (id -> exists check). */
-  readonly championIds: readonly ChampionId[];
-}
+// The data contract lives in @draftorb/shared (single source of truth).
+export type { RecommendData } from '@draftorb/shared';
 
 /**
  * Shrink an exact lane context toward the running prediction (SPECS §5),
@@ -99,14 +70,15 @@ function applyLane(
  * @param input  The user's partial draft knowledge.
  * @param data   Pre-loaded aggregated data objects.
  * @param config Optional rank-weighting config (defaults to DEFAULT_CONFIG).
- * @param compConfig Optional comp config (defaults to DEFAULT_COMP_CONFIG).
+ * @param rc     Optional recommendation-layer config (weights, thresholds,
+ *               lane groups, comp); defaults to DEFAULT_RECOMMEND_CONFIG.
  * @returns A fully ranked DraftResult.
  */
 export function recommend(
   input: DraftInput,
   data: RecommendData,
   config: RankWeightingConfig = DEFAULT_CONFIG,
-  compConfig: CompConfig = DEFAULT_COMP_CONFIG,
+  rc: RecommendConfig = DEFAULT_RECOMMEND_CONFIG,
 ): DraftResult {
   const userBucket = rankToBucket(input.userRank);
   const myRole = input.userRole;
@@ -123,11 +95,16 @@ export function recommend(
   const enemySlots = resolveKnownSlots(input.enemies, 'enemy', data.roleProb);
 
   // --- Infer lane-group champions from known enemies/allies ---
-  const laneGroup = LANE_GROUPS[myRole];
+  const laneGroup = rc.laneGroups[myRole];
   const laneGroupInfo = computeLaneGroup(laneGroup, allySlots, enemySlots);
 
   // --- Build candidate set (board picks excluded, pool champions added) ---
-  const candidateSet = buildCandidateSet(input, data.championIds, data.roleProb);
+  const candidateSet = buildCandidateSet(
+    input,
+    data.championIds,
+    data.roleProb,
+    rc.roleProbThreshold,
+  );
   const knownChampionSet = candidateSet.picked;
 
   // Comp is role-independent: use every board ally, even if role inference dropped it.
@@ -164,7 +141,9 @@ export function recommend(
     const x = baselineLogOdds(winsE, gamesE, config.k0, config.eps);
 
     // Determine if this is an off-role pool champion
-    const isOffRole = candidateSet.poolSet.has(c) && isBelowRoleThreshold(c, myRole, data.roleProb);
+    const isOffRole =
+      candidateSet.poolSet.has(c) &&
+      isBelowRoleThreshold(c, myRole, data.roleProb, rc.roleProbThreshold);
 
     // --- Layer 1: pairs ---
     const pairInfo = scorePairs(
@@ -212,10 +191,11 @@ export function recommend(
     if (laneFullDelta) logOdds += laneFullDelta.term;
 
     // --- Layer 4: comp need ---
-    const compResult = computeCompNeed(c, allyChampIds, data.tags, compConfig);
+    const compResult = computeCompNeed(c, allyChampIds, data.tags, rc.comp);
     let compDeltaPp: number | null = null;
-    if (compResult.filled.length > 0 && compResult.bonus !== 0) {
-      const compTerm = W_COMP * compResult.bonus;
+    // A filled need with a 0 weight (or wComp = 0) adds nothing and gets no reason.
+    const compTerm = rc.wComp * compResult.bonus;
+    if (compResult.filled.length > 0 && compTerm !== 0) {
       compDeltaPp = deltaPp(logOdds, compTerm);
       logOdds += compTerm;
     }
@@ -235,9 +215,11 @@ export function recommend(
         enemyPairIdx,
         p0,
         config,
+        rc.roleProbThreshold,
+        rc.blindWorstCaseFactor,
       );
-      if (rawTerm !== 0) {
-        const term = W_BLIND * rawTerm;
+      const term = rc.wBlind * rawTerm;
+      if (term !== 0) {
         blindDeltaPp = deltaPp(logOdds, term);
         logOdds += term;
       }
@@ -257,17 +239,18 @@ export function recommend(
 
     const warnings = [
       ...(isOffRole ? [OFF_ROLE_WARNING] : []),
-      ...hardCounterWarnings(c, myRole, enemySlots, enemyPairIdx, p0, config),
+      ...hardCounterWarnings(pairInfo.deltas, rc.hardCounterDeltaPp),
     ];
 
     scored.push({ championId: c, score: sigmoid(logOdds), reasons, baselineNEff: nE, warnings });
   }
 
   // --- Sort and rank ---
-  // Quantize scores so the tie rule is transitive (a pairwise epsilon is not).
-  const tieKey = (score: number): number => Math.round(score / SCORE_TIE_EPSILON);
+  // Exact score comparison: transitive and deterministic (pure float math on
+  // identical inputs). Ties only on exactly equal scores, broken by championId.
   const sorted = [...scored].sort(
-    (a, b) => tieKey(b.score) - tieKey(a.score) || a.championId - b.championId,
+    (a, b) =>
+      (a.score === b.score ? 0 : b.score > a.score ? 1 : -1) || a.championId - b.championId,
   );
 
   const recommendations: Recommendation[] = sorted.map((s, i) =>

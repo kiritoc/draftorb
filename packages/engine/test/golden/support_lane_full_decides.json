@@ -1,0 +1,58 @@
+{
+  "name": "support_lane_full_decides",
+  "input": {
+    "userRank": "DIAMOND",
+    "userRole": "SUPPORT",
+    "allies": [{ "championId": 10, "role": "ADC" }],
+    "enemies": [
+      { "championId": 200, "role": "SUPPORT" },
+      { "championId": 201, "role": "ADC" }
+    ],
+    "blindPick": false
+  },
+  "data": {
+    "championIds": [1, 2, 10, 200, 201],
+    "roleProb": {
+      "1": { "SUPPORT": 1.0 },
+      "2": { "SUPPORT": 1.0 },
+      "10": { "ADC": 1.0 },
+      "200": { "SUPPORT": 1.0 },
+      "201": { "ADC": 1.0 }
+    },
+    "baselines": [
+      [1, "DIAMOND", 30, 50, 0.1, 50],
+      [2, "DIAMOND", 30, 50, 0.1, 50]
+    ],
+    "allyPairs": [],
+    "enemyPairs": [],
+    "laneVs": [
+      [1, 200, 201, "DIAMOND", 30, 50, 0.1],
+      [2, 200, 201, "DIAMOND", 30, 50, 0.1]
+    ],
+    "laneFull": [
+      [1, 10, 200, 201, "DIAMOND", 15, 50, 0.1],
+      [2, 10, 200, 201, "DIAMOND", 45, 50, 0.1]
+    ],
+    "tags": {}
+  },
+  "expected": {
+    "recommendations": [
+      {
+        "championId": 2,
+        "rank": 1,
+        "reasons": [
+          { "type": "lane", "lowData": false },
+          { "type": "lane", "lowData": false }
+        ]
+      },
+      {
+        "championId": 1,
+        "rank": 2,
+        "reasons": [
+          { "type": "lane", "lowData": false },
+          { "type": "lane", "lowData": false }
+        ]
+      }
+    ]
+  }
+}

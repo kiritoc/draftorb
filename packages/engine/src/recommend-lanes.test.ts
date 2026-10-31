@@ -217,3 +217,22 @@ describe('recommend: 1v1 lanes', () => {
     expect(laneReasons(rec).map((l) => l.with)).toEqual([[300]]);
   });
 });
+
+describe('recommend: lane lowData', () => {
+  it('flags a lane_vs reason lowData (level 0, deltaPp 0) when the context row is below minGames', () => {
+    // n_eff = gamesW^2 / gamesW2 = 100 / 10 = 10 < minGames (25).
+    const laneVs: LaneVsTable = [[1, 200, 201, 'DIAMOND', 5, 10, 10]];
+    const data = makeData({
+      champions: [1, 10, 200, 201],
+      roleProb: BOT_ROLE_PROB,
+      laneVs,
+    });
+    const input = makeInput({ allies: [{ championId: 10, role: 'ADC' }], enemies: FIXED_BOT });
+    const rec = recommend(input, data).recommendations.find((r) => r.championId === 1);
+    const lane = laneReasons(rec)[0];
+    expect(lane).not.toBeUndefined();
+    expect(lane?.lowData).toBe(true);
+    expect(lane?.level).toBe(0);
+    expect(lane?.deltaPp).toBe(0);
+  });
+});

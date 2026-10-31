@@ -251,3 +251,34 @@ describe('recommend: comp need', () => {
     }
   });
 });
+
+describe('recommend: blind worst-case penalty', () => {
+  it('applies an extra negative penalty when every unseen matchup is unfavorable', () => {
+    const roleProb = asRoleProb({
+      '1': { SUPPORT: 1 },
+      '201': { ADC: 0.5 },
+      '202': { ADC: 0.5 },
+    });
+    const enemyPairs = makeEnemyPairs([
+      { championId: 1, enemyId: 201, role: 'ADC', ...HIGH_GAMES, winsW: 10 },
+      { championId: 1, enemyId: 202, role: 'ADC', ...HIGH_GAMES, winsW: 10 },
+    ]);
+    const data = makeData({
+      champions: [1, 201, 202],
+      roleProb,
+      enemyPairs,
+      baselines: makeBaselines([1]),
+    });
+    const rec = (rc: typeof DEFAULT_RECOMMEND_CONFIG) =>
+      recommend(makeInput({ blindPick: true }), data, DEFAULT_CONFIG, rc).recommendations.find(
+        (r) => r.championId === 1,
+      );
+    const withPenalty = blindOf(rec(DEFAULT_RECOMMEND_CONFIG));
+    const withoutPenalty = blindOf(rec({ ...DEFAULT_RECOMMEND_CONFIG, blindWorstCaseFactor: 0 }));
+    expect(withPenalty).not.toBeUndefined();
+    expect(withoutPenalty).not.toBeUndefined();
+    const wp = withPenalty?.deltaPp ?? 0;
+    const wop = withoutPenalty?.deltaPp ?? 0;
+    expect(wp).toBeLessThan(wop);
+  });
+});

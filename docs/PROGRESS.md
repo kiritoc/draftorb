@@ -3,7 +3,7 @@
 ## Current status
 
 - Phase: 1 (Support / Diamond)
-- Current milestone: M0 Foundations (T-002.b DONE) and M1 ETL (in progress: T-014 DONE; T-015 DONE; T-016..T-019 TODO) -> M2 Engine (T-020..T-023 DONE)
+- Current milestone: M0 Foundations (T-002.b DONE) and M1 ETL (in progress: T-014 DONE; T-015 DONE; T-016 DONE; T-017..T-019 TODO) -> M2 Engine (T-020..T-023 DONE)
 - Last updated: 2026-10-31 by Antigravity
 
 ## Epic status
@@ -29,7 +29,7 @@
 
 T-023 is **DONE** (Role-generic recommendation engine with explanations, layered shrinkage scoring, pool contract D-024, composition needs, golden test runner and golden fixtures including non-support TOP 1v1 lane group).
 Next engine tickets: **T-024** (Blind pick mode), **T-025** (Comp needs full model), **T-026** (Golden test suite 20+ scenarios) or **T-027.a** (Draft backtest harness).
-Next ETL ticket: **T-016** (Aggregate baselines, rank-weighted, role-generic, depends on T-014,T-011.b,T-020).
+Next ETL ticket: **T-017** (Aggregate pair tables, depends on T-016,T-011.b).
 
 Earlier handoff (kept for history): B-017 done (engine and shared `"types": []` plus ESLint purity guardrails in `eslint.config.mjs` with automated regression tests; T-020's engine-purity prerequisite is fully satisfied — the residual `tsc` gap caused by test files importing `vitest` is logged as B-021 and not fixed). B-022 (all Node built-ins blocked), B-023 (Date() call blocked) and B-024 (regression tests) also fixed. B-011 fixed (spec + T-002.b scope; implementation in T-002.b). Fix B-012 done. T-013.e done (typed schema-less `request()`, timeout/invalid-JSON regression tests, CLI + matches refactor below 300 lines; `pnpm check` 184 tests). **T-013.d done** (`pnpm etl status`, read-only parameterized counts and progress, empty & seeded database tests, CLI handling when database does not exist; `pnpm check` 153 tests). **D-008, D-011, D-017, D-018, D-020, D-021, D-022, D-023 accepted (2026-10-29); D-028 (formerly D-025, @types/... devDeps) renumbered and accepted.** SPECS §5/§8 are now normative. **T-002.b DONE** (shared schema parity); `packages/shared/src/index.ts` split by domain into `schemas/*.ts` (10 modules); rankBucketSchema (8 buckets), sparse role-prob with sum-to-1, Reason.with as ChampionId[], Reason.lowData, n_eff non-integer, lane reason type, DraftResult with insufficientData/poolRecommendations/poolUnavailable, championPoolSchema, manifest roles, all role-keyed export tuple schemas with games_w2, rune/build export schemas; 184 tests pass. **T-020 DONE** (rank weighting module: config + kernel + n_eff + equivalent-counts + influence matrix; 49 engine tests). **T-021 DONE** (Role inference — `inferRoles` with brute-force permutation over 120 assignments, viability check for missing champions, confidence = best/total probability mass; 15 tests). **T-022 DONE** (shrinkage + level mapping). T-014 (Participant enrichment) remains **data-blocked** (no Riot key, 0 games collected, no SQLite database under `data/`). **T-014 implementation DONE** (2026-10-29): enrichment module, mastery endpoint, 22 tests.
 
@@ -40,6 +40,19 @@ Earlier handoff (kept for history): B-017 done (engine and shared `"types": []` 
 ---
 
 ## Session log (newest first)
+
+### 2026-10-31 — Antigravity — Ticket T-016 (Aggregate baselines)
+
+- Done:
+  - **`packages/etl/src/aggregate-baseline.ts`** (new): `aggregateBaseline(db)` computes `baseline` rows per (champion, my_role, user rank bucket) using the engine rank kernel (`combinedGameWeight` from `@draftorb/engine`). Each game contributes to every user bucket row weighted by `rankDistanceWeight * recencyFactor * reliabilityFactor`; accumulates `wins_w`, `games_w`, `games_w2`, `games` (raw count); clears and rewrites the table in a transaction (idempotent). Populates the `games` 6th column added by migration 008, resolving B-025/B-033.
+  - **`packages/etl/src/aggregate-baseline.test.ts`** (new, 3 tests): weighted counts and `n_eff` verified on toy data (uniform weight → n_eff = raw count; uneven recency weights → n_eff < raw count; out-of-window game contributes 0 weight; empty DB → empty baseline).
+  - **`packages/etl/src/commands/aggregate.ts`** (edited): `pnpm etl aggregate` now also writes baseline rows; description updated.
+  - **`packages/etl/src/index.ts`** (edited): exports `aggregateBaseline` and `BaselineRow`.
+  - **`packages/etl/package.json`** (edited): added `@draftorb/engine` workspace dependency to reuse the engine rank kernel.
+  - **`packages/etl/tsconfig.json`** (edited): added `../engine` project reference.
+  - **`docs/SETUP.md`** (edited): `pnpm etl aggregate` description updated to include baselines.
+- Tests: `pnpm check` green (typecheck, lint, format: 0 errors; 594 tests across 41 files, including the 3 new baseline tests).
+- State left: **DONE (T-016)**. Resolved B-033 (renumbered from duplicate B-025, now FIXED). Next ETL ticket: T-017 (Aggregate pair tables).
 
 ### 2026-10-31 — Antigravity — Ticket T-015 (Aggregate role probabilities)
 

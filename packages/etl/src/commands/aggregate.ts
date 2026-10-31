@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 import { resolveRepoRoot } from '../config/paths';
+import { aggregateBaseline } from '../aggregate-baseline';
 import { aggregateRoleProb, PATCH_PATTERN } from '../aggregate';
 import { UsageError } from '../cli-args';
 import { parsePositionals, type Command } from './shared';
@@ -39,6 +40,14 @@ async function runAggregate(args: string[]): Promise<void> {
         `  champion ${row.championId} ${row.role}: games=${row.games} prob=${(row.prob * 100).toFixed(2)}%`,
       );
     }
+
+    const baselineRows = aggregateBaseline(db);
+    console.log(`Aggregated baselines: ${baselineRows.length} row(s) written to baseline.`);
+    for (const row of baselineRows) {
+      console.log(
+        `  champion ${row.championId} ${row.myRole} ${row.rankBucket}: wins_w=${row.winsW.toFixed(2)} games_w=${row.gamesW.toFixed(2)} games_w2=${row.gamesW2.toFixed(2)} games=${row.games}`,
+      );
+    }
   } finally {
     db.close();
   }
@@ -46,7 +55,7 @@ async function runAggregate(args: string[]): Promise<void> {
 
 export const aggregateCommand: Command = {
   name: 'aggregate',
-  usage: 'aggregate [patch]',
-  description: 'Compute aggregated tables (role probabilities)',
+  usage: 'aggregate',
+  description: 'Compute aggregated tables (role probabilities and rank-weighted baselines)',
   run: runAggregate,
 };

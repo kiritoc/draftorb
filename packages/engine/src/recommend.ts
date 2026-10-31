@@ -128,7 +128,7 @@ export function recommend(
     knownChampionSet,
     data.championIds,
     data.roleProb,
-    rc.roleProbThreshold,
+    rc.blindOpponentMinShare,
   );
 
   // --- Score each candidate ---
@@ -175,6 +175,7 @@ export function recommend(
       enemyPairIdx,
       p0,
       config,
+      x,
     );
     let logOdds = x + config.s * pairInfo.sum;
 

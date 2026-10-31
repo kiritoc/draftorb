@@ -7,7 +7,38 @@ import { DEFAULT_CONFIG } from './config.js';
 import type { LaneGroupInfo } from './recommend-types.js';
 import type { PairDelta } from './recommend-terms.js';
 import type { ReasonInputs, ScoredCandidate } from './recommend-reasons.js';
-import { buildReasons, toRecommendation } from './recommend-reasons.js';
+import { buildReasons, toReasonLevel, toRecommendation } from './recommend-reasons.js';
+import { baselineGate, isLowData } from './levels.js';
+
+describe('toReasonLevel', () => {
+  it('accepts -3..3 and throws on out-of-range or non-integer levels', () => {
+    for (const l of [-3, -2, -1, 0, 1, 2, 3]) expect(toReasonLevel(l)).toBe(l);
+    expect(() => toReasonLevel(4)).toThrow(RangeError);
+    expect(() => toReasonLevel(-4)).toThrow(RangeError);
+    expect(() => toReasonLevel(1.5)).toThrow(RangeError);
+  });
+});
+
+describe('baseline gate vs reliability.lowData', () => {
+  it('agree at n_eff == minGames and around it', () => {
+    const m = DEFAULT_CONFIG.minGames;
+    for (const n of [m - 0.001, m, m + 0.001]) {
+      expect(baselineGate(n, m)).toBe(!isLowData(n, m));
+    }
+  });
+
+  it('a gated candidate is never reported lowData when minGames > 0', () => {
+    const m = DEFAULT_CONFIG.minGames;
+    const s: ScoredCandidate = {
+      championId: 1,
+      score: 0.5,
+      reasons: [],
+      baselineNEff: m,
+      warnings: [],
+    };
+    expect(toRecommendation(s, 1, DEFAULT_CONFIG).reliability.lowData).toBe(false);
+  });
+});
 
 const EMPTY_LANE: LaneGroupInfo = {
   allies: [],

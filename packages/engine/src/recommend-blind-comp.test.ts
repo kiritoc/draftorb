@@ -147,6 +147,15 @@ describe('recommend: blind safety values and levels', () => {
     expect(delta(blindData(10, [1, 201, 202]))).toBeGreaterThan(delta(blindData()));
   });
 
+  it('blindOpponentMinShare is independent of roleProbThreshold', () => {
+    const rc = { ...DEFAULT_RECOMMEND_CONFIG, blindOpponentMinShare: 1.1 };
+    const rec = recommend(makeInput({ blindPick: true }), blindData(), DEFAULT_CONFIG, rc)
+      .recommendations[0];
+    // Candidate still scored (roleProbThreshold unchanged), but no opponent qualifies.
+    expect(rec?.championId).toBe(1);
+    expect(blindOf(rec)).toBeUndefined();
+  });
+
   it('honors an injected wBlind of 0', () => {
     const rc = { ...DEFAULT_RECOMMEND_CONFIG, wBlind: 0 };
     const rec = recommend(makeInput({ blindPick: true }), blindData(), DEFAULT_CONFIG, rc)

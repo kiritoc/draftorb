@@ -35,7 +35,7 @@ export interface ReasonAccumulator {
   readonly deltaPp: number;
   readonly n: number;
   readonly lowData: boolean;
-  readonly level: ReasonLevel | undefined;
+  readonly level: ReasonLevel;
 }
 
 /** A lane-layer correction (lane_vs or lane_full). */
@@ -46,9 +46,8 @@ export interface LaneDelta {
   readonly deltaPp: number;
 }
 
-// Lane groups are config (SPECS §5, D-021): defined in config.ts, re-exported here.
+// Lane groups are config (SPECS §5, D-021): defined in config.ts (DEFAULT_LANE_GROUPS).
 export type { LaneGroup } from './config.js';
-export { DEFAULT_LANE_GROUPS as LANE_GROUPS } from './config.js';
 
 export interface LaneGroupInfo {
   readonly allies: KnownSlot[];

@@ -14,7 +14,8 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { recommend, type RecommendData } from '../src/recommend.js';
-import type { ChampionId, DraftInput, DraftResult } from '@draftorb/shared';
+import type { DraftInput, DraftResult } from '@draftorb/shared';
+import { draftInputSchema, recommendDataSchema } from '@draftorb/shared';
 
 interface GoldenFixture {
   name: string;
@@ -54,21 +55,17 @@ const fixtureFiles = readdirSync(goldenDir).filter((f) => f.endsWith('.json'));
 for (const file of fixtureFiles) {
   const fullPath = join(goldenDir, file);
   const raw = readFileSync(fullPath, 'utf-8');
-  const json = JSON.parse(raw) as GoldenFixture & { champions?: ChampionId[] };
+  // Validate input/data with the shared zod schemas (never trust raw JSON).
+  const json: unknown = JSON.parse(raw);
+  const obj = json as { name?: unknown; input?: unknown; data?: unknown; expected?: unknown };
+  if (typeof obj.name !== 'string' || typeof obj.expected !== 'object' || !obj.expected) {
+    throw new Error(`golden fixture ${file}: missing name or expected`);
+  }
   const fixture: GoldenFixture = {
-    name: json.name,
-    input: json.input,
-    data: {
-      baselines: json.data.baselines,
-      allyPairs: json.data.allyPairs,
-      enemyPairs: json.data.enemyPairs,
-      laneVs: json.data.laneVs,
-      laneFull: json.data.laneFull,
-      roleProb: json.data.roleProb,
-      tags: json.data.tags,
-      championIds: json.champions ?? json.data.championIds ?? [],
-    },
-    expected: json.expected,
+    name: obj.name,
+    input: draftInputSchema.parse(obj.input),
+    data: recommendDataSchema.parse(obj.data),
+    expected: obj.expected as GoldenFixture['expected'],
   };
 
   describe(`golden: ${fixture.name}`, () => {
@@ -159,10 +156,12 @@ for (const file of fixtureFiles) {
       }
 
       if (fixture.expected.insufficientData) {
-        for (const expInsuff of fixture.expected.insufficientData) {
-          const entry = result.insufficientData.find((i) => i.championId === expInsuff.championId);
-          expect(entry).toBeDefined();
-        }
+        // Exact set: an unexpected insufficientData entry must fail the fixture.
+        const sortIds = (xs: Array<{ championId: number }>): number[] =>
+          xs.map((x) => x.championId).sort((a, b) => a - b);
+        expect(sortIds(result.insufficientData)).toEqual(
+          sortIds(fixture.expected.insufficientData),
+        );
       }
     });
 

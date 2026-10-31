@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { LANE_GROUPS } from './recommend-types.js';
+import { DEFAULT_LANE_GROUPS as LANE_GROUPS } from './config.js';
 
 describe('LANE_GROUPS', () => {
   it('defines the bot lane for SUPPORT and ADC in role order', () => {

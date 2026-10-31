@@ -55,8 +55,8 @@ Earlier handoff (kept for history): B-017 done (engine and shared `"types": []` 
     - Reason generation: reasons emitted in canonical order (pairs by descending influence, ties by championId, then `lane_vs`, `lane_full`, `comp`, `blind`), with level mapping and `lowData` flags.
     - Pool contract (D-024): `recommendations` is the complete overall ranking; `poolRecommendations` retains exact global rank and sequential `poolRank`; pool champions never modify candidate scores; missing baseline data maps to `poolUnavailable` (`insufficientData`) and `insufficientData`; unknown champion IDs map to `poolUnavailable` (`unknownChampion`); below-threshold pool picks receive `offRole` warning.
   - **`packages/engine/src/comp.ts`** and **`packages/engine/src/comp.test.ts`** (new): composition needs scoring from champion tags (engage, peel, waveclear, poke, damage balance).
-  - **`packages/engine/src/golden.test.ts`** (new): pure golden test runner loading fixtures from `packages/engine/test/golden/*.json`.
-  - **Golden test fixtures** (12 scenarios in `packages/engine/test/golden/`; the 4 added in the owner review pass are listed below):
+  - **`packages/engine/test/golden.test.ts`** (new): golden test runner (zod-validated fixtures) loading fixtures from `packages/engine/test/golden/*.json`.
+  - **Golden test fixtures** (14 scenarios in `packages/engine/test/golden/`; the 4 added in the owner review pass and the 2 added in the follow-up pass are listed below):
     - `ally_adc_synergy.json`: ally ADC pair synergy dominating recommendation.
     - `blind_pick_safe_supports.json`: blind pick mode with baseline and comp evaluation.
     - `enemy_counter.json`: enemy counter pick penalizing unfavorable matchup.
@@ -65,6 +65,8 @@ Earlier handoff (kept for history): B-017 done (engine and shared `"types": []` 
     - `top_lane_1v1_matchup.json`: non-support role (TOP) consuming influence matrix and `laneGroup(TOP)` (1v1, `lane_full` skipped).
     - `pool_unavailable_and_offrole.json`: pool handling with unknown champions, insufficient data, and `offRole` warnings.
     - `flex_role_inference.json`: enemy flex pick evaluated with role inference confidence weighting.
+    - `blind_partial_lane_support_known.json`: enemy SUPPORT known, blind safety scores only the unseen ADC role.
+    - `adc_blind_pick.json`: ADC blind pick ranked by matchups against unseen enemy supports.
   - **`packages/engine/src/recommend.test.ts`** (new): candidate enumeration, baseline gate, score ranking, sequential ranks, tie-breaking by champion ID, pair synergies and counters, bot lane vs and 1v1 lane full skipping, pool contract (score invariance, subsequence order, insufficientData, unknownChampion, offRole, roleProb-set relative order preservation), reason reference validity, reason ordering, determinism, edge cases.
   - **`packages/engine/src/index.ts`** (updated): exported `./comp.js` and `./recommend.js`.
 - Files touched:
@@ -74,13 +76,13 @@ Earlier handoff (kept for history): B-017 done (engine and shared `"types": []` 
   - `packages/engine/src/recommend-test-utils.ts` (new, test-only builders)
   - `packages/engine/src/comp.ts` (new)
   - `packages/engine/src/comp.test.ts` (new)
-  - `packages/engine/src/golden.test.ts` (new)
+  - `packages/engine/test/golden.test.ts` (new) and `packages/engine/test/tsconfig.json` (type-checked via `pnpm typecheck`)
   - `packages/engine/src/index.ts` (updated)
-  - `packages/engine/test/golden/*.json` (12 fixtures)
+  - `packages/engine/test/golden/*.json` (14 fixtures)
   - `docs/TICKETS.md` (updated T-023 to DONE)
   - `docs/PROGRESS.md` (updated)
-- Tests: `pnpm check` green before the final review pass (25 files, 447 tests). The final pass adds 12 engine tests (5 review-gap tests plus 3 more in `packages/engine/src/recommend.test.ts` and 4 in the new `packages/engine/src/recommend-terms.test.ts`) and scales the hard-counter warning by influence.
-  - Owner review pass (2026-10-31, D-030 items 10-14): `RecommendData` moved to `@draftorb/shared`; recommendation weights, thresholds and lane groups now come from an injectable `RecommendConfig` (`DEFAULT_RECOMMEND_CONFIG`), the 4th argument of `recommend` (replaces `compConfig`; B-027 fixed); hard-counter warnings reuse the counter reason `deltaPp`; exact score ordering; `reliability.games` renamed `reliability.nEff`; `CompNeedResult.reasons` removed (codes only); duplicate championIds per team deduplicated. New golden fixtures: `adc_bot_lane_full`, `mid_lane_1v1_matchup`, `jungle_counter_and_lane`, `support_lane_full_decides` (12 total). Baseline before this pass: 31 files, 523 tests. Final state: `pnpm check` green in CI (test on ubuntu-latest and windows-latest, lint, format); the follow-up pass adds `packages/engine/src/recommend-edge.test.ts`.
+- Tests: `pnpm check` green before the final review pass (25 files, 447 tests). The final pass adds 12 engine tests (5 review-gap tests plus 3 more in the feature-split `packages/engine/src/recommend-*.test.ts` files and 4 in the new `packages/engine/src/recommend-terms.test.ts`) and scales the hard-counter warning by influence.
+  - Owner review pass (2026-10-31, D-030 items 10-14): `RecommendData` moved to `@draftorb/shared`; recommendation weights, thresholds and lane groups now come from an injectable `RecommendConfig` (`DEFAULT_RECOMMEND_CONFIG`), the 4th argument of `recommend` (replaces `compConfig`; B-027 fixed); hard-counter warnings reuse the counter reason `deltaPp`; exact score ordering; `reliability.games` renamed `reliability.nEff`; `CompNeedResult.reasons` removed (codes only); duplicate championIds per team deduplicated. New golden fixtures: `adc_bot_lane_full`, `mid_lane_1v1_matchup`, `jungle_counter_and_lane`, `support_lane_full_decides` (12 total). Baseline before this pass: 31 files, 523 tests. Final state: `pnpm check` green in CI (test on ubuntu-latest and windows-latest, lint, format). Follow-up review pass: `blindOpponentMinShare` config, exact pair running log-odds, `toReasonLevel` throws on invalid levels, zod-validated golden fixtures, golden fixtures `blind_partial_lane_support_known` and `adc_blind_pick` (14 total), new tests `packages/engine/src/recommend-role-conflicts.unit.test.ts` and `packages/shared/src/schemas/recommend-data.test.ts`.
 - State left: **DONE (T-023)**.
 - Next step: T-024 (Blind pick mode) or T-025 (Comp needs) or T-015 (Aggregate role probabilities in ETL).
 

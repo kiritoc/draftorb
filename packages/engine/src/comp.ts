@@ -35,8 +35,9 @@ function taggedAllies(
 }
 
 /**
- * Compute the team's missing composition needs based on the known ally champions
- * (excluding the candidate `c` itself). Returns the categories the team lacks.
+ * Compute the team's missing composition needs from the tagged board allies
+ * (the candidate is not part of `allyChampionIds`). Returns the categories the
+ * team lacks.
  */
 export function teamMissingNeeds(
   allyChampionIds: ReadonlyArray<ChampionId>,

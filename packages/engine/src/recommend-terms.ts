@@ -45,6 +45,8 @@ export function scorePairs(
   enemyIdx: Map<string, DataRow>,
   p0: number,
   config: RankWeightingConfig,
+  /** Running log-odds before the pair layer; `recommend` passes its baseline `x`. */
+  xStart: number = logit(p0, config.eps),
 ): PairScoreInfo {
   const ordered = slots
     .map((slot) => ({
@@ -56,7 +58,7 @@ export function scorePairs(
 
   const deltas: PairDelta[] = [];
   let sum = 0;
-  let xRunning = logit(p0, config.eps);
+  let xRunning = xStart;
 
   for (const { slot, influence } of ordered) {
     const idx = slot.side === 'ally' ? allyIdx : enemyIdx;
@@ -100,16 +102,10 @@ export function computeBlindSafety(
   enemyIdx: Map<string, DataRow>,
   p0: number,
   config: RankWeightingConfig,
-  roleProbThreshold: number = DEFAULT_RECOMMEND_CONFIG.roleProbThreshold,
+  minShare: number = DEFAULT_RECOMMEND_CONFIG.blindOpponentMinShare,
   worstCaseFactor: number = DEFAULT_RECOMMEND_CONFIG.blindWorstCaseFactor,
 ): number {
-  const opponents = blindOpponents(
-    unknownRoles,
-    excluded,
-    championIds,
-    roleProb,
-    roleProbThreshold,
-  );
+  const opponents = blindOpponents(unknownRoles, excluded, championIds, roleProb, minShare);
   return blindSafetyFromOpponents(c, opponents, enemyIdx, p0, config, worstCaseFactor);
 }
 
@@ -128,7 +124,7 @@ export function blindOpponents(
   excluded: ReadonlySet<ChampionId>,
   championIds: readonly ChampionId[],
   roleProb: ChampionRoleProbabilities,
-  roleProbThreshold: number = DEFAULT_RECOMMEND_CONFIG.roleProbThreshold,
+  minShare: number = DEFAULT_RECOMMEND_CONFIG.blindOpponentMinShare,
 ): ReadonlyMap<Role, readonly BlindOpponent[]> {
   const unique = [...new Set(championIds)];
   const out = new Map<Role, BlindOpponent[]>();
@@ -137,7 +133,7 @@ export function blindOpponents(
     for (const e of unique) {
       if (excluded.has(e)) continue;
       const share = roleProb[e]?.[role];
-      if (typeof share !== 'number' || share < roleProbThreshold) continue;
+      if (typeof share !== 'number' || share < minShare) continue;
       list.push({ championId: e, share });
     }
     out.set(role, list);

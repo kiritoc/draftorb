@@ -349,6 +349,11 @@ export const DEFAULT_LANE_GROUPS: Readonly<Record<Role, LaneGroup>> = Object.fre
 export interface RecommendConfig {
   /** Role probability threshold to enter the candidate set. */
   readonly roleProbThreshold: number;
+  /**
+   * Minimum roleProb share for a champion to count as a likely unseen blind
+   * opponent. Separate from `roleProbThreshold` so tuning one never moves the other.
+   */
+  readonly blindOpponentMinShare: number;
   /** W_comp: scale applied to the comp-need bonus. Prior. */
   readonly wComp: number;
   /** W_blind: scale applied to blindSafety(c). Prior. */
@@ -363,6 +368,7 @@ export interface RecommendConfig {
 
 export const DEFAULT_RECOMMEND_CONFIG: RecommendConfig = Object.freeze({
   roleProbThreshold: 0.05,
+  blindOpponentMinShare: 0.05,
   wComp: 1.0,
   wBlind: 1.0,
   blindWorstCaseFactor: 0.5,

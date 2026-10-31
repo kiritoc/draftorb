@@ -33,6 +33,6 @@
       { "championId": 2, "rank": 1, "reasons": [{ "type": "blind", "lowData": false }] },
       { "championId": 1, "rank": 2, "reasons": [{ "type": "blind", "lowData": false }] }
     ],
-    "insufficientData": []
+    "insufficientData": [{ "championId": 200 }]
   }
 }

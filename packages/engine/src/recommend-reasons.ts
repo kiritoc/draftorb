@@ -28,8 +28,12 @@ function isReasonLevel(n: number): n is ReasonLevel {
   return Number.isInteger(n) && n >= REASON_LEVEL_MIN && n <= REASON_LEVEL_MAX;
 }
 
-function toReasonLevel(levelNum: number): ReasonLevel | undefined {
-  return isReasonLevel(levelNum) ? levelNum : undefined;
+/** Fails loudly on an out-of-range level instead of silently dropping it. */
+export function toReasonLevel(levelNum: number): ReasonLevel {
+  if (!isReasonLevel(levelNum)) {
+    throw new RangeError(`invalid reason level ${levelNum}`);
+  }
+  return levelNum;
 }
 
 export interface ReasonInputs {
@@ -84,7 +88,7 @@ export function buildReasons(
   // Comp and blind reasons have no sample of their own and are never lowData.
   // Map their delta directly (no fabricated n_eff): positive levels cap at L1,
   // negative levels keep their full magnitude (SPECS §5).
-  const unsampledLevel = (d: number): ReasonLevel | undefined => {
+  const unsampledLevel = (d: number): ReasonLevel => {
     const level = mapDeltaPpToLevel(
       d,
       UNSAMPLED_LEVEL_NEFF,
@@ -147,6 +151,9 @@ export function toRecommendation(
       n: r.n, // n_eff is a real number (D-027)
       lowData: r.lowData,
     })),
+    // Scored candidates passed the baseline gate, so lowData is false whenever
+    // minGames > 0; it can only be true for an empty sample with minGames <= 0
+    // (isLowData treats n_eff = 0 as lowData). Kept for the SPECS §7 contract.
     reliability: {
       nEff: s.baselineNEff,
       lowData: isLowData(s.baselineNEff, config.minGames),

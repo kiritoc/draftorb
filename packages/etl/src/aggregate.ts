@@ -17,17 +17,34 @@ export interface RoleProbRow {
  * pairs are written). The table is cleared and rewritten, so the command is
  * idempotent and safe to re-run.
  */
-export function aggregateRoleProb(db: Database.Database): RoleProbRow[] {
-  const rows = db
-    .prepare(
-      `SELECT
-         champion_id AS championId,
-         role,
-         COUNT(*) AS games
-       FROM participants
-       GROUP BY champion_id, role`,
-    )
-    .all() as { championId: number; role: string; games: number }[];
+export function latestPatch(db: Database.Database): string | undefined {
+  const row = db
+    .prepare('SELECT patch FROM matches ORDER BY created_at DESC LIMIT 1')
+    .get() as { patch: string } | undefined;
+  return row?.patch;
+}
+
+/**
+ * Only participants from matches on `patch` are counted (defaults to the patch
+ * of the most recent stored match), so older patches never distort the result.
+ */
+export function aggregateRoleProb(db: Database.Database, patch?: string): RoleProbRow[] {
+  const targetPatch = patch ?? latestPatch(db);
+  const rows =
+    targetPatch === undefined
+      ? []
+      : (db
+          .prepare(
+            `SELECT
+               p.champion_id AS championId,
+               p.role AS role,
+               COUNT(*) AS games
+             FROM participants p
+             JOIN matches m ON m.match_id = p.match_id
+             WHERE m.patch = ?
+             GROUP BY p.champion_id, p.role`,
+          )
+          .all(targetPatch) as { championId: number; role: string; games: number }[]);
 
   const totals = new Map<number, number>();
   for (const row of rows) {

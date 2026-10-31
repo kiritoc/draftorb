@@ -148,6 +148,36 @@ describe('aggregateRoleProb', () => {
     });
   });
 
+  it('only counts participants from the target patch', async () => {
+    await withSeededDb(async (dbPath) => {
+      const db = openDb(dbPath);
+      try {
+        db.prepare(
+          `INSERT INTO matches (
+            match_id, platform, patch, queue_id, duration, created_at, avg_rank_score
+          ) VALUES ('old1', 'euw1', '16.20', 420, 1800, 0, 6.5)`,
+        ).run();
+        db.prepare(
+          `INSERT INTO participants (
+            match_id, puuid, team_id, champion_id, role, win, rank_score,
+            champion_games, mastery_points, is_expert, keystone, primary_style,
+            sub_style, perks_json, items_json, kills, deaths, assists
+          ) VALUES (
+            'old1', 'old', 100, 266, 'MID', 1, null, 0, NULL, NULL, 8439, 8400, 8300, '{}', '[]', 0, 0, 0
+          )`,
+        ).run();
+
+        const current = aggregateRoleProb(db);
+        expect(current.find((r) => r.championId === 266 && r.role === 'MID')).toBeUndefined();
+
+        const old = aggregateRoleProb(db, '16.20');
+        expect(old).toEqual([{ championId: 266, role: 'MID', games: 1, prob: 1 }]);
+      } finally {
+        db.close();
+      }
+    });
+  });
+
   it('leaves role_prob empty when there are no participants', async () => {
     await withSeededDb(async (dbPath) => {
       const db = openDb(dbPath);

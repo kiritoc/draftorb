@@ -12,7 +12,7 @@ function resolveDbPath(): string {
 }
 
 async function runAggregate(args: string[]): Promise<void> {
-  parsePositionals(args, 0, 'aggregate');
+  const [patch] = parsePositionals(args, 1, 'aggregate [patch]');
   const dbPath = resolveDbPath();
 
   if (!existsSync(dbPath)) {
@@ -22,7 +22,7 @@ async function runAggregate(args: string[]): Promise<void> {
 
   const db = new Database(dbPath);
   try {
-    const rows = aggregateRoleProb(db);
+    const rows = aggregateRoleProb(db, patch);
     console.log(`Aggregated role probabilities: ${rows.length} row(s) written to role_prob.`);
     for (const row of rows) {
       console.log(
@@ -36,7 +36,7 @@ async function runAggregate(args: string[]): Promise<void> {
 
 export const aggregateCommand: Command = {
   name: 'aggregate',
-  usage: 'aggregate',
+  usage: 'aggregate [patch]',
   description: 'Compute aggregated tables (role probabilities)',
   run: runAggregate,
 };

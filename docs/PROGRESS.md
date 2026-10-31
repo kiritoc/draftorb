@@ -45,7 +45,7 @@ Earlier handoff (kept for history): B-017 done (engine and shared `"types": []` 
 
 - Done:
   - **`packages/etl/src/aggregate.ts`** (new): `aggregateRoleProb(db)` computes `role_prob` rows from `participants` — per (champion, role): raw `games` count and `prob = games(champion, role) / sum_roles games(champion, role)`; sparse map (only observed pairs); probs sum to 1 per champion; idempotent (clears + rewrites in a transaction).
-  - **`packages/etl/src/commands/aggregate.ts`** (new): `pnpm etl aggregate` CLI command; prints "no database at <path>" and exits 0 when the DB is missing; read-only, never calls the Riot API.
+  - **`packages/etl/src/commands/aggregate.ts`** (new): `pnpm etl aggregate` CLI command; prints "no database at <path>" and exits 0 when the DB is missing; rewrites `role_prob` in the local DB but never calls the Riot API. Optional `[patch]` argument (defaults to the patch of the most recent stored match); only that patch's participants are counted.
   - **`packages/etl/src/cli.ts`** (edited): registered `aggregateCommand`; removed `aggregate` from `PLANNED_COMMANDS` in `packages/etl/src/commands/shared.ts`.
   - **`packages/etl/src/index.ts`** (edited): exports `aggregateRoleProb` and `RoleProbRow`.
   - **`packages/etl/src/aggregate.test.ts`** (new, 3 tests): probs sum to 1 per champion (Soraka 10/2 split → 0.833/0.167, Aatrox 4/4 → 1.0), idempotence, empty DB → empty `role_prob`.

@@ -50,6 +50,7 @@ Only read: AGENTS.md (golden rules), the ticket <T-xxx>, and the SPECS section i
 Use this to get a global "is the project heading in the right direction?" check from an AI that can hold the whole repo in context. The report it produces is self-contained: paste it as-is to a second AI that has no file access (plus the files listed in its Section 10).
 
 How to use:
+
 1. Provide the whole project first (concatenated files with their paths, or direct file access), then paste the prompt below.
 2. Replace `[N]` with the real number of files, so the AI can detect truncation.
 3. Paste the resulting report (and the files it lists in Section 10) to the second reviewer. Ask the reviewer to verify the `[FACT]` claims against the excerpts before giving an opinion.

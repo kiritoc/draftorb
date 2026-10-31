@@ -163,8 +163,7 @@ export function recommend(
     const x = baselineLogOdds(winsE, gamesE, config.k0, config.eps);
 
     // Determine if this is an off-role pool champion
-    const isOffRole =
-      candidateSet.poolSet.has(c) && isBelowRoleThreshold(c, myRole, data.roleProb);
+    const isOffRole = candidateSet.poolSet.has(c) && isBelowRoleThreshold(c, myRole, data.roleProb);
 
     // --- Layer 1: pairs ---
     const pairInfo = scorePairs(

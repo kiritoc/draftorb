@@ -118,7 +118,10 @@ describe('recommend: edge cases', () => {
       [3, 'DIAMOND', 5, 10, 10, 12],
     ];
     const roleProb = { '1': { MID: 1 }, '2': { MID: 1 }, '3': { MID: 1 } };
-    const result = recommend(makeInput({ userRole: 'MID' }), makeData([1, 2, 3], roleProb, { baselines }));
+    const result = recommend(
+      makeInput({ userRole: 'MID' }),
+      makeData([1, 2, 3], roleProb, { baselines }),
+    );
     const byId = (id: number) => result.insufficientData.find((i) => i.championId === id);
     expect(byId(1)).not.toHaveProperty('rawGames');
     expect(byId(2)).not.toHaveProperty('rawGames');
@@ -128,7 +131,10 @@ describe('recommend: edge cases', () => {
   it('emits hard-counter warnings as codes', () => {
     const roleProb = { '1': { SUPPORT: 1 }, '200': { SUPPORT: 1 } };
     const enemyPairs: EnemyPairTable = [[1, 200, 'SUPPORT', 'DIAMOND', 10, 50, 0.1]];
-    const input = makeInput({ userRole: 'SUPPORT', enemies: [FIXED_BOT[0] ?? { championId: 200 }] });
+    const input = makeInput({
+      userRole: 'SUPPORT',
+      enemies: [FIXED_BOT[0] ?? { championId: 200 }],
+    });
     const rec = recommend(input, makeData([1, 200], roleProb, { enemyPairs })).recommendations[0];
     expect(rec?.warnings).toEqual(['counteredBy:SUPPORT:200']);
   });

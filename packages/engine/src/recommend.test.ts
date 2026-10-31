@@ -1507,9 +1507,7 @@ describe('recommend: review gap coverage', () => {
       recommend(makeInput({ enemies: [enemy] }), data).recommendations.find(
         (r) => r.championId === 1,
       )?.warnings ?? [];
-    expect(warnings({ championId: 301, role: 'SUPPORT' })).toContain(
-      'counteredBy:SUPPORT:301',
-    );
+    expect(warnings({ championId: 301, role: 'SUPPORT' })).toContain('counteredBy:SUPPORT:301');
     expect(
       warnings({ championId: 300, role: 'TOP' }).some((w) => w.startsWith('counteredBy:')),
     ).toBe(false);
@@ -1691,8 +1689,10 @@ describe('recommend: review follow-up edge cases', () => {
     });
     const enemyPairs: EnemyPairTable = [[1, 202, 'ADC', 'DIAMOND', 10, 50, 0.1]];
     const data = makeData({ champions: [1, 200, 201, 202], roleProb, enemyPairs });
-    const rec = recommend(makeInput({ blindPick: true, enemies: fixedBot }), data)
-      .recommendations.find((r) => r.championId === 1);
+    const rec = recommend(
+      makeInput({ blindPick: true, enemies: fixedBot }),
+      data,
+    ).recommendations.find((r) => r.championId === 1);
     expect(rec?.reasons.some((r) => r.type === 'blind')).toBe(false);
   });
 

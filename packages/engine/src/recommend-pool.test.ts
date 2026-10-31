@@ -108,7 +108,12 @@ describe('buildPoolOutput', () => {
 
   it('ignores insufficientData entries for champions outside the pool', () => {
     const set = buildCandidateSet(input({ pool: [1] }), championIds, roleProb);
-    const out = buildPoolOutput(set, [scored(1, 0.5)], [{ championId: 2, nEff: 1 }], DEFAULT_CONFIG);
+    const out = buildPoolOutput(
+      set,
+      [scored(1, 0.5)],
+      [{ championId: 2, nEff: 1 }],
+      DEFAULT_CONFIG,
+    );
     expect(out.poolUnavailable).toEqual([]);
     expect(out.poolRecommendations.map((r) => r.championId)).toEqual([1]);
   });

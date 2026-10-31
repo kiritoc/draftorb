@@ -95,9 +95,7 @@ export function buildPoolOutput(
   const poolRecommendations: Recommendation[] = [];
   sorted.forEach((s, i) => {
     if (set.poolSet.has(s.championId)) {
-      poolRecommendations.push(
-        toRecommendation(s, i + 1, config, poolRecommendations.length + 1),
-      );
+      poolRecommendations.push(toRecommendation(s, i + 1, config, poolRecommendations.length + 1));
     }
   });
   return { poolRecommendations, poolUnavailable };

@@ -27,10 +27,13 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import type { ChampionTagsMap, Role } from '@draftorb/shared';
+import type { ChampionTagsMap, RankBucket, Role } from '@draftorb/shared';
 import {
   DEFAULT_CONFIG,
   DEFAULT_LANE_GROUPS,
+  RANK_BUCKET_ORDER,
+  bucketIndex,
+  expertWeight,
   getInfluence,
   recencyFactor,
   reliabilityFactor,
@@ -43,6 +46,7 @@ import { defaultManualDataDir } from './config/paths';
 export interface RuneCtxRow {
   championId: number;
   myRole: string;
+  rankBucket: RankBucket;
   contextKey: string;
   contextLevel: number;
   perksHash: string;
@@ -70,6 +74,7 @@ const ROLE_ORDER: readonly string[] = ['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT']
 interface RuneAccum {
   championId: number;
   myRole: string;
+  rankBucket: RankBucket;
   contextKey: string;
   contextLevel: number;
   perksHash: string;
@@ -87,6 +92,7 @@ interface MatchParticipant {
   puuid: string;
   teamId: number;
   championGames: number;
+  masteryPoints: number | null;
   perksJson: string;
 }
 
@@ -297,9 +303,11 @@ export function aggregateRunesByContext(
          p.puuid AS puuid,
          p.team_id AS teamId,
          p.champion_games AS championGames,
+         p.mastery_points AS masteryPoints,
          p.perks_json AS perksJson,
          m.patch AS patch,
-         m.rank_known_count AS rankKnownCount
+         m.rank_known_count AS rankKnownCount,
+         m.avg_rank_score AS rankScore
        FROM participants p
        JOIN matches m ON m.match_id = p.match_id
        ORDER BY p.match_id`,
@@ -312,10 +320,14 @@ export function aggregateRunesByContext(
     puuid: string;
     teamId: number;
     championGames: number;
+    masteryPoints: number | null;
     perksJson: string;
     patch: string;
     rankKnownCount: number;
+    rankScore: number;
   }>;
+
+  const maxBucket = RANK_BUCKET_ORDER.length - 1;
 
   // Group participants by match so lane context (needs all participants of a
   // match) can be resolved one match at a time.
@@ -324,6 +336,7 @@ export function aggregateRunesByContext(
         matchId: string;
         patch: string;
         rankKnownCount: number;
+        rankScore: number;
         participants: MatchParticipant[];
       }
     | undefined;
@@ -331,15 +344,27 @@ export function aggregateRunesByContext(
   const processMatch = (match: {
     patch: string;
     rankKnownCount: number;
+    rankScore: number;
     participants: MatchParticipant[];
   }): void => {
     const pIdx = patchIndex.get(match.patch);
     if (pIdx === undefined) return;
 
-    const w =
+    const baseW =
       recencyFactor(pIdx, currentPatchIndex, config.decay) *
       reliabilityFactor(match.rankKnownCount, config.unknownRankFactor);
-    if (w <= 0) return;
+    if (baseW <= 0) return;
+
+    // rank_score scale: integer part = RANK_BUCKET_ORDER index (6.5 = DIAMOND).
+    const gameBucketIdx = Math.max(0, Math.min(Math.floor(match.rankScore), maxBucket));
+    // expertWeight per user bucket (SPECS §3): 0 below the user bucket, bonus above.
+    const bucketWeights: Array<{ rankBucket: RankBucket; w: number }> = [];
+    for (const rankBucket of RANK_BUCKET_ORDER) {
+      const w =
+        baseW * expertWeight(gameBucketIdx, bucketIndex(rankBucket), config.alpha, config.wMax);
+      if (w > 0) bucketWeights.push({ rankBucket, w });
+    }
+    if (bucketWeights.length === 0) return;
 
     const teams = new Map<number, MatchParticipant[]>();
     for (const p of match.participants) {
@@ -353,7 +378,12 @@ export function aggregateRunesByContext(
 
     for (const me of match.participants) {
       const windowGames = me.championGames - (futureGames.get(`${me.puuid}|${me.championId}`) ?? 0);
-      if (windowGames < config.minChampGames) continue; // experts rule (SPECS §3, D-022)
+      // Experts rule (SPECS §3, D-022): enough in-window games, or the mastery
+      // fallback. Enrichment only fetches mastery for participants of the
+      // recommended role, so the fallback is role-limited by construction.
+      const masteryExpert =
+        me.masteryPoints !== null && me.masteryPoints >= config.minMasteryPoints;
+      if (windowGames < config.minChampGames && !masteryExpert) continue;
 
       const myTeam = teams.get(me.teamId)!;
       const allies = myTeam.filter((p) => p.puuid !== me.puuid);
@@ -371,7 +401,9 @@ export function aggregateRunesByContext(
       for (let n = slots.length; n >= 1; n--) {
         contexts.push({
           contextKey: `lane:${slots.slice(0, n).map(formatSlot).join(',')}`,
-          contextLevel: CONTEXT_LEVEL_LANE_BASE + (slots.length - n),
+          // Fixed 3-slot hierarchy: level depends only on n (3=1, 2=2, 1=3), so
+          // one-slot keys from TOP or partial lanes match one-slot back-offs.
+          contextLevel: Math.max(CONTEXT_LEVEL_LANE_BASE, CONTEXT_LEVEL_DAMAGE_MIX - n),
         });
       }
       contexts.push(
@@ -379,13 +411,17 @@ export function aggregateRunesByContext(
         { contextKey: 'global', contextLevel: CONTEXT_LEVEL_GLOBAL },
       );
 
-      for (const ctx of contexts) {
-        const key = `${me.championId}|${me.role}|${ctx.contextKey}|${phash}`;
+      const targets = bucketWeights.flatMap(({ rankBucket, w }) =>
+        contexts.map((ctx) => ({ rankBucket, w, ctx })),
+      );
+      for (const { rankBucket, w, ctx } of targets) {
+        const key = `${me.championId}|${me.role}|${rankBucket}|${ctx.contextKey}|${phash}`;
         const existing = accum.get(key);
         if (existing === undefined) {
           accum.set(key, {
             championId: me.championId,
             myRole: me.role,
+            rankBucket,
             contextKey: ctx.contextKey,
             contextLevel: ctx.contextLevel,
             perksHash: phash,
@@ -413,6 +449,7 @@ export function aggregateRunesByContext(
         matchId: row.matchId,
         patch: row.patch,
         rankKnownCount: row.rankKnownCount,
+        rankScore: row.rankScore,
         participants: [],
       };
     }
@@ -423,6 +460,7 @@ export function aggregateRunesByContext(
       puuid: row.puuid,
       teamId: row.teamId,
       championGames: row.championGames,
+      masteryPoints: row.masteryPoints,
       perksJson: row.perksJson,
     });
   }
@@ -433,6 +471,7 @@ export function aggregateRunesByContext(
     result.push({
       championId: entry.championId,
       myRole: entry.myRole,
+      rankBucket: entry.rankBucket,
       contextKey: entry.contextKey,
       contextLevel: entry.contextLevel,
       perksHash: entry.perksHash,
@@ -450,8 +489,9 @@ export function aggregateRunesByContext(
   const clear = db.prepare('DELETE FROM rune_ctx');
   const insert = db.prepare(
     `INSERT INTO rune_ctx (
-      champion_id, my_role, context_key, context_level, perks_hash, perks_json, wins_w, games_w, games_w2, players
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      champion_id, my_role, rank_bucket, context_key, context_level, perks_hash, perks_json,
+      wins_w, games_w, games_w2, players
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
   const write = db.transaction(() => {
     clear.run();
@@ -459,6 +499,7 @@ export function aggregateRunesByContext(
       insert.run(
         row.championId,
         row.myRole,
+        row.rankBucket,
         row.contextKey,
         row.contextLevel,
         row.perksHash,

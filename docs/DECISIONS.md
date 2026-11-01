@@ -294,6 +294,8 @@ Accepted by the owner on 2026-10-31. SPECS §5/§7 text derived from this decisi
 
 ### D-036 — Rune aggregation scope decisions (T-018 follow-ups) — PROPOSED
 
+- Update (T-018 review, 2026-11-01): both gaps are now implemented in T-018. Mastery fallback: a participant is an expert when in-window `champion_games >= minChampGames` OR cached `mastery_points >= minMasteryPoints` (enrichment only fetches mastery for the recommended role, so the fallback is role-limited). Rank weighting: migration 011 rebuilds `rune_ctx` with a `rank_bucket` column; each game contributes to every user bucket with `expertWeight(gameBucket, userBucket, alpha, wMax)` (0 below the user bucket). The text below is kept for history.
+
 - Context: T-018 implemented basic rune aggregation per SPECS §8.1 and D-022 but deferred two features described in D-022: (1) mastery fallback for participants of the user's role, and (2) rank-based expert weighting. The handoff notes these as intentional gaps.
 - Assumption (T-018): these features are intentionally deferred to a follow-up ticket after the baseline rune export (T-019) is complete. Mastery fallback requires a config option `minMasteryPoints` and user-role input to identify which participants are of the recommended role (mastery is fetched per (puuid, champion) and cached in `participants.mastery_points`). Rank-based expert weighting requires a migration to add a `rank_bucket` column to `rune_ctx` (matching the per-bucket tables like `baseline`) and a decision on whether to store separate rows per bucket or weight by bucket at aggregation time.
 - Alternatives:

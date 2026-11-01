@@ -184,7 +184,11 @@ export function requireRow(
   contextKey: string,
 ): RuneCtxRow {
   const row = rows.find(
-    (r) => r.championId === championId && r.myRole === myRole && r.contextKey === contextKey,
+    (r) =>
+      r.championId === championId &&
+      r.myRole === myRole &&
+      r.contextKey === contextKey &&
+      r.rankBucket === 'DIAMOND',
   );
   if (!row) {
     throw new Error(
@@ -202,7 +206,11 @@ export function requireFullLaneRow(
 ): RuneCtxRow {
   const lane = rows
     .filter(
-      (r) => r.championId === championId && r.myRole === myRole && r.contextKey.startsWith('lane:'),
+      (r) =>
+        r.championId === championId &&
+        r.myRole === myRole &&
+        r.rankBucket === 'DIAMOND' &&
+        r.contextKey.startsWith('lane:'),
     )
     .sort((a, b) => b.contextKey.split(',').length - a.contextKey.split(',').length)[0];
   if (!lane) throw new Error(`expected lane row for champion ${championId} role ${myRole}`);
@@ -267,7 +275,9 @@ describe('aggregateRunesByContext', () => {
   it('produces all three back-off context levels (lane, damagemix, global)', () => {
     withSeededDb([{ patch: PATCH_16_21 }], (db) => {
       const rows = aggregateRunesByContext(db);
-      const supportRows = rows.filter((r) => r.championId === 412 && r.myRole === 'SUPPORT');
+      const supportRows = rows.filter(
+        (r) => r.championId === 412 && r.myRole === 'SUPPORT' && r.rankBucket === 'DIAMOND',
+      );
       const keys = new Set(supportRows.map((r) => r.contextKey));
       // Lane back-off: 3, 2 and 1 slots (least influential dropped first).
       const laneKeys = [...keys].filter((k) => k.startsWith('lane:'));
@@ -277,6 +287,55 @@ describe('aggregateRunesByContext', () => {
       const levels = [...supportRows.map((r) => r.contextLevel)].sort((a, b) => a - b);
       // Lane levels increase as slots drop: 3-slot=1, 2-slot=2, 1-slot=3, then damage mix=4, global=5.
       expect(levels).toEqual([1, 2, 3, 4, 5]);
+    });
+  });
+
+  it('applies expertWeight per user rank bucket (below excluded, above boosted)', () => {
+    // Seeded games are DIAMOND (avg_rank_score 6.5, bucket index 6).
+    withSeededDb([{ patch: PATCH_16_21 }], (db) => {
+      const global = aggregateRunesByContext(db).filter(
+        (r) => r.championId === 412 && r.myRole === 'SUPPORT' && r.contextKey === 'global',
+      );
+      const byBucket = new Map(global.map((r) => [r.rankBucket, r.gamesW]));
+      expect(byBucket.has('MASTER_PLUS')).toBe(false);
+      expect(byBucket.get('DIAMOND')).toBeCloseTo(1);
+      expect(byBucket.get('EMERALD')).toBeCloseTo(1 + DEFAULT_CONFIG.alpha);
+      expect(byBucket.get('IRON')).toBeCloseTo(DEFAULT_CONFIG.wMax);
+    });
+  });
+
+  it('accepts mastery-qualified participants below minChampGames', () => {
+    withFreshDb((dbPath) => {
+      const db = openDb(dbPath);
+      try {
+        migrate(db);
+        seedMatch(db, {
+          participants: baseParticipants([{ teamId: 100, championId: 412, championGames: 5 }]),
+        });
+        const setMastery = db.prepare('UPDATE participants SET mastery_points = ? WHERE puuid = ?');
+        setMastery.run(DEFAULT_CONFIG.minMasteryPoints, 'p-me');
+        seedMatch(db, {
+          participants: baseParticipants([
+            { teamId: 100, championId: 412, championGames: 5, puuid: 'p-low' },
+          ]),
+        });
+        setMastery.run(DEFAULT_CONFIG.minMasteryPoints - 1, 'p-low');
+        const row = requireRow(aggregateRunesByContext(db), 412, 'SUPPORT', 'global');
+        expect(row.players).toBe(1);
+        expect(row.gamesW).toBeCloseTo(1);
+      } finally {
+        db.close();
+      }
+    });
+  });
+
+  it('assigns lane levels from slot count alone, for every role', () => {
+    withSeededDb([{ patch: PATCH_16_21 }], (db) => {
+      const lanes = aggregateRunesByContext(db).filter((r) => r.contextKey.startsWith('lane:'));
+      expect(lanes.length).toBeGreaterThan(0);
+      for (const r of lanes) {
+        expect(r.contextLevel).toBe(4 - r.contextKey.split(',').length);
+      }
     });
   });
 

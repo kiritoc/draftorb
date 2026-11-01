@@ -245,6 +245,7 @@ describe('migration runner', () => {
       '008_baseline_raw_games',
       '009_role_prob_decay_weights',
       '010_rune_ctx_context_level',
+      '011_rune_ctx_rank_bucket',
     ]);
     expect(migrate(db)).toEqual([]);
 
@@ -312,7 +313,7 @@ describe('migration runner', () => {
       ) VALUES (1, 'TOP', NULL, 10, 5, 'DIAMOND', 1, 1, 1)`,
     ).run();
     expect(db.prepare('SELECT COUNT(*) AS count FROM _migrations').get()).toMatchObject({
-      count: 10,
+      count: 11,
     });
     db.close();
   });
@@ -340,6 +341,7 @@ describe('migration runner', () => {
       '008_baseline_raw_games',
       '009_role_prob_decay_weights',
       '010_rune_ctx_context_level',
+      '011_rune_ctx_rank_bucket',
     ]);
     expect(migrate(db)).toEqual([]);
 

@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path';
 
 import { resolveRepoRoot } from '../config/paths';
 import { aggregateBaseline } from '../aggregate-baseline';
+import { aggregatePairTables } from '../aggregate-pairs';
 import { aggregateRoleProb, PATCH_PATTERN } from '../aggregate';
 import { UsageError } from '../cli-args';
 import { parsePositionals, type Command } from './shared';
@@ -50,6 +51,22 @@ async function runAggregate(args: string[]): Promise<void> {
       const champions = new Set(baselineRows.map((row) => row.championId)).size;
       console.log(
         `Aggregated baselines: ${baselineRows.length} row(s) for ${champions} champion(s) written to baseline.`,
+      );
+    }
+
+    const pairTables = aggregatePairTables(db, { patch });
+    const pairCount =
+      pairTables.pairAlly.length +
+      pairTables.pairEnemy.length +
+      pairTables.laneVs.length +
+      pairTables.laneFull.length;
+    if (pairCount === 0) {
+      console.log(
+        `No contributing games${patch === undefined ? '' : ` up to patch ${patch}`}; pair tables left unchanged.`,
+      );
+    } else {
+      console.log(
+        `Aggregated pair tables: ${pairTables.pairAlly.length} ally, ${pairTables.pairEnemy.length} enemy, ${pairTables.laneVs.length} lane_vs, ${pairTables.laneFull.length} lane_full row(s) written.`,
       );
     }
   } finally {

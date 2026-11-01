@@ -89,23 +89,78 @@ interface MatchParticipant {
   perksJson: string;
 }
 
-/** Canonical damage mix of a team's champions. */
-function damageMix(championIds: number[], tags: Map<number, string>): 'AD' | 'AP' | 'mixed' {
+interface LaneSlot {
+  championId: number;
+  side: 'a' | 'e';
+  role: string;
+}
+
+/**
+ * Canonical damage mix of a team's champions. Untagged champions carry no
+ * signal and are ignored; with no tagged champion at all the mix is `mixed`.
+ */
+export function damageMix(
+  championIds: number[],
+  tags: Map<number, string>,
+): 'AD' | 'AP' | 'mixed' {
   let hasAd = false;
   let hasAp = false;
   for (const id of championIds) {
     const dmg = tags.get(id);
     if (dmg === 'AD') hasAd = true;
     else if (dmg === 'AP') hasAp = true;
-    // Unknown / other damage types count as mixed signal.
-    else {
+    else if (dmg !== undefined) {
+      // Explicit hybrid / true-damage tags count for both sides.
       hasAd = true;
       hasAp = true;
     }
   }
-  if (hasAd && hasAp) return 'mixed';
-  if (hasAd) return 'AD';
-  return 'AP';
+  if (hasAd && !hasAp) return 'AD';
+  if (hasAp && !hasAd) return 'AP';
+  return 'mixed';
+}
+
+interface RiotPerksLike {
+  statPerks?: { defense?: number; flex?: number; offense?: number };
+  styles?: Array<{
+    description?: string;
+    style?: number;
+    selections?: Array<{ perk?: number }>;
+  }>;
+}
+
+/**
+ * Canonical rune page: keeps only selected style / perk / shard ids and drops
+ * match-specific `var1..var3` statistics, so identical pages share one hash.
+ * Non Riot-shaped JSON is returned unchanged.
+ */
+export function canonicalPerksJson(perksJson: string): string {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(perksJson);
+  } catch {
+    return perksJson;
+  }
+  if (typeof parsed !== 'object' || parsed === null) return perksJson;
+  const perks = parsed as RiotPerksLike;
+  if (!Array.isArray(perks.styles)) return perksJson;
+  const stat = perks.statPerks ?? {};
+  return JSON.stringify({
+    statPerks: {
+      defense: stat.defense ?? null,
+      flex: stat.flex ?? null,
+      offense: stat.offense ?? null,
+    },
+    styles: perks.styles.map((s) => ({
+      description: s.description ?? null,
+      style: s.style ?? null,
+      selections: (s.selections ?? []).map((sel) => ({ perk: sel.perk ?? null })),
+    })),
+  });
+}
+
+function formatSlot(slot: LaneSlot): string {
+  return `${slot.side}.${slot.role}:${slot.championId}`;
 }
 
 function loadChampionTags(): Map<number, string> {
@@ -136,10 +191,12 @@ function contextSlots(
   allies: MatchParticipant[],
   enemies: MatchParticipant[],
   config: RankWeightingConfig,
-): number[] {
+): LaneSlot[] {
   const laneGroup = DEFAULT_LANE_GROUPS[me.role as Role];
+  if (laneGroup === undefined) return [];
   const candidates: Array<{
     championId: number;
+    role: string;
     influence: number;
     side: number;
     roleOrder: number;
@@ -150,6 +207,7 @@ function contextSlots(
     if (!ally) continue;
     candidates.push({
       championId: ally.championId,
+      role,
       influence: getInfluence(me.role as Role, 'ally', role, 'lane', config),
       side: 0,
       roleOrder: ROLE_ORDER.indexOf(role),
@@ -160,6 +218,7 @@ function contextSlots(
     if (!enemy) continue;
     candidates.push({
       championId: enemy.championId,
+      role,
       influence: getInfluence(me.role as Role, 'enemy', role, 'lane', config),
       side: 1,
       roleOrder: ROLE_ORDER.indexOf(role),
@@ -172,10 +231,13 @@ function contextSlots(
     return a.roleOrder - b.roleOrder;
   });
 
-  return candidates
-    .slice(0, config.contextSlots)
-    .map((c) => c.championId)
-    .sort((a, b) => a - b);
+  // Keep influence order (most influential first) and side/role in the key so
+  // swapped ally/enemy matchups never share a row.
+  return candidates.slice(0, config.contextSlots).map((c) => ({
+    championId: c.championId,
+    side: c.side === 0 ? 'a' : 'e',
+    role: c.role,
+  }));
 }
 
 export function aggregateRunesByContext(
@@ -204,6 +266,25 @@ export function aggregateRunesByContext(
   const currentPatchIndex = patches.length - 1;
 
   const tags = loadChampionTags();
+
+  // Experts must be judged within the patch window (D-022): `champion_games`
+  // counts the whole DB, so subtract games newer than the snapshot.
+  const futureGames = new Map<string, number>();
+  if (snapshotPatch !== undefined) {
+    const counts = db
+      .prepare(
+        `SELECT p.puuid AS puuid, p.champion_id AS championId, m.patch AS patch, COUNT(*) AS games
+         FROM participants p
+         JOIN matches m ON m.match_id = p.match_id
+         GROUP BY p.puuid, p.champion_id, m.patch`,
+      )
+      .all() as Array<{ puuid: string; championId: number; patch: string; games: number }>;
+    for (const c of counts) {
+      if (comparePatches(c.patch, snapshotPatch) <= 0) continue;
+      const key = `${c.puuid}|${c.championId}`;
+      futureGames.set(key, (futureGames.get(key) ?? 0) + c.games);
+    }
+  }
 
   // Key: `${championId}|${myRole}|${contextKey}|${perksHash}`
   const accum = new Map<string, RuneAccum>();
@@ -273,22 +354,32 @@ export function aggregateRunesByContext(
     }
 
     for (const me of match.participants) {
-      if (me.championGames < config.minChampGames) continue; // experts rule (SPECS §3)
+      const windowGames =
+        me.championGames - (futureGames.get(`${me.puuid}|${me.championId}`) ?? 0);
+      if (windowGames < config.minChampGames) continue; // experts rule (SPECS §3, D-022)
 
       const myTeam = teams.get(me.teamId)!;
       const allies = myTeam.filter((p) => p.puuid !== me.puuid);
       const enemies = [...teams.values()].filter((t) => t !== myTeam).flat();
 
-      const ctxIds = contextSlots(me, allies, enemies, config);
+      const slots = contextSlots(me, allies, enemies, config);
       const enemyChampIds = enemies.map((e) => e.championId);
       const mix = damageMix(enemyChampIds, tags);
-      const phash = perksHash(me.perksJson);
+      const canonical = canonicalPerksJson(me.perksJson);
+      const phash = perksHash(canonical);
 
-      const contexts: Array<{ contextKey: string; contextLevel: number }> = [
-        { contextKey: `lane:${ctxIds.join(',')}`, contextLevel: CONTEXT_LEVEL_LANE },
+      // Lane back-off (SPECS §8.1): drop the least-influential slot each step.
+      const contexts: Array<{ contextKey: string; contextLevel: number }> = [];
+      for (let n = slots.length; n >= 1; n--) {
+        contexts.push({
+          contextKey: `lane:${slots.slice(0, n).map(formatSlot).join(',')}`,
+          contextLevel: CONTEXT_LEVEL_LANE,
+        });
+      }
+      contexts.push(
         { contextKey: `damagemix:${mix}`, contextLevel: CONTEXT_LEVEL_DAMAGE_MIX },
         { contextKey: 'global', contextLevel: CONTEXT_LEVEL_GLOBAL },
-      ];
+      );
 
       for (const ctx of contexts) {
         const key = `${me.championId}|${me.role}|${ctx.contextKey}|${phash}`;
@@ -300,7 +391,7 @@ export function aggregateRunesByContext(
             contextKey: ctx.contextKey,
             contextLevel: ctx.contextLevel,
             perksHash: phash,
-            perksJson: me.perksJson,
+            perksJson: canonical,
             winsW: w * me.win,
             gamesW: w,
             gamesW2: w * w,

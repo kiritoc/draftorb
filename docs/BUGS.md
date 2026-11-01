@@ -16,6 +16,8 @@ B-026 appears twice: OPEN (blindSafety approximates pickShare with roleProb, lin
 
 T-023 review (2026-10-30) fixed in-PR: blind safety firing on every 1v1 role, blind safety re-scoring known enemies, unknown pool ids being scored, role-inference failure dropping a whole team, raw-winrate hard-counter warning, missing `W_comp`/`W_blind`, engine magic numbers outside `config.ts`, missing level 0 for lowData reasons (`reasonLevelSchema` now includes 0, SPECS §7), board-picked pool champions now reported as `poolUnavailable` `picked`, hard-counter warnings emitted as codes (`counteredBy:<ROLE>:<id>`), `rawGames` optional (omitted when unknown instead of a fake 0).
 
+T-017 review (2026-11-01) fixed in-PR: `aggregatePairTables` buffered every stored match's participants before aggregating; it now streams rows ordered by `match_id` and aggregates each match as soon as it is complete. A ten-player match test was added. No other new bugs were identified during T-017.
+
 T-015 review (2026-10-31) fixed in-PR: `role_prob` mixed participants from all stored patches; aggregation now filters by a target patch (default: the patch of the most recent match). No other new bugs were identified during T-015.
 
 No new bugs were identified during the D-016 formula confirmation; player discovery remains within the current ETL scope.

@@ -44,10 +44,10 @@ Earlier handoff (kept for history): B-017 done (engine and shared `"types": []` 
 - Done:
   - **`packages/etl/src/aggregate-pairs.ts`** (new): `aggregatePairTables(db, { patch?, config? })` computes `pair_ally`, `pair_enemy`, `lane_vs` and `lane_full` rows per (champion, my_role, rank bucket) using the engine rank kernel (`combinedGameWeight`). Lane keys follow `laneGroup(my_role).enemies` order (SUPPORT: `[SUPPORT, ADC]`, ADC: `[ADC, SUPPORT]`; `opp2_id` NULL for 1v1 TOP/MID/JUNGLE) and `partner_id = laneGroup(my_role).allies[0]` (DATA_MODEL.md). Tables are cleared and rewritten in one transaction (idempotent); left unchanged when nothing contributes. Optional `[patch]` snapshot excludes newer matches.
   - **`packages/etl/src/aggregate-pairs-helpers.ts`** (new): `seedMatches` multi-participant match seeder, `requirePairRow`/`requireLaneVsRow`/`requireLaneFullRow` assertions, `withFreshDb`/`withSeededDb` DB fixtures.
-  - **`packages/etl/src/aggregate-pairs.test.ts`** (new, 6 tests): support bot lane pairs + lane_vs + lane_full for both SUPPORT and ADC perspectives (lane id order asserted), TOP 1v1 (`lane_vs` opp2 NULL, `lane_full` empty), recency decay across patches, idempotence, empty DB leaves tables unchanged, snapshot patch excludes newer matches, missing lane champion skips lanes but keeps pairs.
+  - **`packages/etl/src/aggregate-pairs.test.ts`** (new, 8 tests): support bot lane pairs + lane_vs + lane_full for both SUPPORT and ADC perspectives (lane id order asserted), TOP 1v1 (`lane_vs` opp2 NULL, `lane_full` empty), recency decay across patches, idempotence, empty DB leaves tables unchanged, snapshot patch excludes newer matches, missing lane champion skips lanes but keeps pairs.
   - **`packages/etl/src/commands/aggregate.ts`** (edited): `pnpm etl aggregate` now also writes pair tables and prints a summary.
   - **`packages/etl/src/index.ts`** (edited): exports `aggregatePairTables`, `PairRow`, `LaneVsRow`, `LaneFullRow`, `PairTableResult`.
-- Tests: `pnpm check` green (typecheck, lint: 0 errors, format: 0 errors; 640 tests across 46 files).
+- Tests: `pnpm check` green (typecheck, lint: 0 errors, format: 0 errors; 641 tests across 46 files).
 - State left: **DONE (T-017)**. Next ETL ticket: T-018 (Aggregate runes by context, depends on T-014,T-011.b,T-020).
 
 ### 2026-11-01 — Ticket T-015.c (Decay-weighted role_prob evidence)

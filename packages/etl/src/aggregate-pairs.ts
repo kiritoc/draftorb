@@ -271,32 +271,7 @@ export function aggregatePairTables(
     rankScore: number;
   }>;
 
-  const matches = new Map<string, ToyMatch>();
-  for (const row of rows) {
-    const pIdx = patchIndex.get(row.patch);
-    if (pIdx === undefined) continue;
-    let match = matches.get(row.matchId);
-    if (match === undefined) {
-      match = {
-        matchId: row.matchId,
-        patch: row.patch,
-        rankKnownCount: row.rankKnownCount,
-        rankScore: row.rankScore,
-        participants: [],
-      };
-      matches.set(row.matchId, match);
-    }
-    match.participants.push({
-      championId: row.championId,
-      role: row.role,
-      win: row.win,
-      teamId: row.teamId,
-      puuid: row.puuid,
-      rankScore: row.rankScore,
-    });
-  }
-
-  for (const match of matches.values()) {
+  const processMatch = (match: ToyMatch): void => {
     const pIdx = patchIndex.get(match.patch);
     // pIdx is guaranteed defined (we filtered while streaming).
     const recencyBase = pIdx === undefined ? 0 : pIdx;
@@ -372,7 +347,33 @@ export function aggregatePairTables(
         }
       }
     }
+  };
+
+  // Rows are ordered by match_id: aggregate each match as soon as it is
+  // complete so only one match's participants are held in memory.
+  let current: ToyMatch | undefined;
+  for (const row of rows) {
+    if (!patchIndex.has(row.patch)) continue;
+    if (current === undefined || current.matchId !== row.matchId) {
+      if (current !== undefined) processMatch(current);
+      current = {
+        matchId: row.matchId,
+        patch: row.patch,
+        rankKnownCount: row.rankKnownCount,
+        rankScore: row.rankScore,
+        participants: [],
+      };
+    }
+    current.participants.push({
+      championId: row.championId,
+      role: row.role,
+      win: row.win,
+      teamId: row.teamId,
+      puuid: row.puuid,
+      rankScore: row.rankScore,
+    });
   }
+  if (current !== undefined) processMatch(current);
 
   const toArray = <T>(map: Map<string, T>): T[] => [...map.values()];
 

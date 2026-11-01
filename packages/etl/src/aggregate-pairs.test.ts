@@ -99,6 +99,34 @@ describe('aggregatePairTables', () => {
     );
   });
 
+  it('full ten-player match: 4 allies and 5 enemies per participant', () => {
+    const roles = ['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT'];
+    const participants = [100, 200].flatMap((teamId, t) =>
+      roles.map((role, i) => ({
+        championId: (t + 1) * 100 + i,
+        role,
+        win: teamId === 100 ? 1 : 0,
+        teamId,
+        puuid: `p${teamId}${i}`,
+      })),
+    );
+    withSeededDb([{ patch: '16.21', rankKnownCount: 2, participants }], (db) => {
+      const result = aggregatePairTables(db);
+      const diamondAlly = result.pairAlly.filter((r) => r.rankBucket === 'DIAMOND');
+      const diamondEnemy = result.pairEnemy.filter((r) => r.rankBucket === 'DIAMOND');
+      expect(diamondAlly).toHaveLength(10 * 4);
+      expect(diamondEnemy).toHaveLength(10 * 5);
+      const diamondLaneVs = result.laneVs.filter((r) => r.rankBucket === 'DIAMOND');
+      const diamondLaneFull = result.laneFull.filter((r) => r.rankBucket === 'DIAMOND');
+      expect(diamondLaneVs).toHaveLength(10);
+      expect(diamondLaneFull).toHaveLength(4);
+      expect(requireLaneVsRow(result.laneVs, 104, 'SUPPORT', 204, 203, 'DIAMOND').games).toBe(1);
+      expect(requireLaneVsRow(result.laneVs, 202, 'MID', 102, null, 'DIAMOND').winsW).toBeCloseTo(
+        0,
+      );
+    });
+  });
+
   it('TOP lane is 1v1: lane_vs has opp2 null, lane_full is empty', () => {
     withSeededDb(
       [

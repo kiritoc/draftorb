@@ -8,28 +8,28 @@
 
 ## Epic status
 
-| Epic           | Status      | Notes                                                                                                                                    |
-| -------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b DONE                                                                                                          |
-| E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e, T-014, T-015, T-015.b, T-016, T-017 DONE; T-015.c, T-018..T-019 TODO |
-| E2 Engine      | IN PROGRESS | T-020 DONE; T-021 DONE; T-022 DONE; T-023 DONE                                                                                           |
-| E3 Web MVP     | NOT STARTED |                                                                                                                                          |
-| E4 Runes       | NOT STARTED |                                                                                                                                          |
-| E5 Items       | NOT STARTED |                                                                                                                                          |
-| E6 Live        | NOT STARTED |                                                                                                                                          |
-| E7 Vision      | NOT STARTED |                                                                                                                                          |
+| Epic           | Status      | Notes                                                                                                                           |
+| -------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b DONE                                                                                                 |
+| E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e, T-014, T-015, T-015.b, T-016, T-017, T-018 DONE; T-019 TODO |
+| E2 Engine      | IN PROGRESS | T-020 DONE; T-021 DONE; T-022 DONE; T-023 DONE                                                                                  |
+| E3 Web MVP     | NOT STARTED |                                                                                                                                 |
+| E4 Runes       | NOT STARTED |                                                                                                                                 |
+| E5 Items       | NOT STARTED |                                                                                                                                 |
+| E6 Live        | NOT STARTED |                                                                                                                                 |
+| E7 Vision      | NOT STARTED |                                                                                                                                 |
 
 ## Data collection status
 
 - Riot key: not recorded (development keys expire every 24 h).
 - Games collected: 0 (no SQLite database exists under `data/` in this workspace) | Patch: 16.21 (static data imported: champions, items, runes).
-- Last aggregation: role_prob (T-015) and baselines (T-016) implemented; pairs/lane (T-017) implemented; runes/builds (T-018) and export (T-019) not started.
+- Last aggregation: role_prob (T-015) and baselines (T-016) implemented; pairs/lane (T-017) and runes (T-018) implemented; export (T-019) not started.
 
 ## Next recommended ticket
 
 T-023 is **DONE** (Role-generic recommendation engine with explanations, layered shrinkage scoring, pool contract D-024, composition needs, golden test runner and golden fixtures including non-support TOP 1v1 lane group).
 Next engine tickets: **T-024** (Blind pick mode), **T-025** (Comp needs full model), **T-026** (Golden test suite 20+ scenarios) or **T-027.a** (Draft backtest harness).
-Next ETL ticket: **T-018** (Aggregate runes by context, depends on T-014,T-011.b,T-020).
+Next ETL ticket: **T-019** (Export versioned JSON + manifest, depends on T-015..T-018,T-002.b).
 
 Earlier handoff (kept for history): B-017 done (engine and shared `"types": []` plus ESLint purity guardrails in `eslint.config.mjs` with automated regression tests; T-020's engine-purity prerequisite is fully satisfied — the residual `tsc` gap caused by test files importing `vitest` is logged as B-021 and not fixed). B-022 (all Node built-ins blocked), B-023 (Date() call blocked) and B-024 (regression tests) also fixed. B-011 fixed (spec + T-002.b scope; implementation in T-002.b). Fix B-012 done. T-013.e done (typed schema-less `request()`, timeout/invalid-JSON regression tests, CLI + matches refactor below 300 lines; `pnpm check` 184 tests). **T-013.d done** (`pnpm etl status`, read-only parameterized counts and progress, empty & seeded database tests, CLI handling when database does not exist; `pnpm check` 153 tests). **D-008, D-011, D-017, D-018, D-020, D-021, D-022, D-023 accepted (2026-10-29); D-028 (formerly D-025, @types/... devDeps) renumbered and accepted.** SPECS §5/§8 are now normative. **T-002.b DONE** (shared schema parity); `packages/shared/src/index.ts` split by domain into `schemas/*.ts` (10 modules); rankBucketSchema (8 buckets), sparse role-prob with sum-to-1, Reason.with as ChampionId[], Reason.lowData, n_eff non-integer, lane reason type, DraftResult with insufficientData/poolRecommendations/poolUnavailable, championPoolSchema, manifest roles, all role-keyed export tuple schemas with games_w2, rune/build export schemas; 184 tests pass. **T-020 DONE** (rank weighting module: config + kernel + n_eff + equivalent-counts + influence matrix; 49 engine tests). **T-021 DONE** (Role inference — `inferRoles` with brute-force permutation over 120 assignments, viability check for missing champions, confidence = best/total probability mass; 15 tests). **T-022 DONE** (shrinkage + level mapping). T-014 (Participant enrichment) remains **data-blocked** (no Riot key, 0 games collected, no SQLite database under `data/`). **T-014 implementation DONE** (2026-10-29): enrichment module, mastery endpoint, 22 tests.
 
@@ -49,6 +49,17 @@ Earlier handoff (kept for history): B-017 done (engine and shared `"types": []` 
   - **`packages/etl/src/index.ts`** (edited): exports `aggregatePairTables`, `PairRow`, `LaneVsRow`, `LaneFullRow`, `PairTableResult`.
 - Tests: `pnpm check` green (typecheck, lint: 0 errors, format: 0 errors; 641 tests across 46 files).
 - State left: **DONE (T-017)**. Next ETL ticket: T-018 (Aggregate runes by context, depends on T-014,T-011.b,T-020).
+
+### 2026-11-01 — Ticket T-018 (Aggregate runes by context)
+
+- Done:
+  - **`packages/etl/src/aggregate-runes.ts`** (new): `aggregateRunesByContext(db, { patch?, config? })` computes `rune_ctx` rows per (champion, my_role, context_key, perks_hash) using recency × reliability weighting (SPECS §3) and the experts rule (`champion_games >= minChampGames`, D-022). Each expert participant's rune page contributes to three back-off context levels (most specific first, SPECS §8.1): `lane:<ctx champ ids>` (top `contextSlots` lane-context champions by descending lane-phase influence, ties ally-before-enemy then role order), `damagemix:<AD|AP|mixed>` (enemy-team damage mix from `data/manual/champion-tags.json`), and `global`. Accumulates `wins_w`, `games_w`, `games_w2` and distinct-player count `players`. Idempotent (clear + rewrite in one transaction); left unchanged when nothing contributes. Optional `[patch]` snapshot excludes newer matches; malformed patch throws before touching the table.
+  - **`packages/etl/src/aggregate-runes.test.ts`** (new, 10 tests): lane-context row for a support game, all three back-off levels present, expert filter excludes below-`minChampGames`, recency decay across patches, unknown-rank down-weight, idempotent reruns, snapshot predating all matches preserves rows, snapshot excludes newer matches, malformed patch preserves rows, empty DB leaves table empty.
+  - **`packages/etl/src/commands/aggregate.ts`** (edited): `pnpm etl aggregate` now also writes rune contexts and prints a summary.
+  - **`packages/etl/src/commands/aggregate.test.ts`** (edited): rune_ctx rows written and reported when an expert participant exists.
+  - **`packages/etl/src/index.ts`** (edited): exports `aggregateRunesByContext` and `RuneCtxRow`.
+- Tests: `pnpm check` green (typecheck, lint: 0 errors, format: 0 errors; 652 tests across 47 files).
+- State left: **DONE (T-018)**. Next ETL ticket: T-019 (Export versioned JSON + manifest).
 
 ### 2026-11-01 — Ticket T-015.c (Decay-weighted role_prob evidence)
 

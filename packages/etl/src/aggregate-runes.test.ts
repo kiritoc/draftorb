@@ -1,0 +1,373 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
+
+import { DEFAULT_CONFIG, nEff } from '@draftorb/engine';
+
+import { openDb, migrate } from './db';
+import { aggregateRunesByContext, type RuneCtxRow } from './aggregate-runes';
+
+const PATCH_16_20 = '16.20';
+const PATCH_16_21 = '16.21';
+
+interface Participant {
+  teamId: number;
+  championId: number;
+  role: string;
+  win: number;
+  puuid: string;
+  championGames: number;
+  perksJson: string;
+}
+
+// Me = Soraka (412) SUPPORT on team 100, allied ADC = Miss Fortune (21),
+// enemy support = Maokai (266), enemy ADC = Ashe (22).
+const baseParticipants = (overrides: Partial<Participant>[] = []): Participant[] => {
+  const defaults: Record<string, Participant> = {
+    '100:412': {
+      teamId: 100,
+      championId: 412,
+      role: 'SUPPORT',
+      win: 1,
+      puuid: 'p-me',
+      championGames: 100,
+      perksJson: '{"keystone":8439,"primary":8400,"sub":8300}',
+    },
+    '100:21': {
+      teamId: 100,
+      championId: 21,
+      role: 'ADC',
+      win: 1,
+      puuid: 'p-adc',
+      championGames: 100,
+      perksJson: '{"keystone":8112,"primary":8000,"sub":8100}',
+    },
+    '100:14': {
+      teamId: 100,
+      championId: 14,
+      role: 'TOP',
+      win: 1,
+      puuid: 'p-top',
+      championGames: 100,
+      perksJson: '{"keystone":8439,"primary":8400,"sub":8300}',
+    },
+    '100:64': {
+      teamId: 100,
+      championId: 64,
+      role: 'JUNGLE',
+      win: 1,
+      puuid: 'p-jgl',
+      championGames: 100,
+      perksJson: '{"keystone":8112,"primary":8000,"sub":8100}',
+    },
+    '100:157': {
+      teamId: 100,
+      championId: 157,
+      role: 'MID',
+      win: 1,
+      puuid: 'p-mid',
+      championGames: 100,
+      perksJson: '{"keystone":8439,"primary":8400,"sub":8300}',
+    },
+    '200:266': {
+      teamId: 200,
+      championId: 266,
+      role: 'SUPPORT',
+      win: 0,
+      puuid: 'p-ensup',
+      championGames: 100,
+      perksJson: '{"keystone":8112,"primary":8000,"sub":8100}',
+    },
+    '200:22': {
+      teamId: 200,
+      championId: 22,
+      role: 'ADC',
+      win: 0,
+      puuid: 'p-enadc',
+      championGames: 100,
+      perksJson: '{"keystone":8439,"primary":8400,"sub":8300}',
+    },
+    '200:80': {
+      teamId: 200,
+      championId: 80,
+      role: 'TOP',
+      win: 0,
+      puuid: 'p-entop',
+      championGames: 100,
+      perksJson: '{"keystone":8112,"primary":8000,"sub":8100}',
+    },
+    '200:59': {
+      teamId: 200,
+      championId: 59,
+      role: 'JUNGLE',
+      win: 0,
+      puuid: 'p-enjgl',
+      championGames: 100,
+      perksJson: '{"keystone":8439,"primary":8400,"sub":8300}',
+    },
+    '200:12': {
+      teamId: 200,
+      championId: 12,
+      role: 'MID',
+      win: 0,
+      puuid: 'p-enmid',
+      championGames: 100,
+      perksJson: '{"keystone":8112,"primary":8000,"sub":8100}',
+    },
+  };
+  return Object.values(
+    Object.fromEntries([
+      ...Object.entries(defaults),
+      ...overrides.map((o) => [
+        `${o.teamId}:${o.championId}`,
+        { ...defaults[`${o.teamId}:${o.championId}`], ...o } as Participant,
+      ]),
+    ]),
+  );
+};
+
+let matchIndex = 0;
+
+export function seedMatch(
+  db: ReturnType<typeof openDb>,
+  {
+    patch = PATCH_16_21,
+    rankKnownCount = 2,
+    avgRankScore = 6.5,
+    participants = baseParticipants(),
+  }: {
+    patch?: string;
+    rankKnownCount?: number;
+    avgRankScore?: number;
+    participants?: Participant[];
+  } = {},
+): string {
+  const matchId = `m${++matchIndex}`;
+  db.prepare(
+    `INSERT INTO matches (
+      match_id, platform, patch, queue_id, duration, created_at, avg_rank_score, rank_known_count
+    ) VALUES (?, 'euw1', ?, 420, 1800, 1, ?, ?)`,
+  ).run(matchId, patch, avgRankScore, rankKnownCount);
+  const insertParticipant = db.prepare(
+    `INSERT INTO participants (
+      match_id, puuid, team_id, champion_id, role, win, rank_score,
+      champion_games, mastery_points, is_expert, keystone, primary_style,
+      sub_style, perks_json, items_json, kills, deaths, assists
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, 8439, 8400, 8300, ?, '[]', 0, 0, 0)`,
+  );
+  for (const p of participants) {
+    insertParticipant.run(
+      matchId,
+      p.puuid,
+      p.teamId,
+      p.championId,
+      p.role,
+      p.win,
+      avgRankScore,
+      p.championGames,
+      p.perksJson,
+    );
+  }
+  return matchId;
+}
+
+export function requireRow(
+  rows: RuneCtxRow[],
+  championId: number,
+  myRole: string,
+  contextKey: string,
+): RuneCtxRow {
+  const row = rows.find(
+    (r) => r.championId === championId && r.myRole === myRole && r.contextKey === contextKey,
+  );
+  if (!row) {
+    throw new Error(
+      `expected rune_ctx row for champion ${championId} role ${myRole} context ${contextKey}`,
+    );
+  }
+  return row;
+}
+
+export function withFreshDb(run: (dbPath: string) => void): void {
+  const directory = mkdtempSync(join(tmpdir(), 'draftorb-runes-'));
+  const dbPath = join(directory, 'test.sqlite');
+  const originalDbPath = process.env.DRAFTORB_DB_PATH;
+  process.env.DRAFTORB_DB_PATH = dbPath;
+  try {
+    run(dbPath);
+  } finally {
+    if (originalDbPath === undefined) {
+      delete process.env.DRAFTORB_DB_PATH;
+    } else {
+      process.env.DRAFTORB_DB_PATH = originalDbPath;
+    }
+    rmSync(directory, { recursive: true, force: true });
+  }
+}
+
+export function withSeededDb(
+  patches: Array<{ patch: string; rankKnownCount?: number }>,
+  run: (db: ReturnType<typeof openDb>) => void,
+): void {
+  withFreshDb((dbPath) => {
+    const db = openDb(dbPath);
+    try {
+      migrate(db);
+      for (const p of patches) {
+        seedMatch(db, { patch: p.patch, rankKnownCount: p.rankKnownCount ?? 2 });
+      }
+      run(db);
+    } finally {
+      db.close();
+    }
+  });
+}
+
+describe('aggregateRunesByContext', () => {
+  it('accumulates a lane-context rune row for a support game', () => {
+    withSeededDb([{ patch: PATCH_16_21 }], (db) => {
+      const rows = aggregateRunesByContext(db);
+      // Me = Soraka 412 SUPPORT won. Context = ally ADC 21 + enemy support 266 + enemy ADC 22.
+      const lane = requireRow(rows, 412, 'SUPPORT', 'lane:21,22,266');
+      expect(lane.contextLevel).toBe(1);
+      expect(lane.winsW).toBeCloseTo(1);
+      expect(lane.gamesW).toBeCloseTo(1);
+      expect(lane.gamesW2).toBeCloseTo(1);
+      expect(lane.players).toBe(1);
+      expect(lane.perksJson).toBe('{"keystone":8439,"primary":8400,"sub":8300}');
+    });
+  });
+
+  it('produces all three back-off context levels (lane, damagemix, global)', () => {
+    withSeededDb([{ patch: PATCH_16_21 }], (db) => {
+      const rows = aggregateRunesByContext(db);
+      const supportRows = rows.filter((r) => r.championId === 412 && r.myRole === 'SUPPORT');
+      const keys = new Set(supportRows.map((r) => r.contextKey));
+      expect(keys.has('lane:21,22,266')).toBe(true);
+      expect([...keys].some((k) => k.startsWith('damagemix:'))).toBe(true);
+      expect(keys.has('global')).toBe(true);
+      const levels = [...supportRows.map((r) => r.contextLevel)].sort((a, b) => a - b);
+      expect(levels).toEqual([1, 2, 3]);
+    });
+  });
+
+  it('applies the experts rule: champion_games below minChampGames is excluded', () => {
+    withFreshDb((dbPath) => {
+      const db = openDb(dbPath);
+      try {
+        migrate(db);
+        seedMatch(db, {
+          patch: PATCH_16_21,
+          participants: baseParticipants([{ teamId: 100, championId: 412, championGames: 10 }]),
+        });
+        const rows = aggregateRunesByContext(db);
+        expect(rows.find((r) => r.championId === 412 && r.myRole === 'SUPPORT')).toBeUndefined();
+      } finally {
+        db.close();
+      }
+    });
+  });
+
+  it('applies recency decay across patches', () => {
+    withSeededDb(
+      [
+        { patch: PATCH_16_20, rankKnownCount: 2 },
+        { patch: PATCH_16_21, rankKnownCount: 2 },
+      ],
+      (db) => {
+        const rows = aggregateRunesByContext(db);
+        const lane = requireRow(rows, 412, 'SUPPORT', 'lane:21,22,266');
+        // 16.20 (index 0, recency 0.85) + 16.21 (index 1, recency 1.0); me wins both.
+        expect(lane.gamesW).toBeCloseTo(1.85);
+        expect(lane.winsW).toBeCloseTo(1.85);
+        expect(lane.gamesW2).toBeCloseTo(0.85 ** 2 + 1);
+        // Same puuid ('p-me') plays both matches, so distinct players = 1.
+        expect(lane.players).toBe(1);
+        expect(nEff(lane.gamesW, lane.gamesW2)).toBeCloseTo(1.9871);
+        // n_eff is below the raw game count (2) when weights are uneven.
+        expect(nEff(lane.gamesW, lane.gamesW2)).toBeLessThan(2);
+      },
+    );
+  });
+
+  it('down-weights games where only the seed rank is known', () => {
+    withSeededDb([{ patch: PATCH_16_21, rankKnownCount: 1 }], (db) => {
+      const lane = requireRow(aggregateRunesByContext(db), 412, 'SUPPORT', 'lane:21,22,266');
+      expect(lane.gamesW).toBeCloseTo(DEFAULT_CONFIG.unknownRankFactor);
+      expect(lane.gamesW2).toBeCloseTo(DEFAULT_CONFIG.unknownRankFactor ** 2);
+    });
+  });
+
+  it('is idempotent across reruns', () => {
+    withFreshDb((dbPath) => {
+      const db = openDb(dbPath);
+      try {
+        migrate(db);
+        seedMatch(db, { patch: PATCH_16_20 });
+        seedMatch(db, { patch: PATCH_16_21 });
+        const first = aggregateRunesByContext(db);
+        const second = aggregateRunesByContext(db);
+        expect(second).toEqual(first);
+        expect(db.prepare('SELECT COUNT(*) AS count FROM rune_ctx').get()).toMatchObject({
+          count: first.length,
+        });
+      } finally {
+        db.close();
+      }
+    });
+  });
+
+  it('preserves existing rows when the snapshot predates all stored matches', () => {
+    withSeededDb([{ patch: PATCH_16_21 }], (db) => {
+      const before = aggregateRunesByContext(db);
+      expect(before.length).toBeGreaterThan(0);
+      expect(aggregateRunesByContext(db, { patch: '16.1' })).toEqual([]);
+      expect(db.prepare('SELECT COUNT(*) AS count FROM rune_ctx').get()).toMatchObject({
+        count: before.length,
+      });
+    });
+  });
+
+  it('excludes matches newer than the snapshot patch', () => {
+    withSeededDb(
+      [
+        { patch: PATCH_16_20, rankKnownCount: 2 },
+        { patch: PATCH_16_21, rankKnownCount: 2 },
+      ],
+      (db) => {
+        const rows = aggregateRunesByContext(db, { patch: PATCH_16_20 });
+        // Only 16.20 contributes: one game, weight 1.
+        const lane = requireRow(rows, 412, 'SUPPORT', 'lane:21,22,266');
+        expect(lane.gamesW).toBeCloseTo(1);
+        expect(lane.players).toBe(1);
+      },
+    );
+  });
+
+  it('rejects a malformed patch and leaves the table untouched', () => {
+    withSeededDb([{ patch: PATCH_16_21 }], (db) => {
+      const before = aggregateRunesByContext(db);
+      expect(() => aggregateRunesByContext(db, { patch: '16' })).toThrow(/Invalid patch/);
+      expect(db.prepare('SELECT COUNT(*) AS count FROM rune_ctx').get()).toMatchObject({
+        count: before.length,
+      });
+    });
+  });
+
+  it('leaves rune_ctx empty when there are no participants', () => {
+    withFreshDb((dbPath) => {
+      const db = openDb(dbPath);
+      try {
+        migrate(db);
+        const rows = aggregateRunesByContext(db);
+        expect(rows).toEqual([]);
+        expect(db.prepare('SELECT COUNT(*) AS count FROM rune_ctx').get()).toMatchObject({
+          count: 0,
+        });
+      } finally {
+        db.close();
+      }
+    });
+  });
+});

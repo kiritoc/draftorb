@@ -304,6 +304,62 @@ Accepted by the owner on 2026-10-31. SPECS §5/§7 text derived from this decisi
   - Drop rank-based weighting entirely and treat all experts equally. Rejected: D-022 says "rank-based expertWeight" is a future addition.
 - Consequences: T-018 stores a single expert-weighted `rune_ctx` table with no rank bucket column. Follow-up work will require a migration if rank buckets are added. Mastery points are already stored in `participants` from T-014 but are not used in T-018.
 
+### D-043 — Patch index ordered from the data source versions list — ACCEPTED
+
+- Context: SPEC 1 requires a `patches(patch_index, version_label, released_at)` table whose ordering comes from the ordered versions list of the data source (e.g. Data Dragon `versions.json`), never from parsing version numbers. Hotfixes merge into their major patch; one patch = one `patch_index`; all age/from_patch logic uses `patch_index` only.
+- Decision: Accept SPEC 1 as documented in SPECS §12. `patch_index` is a dense ordinal over the data source's ordered version list; hotfix grouping is configurable.
+- Alternatives: numeric version parsing (rejected — season/format changes break it, e.g. 14.24 → 15.1).
+- Consequences: Tension with D-033, which chose `patchIndex` dense over distinct stored patches (sorted numerically with `comparePatches`). The two definitions assign different ages to the same game when data-source patches differ from stored patches. Owner decision 2026-11-01: keep D-033 for current implementation (T-015..T-018) and add a migration to D-043 in a future ETL ticket. Current implementation continues to use D-033; the migration will add a `patches` table from Data Dragon and convert patch indices to the data-source-based definition.
+
+### D-044 — Bounded retention storage + purge — ACCEPTED
+
+- Context: SPEC 2 requires bounded retention with no raw matches stored long term.
+- Decision: Accept SPEC 2 as documented in SPECS §13. Separate aggregate tables (`champion_stats`, `matchup_stats`, `item_stats`, `build_stats`) each with `patch_index`, `games`, `wins`, `deleted_at`; `RETENTION_PATCHES` default 8; `MIN_GAMES_STORED` default 5; purge on each new patch soft-deletes rows with `patch_index <= latest - N`, hard delete after `GRACE_PATCHES` default 2. A downweight breakpoint never extends retention beyond N. At patch close, delete rows of that patch with `games < MIN_GAMES_STORED` from `build_stats` and `matchup_stats` only (never `champion_stats`/`item_stats`, never while the patch still receives data). `reset` takes weight 0 at read time immediately; the purge job soft-deletes those rows afterwards; deletion only follows a weight that is already 0. `match_id` dedup limited to the last 2 `patch_index` values; weights computed at read time, never by deleting rows.
+- Alternatives: keeping full history (rejected — unbounded growth); age-only purge (rejected — ignores breakpoints); one single mixed aggregate table (rejected — scopes could not affect only the right data); applying weights by deleting rows (rejected — weights must be read-time).
+- Consequences: Tension with DATA_MODEL.md / T-015..T-018, where aggregate tables are cleared and rewritten per aggregate run rather than accumulated across patches with a retention purge. The new model discards raw matches after aggregation while existing aggregates rebuild from stored matches. No ticket tracks the storage migration from the current clear-and-rewrite model to the accumulated-with-retention model. Owner decision 2026-11-01: create a future ETL ticket for the retention model migration, which will also include the D-043 patch index migration. Current implementation (T-015..T-018) continues with the clear-and-rewrite model.
+
+### D-045 — Read-time weights (decay + change weight) — ACCEPTED
+
+- Context: SPEC 3 defines row weights as age decay × min over entity change-weight products.
+- Decision: Accept SPEC 3 as documented in SPECS §14. `age_weight = DECAY^(latest_index - patch_index)` (DECAY default 0.7); `entity_weight` is the product of change weights over newer patches, floored at `MIN_WEIGHT` default 0.05 (reset = 0, no floor); across time = product, across scopes = min; displayed stats are weighted sums; keep raw games and effective games. Right after a new patch the latest patch has little data, so displayed stats lean on older data; Bayesian smoothing partly compensates and the UI shows effective sample size.
+- Alternatives: applying weights by deleting rows (rejected); binary reset/no-reset weighting (rejected — downweight is a spectrum).
+- Consequences: `DECAY` default 0.7 differs from SPECS §3 recency `decay` default 0.85. The two live in different contexts (retention store vs recommendation weighting) and are kept as-is; owner to note (see conflict summary).
+
+### D-046 — Automatic change score from Data Dragon — ACCEPTED
+
+- Context: SPEC 4 requires deterministic change scoring from Data Dragon without storing full JSON snapshots.
+- Decision: Accept SPEC 4 as documented in SPECS §15. Table `entity_change_scores(entity_type, entity_id, patch_index, content_hash, change_score, details)`; content_hash + details only (no snapshots); documented flatten/contribution algorithm; `change_score` rounded to 4 decimals; score→change weight with a score exactly equal to a threshold going to the UPPER band (compared after rounding to 4 decimals); ≥ 0.6 creates a `suggested` breakpoint; fallback NULL / weight 1.0 / warning, with the first patch ever processed getting `change_score = NULL` (same fallback, no warning); never invent a score, never block the pipeline.
+- Alternatives: storing full JSON snapshots (rejected — unbounded); LLM-based change scoring (rejected — non-deterministic, D-006).
+- Consequences: none beyond SPEC 4 scope.
+
+### D-047 — Breakpoints (manual or validated override) — ACCEPTED
+
+- Context: SPEC 5 requires manual or validated override of automatic change weights.
+- Decision: Accept SPEC 5 as documented in SPECS §16. Table `data_breakpoints(id, scope_type, scope_id, from_patch_index, mode, weight_factor, status, source, reason, created_at)`; affected data `patch_index < from_patch_index`; `reset` = weight 0 + purgeable; `downweight` = change weight = `weight_factor`; active breakpoint replaces the automatic change weight for that entity/patch but still multiplies with other patches; scope rules for champion / item / global.
+- Consequences: none beyond SPEC 5 scope.
+
+### D-048 — Bayesian smoothing — ACCEPTED
+
+- Context: SPEC 6 requires Bayesian-smoothed winrates with a data-driven prior.
+- Decision: Accept SPEC 6 as documented in SPECS §17. `smoothed_winrate = (weighted_wins + K × p0) / (effective_games + K)`; `p0` = weighted average winrate of the role over the same window (same weights); `K` default 20; confidence on `effective_games`; display both.
+- Alternatives: none additional.
+- Consequences: `p0` is data-driven (weighted role average) whereas SPECS §5 baseline shrinkage uses a fixed prior of 0.5 with `k0 = 20`. Different contexts (retention store vs recommendation baseline); existing text kept; owner to note (see conflict summary).
+
+### D-049 — Rejected alternatives (SPEC 8) — ACCEPTED
+
+- Context: SPEC 8 lists alternatives that must be explicitly documented as rejected.
+- Decision: Rejected, with rationale:
+  - Keeping full history: rejected — unbounded database growth; bounded retention (D-044) instead.
+  - Age-only purge: rejected — ignores active breakpoints that still need old rows (D-044).
+  - 100% manual marking: rejected — automatic change scoring (D-046) surfaces candidates; manual marking is the override channel (SPEC 7).
+  - Binary reset/no-reset weighting: rejected — downweight factors give a spectrum; reset is one mode (SPEC 5).
+  - One single mixed aggregate table: rejected — scopes must affect only the right data (D-044, separate tables).
+  - Applying weights by deleting rows: rejected — weights computed at read time (D-045).
+  - Storing full JSON snapshots: rejected — store content_hash + details only (D-046).
+  - LLM-based change scoring (non-deterministic): rejected — violates deterministic, auditable scoring (D-006, D-046).
+  - Numeric version parsing for ordering: rejected — season/format changes break it (D-043).
+- Consequences: documented once here; referenced by SPECS §12–§17.
+
 ### Template
 
 ```

@@ -39,6 +39,15 @@ Earlier handoff (kept for history): B-017 done (engine and shared `"types": []` 
 
 ## Session log (newest first)
 
+### 2026-11-01 — Specification update: SPECS §12-16 (retention model, patch index, change scoring)
+
+- Done:
+  - **`docs/SPECS.md`** (edited): Added SPEC 1-5 (§12-16) defining a new retention model with bounded storage, patch index from data source versions, read-time weights, deterministic change scoring, and manual override of change weights. Purge threshold corrected from `< latest - N` to `<= latest - N` to retain exactly N patches.
+  - **`docs/DECISIONS.md`** (edited): Added D-043 through D-047 accepting the new specifications. D-043 documents the tension with D-033 (patch index definition conflict: dense over data source versions vs dense over distinct stored patches). D-044 documents the tension with DATA_MODEL.md/T-015..T-018 (clear-and-rewrite vs accumulated-with-retention). D-045 notes the DECAY constant difference (0.7 vs 0.85).
+  - **`docs/TESTING.md`** (edited): Added test guidance for the new model (hotfix merging, patch index ordering, first-patch fallback, Bayesian smoothing).
+- State left: **Specification update (no ticket)**. The new retention model (SPEC 2) is orthogonal to the current ETL implementation (T-015..T-018), which clears and rewrites aggregate tables per run. No code changes were made; the conflicts are documented and await owner resolution. The corrected purge threshold (SPEC 2 line 223) fixes the off-by-one error that would have retained N+1 patches.
+- Next: Owner to resolve D-043 (patch index definition conflict) and D-044 (retention model migration path). Current ETL tickets (T-019 export) continue with the existing DATA_MODEL.md model.
+
 ### 2026-11-01 — Ticket T-017 (Aggregate pair tables)
 
 - Done:

@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path';
 import { resolveRepoRoot } from '../config/paths';
 import { aggregateBaseline } from '../aggregate-baseline';
 import { aggregatePairTables } from '../aggregate-pairs';
+import { aggregateRunesByContext } from '../aggregate-runes';
 import { aggregateRoleProb, PATCH_PATTERN } from '../aggregate';
 import { UsageError } from '../cli-args';
 import { parsePositionals, type Command } from './shared';
@@ -69,6 +70,18 @@ async function runAggregate(args: string[]): Promise<void> {
         `Aggregated pair tables: ${pairTables.pairAlly.length} ally, ${pairTables.pairEnemy.length} enemy, ${pairTables.laneVs.length} lane_vs, ${pairTables.laneFull.length} lane_full row(s) written.`,
       );
     }
+
+    const runeRows = aggregateRunesByContext(db, { patch });
+    if (runeRows.length === 0) {
+      console.log(
+        `No contributing games${patch === undefined ? '' : ` up to patch ${patch}`}; rune_ctx left unchanged.`,
+      );
+    } else {
+      const champions = new Set(runeRows.map((row) => row.championId)).size;
+      console.log(
+        `Aggregated rune contexts: ${runeRows.length} row(s) for ${champions} champion(s) written to rune_ctx.`,
+      );
+    }
   } finally {
     db.close();
   }
@@ -77,6 +90,7 @@ async function runAggregate(args: string[]): Promise<void> {
 export const aggregateCommand: Command = {
   name: 'aggregate',
   usage: 'aggregate [patch]',
-  description: 'Compute aggregated tables (role probabilities and rank-weighted baselines)',
+  description:
+    'Compute aggregated tables (role probabilities, rank-weighted baselines, pair tables and rune contexts)',
   run: runAggregate,
 };

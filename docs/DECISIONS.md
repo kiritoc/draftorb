@@ -292,6 +292,18 @@ Accepted by the owner on 2026-10-31. SPECS §5/§7 text derived from this decisi
 - Gate: `exportMinGames` (default 10, raw `games` floor) is used by the exporter (T-019), not by `aggregate.ts`. `n_eff` is computable from `games_w`/`games_w2` but is not used as a storage filter because `role_prob` is single-role-pair evidence (no user-bucket weighting); using `n_eff` here would mix concepts that belong to per-bucket tables like `baseline`. A raw-game floor is the simplest gate the exporter can apply before writing the bare sparse map.
 - Consequences: `aggregate.ts` signature changes from `(db, patch?)` to `(db, { patch?, config? })`; callers updated. Migration 009 applied before first real collection run. T-015.c tracks this work, sequenced with T-015.b and before T-019.
 
+### D-036 — Rune aggregation scope decisions (T-018 follow-ups) — ACCEPTED
+
+- Update (T-018 review, 2026-11-01): both gaps are now implemented in T-018. Mastery fallback: a participant is an expert when in-window `champion_games >= minChampGames` OR cached `mastery_points >= minMasteryPoints` (enrichment only fetches mastery for the recommended role, so the fallback is role-limited). Rank weighting: migration 011 rebuilds `rune_ctx` with a `rank_bucket` column; each game contributes to every user bucket with `expertWeight(gameBucket, userBucket, alpha, wMax)` (0 below the user bucket). The text below is kept for history.
+
+- Context: T-018 implemented basic rune aggregation per SPECS §8.1 and D-022 but deferred two features described in D-022: (1) mastery fallback for participants of the user's role, and (2) rank-based expert weighting. The handoff notes these as intentional gaps.
+- Assumption (T-018): these features are intentionally deferred to a follow-up ticket after the baseline rune export (T-019) is complete. Mastery fallback requires a config option `minMasteryPoints` and user-role input to identify which participants are of the recommended role (mastery is fetched per (puuid, champion) and cached in `participants.mastery_points`). Rank-based expert weighting requires a migration to add a `rank_bucket` column to `rune_ctx` (matching the per-bucket tables like `baseline`) and a decision on whether to store separate rows per bucket or weight by bucket at aggregation time.
+- Alternatives:
+  - Implement both features in T-018. Rejected: would expand scope beyond the baseline aggregation and defer the export.
+  - Drop mastery fallback entirely and rely only on `champion_games`. Rejected: D-022 specifies the fallback for participants of the user's role.
+  - Drop rank-based weighting entirely and treat all experts equally. Rejected: D-022 says "rank-based expertWeight" is a future addition.
+- Consequences: T-018 stores a single expert-weighted `rune_ctx` table with no rank bucket column. Follow-up work will require a migration if rank buckets are added. Mastery points are already stored in `participants` from T-014 but are not used in T-018.
+
 ### Template
 
 ```

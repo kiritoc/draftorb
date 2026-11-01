@@ -125,6 +125,8 @@ export {
   type PairTableResult,
 } from './aggregate-pairs';
 
+export { aggregateRunesByContext, type RuneCtxRow } from './aggregate-runes';
+
 export {
   DEFAULT_PLAYER_QUOTAS,
   DEFAULT_PLAYER_TIER_SEQUENCE,

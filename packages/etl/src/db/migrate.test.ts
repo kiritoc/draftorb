@@ -244,6 +244,7 @@ describe('migration runner', () => {
       '007_matches_enriched',
       '008_baseline_raw_games',
       '009_role_prob_decay_weights',
+      '010_rune_ctx_context_level',
     ]);
     expect(migrate(db)).toEqual([]);
 
@@ -311,7 +312,7 @@ describe('migration runner', () => {
       ) VALUES (1, 'TOP', NULL, 10, 5, 'DIAMOND', 1, 1, 1)`,
     ).run();
     expect(db.prepare('SELECT COUNT(*) AS count FROM _migrations').get()).toMatchObject({
-      count: 9,
+      count: 10,
     });
     db.close();
   });
@@ -335,7 +336,11 @@ describe('migration runner', () => {
       ) VALUES (1, 'SUPPORT', 'DIAMOND', 3, 5, 5)`,
     ).run();
 
-    expect(migrate(db)).toEqual(['008_baseline_raw_games', '009_role_prob_decay_weights']);
+    expect(migrate(db)).toEqual([
+      '008_baseline_raw_games',
+      '009_role_prob_decay_weights',
+      '010_rune_ctx_context_level',
+    ]);
     expect(migrate(db)).toEqual([]);
 
     const columns = db.prepare('PRAGMA table_info(baseline)').all() as {

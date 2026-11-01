@@ -275,7 +275,8 @@ describe('aggregateRunesByContext', () => {
       expect([...keys].some((k) => k.startsWith('damagemix:'))).toBe(true);
       expect(keys.has('global')).toBe(true);
       const levels = [...supportRows.map((r) => r.contextLevel)].sort((a, b) => a - b);
-      expect(levels).toEqual([1, 1, 1, 2, 3]);
+      // Lane levels increase as slots drop: 3-slot=1, 2-slot=2, 1-slot=3, then damage mix=4, global=5.
+      expect(levels).toEqual([1, 2, 3, 4, 5]);
     });
   });
 

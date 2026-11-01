@@ -60,9 +60,10 @@ export interface AggregateRunesOptions {
 }
 
 // Back-off context levels (most specific = lowest number, SPECS §8.1).
-const CONTEXT_LEVEL_LANE = 1;
-const CONTEXT_LEVEL_DAMAGE_MIX = 2;
-const CONTEXT_LEVEL_GLOBAL = 3;
+// Lane contexts increment as slots are dropped (3-slot → 2-slot → 1-slot).
+const CONTEXT_LEVEL_LANE_BASE = 1;
+const CONTEXT_LEVEL_DAMAGE_MIX = 4;
+const CONTEXT_LEVEL_GLOBAL = 5;
 
 const ROLE_ORDER: readonly string[] = ['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT'];
 
@@ -365,11 +366,12 @@ export function aggregateRunesByContext(
       const phash = perksHash(canonical);
 
       // Lane back-off (SPECS §8.1): drop the least-influential slot each step.
+      // Context level increases as specificity decreases (more slots = lower level).
       const contexts: Array<{ contextKey: string; contextLevel: number }> = [];
       for (let n = slots.length; n >= 1; n--) {
         contexts.push({
           contextKey: `lane:${slots.slice(0, n).map(formatSlot).join(',')}`,
-          contextLevel: CONTEXT_LEVEL_LANE,
+          contextLevel: CONTEXT_LEVEL_LANE_BASE + (slots.length - n),
         });
       }
       contexts.push(
@@ -448,8 +450,8 @@ export function aggregateRunesByContext(
   const clear = db.prepare('DELETE FROM rune_ctx');
   const insert = db.prepare(
     `INSERT INTO rune_ctx (
-      champion_id, my_role, context_key, perks_hash, perks_json, wins_w, games_w, games_w2, players
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      champion_id, my_role, context_key, context_level, perks_hash, perks_json, wins_w, games_w, games_w2, players
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
   const write = db.transaction(() => {
     clear.run();
@@ -458,6 +460,7 @@ export function aggregateRunesByContext(
         row.championId,
         row.myRole,
         row.contextKey,
+        row.contextLevel,
         row.perksHash,
         row.perksJson,
         row.winsW,

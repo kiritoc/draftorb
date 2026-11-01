@@ -63,13 +63,18 @@ CREATE TABLE data_breakpoints (
   id INTEGER PRIMARY KEY,
   scope_type TEXT NOT NULL CHECK (scope_type IN ('champion','item','rune','global')),
   scope_id INTEGER,                    -- NULL iff scope_type = 'global'
-  from_patch_index INTEGER NOT NULL,
+  from_patch_index INTEGER NOT NULL CHECK (from_patch_index >= 1),
   mode TEXT NOT NULL CHECK (mode IN ('reset','downweight')),
   weight_factor REAL,                  -- NULL for reset; 0 < weight_factor <= 1 for downweight
   status TEXT NOT NULL CHECK (status IN ('suggested','active','rejected')),
   source TEXT NOT NULL CHECK (source IN ('auto','manual')),
-  reason TEXT NOT NULL,
-  created_at INTEGER NOT NULL
+  reason TEXT NOT NULL CHECK (length(reason) > 0),
+  created_at INTEGER NOT NULL,
+  CHECK ((scope_type = 'global') = (scope_id IS NULL)),
+  CHECK (
+    (mode = 'reset' AND weight_factor IS NULL)
+    OR (mode = 'downweight' AND weight_factor IS NOT NULL AND weight_factor > 0 AND weight_factor <= 1)
+  )
 );
 CREATE UNIQUE INDEX idx_data_breakpoints_unique ON data_breakpoints(scope_type, COALESCE(scope_id, -1), from_patch_index, source);
 ```

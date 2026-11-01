@@ -52,7 +52,7 @@ Notes: match ingestion persists the match row and its 10 participant rows in one
 
 Rank buckets: every `rank_bucket` column and every exported `bucket` field uses the 8 SPECS §3 rank buckets (IRON, BRONZE, SILVER, GOLD, PLATINUM, EMERALD, DIAMOND, MASTER_PLUS), not the 10 raw rank tiers. `MANIFEST.rankBuckets` mirrors this same 8-value list.
 
-- `role_prob(champion_id, role, games, prob)`
+- `role_prob(champion_id, role, games, games_w, games_w2, prob)` (weighted; `games_w` = sum of recency weights, `games_w2` = sum of squared weights for `n_eff`, SPECS §3; `games` = raw unweighted match count)
 - `baseline(champion_id, my_role, rank_bucket, wins_w, games_w, games_w2, games)` (weighted; `games_w2` = sum of squared weights for `n_eff`, SPECS §3; `games` = raw unweighted match count)
 - `pair_ally(my_champion_id, my_role, other_champion_id, other_role, rank_bucket, wins_w, games_w, games_w2)`
 - `pair_enemy(my_champion_id, my_role, other_champion_id, other_role, rank_bucket, wins_w, games_w, games_w2)`

@@ -8,22 +8,22 @@
 
 ## Epic status
 
-| Epic           | Status      | Notes                                                                                                             |
-| -------------- | ----------- | ----------------------------------------------------------------------------------------------------------------- |
-| E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b DONE                                                                                   |
-| E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e, T-014, T-015, T-015.b DONE; T-016..T-019 TODO |
-| E2 Engine      | IN PROGRESS | T-020 DONE; T-021 DONE; T-022 DONE; T-023 DONE                                                                    |
-| E3 Web MVP     | NOT STARTED |                                                                                                                   |
-| E4 Runes       | NOT STARTED |                                                                                                                   |
-| E5 Items       | NOT STARTED |                                                                                                                   |
-| E6 Live        | NOT STARTED |                                                                                                                   |
-| E7 Vision      | NOT STARTED |                                                                                                                   |
+| Epic           | Status      | Notes                                                                                                                                  |
+| -------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b DONE                                                                                                        |
+| E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e, T-014, T-015, T-015.b DONE; T-015.c, T-016 DONE; T-017..T-019 TODO |
+| E2 Engine      | IN PROGRESS | T-020 DONE; T-021 DONE; T-022 DONE; T-023 DONE                                                                                         |
+| E3 Web MVP     | NOT STARTED |                                                                                                                                        |
+| E4 Runes       | NOT STARTED |                                                                                                                                        |
+| E5 Items       | NOT STARTED |                                                                                                                                        |
+| E6 Live        | NOT STARTED |                                                                                                                                        |
+| E7 Vision      | NOT STARTED |                                                                                                                                        |
 
 ## Data collection status
 
 - Riot key: not recorded (development keys expire every 24 h).
 - Games collected: 0 (no SQLite database exists under `data/` in this workspace) | Patch: 16.21 (static data imported: champions, items, runes).
-- Last aggregation: never (aggregation is not implemented yet, T-015..T-018).
+- Last aggregation: role_prob (T-015) and baselines (T-016) implemented; T-015.c (decay-weighted role_prob) pending; pairs/lane/runes/builds (T-017..T-018) and export (T-019) not started.
 
 ## Next recommended ticket
 
@@ -34,8 +34,6 @@ Next ETL ticket: **T-017** (Aggregate pair tables, depends on T-016,T-011.b).
 Earlier handoff (kept for history): B-017 done (engine and shared `"types": []` plus ESLint purity guardrails in `eslint.config.mjs` with automated regression tests; T-020's engine-purity prerequisite is fully satisfied — the residual `tsc` gap caused by test files importing `vitest` is logged as B-021 and not fixed). B-022 (all Node built-ins blocked), B-023 (Date() call blocked) and B-024 (regression tests) also fixed. B-011 fixed (spec + T-002.b scope; implementation in T-002.b). Fix B-012 done. T-013.e done (typed schema-less `request()`, timeout/invalid-JSON regression tests, CLI + matches refactor below 300 lines; `pnpm check` 184 tests). **T-013.d done** (`pnpm etl status`, read-only parameterized counts and progress, empty & seeded database tests, CLI handling when database does not exist; `pnpm check` 153 tests). **D-008, D-011, D-017, D-018, D-020, D-021, D-022, D-023 accepted (2026-10-29); D-028 (formerly D-025, @types/... devDeps) renumbered and accepted.** SPECS §5/§8 are now normative. **T-002.b DONE** (shared schema parity); `packages/shared/src/index.ts` split by domain into `schemas/*.ts` (10 modules); rankBucketSchema (8 buckets), sparse role-prob with sum-to-1, Reason.with as ChampionId[], Reason.lowData, n_eff non-integer, lane reason type, DraftResult with insufficientData/poolRecommendations/poolUnavailable, championPoolSchema, manifest roles, all role-keyed export tuple schemas with games_w2, rune/build export schemas; 184 tests pass. **T-020 DONE** (rank weighting module: config + kernel + n_eff + equivalent-counts + influence matrix; 49 engine tests). **T-021 DONE** (Role inference — `inferRoles` with brute-force permutation over 120 assignments, viability check for missing champions, confidence = best/total probability mass; 15 tests). **T-022 DONE** (shrinkage + level mapping). T-014 (Participant enrichment) remains **data-blocked** (no Riot key, 0 games collected, no SQLite database under `data/`). **T-014 implementation DONE** (2026-10-29): enrichment module, mastery endpoint, 22 tests.
 
 ## Open questions for the owner
-
-- Review T-013.b (gaps fixed in B-010 and B-014).
 
 ---
 

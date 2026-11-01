@@ -10,6 +10,10 @@ Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATI
 | B-027 | S3  | engine | `W_COMP`, `W_BLIND`, `BLIND_WORST_CASE_FACTOR`, `HARD_COUNTER_DELTA_PP` and `LANE_GROUPS` were module constants; now injectable via `RecommendConfig` (T-027.a tuning) | FIXED  | T-023 review 2026-10-31           | T-027.a |
 | B-021 | S3  | engine | `types: []` in engine/shared tsconfigs is circumvented by test files importing vitest, so the type-checker still resolves Node globals in production files             | OPEN   | B-017 fix verification 2026-10-28 | –       |
 
+## Duplicate bug IDs (not renumbered)
+
+B-026 appears twice: OPEN (blindSafety approximates pickShare with roleProb, line 9) and FIXED under the Fixed section below (engine `shrink()` returns NaN for empty contexts, migration to `levels.ts`). B-027 appears twice: FIXED in the Open table below (injectable recommendation config, line 10) and FIXED under the Fixed section below (transient enrichment failures become permanent gaps). Neither ID is renumbered per owner instruction; both duplicates are documented here.
+
 T-023 review (2026-10-30) fixed in-PR: blind safety firing on every 1v1 role, blind safety re-scoring known enemies, unknown pool ids being scored, role-inference failure dropping a whole team, raw-winrate hard-counter warning, missing `W_comp`/`W_blind`, engine magic numbers outside `config.ts`, missing level 0 for lowData reasons (`reasonLevelSchema` now includes 0, SPECS §7), board-picked pool champions now reported as `poolUnavailable` `picked`, hard-counter warnings emitted as codes (`counteredBy:<ROLE>:<id>`), `rawGames` optional (omitted when unknown instead of a fake 0).
 
 T-015 review (2026-10-31) fixed in-PR: `role_prob` mixed participants from all stored patches; aggregation now filters by a target patch (default: the patch of the most recent match). No other new bugs were identified during T-015.

@@ -27,7 +27,7 @@ async function runAggregate(args: string[]): Promise<void> {
 
   const db = new Database(dbPath);
   try {
-    const rows = aggregateRoleProb(db, patch);
+    const rows = aggregateRoleProb(db, { patch });
     if (rows.length === 0) {
       console.log(
         `No participants found${patch === undefined ? '' : ` for patch ${patch}`}; role_prob left unchanged.`,

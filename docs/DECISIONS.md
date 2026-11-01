@@ -281,6 +281,17 @@ Accepted by the owner on 2026-10-31. SPECS §5/§7 text derived from this decisi
 - Alternatives: remove `roles` from `champions.json` and the shared schema. Rejected: breaks the shared contract, DATA_MODEL.md, and tag coverage; `role-prob.json` is a separate file that does not yet exist.
 - Consequences: `transformChampions` gains an optional `roleProbabilities` parameter (tag fallback when absent, backward compatible). `champions.json.roles` now reflects observed probabilities once `pnpm etl derive-roles` runs after `pnpm etl aggregate`.
 
+### D-035 — Decay-weighted `role_prob` evidence, superseding D-031 single-patch assumption — PROPOSED
+
+- Context: D-031 (PROPOSED) made `aggregateRoleProb` count one target patch only, with `role_prob` having no `games_w`/`games_w2` columns and no recency decay. SPECS §3 applies recency decay at aggregation time and never drops older patches. The single-patch implementation wipes `role_prob` on every aggregate: after one newer-patch match is ingested, the next `pnpm etl aggregate` rebuilds the table from ~10 participants, dropping champions absent from that patch. The `role-prob.json` export carries no `games` signal, so D-031's mitigation ("consumers should check games") cannot work. Baselines (T-016/D-033) already use cross-patch decay with a dense patch index — the two tables followed different rules.
+- Decision: `aggregateRoleProb` stores decay-weighted evidence like the other aggregate tables: `games` (raw count), `games_w` (sum of recency weights), `games_w2` (sum of squared weights). Weight = `recencyFactor(patchIndex, currentPatchIndex, decay) * reliabilityFactor(rankKnownCount, unknownRankFactor)`, using the same dense patch index and snapshot-patch rules as D-033. `prob = games_w(champion, role) / sum_roles games_w(champion, role)`, preserving the sum-to-1 invariant. `role-prob.json` stays a bare sparse map of probabilities (no `p`, `games` wrapper), so D-027, D-029, the shared schema, parity tests, and engine consumers do NOT change. Migration 009 adds `games_w` and `games_w2` to `role_prob`. The exporter (T-019) drops champions below `exportMinGames`; aggregate.ts itself does not filter.
+- Alternatives considered:
+  - Keep D-031 single-patch counts. Rejected: wipes champions absent from the latest patch; contradicts SPECS §3 recency; no sample-size signal survives export.
+  - Per-champion "keep old row" guard. Rejected: leaves rows of unknown age and a third behavior beside D-033; does not match the decay-weighted model of other aggregate tables.
+  - Change export to `{ [championId]: { role: { p, games } } }`. Rejected: breaks D-027/D-029 sparse-map contract, shared schema, parity tests, engine `roleProb` consumers, and would require a manifest schemaVersion bump plus engine consumer work outside this ticket.
+- Gate: `exportMinGames` (default 10, raw `games` floor) is used by the exporter (T-019), not by `aggregate.ts`. `n_eff` is computable from `games_w`/`games_w2` but is not used as a storage filter because `role_prob` is single-role-pair evidence (no user-bucket weighting); using `n_eff` here would mix concepts that belong to per-bucket tables like `baseline`. A raw-game floor is the only sample-size signal available in a single-patch, unweighted table.
+- Consequences: `aggregate.ts` signature changes from `(db, patch?)` to `(db, { patch?, config? })`; callers updated. Migration 009 applied before first real collection run. T-015.c tracks this work, sequenced with T-015.b and before T-019.
+
 ### Template
 
 ```

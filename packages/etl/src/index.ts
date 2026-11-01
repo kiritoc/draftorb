@@ -118,6 +118,14 @@ export { applyDerivedRoles, deriveChampionRoles } from './derive-roles';
 export { aggregateBaseline, type BaselineRow } from './aggregate-baseline';
 
 export {
+  aggregatePairTables,
+  type LaneFullRow,
+  type LaneVsRow,
+  type PairRow,
+  type PairTableResult,
+} from './aggregate-pairs';
+
+export {
   DEFAULT_PLAYER_QUOTAS,
   DEFAULT_PLAYER_TIER_SEQUENCE,
   discoverPlayersByTier,

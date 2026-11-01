@@ -11,7 +11,7 @@
 | Epic           | Status      | Notes                                                                                                                                  |
 | -------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b DONE                                                                                                        |
-| E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e, T-014, T-015, T-015.b DONE; T-015.c, T-016 DONE; T-017..T-019 TODO |
+| E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e, T-014, T-015, T-015.b, T-016, T-017 DONE; T-015.c, T-018..T-019 TODO |
 | E2 Engine      | IN PROGRESS | T-020 DONE; T-021 DONE; T-022 DONE; T-023 DONE                                                                                         |
 | E3 Web MVP     | NOT STARTED |                                                                                                                                        |
 | E4 Runes       | NOT STARTED |                                                                                                                                        |
@@ -23,13 +23,13 @@
 
 - Riot key: not recorded (development keys expire every 24 h).
 - Games collected: 0 (no SQLite database exists under `data/` in this workspace) | Patch: 16.21 (static data imported: champions, items, runes).
-- Last aggregation: role_prob (T-015) and baselines (T-016) implemented; T-015.c (decay-weighted role_prob) DONE; pairs/lane/runes/builds (T-017..T-018) and export (T-019) not started.
+- Last aggregation: role_prob (T-015) and baselines (T-016) implemented; pairs/lane (T-017) implemented; runes/builds (T-018) and export (T-019) not started.
 
 ## Next recommended ticket
 
 T-023 is **DONE** (Role-generic recommendation engine with explanations, layered shrinkage scoring, pool contract D-024, composition needs, golden test runner and golden fixtures including non-support TOP 1v1 lane group).
 Next engine tickets: **T-024** (Blind pick mode), **T-025** (Comp needs full model), **T-026** (Golden test suite 20+ scenarios) or **T-027.a** (Draft backtest harness).
-Next ETL ticket: **T-017** (Aggregate pair tables, depends on T-016,T-011.b).
+Next ETL ticket: **T-018** (Aggregate runes by context, depends on T-014,T-011.b,T-020).
 
 Earlier handoff (kept for history): B-017 done (engine and shared `"types": []` plus ESLint purity guardrails in `eslint.config.mjs` with automated regression tests; T-020's engine-purity prerequisite is fully satisfied — the residual `tsc` gap caused by test files importing `vitest` is logged as B-021 and not fixed). B-022 (all Node built-ins blocked), B-023 (Date() call blocked) and B-024 (regression tests) also fixed. B-011 fixed (spec + T-002.b scope; implementation in T-002.b). Fix B-012 done. T-013.e done (typed schema-less `request()`, timeout/invalid-JSON regression tests, CLI + matches refactor below 300 lines; `pnpm check` 184 tests). **T-013.d done** (`pnpm etl status`, read-only parameterized counts and progress, empty & seeded database tests, CLI handling when database does not exist; `pnpm check` 153 tests). **D-008, D-011, D-017, D-018, D-020, D-021, D-022, D-023 accepted (2026-10-29); D-028 (formerly D-025, @types/... devDeps) renumbered and accepted.** SPECS §5/§8 are now normative. **T-002.b DONE** (shared schema parity); `packages/shared/src/index.ts` split by domain into `schemas/*.ts` (10 modules); rankBucketSchema (8 buckets), sparse role-prob with sum-to-1, Reason.with as ChampionId[], Reason.lowData, n_eff non-integer, lane reason type, DraftResult with insufficientData/poolRecommendations/poolUnavailable, championPoolSchema, manifest roles, all role-keyed export tuple schemas with games_w2, rune/build export schemas; 184 tests pass. **T-020 DONE** (rank weighting module: config + kernel + n_eff + equivalent-counts + influence matrix; 49 engine tests). **T-021 DONE** (Role inference — `inferRoles` with brute-force permutation over 120 assignments, viability check for missing champions, confidence = best/total probability mass; 15 tests). **T-022 DONE** (shrinkage + level mapping). T-014 (Participant enrichment) remains **data-blocked** (no Riot key, 0 games collected, no SQLite database under `data/`). **T-014 implementation DONE** (2026-10-29): enrichment module, mastery endpoint, 22 tests.
 
@@ -38,6 +38,17 @@ Earlier handoff (kept for history): B-017 done (engine and shared `"types": []` 
 ---
 
 ## Session log (newest first)
+
+### 2026-11-01 — Ticket T-017 (Aggregate pair tables)
+
+- Done:
+  - **`packages/etl/src/aggregate-pairs.ts`** (new): `aggregatePairTables(db, { patch?, config? })` computes `pair_ally`, `pair_enemy`, `lane_vs` and `lane_full` rows per (champion, my_role, rank bucket) using the engine rank kernel (`combinedGameWeight`). Lane keys follow `laneGroup(my_role).enemies` order (SUPPORT: `[SUPPORT, ADC]`, ADC: `[ADC, SUPPORT]`; `opp2_id` NULL for 1v1 TOP/MID/JUNGLE) and `partner_id = laneGroup(my_role).allies[0]` (DATA_MODEL.md). Tables are cleared and rewritten in one transaction (idempotent); left unchanged when nothing contributes. Optional `[patch]` snapshot excludes newer matches.
+  - **`packages/etl/src/aggregate-pairs-helpers.ts`** (new): `seedMatches` multi-participant match seeder, `requirePairRow`/`requireLaneVsRow`/`requireLaneFullRow` assertions, `withFreshDb`/`withSeededDb` DB fixtures.
+  - **`packages/etl/src/aggregate-pairs.test.ts`** (new, 6 tests): support bot lane pairs + lane_vs + lane_full for both SUPPORT and ADC perspectives (lane id order asserted), TOP 1v1 (`lane_vs` opp2 NULL, `lane_full` empty), recency decay across patches, idempotence, empty DB leaves tables unchanged, snapshot patch excludes newer matches, missing lane champion skips lanes but keeps pairs.
+  - **`packages/etl/src/commands/aggregate.ts`** (edited): `pnpm etl aggregate` now also writes pair tables and prints a summary.
+  - **`packages/etl/src/index.ts`** (edited): exports `aggregatePairTables`, `PairRow`, `LaneVsRow`, `LaneFullRow`, `PairTableResult`.
+- Tests: `pnpm check` green (typecheck, lint: 0 errors, format: 0 errors; 640 tests across 46 files).
+- State left: **DONE (T-017)**. Next ETL ticket: T-018 (Aggregate runes by context, depends on T-014,T-011.b,T-020).
 
 ### 2026-11-01 — Ticket T-015.c (Decay-weighted role_prob evidence)
 

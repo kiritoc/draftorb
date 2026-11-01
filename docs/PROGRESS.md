@@ -23,7 +23,7 @@
 
 - Riot key: not recorded (development keys expire every 24 h).
 - Games collected: 0 (no SQLite database exists under `data/` in this workspace) | Patch: 16.21 (static data imported: champions, items, runes).
-- Last aggregation: role_prob (T-015) and baselines (T-016) implemented; T-015.c (decay-weighted role_prob) pending; pairs/lane/runes/builds (T-017..T-018) and export (T-019) not started.
+- Last aggregation: role_prob (T-015) and baselines (T-016) implemented; T-015.c (decay-weighted role_prob) DONE; pairs/lane/runes/builds (T-017..T-018) and export (T-019) not started.
 
 ## Next recommended ticket
 
@@ -38,6 +38,18 @@ Earlier handoff (kept for history): B-017 done (engine and shared `"types": []` 
 ---
 
 ## Session log (newest first)
+
+### 2026-11-01 — Ticket T-015.c (Decay-weighted role_prob evidence)
+
+- Done:
+  - **`packages/etl/migrations/009_role_prob_decay_weights.sql`** (new): adds `games_w` and `games_w2` to `role_prob`.
+  - **`packages/etl/src/aggregate.ts`** (edited): `aggregateRoleProb(db, { patch?, config? })` accumulates `games`, `games_w`, `games_w2` across patches <= snapshot using the D-033 dense patch index and `recencyFactor * reliabilityFactor`; `prob = games_w / sum_roles games_w`. The table is left untouched when nothing contributes.
+  - **`packages/etl/src/commands/aggregate.ts`** (edited): passes the new options object.
+  - Tests: `packages/etl/src/aggregate.test.ts`, `packages/etl/src/commands/aggregate.test.ts`, `packages/etl/src/db/migrate.test.ts` updated (decay retention, newer-patch no-wipe, n_eff < raw count, future snapshot).
+  - Docs: D-035 (PROPOSED), T-015.c, DATA_MODEL `role_prob` columns, SPECS `reliability.nEff`, BUGS duplicate-ID note.
+- Tests: `pnpm check` green; CI test (ubuntu, windows), lint and format pass (45 test files).
+- State left: **DONE (T-015.c)**. Next ETL ticket: T-017 (Aggregate pair tables).
+- Pitfalls: `role-prob.json` stays a bare sparse map; the `exportMinGames` filter belongs to the exporter (T-019), not `aggregate.ts`.
 
 ### 2026-10-31 — Antigravity — Ticket T-015.b (Derive champion roles from role probabilities)
 

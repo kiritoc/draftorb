@@ -49,3 +49,4 @@
 - First patch without previous version: `change_score = NULL` (same fallback, no warning).
 - Newly released patch with very little data: displayed stats lean on older data; smoothing partly compensates; UI shows effective sample size.
 - Idempotent re-run of detection: re-running overwrites the `entity_change_scores` row; identical entity → change_score 0.
+- Overlapping `downweight` breakpoints multiply their `weight_factor`s (floored at `MIN_WEIGHT`); a `reset` still dominates (weight 0); same rule whether they share `from_patch_index` or not.

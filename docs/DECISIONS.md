@@ -335,7 +335,7 @@ Accepted by the owner on 2026-10-31. SPECS §5/§7 text derived from this decisi
 ### D-047 — Breakpoints (manual or validated override) — ACCEPTED
 
 - Context: SPEC 5 requires manual or validated override of automatic change weights.
-- Decision: Accept SPEC 5 as documented in SPECS §16. Table `data_breakpoints(id, scope_type, scope_id, from_patch_index, mode, weight_factor, status, source, reason, created_at)`; affected data `patch_index < from_patch_index`; `reset` = weight 0 + purgeable; `downweight` = change weight = `weight_factor`; active breakpoint replaces the automatic change weight for that entity/patch but still multiplies with other patches; scope rules for champion / item / global.
+- Decision: Accept SPEC 5 as documented in SPECS §16. Table `data_breakpoints(id, scope_type, scope_id, from_patch_index, mode, weight_factor, status, source, reason, created_at)`; affected data `patch_index < from_patch_index`; `reset` = weight 0 + purgeable; `downweight` = change weight = `weight_factor`; active breakpoint replaces the automatic change weight for that entity/patch but still multiplies with other patches; scope rules for champion / item / global. Overlapping `downweight` breakpoints on the same entity multiply their `weight_factor`s (floored at `MIN_WEIGHT`), consistent with "across time = product" in SPECS §14; a `reset` still dominates (weight 0); the rule is the same whether they share `from_patch_index` or not.
 - Consequences: none beyond SPEC 5 scope.
 
 ### D-048 — Bayesian smoothing — ACCEPTED

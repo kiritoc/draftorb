@@ -3,21 +3,21 @@
 ## Current status
 
 - Phase: 1 (Support / Diamond)
-- Current milestone: M0 Foundations (T-002.b DONE) and M1 ETL (in progress: T-014 DONE; T-015/T-015.b DONE; T-016 DONE; T-017..T-019 TODO) -> M2 Engine (T-020..T-023 DONE)
+- Current milestone: M0 Foundations (T-002.b DONE) and M1 ETL (in progress: T-014 DONE; T-015/T-015.b DONE; T-016 DONE; T-017..T-019 TODO; T-019.b TODO) -> M2 Engine (T-020..T-023 DONE)
 - Last updated: 2026-10-31 by Antigravity
 
 ## Epic status
 
-| Epic           | Status      | Notes                                                                                                                           |
-| -------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b DONE                                                                                                 |
-| E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e, T-014, T-015, T-015.b, T-016, T-017, T-018 DONE; T-019 TODO |
-| E2 Engine      | IN PROGRESS | T-020 DONE; T-021 DONE; T-022 DONE; T-023 DONE                                                                                  |
-| E3 Web MVP     | NOT STARTED |                                                                                                                                 |
-| E4 Runes       | NOT STARTED |                                                                                                                                 |
-| E5 Items       | NOT STARTED |                                                                                                                                 |
-| E6 Live        | NOT STARTED |                                                                                                                                 |
-| E7 Vision      | NOT STARTED |                                                                                                                                 |
+| Epic           | Status      | Notes                                                                                                                                         |
+| -------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b DONE                                                                                                               |
+| E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e, T-014, T-015, T-015.b, T-016, T-017, T-018 DONE; T-019 TODO; T-019.b TODO |
+| E2 Engine      | IN PROGRESS | T-020 DONE; T-021 DONE; T-022 DONE; T-023 DONE                                                                                                |
+| E3 Web MVP     | NOT STARTED |                                                                                                                                               |
+| E4 Runes       | NOT STARTED |                                                                                                                                               |
+| E5 Items       | NOT STARTED |                                                                                                                                               |
+| E6 Live        | NOT STARTED |                                                                                                                                               |
+| E7 Vision      | NOT STARTED |                                                                                                                                               |
 
 ## Data collection status
 
@@ -37,16 +37,28 @@ Earlier handoff (kept for history): B-017 done (engine and shared `"types": []` 
 
 ---
 
-## Session log (newest first)
-
-### 2026-11-01 — Specification update: SPECS §12-16 (retention model, patch index, change scoring)
+### 2026-11-01 — PR #42 docs completion: T-019.b ticket, downweight precedence, loose ends
 
 - Done:
-  - **`docs/SPECS.md`** (edited): Added SPEC 1-5 (§12-16) defining a new retention model with bounded storage, patch index from data source versions, read-time weights, deterministic change scoring, and manual override of change weights. Purge threshold corrected from `< latest - N` to `<= latest - N` to retain exactly N patches.
-  - **`docs/DECISIONS.md`** (edited): Added D-043 through D-047 accepting the new specifications. D-043 documents the tension with D-033 (patch index definition conflict: dense over data source versions vs dense over distinct stored patches). D-044 documents the tension with DATA_MODEL.md/T-015..T-018 (clear-and-rewrite vs accumulated-with-retention). D-045 notes the DECAY constant difference (0.7 vs 0.85).
-  - **`docs/TESTING.md`** (edited): Added test guidance for the new model (hotfix merging, patch index ordering, first-patch fallback, Bayesian smoothing).
+  - **`docs/TICKETS.md`** (edited): Replaced "Future work" paragraph with `T-019.b | Retention model migration (L)` in E1 ETL; deps `T-019, T-015..T-018, T-002.b`; acceptance mirrors `docs/TESTING.md` expected tests.
+  - **`docs/SPECS.md`** (edited): §18 documents overlapping `downweight` precedence (multiply `weight_factor`s floored at `MIN_WEIGHT`; `reset` dominates; same rule regardless of `from_patch_index`); §18 hotfix line reworded (weights never stored, nothing "kept"); §14 note confirms `DECAY` 0.7 vs `decay` 0.85 and data-driven `p0` vs fixed 0.5 prior are intentional.
+  - **`docs/DECISIONS.md`** (edited): D-047 adds overlapping `downweight` precedence line.
+  - **`docs/TESTING.md`** (edited): Added overlapping `downweight` precedence test expectation.
+  - **`docs/PROGRESS.md`** (edited): Session log corrected to §12-18 / D-043..D-049; removed open follow-ups; T-019.b added as TODO.
+- Tests: `pnpm check` green (typecheck, lint 0 errors, format 0 errors); prettier fixed `docs/PROGRESS.md` wrapping.
+- State left: **Docs-only PR complete**. No code changed. `BUGS.md` unchanged (no bugs found).
+- Next: Owner review; then schedule T-019.b or continue T-019 (export).
+
+## Session log (newest first)
+
+### 2026-11-01 — Specification update: SPECS §12-18 (retention model, patch index, change scoring)
+
+- Done:
+  - **`docs/SPECS.md`** (edited): Added SPEC 1-5 (§12-18) defining a new retention model with bounded storage, patch index from data source versions, read-time weights, deterministic change scoring, and manual override of change weights. Purge threshold corrected from `< latest - N` to `<= latest - N` to retain exactly N patches.
+  - **`docs/DECISIONS.md`** (edited): Added D-043 through D-049 accepting the new specifications. D-043 documents the tension with D-033 (patch index definition conflict: dense over data source versions vs dense over distinct stored patches). D-044 documents the tension with DATA_MODEL.md/T-015..T-018 (clear-and-rewrite vs accumulated-with-retention). D-045 notes the DECAY constant difference (0.7 vs 0.85). D-046 documents automatic change scoring from Data Dragon. D-047 documents breakpoints including overlapping `downweight` precedence (multiply `weight_factor`s floored at `MIN_WEIGHT`; `reset` dominates). D-048 documents Bayesian smoothing with data-driven `p0` vs the fixed 0.5 prior in §5. D-049 documents rejected alternatives.
+  - **`docs/TESTING.md`** (edited): Added test guidance for the new model (hotfix merging, patch index ordering, first-patch fallback, Bayesian smoothing, overlapping `downweight` precedence).
 - State left: **Specification update (no ticket)**. The new retention model (SPEC 2) is orthogonal to the current ETL implementation (T-015..T-018), which clears and rewrites aggregate tables per run. No code changes were made. Owner decision 2026-11-01 (D-043, D-044): keep D-033 and clear-and-rewrite for T-015..T-018; migrate later via the future retention-migration ticket in TICKETS.md. The corrected purge threshold (`<= latest - N`) fixes the off-by-one error that would have retained N+1 patches.
-- Next: Continue T-019 (export) on the existing DATA_MODEL.md model and D-033. Open follow-ups: assign an ID to the retention-migration ticket; define precedence for overlapping `downweight` breakpoints (SPECS §18).
+- Next: Continue T-019 (export) on the existing DATA_MODEL.md model and D-033. T-019.b (Retention model migration) is tracked as TODO in TICKETS.md; overlapping `downweight` precedence is documented in SPECS §18 / D-047.
 
 ### 2026-11-01 — Ticket T-017 (Aggregate pair tables)
 

@@ -242,6 +242,7 @@ Rules:
 - Right after a new patch the latest patch has little data, so displayed stats lean on older (decayed or downweighted) data; Bayesian smoothing (§17) partly compensates and the UI shows effective sample size.
 - Displayed stats = weighted sums: `sum(wins × w) / sum(games × w)`.
 - Keep both raw `games` and effective `games` (`sum(games × w)`).
+- `DECAY` (0.7, retention-store age decay, §13/§14) is distinct from `decay` (0.85, recommendation recency, §3); `p0` (§17, data-driven role average) is distinct from the fixed 0.5 prior in §5 baseline shrinkage (`k0 = 20`). Both pairs are kept intentionally in separate contexts.
 
 ## 15. Automatic change score (SPEC 4)
 
@@ -323,8 +324,8 @@ Scope (which tables are affected):
 ## 18. Edge cases (SPEC 8)
 
 - Breakpoint on an already purged patch: no effect on stored data (already gone); record the breakpoint anyway for future patches.
-- Several breakpoints on the same entity: every active breakpoint whose `from_patch_index > patch_index` applies; a `reset` dominates (weight 0). Multiple `downweight` breakpoints on overlapping ranges — document precedence per entity/patch.
-- Hotfix received after aggregation: re-run change detection for the hotfix patch; new breakpoint rows apply at read time; already-aggregated rows keep stored weights until recomputed.
+- Several breakpoints on the same entity: every active breakpoint whose `from_patch_index > patch_index` applies; a `reset` dominates (weight 0). Multiple `downweight` breakpoints on overlapping ranges multiply their `weight_factor`s (floored at `MIN_WEIGHT`), consistent with "across time = product" in §14; the rule is the same whether they share `from_patch_index` or not.
+- Hotfix received after aggregation: re-run change detection for the hotfix patch; new breakpoint rows apply at read time; weights are never stored (§13/§14), so nothing is "kept" — recomputed rows use the new breakpoint immediately.
 - Missing source data: `change_score = NULL`, weight 1.0, warning logged (§15 fallback). The first patch ever processed has no previous version: `change_score = NULL` (same fallback, no warning needed).
 - Entity renamed or ID changed between patches: treated as removed + added (key-set diff contributes 0.6 per §15); `content_hash` differs so a score is computed.
 - Cumulative weight hitting `MIN_WEIGHT`: floored at `MIN_WEIGHT` (default 0.05); never below, except `reset = 0`.

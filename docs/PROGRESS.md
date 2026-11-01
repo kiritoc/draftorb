@@ -1033,3 +1033,14 @@ The 2026-10-22 entries had no timestamps; their order was reconstructed from tic
   - `postcss.config.mjs` (ESM, not CJS) to avoid lint errors in ESM project
   - Engine has a placeholder `add()` function + test — replace with real code in T-020+
   - Tailwind v3 is used (v4 was still beta-ish at time of scaffold)
+
+### 2026-11-01 — Kilo — Documentation: patch / retention / weighting / change-detection redesign (D-043..D-048, SPECS §12-17, T-019.b..f)
+
+- Done:
+  - `docs/DECISIONS.md`: appended D-043 (patch index), D-044 (retention/prune), D-045 (weight formula), D-046 (change score), D-047 (breakpoints), D-048 (no separate smoothing); all PROPOSED; D-049 removed; D-031 marked SUPERSEDED by D-035; D-028/D-026/D-025 order and D-031 status addressed per housekeeping (Part I proposed, not applied).
+  - `docs/SPECS.md`: §3 recency bullet now references `patches` table (SPECS §12) with T-019.b as the switch point; added target-model banner and replaced sections 12-17 with patch index, retention/prune, weights, change score, breakpoints, edge cases.
+  - `docs/TICKETS.md`: replaced T-019.b with T-019.b..f (S/M/L), referencing SPECS sections, correct dependencies, template fields; T-019 (export) not blocked.
+  - `docs/DATA_MODEL.md`: `match_rejects.reason` comment extended to `queue|short|patch|invalid|pruned`; `pruned` permanent. Existing `patches`/`entity_change_scores`/`data_breakpoints` DDL already matches required text.
+  - `docs/TESTING.md`: deleted old "Expected tests: data retention, change scoring, breakpoints (SPEC 8)" block; single section 6 with retention/weights/change-scoring/breakpoints tests plus real-fixture rule; no `soft`, `grace`, `MIN_GAMES`, `champion_stats`, `smoothing`, `SPEC` remains.
+  - `docs/RIOT_API.md`: per-champion files, `versions.json` order, `runesReforged.json`, `gameVersion`->label rule already present with VERIFY markers (no change needed).
+- State left: documentation complete; no code changes. Next session: implement T-019.b (patches table).

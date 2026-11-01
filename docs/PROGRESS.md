@@ -3,21 +3,21 @@
 ## Current status
 
 - Phase: 1 (Support / Diamond)
-- Current milestone: M0 Foundations (T-002.b DONE) and M1 ETL (in progress: T-014 DONE; T-015/T-015.b DONE; T-016 DONE; T-017..T-019 TODO; T-019.b TODO) -> M2 Engine (T-020..T-023 DONE)
+- Current milestone: M0 Foundations (T-002.b DONE) and M1 ETL (in progress: T-014 DONE; T-015/T-015.b DONE; T-016 DONE; T-017..T-019 TODO; T-019.b..f TODO) -> M2 Engine (T-020..T-023 DONE)
 - Last updated: 2026-10-31 by Antigravity
 
 ## Epic status
 
-| Epic           | Status      | Notes                                                                                                                                         |
-| -------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b DONE                                                                                                               |
-| E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e, T-014, T-015, T-015.b, T-016, T-017, T-018 DONE; T-019 TODO; T-019.b TODO |
-| E2 Engine      | IN PROGRESS | T-020 DONE; T-021 DONE; T-022 DONE; T-023 DONE                                                                                                |
-| E3 Web MVP     | NOT STARTED |                                                                                                                                               |
-| E4 Runes       | NOT STARTED |                                                                                                                                               |
-| E5 Items       | NOT STARTED |                                                                                                                                               |
-| E6 Live        | NOT STARTED |                                                                                                                                               |
-| E7 Vision      | NOT STARTED |                                                                                                                                               |
+| Epic           | Status      | Notes                                                                                                                                            |
+| -------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b DONE                                                                                                                  |
+| E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e, T-014, T-015, T-015.b, T-016, T-017, T-018 DONE; T-019 TODO; T-019.b..f TODO |
+| E2 Engine      | IN PROGRESS | T-020 DONE; T-021 DONE; T-022 DONE; T-023 DONE                                                                                                   |
+| E3 Web MVP     | NOT STARTED |                                                                                                                                                  |
+| E4 Runes       | NOT STARTED |                                                                                                                                                  |
+| E5 Items       | NOT STARTED |                                                                                                                                                  |
+| E6 Live        | NOT STARTED |                                                                                                                                                  |
+| E7 Vision      | NOT STARTED |                                                                                                                                                  |
 
 ## Data collection status
 
@@ -36,6 +36,19 @@ Earlier handoff (kept for history): B-017 done (engine and shared `"types": []` 
 ## Open questions for the owner
 
 ---
+
+### 2026-11-01 — PR #42 redesign: storage/weighting/change-detection made coherent (docs only)
+
+- Done:
+  - **`docs/DECISIONS.md`** (edited): Replaced old D-043..D-049 (ACCEPTED) with new D-043..D-048 (PROPOSED): patches table (D-043), retention/prune (D-044), single weight formula (D-045), automatic change score (D-046), breakpoints (D-047), no separate smoothing (D-048). D-049 removed (content folded into Alternatives). No fabricated owner decisions or dates.
+  - **`docs/SPECS.md`** (edited): §3 recency references `patches` table (D-043); removed §14 DECAY/p0 note; replaced sections 12-18 with target-model sections 12-17 (patch index, retention/prune, weights, change score, breakpoints, edge cases) preceded by a target-model banner.
+  - **`docs/TICKETS.md`** (edited): Replaced single T-019.b with session-sized chain T-019.b..f; T-019 (export) unblocked.
+  - **`docs/DATA_MODEL.md`** (edited): Added `patches`, `entity_change_scores`, `data_breakpoints` DDL with CHECKs and unique index; aggregated tables recomputed each run with weights baked in; exports unchanged note.
+  - **`docs/TESTING.md`** (edited): Added section 6 (retention, weights, change scoring, breakpoints) with property checks and real-JSON fixture rule.
+  - **`docs/RIOT_API.md`** (edited): Expanded Data Dragon static data row; added VERIFY markers.
+- Tests: `pnpm check` green (typecheck, lint 0 errors, format 0 errors). No code changed.
+- State left: **Docs-only redesign complete**. `BUGS.md` unchanged (no bugs found).
+- Next: Owner review of PROPOSED ADRs; then schedule T-019.b.
 
 ### 2026-11-01 — PR #42 docs completion: T-019.b ticket, downweight precedence, loose ends
 

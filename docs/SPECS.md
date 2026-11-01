@@ -41,7 +41,7 @@ Rank buckets for weighting (distinct from persisted `rank_score` in DATA_MODEL.m
 - **Draft probabilities** (pairs, matchups, baselines): weight per game `w = exp(-|gameRank - userRank| / tau)`, tau=1.25 (config). Never use data below userRank-2 tiers.
 - **Runes & items**: use games with `gameRank >= userRank` (up to Challenger). Weight `w = min(1 + alpha*(gameRank-userRank), wMax)`, alpha=0.25, wMax=2.0. Only expert players (D-022): `champion_games >= minChampGames` (default 30) in our data, with the champion-mastery-v4 fallback applied only to participants of the user's role (`is_expert` flag). Show both winrate and pick share among those players.
 - Optional UI toggle: "Master+ only".
-- Recency: multiply by `decay^(currentPatchIndex - gamePatchIndex)` (decay=0.85).
+- Recency: multiply by `decay^(currentPatchIndex - gamePatchIndex)` (decay=0.85). `currentPatchIndex` and `gamePatchIndex` come from the `patches` table (D-043): ordinal assigned oldest-first from Data Dragon `versions.json`; version strings are never compared for age or windows.
 - Patch window: ingestion keeps every patch >= `--since-patch` (D-017); recency is applied here, at aggregation time, never by dropping games at ingestion.
 - Rank reliability: games with `matches.rank_known_count = 1` (only the seed player's rank is known, D-019) are multiplied by `unknownRankFactor` (default 0.5, config).
 - Known limitation (D-004/D-021): draft baselines and pairs are not expert-filtered, so one-trick players can inflate some picks; T-027.a includes an optional ablation that down-weights games by `champion_games` to measure it.
@@ -195,138 +195,98 @@ Order of preference:
 
 Non-support roles, accounts/login, pool sync across devices or auto-import of the pool from a Riot account, server-side code, paid anything, mobile app, replays. The engine and data model are role-generic (D-020/D-021); only the SUPPORT role is populated and exposed in Phase 1.
 
-## 12. Patch index (SPEC 1)
+## 12-17. Storage, retention, weights, change scoring, breakpoints (target model)
 
-Table `patches(patch_index, version_label, released_at)`:
+These sections describe the **target** storage and weighting model, implemented by tickets T-019.b through T-019.f. Until those tickets are complete, SPECS §3 (recency with the dense stored-patch index from D-033) and clear-and-rewrite aggregation (DATA_MODEL.md, T-015..T-018) govern. Sections 12-17 are normative once implemented; they do not describe current code. No new tables are created and no rows are soft-deleted until T-019.b..f are done.
 
-- `patch_index`: sequential integer, unique, starting at 1. One row per "patch".
-- Ordering comes from the ordered versions list of the data source (e.g. Data Dragon `versions.json`), **never** from parsing version numbers. Season/format changes break numeric comparison (e.g. 14.24 → 15.1), so ordinal position in the source's ordered list is the source of truth.
-- Hotfixes are merged into their major patch. The grouping rule is configurable and documented once (D-036). One "patch" = one `patch_index`.
-- All "age" and "from_patch" logic uses `patch_index` only. Never parse or compare version strings for age, windows, or breakpoints.
+## 12. Patch index (D-043)
 
-## 13. Storage and bounded retention (SPEC 2)
+Table `patches(patch_index INTEGER PRIMARY KEY, version_label TEXT NOT NULL UNIQUE, released_at INTEGER)`:
 
-No raw matches are stored long term. Ingestion aggregates immediately into separate tables; every table has `patch_index`, `games`, `wins`, `deleted_at`:
+- `version_label` = `major.minor`, identical to `matches.patch` (RIOT_API.md).
+- `patch_index` assigned once, oldest-first starting at 1, append-only, never reassigned or renumbered.
+- Ordering comes from Data Dragon `versions.json`, reversed (newest-first -> oldest-first ordinal), never from parsing version numbers.
+- Hotfixes: all source versions sharing the same `major.minor` label collapse to one `patch_index`; one patch = one `patch_index`.
+- One parse is allowed and defined once: `gameVersion` -> `major.minor`. Version strings are never compared numerically for age, windows, or breakpoints; all age/window/breakpoint logic uses `patch_index` only.
+- A match whose label is absent from `patches`: refresh `patches` from the source first; if still absent, a typed error / `invalid` reject.
 
-| Table            | Key columns                                                       |
-| ---------------- | ----------------------------------------------------------------- |
-| `champion_stats` | `patch_index`, `champion`, `role`                                 |
-| `matchup_stats`  | `patch_index`, `role`, `champion`, `enemy_champion` (directional) |
-| `item_stats`     | `patch_index`, `item`                                             |
-| `build_stats`    | `patch_index`, `champion`, `role`, `item`                         |
+## 13. Retention and prune (D-044)
 
-Separate tables are required so breakpoints/scopes (§16) can affect only the relevant data.
+No parallel stats tables. Existing aggregate tables (`baseline`, `pair_ally`, `pair_enemy`, `lane_vs`, `lane_full`, `rune_ctx`, `item_build`, `role_prob`) are the only statistics store; they are recomputed on every `aggregate` run with weights baked in (SPECS §14, D-045).
 
-Rules:
+- Raw `matches`/`participants`/`item_events` kept for the last N patches only (`retentionPatches`, default 8, ETL config).
+- Retention window must contain the frozen holdout plus the training window (D-023/T-027.a).
+- `pnpm etl prune --keep-patches N [--dry-run]`: in ONE transaction, for matches with `patch_index <= latest - N`, insert/refresh a `match_rejects` tombstone (`reason='patch'`, actual `patch`, `checked_at`) and delete the match (cascade removes `participants`/`item_events`). Idempotent. `--dry-run` prints counts only.
+- Tombstones replace D-017's `patch` reject; dedup stays global and complete; no 2-patch dedup window. Tombstones are tiny and kept.
+- Aggregate tables need no purge, no `deleted_at`, no grace period, no soft delete, no `MIN_GAMES_STORED`: they are rebuilt each run.
+- `reset` breakpoints give weight 0 at aggregation; they do not delete data. Retention and weighting are independent.
+- Invariant: rows are never deleted to express a weight; they are deleted only for retention (outside the window).
 
-- Weights are never applied by deleting or editing rows. They are computed at read time (§14). Only the purge job removes rows. Deletion only follows a weight that is already 0; weights are never applied by deletion.
-- A `match_id` dedup table is kept, limited to the last 2 `patch_index` values.
-- Config `RETENTION_PATCHES` (N, default 8). Config `MIN_GAMES_STORED` (default 5).
-- Purge on each new patch: soft-delete rows with `patch_index <= latest - N`. A downweight breakpoint never extends retention beyond N. Hard delete after `GRACE_PATCHES` (default 2) patches. Soft-deleted rows are excluded from computations but restorable.
-- At patch close (when a newer patch starts), delete rows of that patch with `games < MIN_GAMES_STORED` from `build_stats` and `matchup_stats` only. Never apply it to `champion_stats` or `item_stats`. Never apply it while the patch is still receiving data.
-- `reset` breakpoint: weight 0 at read time, immediately. The purge job soft-deletes those rows afterwards.
-- Estimated maximum database size: bounded by row counts, not match count. Across the four tables, at most N rows per patch per entity-key (E entities/patch), plus the 2-patch `match_id` dedup window. MIN_GAMES_STORED further prunes low-volume `build_stats`/`matchup_stats` rows at patch close. Size = Σ over tables of (rows retained × bytes/row) + dedup window, where rows retained ≤ N × E per table (less after MIN_GAMES_STORED pruning). Because rows are bounded by `patch_index`, database size does not grow with the number of matches ingested.
+## 14. Weights (D-045)
 
-## 14. Read-time weights (SPEC 3)
+One weight formula, applies per game and per aggregate row:
 
-- `age_weight = DECAY^(latest_index - patch_index)`, `DECAY` default 0.7.
-- Per entity `e` (champion, item, or global) and data patch `p`:
-  `entity_weight(e, p) = PRODUCT of the change weights of all change events of e at patches q with p < q <= latest`, floored at `MIN_WEIGHT` (default 0.05), except `reset = 0` (no floor). Successive changes multiply (e.g. 0.9 × 0.9 × 0.5).
-- Row weight = `age_weight × MIN over the entities involved in the row`:
-  - `champion_stats`: `entity_weight(champion)`, and the global entity weight
-  - `matchup_stats`: `entity_weight(champion)`, `entity_weight(enemy_champion)`, and the global entity weight
-  - `item_stats`: `entity_weight(item)`, and the global entity weight
-  - `build_stats`: `entity_weight(champion)`, `entity_weight(item)`, and the global entity weight
-  - Across time = product; across scopes = min.
-- Age decay and change weights partly overlap; accepted on purpose. Tune `DECAY` and the change-weight thresholds with real data.
-- Right after a new patch the latest patch has little data, so displayed stats lean on older (decayed or downweighted) data; Bayesian smoothing (§17) partly compensates and the UI shows effective sample size.
-- Displayed stats = weighted sums: `sum(wins × w) / sum(games × w)`.
-- Keep both raw `games` and effective `games` (`sum(games × w)`).
-- `DECAY` (0.7, retention-store age decay, §13/§14) is distinct from `decay` (0.85, recommendation recency, §3); `p0` (§17, data-driven role average) is distinct from the fixed 0.5 prior in §5 baseline shrinkage (`k0 = 20`). Both pairs are kept intentionally in separate contexts.
+`w = rankKernel × reliability × recency × changeWeight`
 
-## 15. Automatic change score (SPEC 4)
+- `rankKernel(gameBucket, userBucket)`, `reliability(rank_known_count, unknownRankFactor)`, `recency(decay, currentPatchIndex - patchIndex)` exist (SPECS §3, `combinedGameWeight`, D-032, D-033).
+- `decay = 0.85` (SPECS §3). There is no separate `DECAY`.
+- `changeWeight(entities, patchIndex, asOf)`:
+  - Across time (successive change events of one entity): product of change weights at patches q with `p < q <= asOf`.
+  - Across entities in the row's entity set: min.
+  - Floor `minWeight` (default 0.05, ETL config), except `reset` = 0 (no floor).
+  - Only events with `patch_index > p` AND `patch_index <= asOf` apply; `asOf` = snapshot's `currentPatchIndex` (backtest: patch before holdout).
+  - An active breakpoint (D-047) replaces the automatic change weight for that entity/patch with its `weight_factor`; it still multiplies with change weights of other patches.
+- Entity set per aggregate table: baseline {champion}; pair_ally {champion, ally champion}; pair_enemy {champion, enemy champion}; lane_vs {champion, opp1, opp2}; lane_full {champion, partner, opp1, opp2}; rune_ctx {champion}; item_build {champion, item}; role_prob {champion}.
+- Weights baked into `wins_w`, `games_w`, `games_w2`; `n_eff`, thresholds, exports, engine contracts unchanged.
+- Purity: engine `changeWeight` is pure, receives plain data (events, breakpoints); SQLite reads stay in ETL.
+- Safety: change weighting disabled by default (`changeWeightEnabled` = false; neutral weights 1.0). Enabled only after T-027.a passes the D-023 gate. With flag on and no events/breakpoints, aggregates byte-identical to current output.
 
-Source: Data Dragon `champion/{id}.json` and `item.json` for the previous and current patch.
+## 15. Change score (D-046)
 
-Known limit: Data Dragon has few details on ratios and some effects, so some real changes score low. An optional secondary source (Community Dragon, patch notes) may be added later — not part of this work. The fallback below covers missing data.
+Command `pnpm etl changes <patch>` writes `entity_change_scores(entity_type, entity_id, patch_index, content_hash, change_score, details)`; `entity_type` IN (`champion`,`item`,`rune`); unique key `(entity_type, entity_id, patch_index)`; re-run overwrites. `change_score` REAL in [0,1] or NULL, rounded to 4 decimals. `content_hash` + `details` only (no snapshots).
 
-Storage (bounded): do not store full JSON snapshots. Per entity and patch store only `content_hash` + `details`.
+Algorithm (TypeScript terms):
 
-Table `entity_change_scores(entity_type, entity_id, patch_index, content_hash, change_score, details)`:
+1. Flatten entity into `Map<string, Leaf>` (key -> leaf). Leaf typed as `number | number[] | text | other`.
+2. Ignored keys (configurable): `image`, `tags`, `blurb`, `lore`, `skins`, `allytips`, `enemytips`, `partype`, burn strings (`cooldownBurn`, `effectBurn`), other cosmetic/UI keys.
+3. `content_hash` = sha256 of canonical JSON (sorted keys) of the filtered map (`node:crypto`, no new dependency). Equal -> `change_score = 0`.
+4. Otherwise sum contributions:
+   - number: `min(1, abs(new-old) / max(abs(old), 1e-6)) * 0.5`, per-leaf cap 0.5.
+   - number[] same length: `mean(relative change per index) * 0.5` (one contribution per array). Different length: 0.3.
+   - text: strip HTML, remove digits, lowercase; char-bigram Dice similarity; if < 0.9 -> 0.3; total text contribution per entity capped at 0.3.
+   - structural: ability/passive/effect added or removed -> 0.6 each, counted once (no text double count).
+   - item-only: recipe (`from[]`) changed -> 0.3; stat key added/removed -> 0.3; gold cost is a normal numeric leaf; only Summoner's Rift items (`maps["11"] == true`).
+   - runes: same rules as champion.
+5. `change_score = min(1, sum)`, rounded to 4 decimals.
 
-- `change_score`: 0–1 or NULL.
-- `details`: JSON list of contributions.
-- Unique key: `entity_type + entity_id + patch_index`. Re-running overwrites the row.
+Properties: pure reword alone can never reach suggested band (text capped at 0.3 < 0.6); magnitude matters beyond per-leaf cap; monotone in change size for fixed keys; key order never changes result.
 
-Pre-filtering:
+Bands (half-open): [0, 0.1) x1.0; [0.1, 0.3) x0.9; [0.3, 0.6) x0.5; [0.6, 1] creates `suggested` breakpoint (source `auto`, mode `downweight`, `weight_factor` 0.2). While a suggestion is pending or after rejection: effective weight = [0.3, 0.6) band weight (x0.5), never 1.0.
 
-- Ignored keys (configurable list): `image`, `tags`, `blurb`, `lore`, `skins`, `allytips`, `enemytips`, `partype`, and any purely cosmetic/UI key.
-- Items: only items available on Summoner's Rift (`maps["11"] == true`). Ignore other-map-only items so an ARAM-only change gives no false positive.
+Fallback (stated once): missing/unreadable/incomplete source, or no previous patch with data -> `change_score = NULL`, weight 1.0, warning logged (first patch: NULL, no warning). Never invent a score, never block the pipeline.
 
-Algorithm (implement exactly as documented):
+## 16. Breakpoints (D-047)
 
-1. Flatten each entity into key → leaf pairs. A leaf is a scalar or an array of numbers (e.g. `spells.1.cooldown` → `[10,9,8,7,6]`; `stats.armor` → `30`). Rank arrays are one leaf, not one leaf per rank.
-2. Compute `content_hash` of the filtered flattened dict for both patches. Equal → `change_score = 0`, stop.
-3. Otherwise sum contributions per key:
-   - Scalar number changed: `+= min(1, abs(new-old) / max(abs(old), 1e-6)) × 0.5`
-   - Number array changed, same length: `+= mean over indices of the relative change × 0.5` (one contribution per array). Different length: `+= 0.3`
-   - Text leaf (description/tooltip): strip HTML, remove digits, lowercase. If `difflib.SequenceMatcher` ratio < 0.9: `+= 0.3` per text field. Number-only text changes are ignored here (already counted by numeric leaves).
-   - Ability, passive, or item effect added/removed (key set differs or its name changed): `+= 0.6` each.
-   - Item only: recipe (`from[]`) changed: `+= 0.3`; stat key added/removed: `+= 0.3`; gold cost is a normal numeric leaf.
-4. `change_score = min(1.0, sum)`. Round to 4 decimals. Store each contribution in `details` (`key`, `old`, `new`, `contribution`) so a human can audit it.
+Table `data_breakpoints(id INTEGER PRIMARY KEY, scope_type TEXT NOT NULL, scope_id INTEGER, from_patch_index INTEGER NOT NULL, mode TEXT NOT NULL, weight_factor REAL, status TEXT NOT NULL, source TEXT NOT NULL, reason TEXT NOT NULL, created_at INTEGER NOT NULL)`:
 
-Fixtures (expected results):
+- CHECKs: `scope_type IN ('champion','item','rune','global')`; `scope_id IS NULL` iff `scope_type='global'`; `mode IN ('reset','downweight')`; `weight_factor IS NULL` for `reset` and `0 < weight_factor <= 1` for `downweight`; `status IN ('suggested','active','rejected')`; `source IN ('auto','manual')`.
+- Unique expression index `idx_data_breakpoints_unique` on `(scope_type, COALESCE(scope_id, -1), from_patch_index, source)`. Re-running detection cannot duplicate rows.
+- Affected data: `patch_index < from_patch_index`. Active breakpoint replaces the automatic change weight for that entity/patch; still multiplies with change weights of other patches.
+- Several active breakpoints on same entity/patch: `reset` dominates (0); otherwise `weight_factor`s multiply, floored at `minWeight`. One rule, same whether or not they share `from_patch_index`.
+- Scope table:
+  - champion: `baseline`, `pair_ally`, `pair_enemy`, `lane_vs`, `lane_full`, `rune_ctx`, `role_prob`
+  - item: `item_build` only (no `item_stats` table; champion/global breakpoints handle champion-wide shifts)
+  - rune: `rune_ctx`
+  - global: all aggregate tables
+- Lifecycle: `suggested -> active` (validate) or `rejected`. CLI `pnpm etl breakpoint list|add|validate|reject`; `pnpm etl status` shows "review needed" count. Manual `add` creates `active` row (`source='manual'`, mandatory `reason`). Web badge out of scope.
+- Hotfix limitation: hotfixes merged into the same `patch_index` never downweight same-patch data.
+- Breakpoint on pruned patch: no effect on stored data; recorded anyway for future patches.
 
-- scalar cooldown 10 → 9, nothing else: 0.05
-- base armor 30 → 36 plus scalar cooldown 10 → 9: 0.15 (clearly inside a band)
-- cooldown array `[10,9,8,7,6]` → `[9,8,7,6,5]`: about 0.065 (one contribution, not five)
-- an ability replaced by a new one (name changed): ≥ 0.6
-- identical entity: exactly 0
-- description reworded, no number change: 0.3
-- change only in an ignored key or an ARAM-only item: 0
+## 17. Edge cases
 
-Score → change weight (thresholds configurable, defaults; a score exactly equal to a threshold goes to the UPPER band, compared after rounding to 4 decimals):
-
-- `< 0.1`: ×1.0 ; `0.1–0.3`: ×0.9 ; `0.3–0.6`: ×0.5
-- `≥ 0.6`: no automatic weight; create a breakpoint with status `suggested` (source `auto`, mode `downweight`, `weight_factor 0.2`).
-- While a suggestion is pending: no effect on weights (UI shows a badge "review needed").
-- If rejected: use the 0.3–0.6 band weight (×0.5, configurable).
-- If validated: it behaves as an active breakpoint (§16).
-- Each change event applies to data with `patch_index <` the patch where the change happened.
-
-Fallback: source data missing, unreadable, or incomplete → `change_score = NULL`, change weight 1.0, log a warning. Never invent a score. Never block the pipeline. The first patch ever processed has no previous version: `change_score = NULL` (same fallback, no warning needed).
-
-## 16. Breakpoints (SPEC 5)
-
-Table `data_breakpoints(id, scope_type, scope_id, from_patch_index, mode, weight_factor, status, source, reason, created_at)`:
-
-- `scope_type`: `champion | item | global`; `scope_id` nullable if `global`.
-- `mode`: `reset | downweight`; `weight_factor` 0–1 (default 0.2).
-- `status`: `suggested | active | rejected`; `source`: `auto | manual`.
-- Affected data: `patch_index < from_patch_index`.
-- `reset`: weight 0 at read time, immediately. Rows become eligible for the purge job (soft-delete, then hard delete). Weights are never applied by deletion; deletion only follows a weight that is already 0.
-- `downweight`: change weight = `weight_factor`; rows kept until they leave the N window.
-- An active breakpoint **replaces** the automatic change weight for that entity and that patch; it still multiplies with change weights of other patches (§14).
-
-Scope (which tables are affected):
-
-- `champion`: `champion_stats`, `matchup_stats` (both as `champion` and as `enemy`, so its counters and the champions it counters), `build_stats` for that champion. NOT `item_stats`.
-- `item`: `item_stats` and `build_stats` containing it. NOT `champion_stats`, NOT `matchup_stats`.
-- `global`: all tables.
-
-## 17. Bayesian smoothing (SPEC 6)
-
-- `smoothed_winrate = (weighted_wins + K × p0) / (effective_games + K)`
-- `p0` = weighted average winrate of the role over the same window (same weights as the rest), `K` configurable (default 20).
-- Confidence is based on `effective_games`, not raw games.
-- Display both: smoothed winrate and effective sample size.
-
-## 18. Edge cases (SPEC 8)
-
-- Breakpoint on an already purged patch: no effect on stored data (already gone); record the breakpoint anyway for future patches.
-- Several breakpoints on the same entity: every active breakpoint whose `from_patch_index > patch_index` applies; a `reset` dominates (weight 0). Multiple `downweight` breakpoints on overlapping ranges multiply their `weight_factor`s (floored at `MIN_WEIGHT`), consistent with "across time = product" in §14; the rule is the same whether they share `from_patch_index` or not.
-- Hotfix received after aggregation: re-run change detection for the hotfix patch; new breakpoint rows apply at read time; weights are never stored (§13/§14), so nothing is "kept" — recomputed rows use the new breakpoint immediately.
-- Missing source data: `change_score = NULL`, weight 1.0, warning logged (§15 fallback). The first patch ever processed has no previous version: `change_score = NULL` (same fallback, no warning needed).
-- Entity renamed or ID changed between patches: treated as removed + added (key-set diff contributes 0.6 per §15); `content_hash` differs so a score is computed.
-- Cumulative weight hitting `MIN_WEIGHT`: floored at `MIN_WEIGHT` (default 0.05); never below, except `reset = 0`.
-- Newly released patch with very little data: displayed stats lean on older (decayed or downweighted) data; Bayesian smoothing (§17) partly compensates and the UI shows effective sample size.
+- Missing source data: `change_score = NULL`, weight 1.0, warning logged (first patch: NULL, no warning). Stated once; referenced by §15.
+- Entity renamed / ID changed between patches: new `entity_id` = new row; cross-patch comparison uses `entity_id`, so renamed entities are separate rows. Champion keyed by name id (e.g. `MonkeyKing`), mapped to numeric key via the `key` field (VERIFY against Data Dragon).
+- Burn strings (`cooldownBurn`, `effectBurn`) ignored (duplicate numeric arrays).
+- Item passives living in description HTML: VERIFY against real `item.json` before asserting structural detection.
+- Runes not scored (`runesReforged.json` not in change detection; UC3/`rune_ctx` unaffected).
+- One normative statement per rule; cross-references (§14, §15, §16) used elsewhere.

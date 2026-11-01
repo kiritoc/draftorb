@@ -50,3 +50,18 @@
 - Newly released patch with very little data: displayed stats lean on older data; smoothing partly compensates; UI shows effective sample size.
 - Idempotent re-run of detection: re-running overwrites the `entity_change_scores` row; identical entity → change_score 0.
 - Overlapping `downweight` breakpoints multiply their `weight_factor`s (floored at `MIN_WEIGHT`); a `reset` still dominates (weight 0); same rule whether they share `from_patch_index` or not.
+
+## 6. Retention, weights, change scoring, breakpoints (ETL)
+
+- Patch ordering across a season-change fixture: Data Dragon `versions.json` reversed -> oldest-first ordinal; 14.24 -> 15.1 orders via `patch_index`, not numeric compare.
+- Hotfix merge: all source versions sharing `major.minor` collapse to one `patch_index`.
+- Unknown label: refresh `patches` first; if still absent, `invalid` reject.
+- Prune idempotence: re-running `pnpm etl prune` deletes no additional matches; tombstone dedup (a relisted pruned match is not re-aggregated); `--dry-run` prints counts only.
+- Weight product across patches; min across entities; floor at `minWeight`; `reset` = 0 (no floor).
+- As-of evaluation: change events with `patch_index > asOf` have no effect; events at `<= asOf` apply.
+- Byte-identical aggregates when `changeWeightEnabled` is off or no events/breakpoints exist (regression test).
+- Band boundary values on half-open intervals: [0,0.1) x1.0, [0.1,0.3) x0.9, [0.3,0.6) x0.5, [0.6,1] suggested.
+- Pending/rejected suggestion: effective weight x0.5 (never 1.0); monotonicity (score never decreases as change size grows for fixed keys).
+- Breakpoint uniqueness and CHECK constraints; combination rule (reset dominates; downweight factors multiply).
+- Key-order invariance of change score; weight in [0,1]; non-increasing with age for fixed change events; prune idempotent.
+- Change-score fixtures on toy data (with shown arithmetic) AND real JSON fixtures: two consecutive real patches under `packages/etl/test/fixtures` (VERIFY Data Dragon structure).

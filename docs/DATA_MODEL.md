@@ -42,13 +42,48 @@ CREATE TABLE match_rejects (  -- matches seen and rejected, deduped across playe
   checked_at INTEGER NOT NULL
 );
 CREATE INDEX idx_part_champ_role ON participants(champion_id, role);
+
+CREATE TABLE patches (
+  patch_index INTEGER PRIMARY KEY,
+  version_label TEXT NOT NULL UNIQUE,   -- major.minor, matches matches.patch
+  released_at INTEGER
+);
+
+CREATE TABLE entity_change_scores (
+  entity_type TEXT NOT NULL CHECK (entity_type IN ('champion','item','rune')),
+  entity_id INTEGER NOT NULL,
+  patch_index INTEGER NOT NULL,
+  content_hash TEXT NOT NULL,
+  change_score REAL CHECK (change_score IS NULL OR (change_score >= 0 AND change_score <= 1)),
+  details TEXT NOT NULL,               -- JSON list of {key, old, new, contribution}
+  PRIMARY KEY (entity_type, entity_id, patch_index)
+);
+
+CREATE TABLE data_breakpoints (
+  id INTEGER PRIMARY KEY,
+  scope_type TEXT NOT NULL CHECK (scope_type IN ('champion','item','rune','global')),
+  scope_id INTEGER,                    -- NULL iff scope_type = 'global'
+  from_patch_index INTEGER NOT NULL CHECK (from_patch_index >= 1),
+  mode TEXT NOT NULL CHECK (mode IN ('reset','downweight')),
+  weight_factor REAL,                  -- NULL for reset; 0 < weight_factor <= 1 for downweight
+  status TEXT NOT NULL CHECK (status IN ('suggested','active','rejected')),
+  source TEXT NOT NULL CHECK (source IN ('auto','manual')),
+  reason TEXT NOT NULL CHECK (length(reason) > 0),
+  created_at INTEGER NOT NULL,
+  CHECK ((scope_type = 'global') = (scope_id IS NULL)),
+  CHECK (
+    (mode = 'reset' AND weight_factor IS NULL)
+    OR (mode = 'downweight' AND weight_factor IS NOT NULL AND weight_factor > 0 AND weight_factor <= 1)
+  )
+);
+CREATE UNIQUE INDEX idx_data_breakpoints_unique ON data_breakpoints(scope_type, COALESCE(scope_id, -1), from_patch_index, source);
 ```
 
-Notes: match ingestion persists the match row and its 10 participant rows in one transaction. A match is accepted only when each of two teams has exactly one participant in each role; invalid layouts are rejected and have no stored participants. `rank_score` = coarse tier/division score at collection time (approximation, documented in RIOT_API.md). Exact rank ordering uses the stored `tier`, `division`, and `lp` fields separately. The score uses the D-016 tier base and division bonus formula; it excludes LP and is distinct from the SPECS §3 weighting buckets. Store only needed fields. `match_rejects` records match ids already evaluated and rejected (wrong queue, too short, off-patch, invalid payload) so shared matches are not re-fetched per player; a `patch` reject keeps the match's actual patch so it is re-evaluated once a run's `--since-patch` window includes it (D-017).
+Notes: match ingestion persists the match row and its 10 participant rows in one transaction. A match is accepted only when each of two teams has exactly one participant in each role; invalid layouts are rejected and have no stored participants. `rank_score` = coarse tier/division score at collection time (approximation, documented in RIOT_API.md). Exact rank ordering uses the stored `tier`, `division`, and `lp` fields separately. The score uses the D-016 tier base and division bonus formula; it excludes LP and is distinct from the SPECS §3 weighting buckets. Store only needed fields. `match_rejects` records match ids already evaluated and rejected (wrong queue, too short, off-patch, invalid payload) so shared matches are not re-fetched per player; a `patch` reject keeps the match's actual patch so it is re-evaluated once a run's `--since-patch` window includes it (D-017). `reason` is `queue|short|patch|invalid|pruned`; `pruned` is written by `pnpm etl prune` (reason for deletion = retention, actual `patch`, `checked_at`) and is permanent: `findRejection` never deletes or re-evaluates it, whatever `--since-patch` says (D-044).
 
 `champions.json.roles` is kept (D-034, PROPOSED). `pnpm etl derive-roles` rewrites it with the roles observed for that patch's participants (probability > 0, canonical order). Champions with no observations keep the Data Dragon tag roles, read from an untouched `champions.bootstrap.json` snapshot. Re-run `derive-roles` after `static`, because `static` restores the tag roles.
 
-## Aggregated tables (SQLite) — recomputed per patch; role-generic (Phase 1 populates only `my_role = 'SUPPORT'`)
+## Aggregated tables (SQLite) — recomputed on every `aggregate` run; weights baked into `wins_w`, `games_w`, `games_w2` (SPECS §14, D-045); role-generic (Phase 1 populates only `my_role = 'SUPPORT'`)
 
 Rank buckets: every `rank_bucket` column and every exported `bucket` field uses the 8 SPECS §3 rank buckets (IRON, BRONZE, SILVER, GOLD, PLATINUM, EMERALD, DIAMOND, MASTER_PLUS), not the 10 raw rank tiers. `MANIFEST.rankBuckets` mirrors this same 8-value list.
 
@@ -86,6 +121,8 @@ Every exported row carries `games_w2` so the engine can compute `n_eff` (SPECS �
 Manual files (committed, hand-written, zod-validated): `data/manual/champion-tags.json`, `data/manual/item-tags.json`, `data/manual/gameplans/*.md`.
 
 `schemaVersion` is bumped once for this role-keyed layout, and again whenever a JSON format changes; the web app checks it and shows a clear error on mismatch.
+
+Exported JSON format and engine contracts are unchanged (SPECS §14, D-045). `n_eff` thresholds and D-021..D-027 semantics unchanged.
 
 ## Browser storage (apps/web, not exported, D-024)
 

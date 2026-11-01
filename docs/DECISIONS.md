@@ -123,7 +123,7 @@ Owner decision 2026-10-29.
 ### D-019 — `matches.avg_rank_score` = mean `rank_score` of known participants, plus `rank_known_count` — ACCEPTED
 
 - Context: `matches.avg_rank_score` exists in DATA_MODEL.md but its computation is unspecified. Every rank weight in SPECS §3 depends on the game's rank, so the reliability of that estimate must be visible. At ingestion time only discovered players have a `rank_score`; the player whose match triggered ingestion is always known.
-- Decision: `avg_rank_score` is the mean of known participant `players.rank_score` values, including the seed player's rank. If no other participants are known, it falls back to the seed player's `rank_score`. `matches.rank_known_count` stores the number of known ranks including the seed, so its minimum is 1; a value of 1 means only the seed's rank is known. T-014 enriches the ranks of the four bot-lane participants (league-v4 by puuid, cached in `players` so each player costs one call overall) and recomputes both columns.
+- Decision: `avg_rank_score` is the mean of known participant `players.rank_score` values, including the seed player's rank. If no other participants are known, it falls back to the seed player's `rank_score`. `matches.rank_known_count` stores the number of known ranks including the seed, so its minimum is 1; a value of 1 means only the seed's rank is known. T-014 enriches the ranks of the four bot-lane participants (league-v4 by puuid, cached in `players`) and recomputes both columns.
 - Alternatives: (a) seed player's score only — rejected, ignores other known participants; (b) leave NULL — rejected, downstream buckets need a number; (c) fetch all 10 ranks during T-013 — rejected, ~10x API cost per match; T-014 does a targeted, cached version.
 - Consequences: approximate by construction (documented approximation like D-008). Since only discovered Emerald+ players count as known, `avg_rank_score` is biased upward; T-014's bot-lane rank enrichment mitigates this. Aggregation can down-weight games with `rank_known_count = 1` using `unknownRankFactor`.
 
@@ -148,7 +148,7 @@ Owner decision 2026-10-29.
 ### D-022 — Runes and items compared like for like; definition of experts — ACCEPTED
 
 - Context: Raw item win rates are biased: late items only appear in long games and players who are ahead can afford more, so "item X has 58 % win rate" mostly measures game state. SPECS §3 also asks for players with `championGames >= 30`, but champion-mastery-v4 returns points, not games.
-- Decision: An item is only compared with other items bought in the same situation: same champion, same item slot `k` (0 = starting items, k >= 1 = k-th completed item), same purchase time bucket (5 min), same state bucket at purchase (`ahead|even|behind` from the team gold difference in the timeline, §8.2 thresholds), same enemy profile bucket (threat-weighted damage mix: `AD|AP|mixed`); for the `lane` phase (k = 0 always; k = 1 only when bought before `laneEndSeconds`, D-020) the context also contains the lane-context slots (top `contextSlots` by lane-phase influence). The score is the shrunk win rate of the item versus the average of all items bought in that same context, with the D-021 back-off chain dropping context dimensions in this order: lane champions -> enemy profile -> state -> time bucket -> (champion, k). Runes use the same chain with context = lane champions -> enemy damage mix -> champion. The `contextSlots` selection ranks slots by descending lane-phase influence (ties by side, ally before enemy, then role order TOP, JUNGLE, MID, ADC, SUPPORT); back-off drops them in the reverse order, least influential first, so the strongest matchup signal survives longest. Experts: a participant counts as an expert on a champion when they have `>= minChampGames` (default 30, config) games on that champion in our own `participants` data within the patch window. The champion-mastery-v4 fallback (`championPoints >= minMasteryPoints`, default 50 000, config) applies only to participants of the role the recommendation is built from (the user's role): mastery is fetched once per (puuid, champion) pair via the by-champion endpoint (`champion-mastery-v4 .../by-puuid/{puuid}/by-champion/{id}`) and cached in `participants.mastery_points` for that champion's rows only — mastery is champion-specific, so a player's points on one champion never bleed into another. Mastery points span all queues and years, so the fallback is an approximation like D-008. `is_expert` is derived: it is recomputed at every aggregation run (idempotent) from the current in-data counts plus the cached `mastery_points`, never at extraction time, so a participant becomes expert as more of their games accumulate. Known limitation: seed players have their full history ingested while other participants appear sporadically, so the in-data test favors seeds; the mastery fallback only covers participants of the recommended role.
+- Decision: An item is only compared with other items bought in the same situation: same champion, same item slot `k` (0 = starting items, k >= 1 = k-th completed item), same purchase time bucket (5 min), same state bucket at purchase (`ahead|even|behind` from the team gold difference in the timeline, §8.2 thresholds), same enemy profile bucket (threat-weighted damage mix: `AD|AP|mixed`); for the `lane` phase (k = 0 always; k = 1 only when bought before `laneEndSeconds`, D-020) the context also contains the lane-context slots (top `contextSlots` by lane-phase influence). The score is the shrunk win rate of the item versus the average of all items bought in that same context, with the D-021 back-off chain dropping context dimensions in this order: lane champions -> enemy profile -> state -> time bucket -> (champion, k). Runes use the same chain with context = lane champions -> enemy damage mix -> champion. The `contextSlots` selection ranks slots by descending lane-phase influence (ties by side, ally before enemy, then role order TOP, JUNGLE, MID, ADC, SUPPORT); back-off drops them in the reverse order, least influential first, so the strongest matchup signal survives longest. Experts: a participant counts as an expert on a champion when they have `>= minChampGames` (default 30, config) games on that champion in our own `participants` data within the patch window. The champion-mastery-v4 fallback (`championPoints >= minMasteryPoints`, default 50 000, config) applies only to participants of the role the recommendation is built from (the user's role): mastery is fetched once per (puuid, champion) pair via the by-champion endpoint (`champion-mastery-v4 .../by-puuid/{puuid}/by-champion/{id}`) and cached in `participants.mastery_points` for that champion's rows only — mastery is champion-specific, so a player's points on one champion never bleed into another. Mastery points span all queues and years, so the fallback is an approximation like D-008. `is_expert` is derived: ... (line truncated to 2000 chars)
 - Alternatives: (a) raw per-item win rate — rejected, state and survival bias; (b) only pick rate ("what others build") — rejected, ignores outcome; (c) mastery points only — rejected, points also accumulate in other queues and over years.
 - Consequences: at most one champion-mastery-v4 call per (puuid, champion) pair, and only for participants of the recommended role (bounded API cost); `participants` gains `mastery_points` and `is_expert` (migration 004, T-011.b); a second pass in T-014 fills `champion_games` and `mastery_points` (`is_expert` is derived at aggregation). Timeline ingestion (T-051) must record, per purchase, its completed-item index, game time and team gold difference; results are observational ("players who bought X here won Y %"), never presented as causal, and always shown with sample size and pick share. If rejected: SPECS §8.2 keeps only rule-based item scoring and T-011.b's item/expert columns and T-051/T-056's like-for-like work are dropped.
 
@@ -238,7 +238,7 @@ Owner decision 2026-10-29.
   6. **`conf_lane`.** `lane_vs` is scaled by the product of the lane-group enemy confidences only (the ally partner is not part of that context). `lane_full` uses the product over allies and enemies.
   7. **`compNeed` ignores enemies until T-025.** Only tagged board allies count as evidence, including allies whose role could not be inferred.
   8. **Ambiguous fixed roles.** When role inference fails and two or more slots on a team are fixed to the same role, those slots are dropped from role-dependent layers (pairs and lane), so they cannot form a fake complete lane.
-  9. **Unknown raw counts.** `insufficientData.rawGames` and the 6th baseline column are optional; a missing or 0 count is omitted rather than reported (golden rule 8, B-025).
+  9. **Unknown raw counts.** `insufficientData.rawGames` and the 6th baseline column are optional; a missing or 0 count is omitted rather than reported (golden rule 8; B-025).
   10. **Warnings are codes.** `counteredBy:<ROLE>:<championId>` and `offRole`; UI text lives in the web `strings` module. Comp needs are exposed only as `filled` category codes.
   11. **Hard-counter delta = reason delta.** The warning uses the `deltaPp` of the layer-1 `counter` reason (running log-odds), so warning and reason never disagree.
   12. **Ranking ties.** Scores are compared exactly; only exactly equal scores tie, broken by championId ascending.
@@ -250,7 +250,7 @@ Owner decision 2026-10-29.
 
 Accepted by the owner on 2026-10-31. SPECS §5/§7 text derived from this decision is normative.
 
-### D-031 — `role_prob` counts a single patch, no recency decay — PROPOSED
+### D-031 — `role_prob` counts a single patch, no recency decay — SUPERSEDED by D-035
 
 - Context: SPECS §3 applies recency decay `decay^(currentPatchIndex - gamePatchIndex)` at aggregation time and D-017 keeps older patches for that purpose. §3 names draft probabilities (pairs, matchups, baselines) but not `role_prob`, and DATA_MODEL.md says aggregated tables are "recomputed per patch". T-015 had to choose between single-patch counts and decay-weighted counts across patches.
 - Assumption (T-015): `aggregateRoleProb` counts only participants of one target patch (default: highest stored patch, numeric major.minor compare as in D-017). `role_prob` has no `patch` column and holds one patch at a time. A target patch with no participants leaves the table unchanged; a malformed patch is a usage error.
@@ -263,16 +263,18 @@ Accepted by the owner on 2026-10-31. SPECS §5/§7 text derived from this decisi
 - Decision: `@draftorb/etl` depends on `@draftorb/engine` (`workspace:*`, internal, no new third-party code or license) and imports `combinedGameWeight`, `bucketIndex`, `RANK_BUCKET_ORDER` and `DEFAULT_CONFIG`. `packages/etl/tsconfig.json` references `../engine`.
 - Alternatives: duplicate the kernel in ETL (rejected: the two copies could drift apart); move the kernel to `@draftorb/shared` (deferred: a larger refactor outside T-016).
 - Consequences: ETL builds after engine. Engine must not import from ETL, which would create a cycle. Changes to the kernel change aggregated baselines, so the ETL must be re-run.
-- Owner decision 2026-10-31.
 
-### D-033 — Recency `patchIndex` and game rank bucket in ETL aggregation — ACCEPTED
+Owner decision 2026-10-31.
+
+### D-033 — Recency `patchIndex` and game rank bucket in ETL aggregation — SUPERSEDED by T-019.b
 
 - Context: SPECS §3 defines recency as `decay ^ (currentPatchIndex - patchIndex)` but does not define `patchIndex`. It also does not say how a match's `avg_rank_score` maps to a rank bucket. T-016 needs both.
 - Question: should a patch gap (no stored games on some patches) count as one decay step or as the real number of patches released in between?
 - Decision: `patchIndex` is dense over the distinct stored patches (sorted numerically with `comparePatches`), up to and including the snapshot patch. The game bucket is `clamp(floor(avg_rank_score), 0, 7)`, i.e. the `RANK_BUCKET_ORDER` index. The snapshot patch is promoted to `currentPatchIndex` even when not yet stored, so recency is measured from it.
 - Alternatives: index by real release order (needs a patch list, e.g. from Data Dragon versions); use the distance in minor versions (breaks across major versions).
 - Consequences: with gaps in the collected data, older patches decay less than real time would suggest. T-017 pair aggregation must use the same indexing so baselines and pairs stay consistent.
-- Owner decision 2026-10-31.
+
+Owner decision 2026-10-31.
 
 ### D-034 — Champion roles derived from role-prob data, `champions.json.roles` kept — PROPOSED
 
@@ -303,6 +305,122 @@ Accepted by the owner on 2026-10-31. SPECS §5/§7 text derived from this decisi
   - Drop mastery fallback entirely and rely only on `champion_games`. Rejected: D-022 specifies the fallback for participants of the user's role.
   - Drop rank-based weighting entirely and treat all experts equally. Rejected: D-022 says "rank-based expertWeight" is a future addition.
 - Consequences: T-018 stores a single expert-weighted `rune_ctx` table with no rank bucket column. Follow-up work will require a migration if rank buckets are added. Mastery points are already stored in `participants` from T-014 but are not used in T-018.
+
+### D-043 — Patch index from Data Dragon versions.json — PROPOSED
+
+- Context: SPECS §12 requires a `patches(patch_index, version_label, released_at)` table. `matches.patch` is TEXT `major.minor` (RIOT_API.md). Data Dragon `versions.json` lists versions newest-first; hotfixes share a `major.minor` label.
+- Decision:
+  - Table `patches(patch_index INTEGER PRIMARY KEY, version_label TEXT NOT NULL UNIQUE, released_at INTEGER)`.
+  - `version_label` = `major.minor`, identical to `matches.patch`.
+  - `patch_index` assigned once, oldest-first starting at 1, append-only, never reassigned or renumbered.
+  - Ordering source: Data Dragon `versions.json`, reversed (newest-first -> oldest-first ordinal).
+  - Hotfixes: all source versions sharing the same `major.minor` label collapse to one `patch_index`; one patch = one `patch_index`; the grouping rule is defined here, once.
+  - One parse is allowed and defined once: `gameVersion` -> `major.minor` label. Version strings are never compared numerically for age, windows, or breakpoints; age/window/breakpoint logic uses `patch_index` only.
+  - A match whose label is absent from `patches`: refresh `patches` from the source first; if still absent, a typed error / `invalid` reject (never a silent skip), distinct from `patch` and `pruned`.
+- Alternatives:
+  - Numeric version comparison for age — rejected: the source ordinal is the source of truth; parse-once maps to `patch_index`, then only ordinals are used.
+  - Dense-over-stored-patches index (D-033) — rejected: gaps in collected data distort recency.
+- Consequences: D-033's dense-over-stored-patches index and the numeric-compare part of D-017 are superseded by T-019.b (not before). Aggregate tables are rebuilt each run, so switching is a code change plus re-run, not a data migration. With gaps in collected data, recency follows real patch distance, not stored-patch distance.
+
+### D-044 — Retention and prune — PROPOSED
+
+- Context: SPECS §13 requires bounded retention. D-017 leaves "pruning old patches" as a separate concern. `matches`/`participants`/`item_events` have ON DELETE CASCADE.
+- Decision:
+  - No parallel stats tables. Existing aggregate tables (`baseline`, `pair_ally`, `pair_enemy`, `lane_vs`, `lane_full`, `rune_ctx`, `item_build`, `role_prob`) are the only statistics store; recomputed on every `aggregate` run with weights baked in (SPECS §14, D-045).
+  - Raw `matches`/`participants`/`item_events` kept for the last N patches only (`retentionPatches`, default 8, ETL config). The retention window must contain the frozen holdout plus the training window (D-023/T-027.a).
+  - `pnpm etl prune --keep-patches N [--dry-run]`: in ONE transaction, for matches with `patch_index <= latest - N`, write a `match_rejects` tombstone with reason `pruned` (actual `patch`, `checked_at`) and delete the match (cascade removes `participants`/`item_events`). Idempotent. `--dry-run` prints counts only.
+  - `match_rejects.reason` list becomes `queue|short|patch|invalid|pruned`. This extends D-017's list; do not edit D-017. `patch` keeps its D-017 meaning (re-evaluated when a run's window includes it). `pruned` is permanent: `findRejection` never deletes or re-evaluates it, whatever `--since-patch` says.
+  - `--reset` (D-018) clears `queue|short|patch|invalid` rejects and keeps `pruned`. Only the explicit flag `--reset-tombstones` clears `pruned`; its help text warns that pruned matches become fetchable again.
+  - Default ingestion window: `patch_index >= latest - retentionPatches + 1`, so ingestion never re-adds data the next prune would delete. An explicit `--since-patch` below this bound is a usage error unless `--reset-tombstones` is also given.
+  - If `match_rejects.reason` has a CHECK or enum in the real migrations, T-019.c adds a migration (next free number) allowing `pruned`. If not, none.
+  - Aggregate tables are rebuilt each run: no purge, no soft delete, no grace period. `reset` breakpoints give weight 0 at aggregation; they do not delete data. Retention and weighting are independent.
+  - Invariant: rows are never deleted to express a weight; they are deleted only for retention (outside the window).
+- Size estimate (assumptions stated): assume `M` matches per patch (unknown; parameterize), ~20 stored rows per match (1 match + 10 participants + ~8 item events + 1 tombstone), ~150 bytes per row. Retained rows ≈ N × M × 20 × 150 bytes. For N=8, M=1000: ≈ 2.4 MB. Tombstones ≈ N × M × 1 row × ~60 bytes ≈ 0.5 MB. Aggregate tables bounded by key cardinality × 8 rank buckets × N patches, not by match count.
+- Alternatives:
+  - Keep full history — rejected: unbounded growth.
+  - Soft-delete + grace period — rejected: complexity without benefit since aggregates are rebuilt.
+  - Parallel stats tables (`champion_stats`, `matchup_stats`, `item_stats`, `build_stats`) — rejected: no producer/consumer, cannot represent engine consumption (F2/F3).
+- Consequences: prune must run before backtest evaluation; the holdout patch must be inside the window. Pruned matches cannot return through any ingestion or reset path except `--reset-tombstones`.
+
+### D-045 — Weight formula — PROPOSED
+
+- Context: SPECS §14 needs one weight formula combining rank kernel, reliability, recency, and change weight. Two decays (0.85 in section 3, 0.7 in the PR) conflict; keep one: `decay = 0.85`.
+- Decision:
+  - Single formula (SPECS §14), stated once: `w = rankKernel × reliability × recency × changeWeight`.
+    - `rankKernel(gameBucket, userBucket)`, `reliability(rank_known_count, unknownRankFactor)`, `recency(decay, currentPatchIndex - patchIndex)` exist (SPECS §3, `combinedGameWeight`, D-032, D-033).
+    - `decay = 0.85` (SPECS §3). There is no separate decay constant distinct from `decay`.
+    - `changeWeight(entities, patchIndex, asOf)`: across time = product of change weights at patches q with `p < q <= asOf`; across entities of the row's entity set INCLUDING the global entity = min; floor `minWeight` (default 0.05, ETL config) except `reset` = 0 (no floor); only events with `patch_index > p` AND `patch_index <= asOf` apply; `asOf` = snapshot's `currentPatchIndex` (backtest: patch before holdout).
+  - Entity set per aggregate table: baseline {champion}; pair_ally {champion, ally champion}; pair_enemy {champion, enemy champion}; lane_vs {champion, opp1, opp2}; lane_full {champion, partner, opp1, opp2}; rune_ctx {champion} plus every rune id of the row's page (keystone, primary style, sub style, selected perks from `perks_json`; stat shards excluded); item_build {champion, item}; role_prob {champion}. The global entity is added to every set. For `rune_ctx` the weight is computed per game from that participant's own page.
+  - Weights baked into `wins_w`, `games_w`, `games_w2`; `n_eff`, thresholds, exports, engine unchanged.
+  - Purity: engine `changeWeight` is pure, receives plain data (events, breakpoints); SQLite reads stay in ETL.
+  - Safety: change weighting disabled by default (`changeWeightEnabled` = false, ETL config; neutral weights 1.0). Enabled only after T-027.a passes the D-023 gate. With flag on and no events/breakpoints, aggregates byte-identical to current output (regression test).
+  - Every new parameter (`minWeight`, band edges/weights, default `weight_factor`) is a prior; changes only through the D-023 gate.
+- Alternatives:
+  - A second decay constant distinct from `decay=0.85` — rejected: two decays on same rows.
+  - Read-time weights in the web app — rejected: D-002 precomputes JSON; only aggregation/export time is coherent.
+- Consequences: config names camelCase (`changeWeightEnabled`, `minWeight`, `retentionPatches`) in ETL config; engine parameters stay in `engine/config.ts`.
+
+### D-046 — Automatic change score — PROPOSED
+
+- Context: SPECS §15 needs deterministic change scoring from Data Dragon without full snapshots. Python `difflib` is not a TypeScript dependency; deterministic char-bigram Dice specified instead.
+- Decision:
+  - Command `pnpm etl changes <patch>` writes `entity_change_scores(entity_type, entity_id, patch_index, content_hash, change_score, details)`; `entity_type` IN (`champion`,`item`,`rune`); unique key `(entity_type, entity_id, patch_index)`; re-run overwrites. `change_score` REAL in [0,1] or NULL, rounded to 4 decimals. `content_hash` + `details` only (no snapshots). Data Dragon versions assumed immutable on CDN; previous patch's files re-downloaded when needed (VERIFY).
+  - Algorithm (TypeScript terms):
+    1. Flatten entity into `Map<string, Leaf>` (key -> leaf). Leaf typed as `number | number[] | text | other`.
+    2. Ignored keys (configurable): `image`, `tags`, `blurb`, `lore`, `skins`, `allytips`, `enemytips`, `partype`, burn strings (`cooldownBurn`, `effectBurn`), other cosmetic/UI keys.
+    3. `content_hash` = sha256 of canonical JSON (sorted keys) of the filtered map (`node:crypto`, no new dependency). Equal -> `change_score = 0`.
+    4. Otherwise sum contributions:
+       - number: `min(1, abs(new-old) / max(abs(old), 1e-6)) * 0.5`, per-leaf cap 0.5.
+       - number[] same length: `mean(relative change per index) * 0.5` (one contribution per array). Different length: 0.3.
+       - text: strip HTML, remove digits, lowercase; char-bigram Dice similarity; if < 0.9 -> 0.3; total text contribution per entity capped at 0.3.
+       - structural: ability/passive/effect added or removed -> 0.6 each, counted once (no text double count).
+       - item-only: recipe (`from[]`) changed -> 0.3; stat key added/removed -> 0.3; gold cost is a normal numeric leaf; only Summoner's Rift items (`maps["11"] == true`).
+       - runes: same rules as champion (no special casing beyond `entity_type`).
+    5. `change_score = min(1, sum)`, rounded to 4 decimals.
+  - Properties (tested): pure reword alone can never reach suggested band (text capped at 0.3 < 0.6); magnitude matters beyond per-leaf cap; monotone in change size for fixed keys; key order never changes result (canonical JSON).
+  - Bands (half-open): [0, 0.1) x1.0; [0.1, 0.3) x0.9; [0.3, 0.6) x0.5; [0.6, 1] creates `suggested` breakpoint (source `auto`, mode `downweight`, `weight_factor` 0.2). While a suggestion is pending or after rejection: effective weight = [0.3, 0.6) band weight (x0.5), never 1.0 (F18).
+  - Fallback: missing/unreadable/incomplete source, or no previous patch with data -> `change_score = NULL`, weight 1.0, warning logged (first patch: NULL, no warning). Stated once in SPECS §15; all other sections reference it. Never invent a score, never block the pipeline.
+  - Fixtures (arithmetic shown in SPECS §15): cooldown scalar 10->9 = 0.05 ([0,0.1) x1.0); armor 30->36 (0.1) + cooldown 10->9 (0.05) = 0.15 ([0.1,0.3) x0.9); cooldown array [10,9,8,7,6]->[9,8,7,6,5] ≈ 0.065 ([0,0.1) x1.0); ability replaced = 0.6 ([0.6,1] suggested); identical = 0; reword only = 0.3 (capped, [0.3,0.6) x0.5, not suggested); ignored key / ARAM-only item = 0.
+  - Real-JSON fixtures: two consecutive real patches under `packages/etl/test/fixtures` (VERIFY Data Dragon structure before asserting).
+- Alternatives:
+  - Python `difflib.SequenceMatcher` — rejected: project is TypeScript (D-001); deterministic char-bigram Dice specified instead.
+  - Full JSON snapshots — rejected: unbounded (D-006).
+  - LLM scoring — rejected: non-deterministic (D-006).
+  - Pending suggestion = weight 1.0 — rejected: biggest changes get least protection.
+- Consequences: no new dependency (`node:crypto` is built-in). `content_hash`/`details` stored, not snapshots.
+
+### D-047 — Breakpoints — PROPOSED
+
+- Context: SPECS §16 needs manual/validated override of automatic change weights. The PR's table lacks uniqueness, CHECK constraints, and a lifecycle.
+- Decision:
+  - Table `data_breakpoints(id INTEGER PRIMARY KEY, scope_type TEXT NOT NULL, scope_id INTEGER, from_patch_index INTEGER NOT NULL, mode TEXT NOT NULL, weight_factor REAL, status TEXT NOT NULL, source TEXT NOT NULL, reason TEXT NOT NULL, created_at INTEGER NOT NULL)` with CHECKs: `scope_type IN ('champion','item','rune','global')`; `scope_id IS NULL` iff `scope_type='global'`; `mode IN ('reset','downweight')`; `weight_factor IS NULL` for `reset` and `0 < weight_factor <= 1` for `downweight`; `status IN ('suggested','active','rejected')`; `source IN ('auto','manual')`; `reason NOT NULL` with `length(reason) > 0`; `from_patch_index >= 1`.
+  - Unique expression index `idx_data_breakpoints_unique` on `(scope_type, COALESCE(scope_id, -1), from_patch_index, source)`. Re-running detection cannot duplicate rows.
+  - Affected data: `patch_index < from_patch_index`. An active breakpoint replaces the automatic change weight for that entity/patch with its `weight_factor`; still multiplies with change weights of other patches. Several active breakpoints on same entity/patch: `reset` dominates (0); otherwise `weight_factor`s multiply, floored at `minWeight`. One rule, same whether or not they share `from_patch_index`. A breakpoint applies at aggregation to any retained data with `patch_index < from_patch_index`; if none remains it has no effect (F39).
+  - Scope table (which aggregate tables each scope affects):
+    - champion: `baseline`, `pair_ally`, `pair_enemy`, `lane_vs`, `lane_full`, `rune_ctx`, `role_prob` (rows keyed by champion)
+    - item: `item_build` only. Champion-wide win-rate shifts from item reworks are handled by `champion` or `global` breakpoints (documented limitation; cascade is a rejected alternative).
+    - rune: `rune_ctx`
+    - global: all aggregate tables
+  - Lifecycle: `suggested -> active` (validate) or `rejected`. CLI `pnpm etl breakpoint list|add|validate|reject`. `pnpm etl status` shows "review needed" count for suggested breakpoints. Web badge out of scope. Manual `add` creates `active` row with `source='manual'` and mandatory `reason`.
+  - Hotfix limitation: hotfixes merged into the same `patch_index` never downweight same-patch data (known limitation; change events apply to `patch_index <` the change patch).
+  - Breakpoint on pruned patch: see the affected-data rule above (`patch_index < from_patch_index`; no retained data = no effect).
+- Alternatives:
+  - item breakpoint cascades to champion tables — rejected: champion/global breakpoints are the tool.
+  - `weight_factor = 0` as reset — rejected: reset is its own mode; require 0 < weight_factor <= 1.
+- Consequences: `status` enum has no `validated` (use `active`); `weight_factor` NOT NULL required only for downweight.
+
+### D-048 — No separate Bayesian smoothing — PROPOSED
+
+- Context: SPECS §17 proposed smoothing `smoothed_winrate = (weighted_wins + K × p0) / (effective_games + K)` with data-driven `p0`.
+- Decision: NOT adopted.
+  - D-021 layered shrinkage on equivalent counts already provides Bayesian-style smoothing (`k` in raw-game units).
+  - `p0` = weighted role average equals 0.5 under complete-role matches (one participant per role per team), so it adds nothing over §5's fixed 0.5 prior.
+  - `K = 20` semantics conflict with D-021's equivalent-count conversion.
+  - For items, `p0` is undefined (no role).
+- Alternatives:
+  - Adopt as is — rejected: redundant with D-021; `p0` = 0.5 adds nothing.
+  - Adopt with equivalent-count conversion — rejected: still redundant; D-021 shrinkage is the single smoothing mechanism.
+- Consequences: no `K`, `p0`, or smoothing table. Edge cases in §17 reference §5/D-021 for confidence.
 
 ### Template
 

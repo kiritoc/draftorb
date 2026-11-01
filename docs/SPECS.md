@@ -198,6 +198,7 @@ Non-support roles, accounts/login, pool sync across devices or auto-import of th
 ## 12. Patch index (SPEC 1)
 
 Table `patches(patch_index, version_label, released_at)`:
+
 - `patch_index`: sequential integer, unique, starting at 1. One row per "patch".
 - Ordering comes from the ordered versions list of the data source (e.g. Data Dragon `versions.json`), **never** from parsing version numbers. Season/format changes break numeric comparison (e.g. 14.24 → 15.1), so ordinal position in the source's ordered list is the source of truth.
 - Hotfixes are merged into their major patch. The grouping rule is configurable and documented once (D-036). One "patch" = one `patch_index`.
@@ -207,16 +208,17 @@ Table `patches(patch_index, version_label, released_at)`:
 
 No raw matches are stored long term. Ingestion aggregates immediately into separate tables; every table has `patch_index`, `games`, `wins`, `deleted_at`:
 
-| Table | Key columns |
-|---|---|
-| `champion_stats` | `patch_index`, `champion`, `role` |
-| `matchup_stats` | `patch_index`, `role`, `champion`, `enemy_champion` (directional) |
-| `item_stats` | `patch_index`, `item` |
-| `build_stats` | `patch_index`, `champion`, `role`, `item` |
+| Table            | Key columns                                                       |
+| ---------------- | ----------------------------------------------------------------- |
+| `champion_stats` | `patch_index`, `champion`, `role`                                 |
+| `matchup_stats`  | `patch_index`, `role`, `champion`, `enemy_champion` (directional) |
+| `item_stats`     | `patch_index`, `item`                                             |
+| `build_stats`    | `patch_index`, `champion`, `role`, `item`                         |
 
 Separate tables are required so breakpoints/scopes (§16) can affect only the relevant data.
 
 Rules:
+
 - Weights are never applied by deleting or editing rows. They are computed at read time (§14). Only the purge job removes rows. Deletion only follows a weight that is already 0; weights are never applied by deletion.
 - A `match_id` dedup table is kept, limited to the last 2 `patch_index` values.
 - Config `RETENTION_PATCHES` (N, default 8). Config `MIN_GAMES_STORED` (default 5).
@@ -250,15 +252,18 @@ Known limit: Data Dragon has few details on ratios and some effects, so some rea
 Storage (bounded): do not store full JSON snapshots. Per entity and patch store only `content_hash` + `details`.
 
 Table `entity_change_scores(entity_type, entity_id, patch_index, content_hash, change_score, details)`:
+
 - `change_score`: 0–1 or NULL.
 - `details`: JSON list of contributions.
 - Unique key: `entity_type + entity_id + patch_index`. Re-running overwrites the row.
 
 Pre-filtering:
+
 - Ignored keys (configurable list): `image`, `tags`, `blurb`, `lore`, `skins`, `allytips`, `enemytips`, `partype`, and any purely cosmetic/UI key.
 - Items: only items available on Summoner's Rift (`maps["11"] == true`). Ignore other-map-only items so an ARAM-only change gives no false positive.
 
 Algorithm (implement exactly as documented):
+
 1. Flatten each entity into key → leaf pairs. A leaf is a scalar or an array of numbers (e.g. `spells.1.cooldown` → `[10,9,8,7,6]`; `stats.armor` → `30`). Rank arrays are one leaf, not one leaf per rank.
 2. Compute `content_hash` of the filtered flattened dict for both patches. Equal → `change_score = 0`, stop.
 3. Otherwise sum contributions per key:
@@ -270,6 +275,7 @@ Algorithm (implement exactly as documented):
 4. `change_score = min(1.0, sum)`. Round to 4 decimals. Store each contribution in `details` (`key`, `old`, `new`, `contribution`) so a human can audit it.
 
 Fixtures (expected results):
+
 - scalar cooldown 10 → 9, nothing else: 0.05
 - base armor 30 → 36 plus scalar cooldown 10 → 9: 0.15 (clearly inside a band)
 - cooldown array `[10,9,8,7,6]` → `[9,8,7,6,5]`: about 0.065 (one contribution, not five)
@@ -279,6 +285,7 @@ Fixtures (expected results):
 - change only in an ignored key or an ARAM-only item: 0
 
 Score → change weight (thresholds configurable, defaults; a score exactly equal to a threshold goes to the UPPER band, compared after rounding to 4 decimals):
+
 - `< 0.1`: ×1.0 ; `0.1–0.3`: ×0.9 ; `0.3–0.6`: ×0.5
 - `≥ 0.6`: no automatic weight; create a breakpoint with status `suggested` (source `auto`, mode `downweight`, `weight_factor 0.2`).
 - While a suggestion is pending: no effect on weights (UI shows a badge "review needed").
@@ -291,6 +298,7 @@ Fallback: source data missing, unreadable, or incomplete → `change_score = NUL
 ## 16. Breakpoints (SPEC 5)
 
 Table `data_breakpoints(id, scope_type, scope_id, from_patch_index, mode, weight_factor, status, source, reason, created_at)`:
+
 - `scope_type`: `champion | item | global`; `scope_id` nullable if `global`.
 - `mode`: `reset | downweight`; `weight_factor` 0–1 (default 0.2).
 - `status`: `suggested | active | rejected`; `source`: `auto | manual`.
@@ -300,6 +308,7 @@ Table `data_breakpoints(id, scope_type, scope_id, from_patch_index, mode, weight
 - An active breakpoint **replaces** the automatic change weight for that entity and that patch; it still multiplies with change weights of other patches (§14).
 
 Scope (which tables are affected):
+
 - `champion`: `champion_stats`, `matchup_stats` (both as `champion` and as `enemy`, so its counters and the champions it counters), `build_stats` for that champion. NOT `item_stats`.
 - `item`: `item_stats` and `build_stats` containing it. NOT `champion_stats`, NOT `matchup_stats`.
 - `global`: all tables.

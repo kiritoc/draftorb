@@ -129,13 +129,13 @@ Recommendation {
 DraftResult {
   recommendations: Recommendation[]                    // overall ranking: ALL scored candidates, never truncated by the engine (D-024)
   schemaVersion: 1   // DRAFT_RESULT_SCHEMA_VERSION, bumped on every breaking output change (D-030)
-  insufficientData: { championId, nEff: number, rawGames?: number }[]  // baseline n_eff < minGames (§5), unscored; rawGames omitted when unknown (B-025)
+  insufficientData: { championId, nEff: number, rawGames?: number }[]  // baseline n_eff < minGames (§5), unscored; rawGames omitted when unknown (B-033)
   poolRecommendations?: Recommendation[]               // only when input.pool is non-empty: scored pool champions in overall order (`rank` = overall rank, `poolRank` = rank in the pool)
   poolUnavailable?: { championId, reason: 'insufficientData' | 'unknownChampion' | 'picked' }[]  // pool champions without a score (numbers live in insufficientData); 'picked' = already on the board
 }
 ```
 
-Sorted desc. Always show why + sample sizes. Never show a % without sample size. A `Reason.n` and `Recommendation.reliability.games` carry the **effective sample size** `n_eff = (sum w)^2 / sum w^2` (a real number, not a raw game count), because every threshold and `lowData` flag in §5/§7 is evaluated against `n_eff`; `DraftResult.insufficientData` separately exposes `nEff` and `rawGames` for champions that fail the baseline gate. Reason type `lane`, `DraftResult.insufficientData` and the pool fields (`poolRank`, `poolRecommendations`, `poolUnavailable`) are added to the shared schemas by T-002.b.
+Sorted desc. Always show why + sample sizes. Never show a % without sample size. A `Reason.n` and `Recommendation.reliability.nEff` carry the **effective sample size** `n_eff = (sum w)^2 / sum w^2` (a real number, not a raw game count), because every threshold and `lowData` flag in §5/§7 is evaluated against `n_eff`; `DraftResult.insufficientData` separately exposes `nEff` and `rawGames` for champions that fail the baseline gate. Reason type `lane`, `DraftResult.insufficientData` and the pool fields (`poolRank`, `poolRecommendations`, `poolUnavailable`) are added to the shared schemas by T-002.b.
 
 ## 7.1 Recommendation lists (D-024)
 

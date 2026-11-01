@@ -8,22 +8,22 @@
 
 ## Epic status
 
-| Epic           | Status      | Notes                                                                                                             |
-| -------------- | ----------- | ----------------------------------------------------------------------------------------------------------------- |
-| E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b DONE                                                                                   |
-| E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e, T-014, T-015, T-015.b DONE; T-016..T-019 TODO |
-| E2 Engine      | IN PROGRESS | T-020 DONE; T-021 DONE; T-022 DONE; T-023 DONE                                                                    |
-| E3 Web MVP     | NOT STARTED |                                                                                                                   |
-| E4 Runes       | NOT STARTED |                                                                                                                   |
-| E5 Items       | NOT STARTED |                                                                                                                   |
-| E6 Live        | NOT STARTED |                                                                                                                   |
-| E7 Vision      | NOT STARTED |                                                                                                                   |
+| Epic           | Status      | Notes                                                                                                                                  |
+| -------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b DONE                                                                                                        |
+| E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e, T-014, T-015, T-015.b DONE; T-015.c, T-016 DONE; T-017..T-019 TODO |
+| E2 Engine      | IN PROGRESS | T-020 DONE; T-021 DONE; T-022 DONE; T-023 DONE                                                                                         |
+| E3 Web MVP     | NOT STARTED |                                                                                                                                        |
+| E4 Runes       | NOT STARTED |                                                                                                                                        |
+| E5 Items       | NOT STARTED |                                                                                                                                        |
+| E6 Live        | NOT STARTED |                                                                                                                                        |
+| E7 Vision      | NOT STARTED |                                                                                                                                        |
 
 ## Data collection status
 
 - Riot key: not recorded (development keys expire every 24 h).
 - Games collected: 0 (no SQLite database exists under `data/` in this workspace) | Patch: 16.21 (static data imported: champions, items, runes).
-- Last aggregation: never (aggregation is not implemented yet, T-015..T-018).
+- Last aggregation: role_prob (T-015) and baselines (T-016) implemented; T-015.c (decay-weighted role_prob) DONE; pairs/lane/runes/builds (T-017..T-018) and export (T-019) not started.
 
 ## Next recommended ticket
 
@@ -35,11 +35,21 @@ Earlier handoff (kept for history): B-017 done (engine and shared `"types": []` 
 
 ## Open questions for the owner
 
-- Review T-013.b (gaps fixed in B-010 and B-014).
-
 ---
 
 ## Session log (newest first)
+
+### 2026-11-01 — Ticket T-015.c (Decay-weighted role_prob evidence)
+
+- Done:
+  - **`packages/etl/migrations/009_role_prob_decay_weights.sql`** (new): adds `games_w` and `games_w2` to `role_prob`.
+  - **`packages/etl/src/aggregate.ts`** (edited): `aggregateRoleProb(db, { patch?, config? })` accumulates `games`, `games_w`, `games_w2` across patches <= snapshot using the D-033 dense patch index and `recencyFactor * reliabilityFactor`; `prob = games_w / sum_roles games_w`. The table is left untouched when nothing contributes.
+  - **`packages/etl/src/commands/aggregate.ts`** (edited): passes the new options object.
+  - Tests: `packages/etl/src/aggregate.test.ts`, `packages/etl/src/commands/aggregate.test.ts`, `packages/etl/src/db/migrate.test.ts` updated (decay retention, newer-patch no-wipe, n_eff < raw count, future snapshot).
+  - Docs: D-035 (PROPOSED), T-015.c, DATA_MODEL `role_prob` columns, SPECS `reliability.nEff`, BUGS duplicate-ID note.
+- Tests: `pnpm check` green; CI test (ubuntu, windows), lint and format pass (45 test files).
+- State left: **DONE (T-015.c)**. Next ETL ticket: T-017 (Aggregate pair tables).
+- Pitfalls: `role-prob.json` stays a bare sparse map; the `exportMinGames` filter belongs to the exporter (T-019), not `aggregate.ts`.
 
 ### 2026-10-31 — Antigravity — Ticket T-015.b (Derive champion roles from role probabilities)
 

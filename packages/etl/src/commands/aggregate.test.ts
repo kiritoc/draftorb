@@ -96,10 +96,11 @@ describe('aggregateCommand', () => {
     ).run();
     db.close();
 
-    // Target patch 16.21 has no participants; role_prob is left unchanged but
-    // baseline must still aggregate the stored 16.20 games (<= snapshot).
+    // Target patch 16.21 has no participants of its own, but 16.20 evidence is
+    // <= snapshot and contributes with decay. role_prob is aggregated (not left
+    // unchanged), and baseline aggregates the stored 16.20 games.
     await aggregateCommand.run(['16.21']);
-    expect(output()).toMatch(/role_prob left unchanged/);
+    expect(output()).toMatch(/Aggregated role probabilities: 1 row\(s\) written to role_prob/);
     expect(output()).toMatch(/Aggregated baselines:/);
 
     const db2 = openDb(dbPath);

@@ -74,7 +74,7 @@ function openAndRead(dbPath: string): RoleProbRow[] {
   try {
     return db
       .prepare(
-        'SELECT champion_id AS championId, role, games, prob FROM role_prob ORDER BY champion_id, role',
+        'SELECT champion_id AS championId, role, games, games_w, games_w2, prob FROM role_prob ORDER BY champion_id, role',
       )
       .all() as RoleProbRow[];
   } finally {
@@ -97,7 +97,7 @@ describe('aggregateRoleProb', () => {
           byChampion.set(row.championId, list);
         }
 
-        // Soraka: 10 support / 2 mid = 12 total.
+        // Soraka: 10 support / 2 mid = 12 total, same patch so weights are equal.
         const soraka = byChampion.get(412)!;
         expect(soraka.map((r) => r.role).sort()).toEqual(['MID', 'SUPPORT']);
         const support = soraka.find((r) => r.role === 'SUPPORT')!;
@@ -148,14 +148,16 @@ describe('aggregateRoleProb', () => {
     });
   });
 
-  it('only counts participants from the target patch', async () => {
+  it('only counts participants from patches up to the target patch', async () => {
     await withSeededDb(async (dbPath) => {
       const db = openDb(dbPath);
       try {
+        // Add an older-patch match for Aatrox mid.
         db.prepare(
           `INSERT INTO matches (
-            match_id, platform, patch, queue_id, duration, created_at, avg_rank_score
-          ) VALUES ('old1', 'euw1', '16.20', 420, 1800, 0, 6.5)`,
+            match_id, platform, patch, queue_id, duration, created_at, avg_rank_score,
+            rank_known_count
+          ) VALUES ('old1', 'euw1', '16.20', 420, 1800, 0, 6.5, 2)`,
         ).run();
         db.prepare(
           `INSERT INTO participants (
@@ -167,11 +169,125 @@ describe('aggregateRoleProb', () => {
           )`,
         ).run();
 
+        // Default (latest patch 16.21): Aatrox mid from 16.20 is decayed but retained.
         const current = aggregateRoleProb(db);
-        expect(current.find((r) => r.championId === 266 && r.role === 'MID')).toBeUndefined();
+        const aatroxMid = current.find((r) => r.championId === 266 && r.role === 'MID');
+        expect(aatroxMid).toBeDefined();
+        expect(aatroxMid!.prob).toBeGreaterThan(0);
+        expect(aatroxMid!.games).toBe(1);
+        // Decay weight < 1 so gamesW < games.
+        expect(aatroxMid!.gamesW).toBeLessThan(aatroxMid!.games);
 
-        const old = aggregateRoleProb(db, '16.20');
-        expect(old).toEqual([{ championId: 266, role: 'MID', games: 1, prob: 1 }]);
+        // Explicit 16.20: only the old patch's evidence counts.
+        const old = aggregateRoleProb(db, { patch: '16.20' });
+        expect(old).toEqual([
+          { championId: 266, role: 'MID', games: 1, gamesW: 1, gamesW2: 1, prob: 1 },
+        ]);
+      } finally {
+        db.close();
+      }
+    });
+  });
+
+  it('newer single-match patch does not wipe champions absent from it', async () => {
+    await withSeededDb(async (dbPath) => {
+      const db = openDb(dbPath);
+      try {
+        // Aggregate first (16.21 has Soraka and Aatrox).
+        const before = aggregateRoleProb(db);
+        expect(before.find((r) => r.championId === 266)).toBeDefined();
+
+        // Ingest a single new match on a newer patch with a different champion.
+        db.prepare(
+          `INSERT INTO matches (
+            match_id, platform, patch, queue_id, duration, created_at, avg_rank_score
+          ) VALUES ('new1', 'euw1', '16.22', 420, 1800, 2, 6.5)`,
+        ).run();
+        db.prepare(
+          `INSERT INTO participants (
+            match_id, puuid, team_id, champion_id, role, win, rank_score,
+            champion_games, mastery_points, is_expert, keystone, primary_style,
+            sub_style, perks_json, items_json, kills, deaths, assists
+          ) VALUES (
+            'new1', 'new', 100, 99, 'SUPPORT', 1, null, 0, NULL, NULL, 8439, 8400, 8300, '{}', '[]', 0, 0, 0
+          )`,
+        ).run();
+
+        // Re-aggregate default (latest patch 16.22): 16.21 evidence is decayed but retained.
+        const after = aggregateRoleProb(db);
+        expect(after.find((r) => r.championId === 266 && r.role === 'TOP')).toBeDefined();
+        expect(after.find((r) => r.championId === 412 && r.role === 'SUPPORT')).toBeDefined();
+        // New champion 99 appears from 16.22.
+        expect(after.find((r) => r.championId === 99 && r.role === 'SUPPORT')).toBeDefined();
+      } finally {
+        db.close();
+      }
+    });
+  });
+
+  it('absent champion keeps decayed evidence across patches', async () => {
+    await withSeededDb(async (dbPath) => {
+      const db = openDb(dbPath);
+      try {
+        // 16.21: Soraka support games.
+        const before = aggregateRoleProb(db);
+        const sorakaBefore = before.find((r) => r.championId === 412 && r.role === 'SUPPORT')!;
+        expect(sorakaBefore.games).toBe(10);
+
+        // Ingest only on a newer patch without Soraka.
+        db.prepare(
+          `INSERT INTO matches (
+            match_id, platform, patch, queue_id, duration, created_at, avg_rank_score
+          ) VALUES ('new2', 'euw1', '16.22', 420, 1800, 2, 6.5)`,
+        ).run();
+        db.prepare(
+          `INSERT INTO participants (
+            match_id, puuid, team_id, champion_id, role, win, rank_score,
+            champion_games, mastery_points, is_expert, keystone, primary_style,
+            sub_style, perks_json, items_json, kills, deaths, assists
+          ) VALUES (
+            'new2', 'new', 100, 266, 'TOP', 1, null, 0, NULL, NULL, 8439, 8400, 8300, '{}', '[]', 0, 0, 0
+          )`,
+        ).run();
+
+        const after = aggregateRoleProb(db);
+        const sorakaAfter = after.find((r) => r.championId === 412 && r.role === 'SUPPORT');
+        expect(sorakaAfter).toBeDefined();
+        // Decayed: gamesW < games because older patch evidence is down-weighted.
+        expect(sorakaAfter!.gamesW).toBeLessThan(sorakaAfter!.games);
+        expect(sorakaAfter!.games).toBe(10); // raw count unchanged
+      } finally {
+        db.close();
+      }
+    });
+  });
+
+  it('n_eff is below raw count when weights are uneven', async () => {
+    await withSeededDb(async (dbPath) => {
+      const db = openDb(dbPath);
+      try {
+        // Add a much older patch match for Soraka support.
+        db.prepare(
+          `INSERT INTO matches (
+            match_id, platform, patch, queue_id, duration, created_at, avg_rank_score
+          ) VALUES ('old3', 'euw1', '16.10', 420, 1800, 0, 6.5)`,
+        ).run();
+        db.prepare(
+          `INSERT INTO participants (
+            match_id, puuid, team_id, champion_id, role, win, rank_score,
+            champion_games, mastery_points, is_expert, keystone, primary_style,
+            sub_style, perks_json, items_json, kills, deaths, assists
+          ) VALUES (
+            'old3', 'old', 100, 412, 'SUPPORT', 1, null, 0, NULL, NULL, 8439, 8400, 8300, '{}', '[]', 0, 0, 0
+          )`,
+        ).run();
+
+        const rows = aggregateRoleProb(db);
+        const sorakaSupport = rows.find((r) => r.championId === 412 && r.role === 'SUPPORT')!;
+        // 11 raw games but uneven weights -> n_eff < 11.
+        const nEff = sorakaSupport.gamesW ** 2 / sorakaSupport.gamesW2;
+        expect(nEff).toBeLessThan(sorakaSupport.games);
+        expect(nEff).toBeGreaterThan(0);
       } finally {
         db.close();
       }
@@ -183,8 +299,23 @@ describe('aggregateRoleProb', () => {
       const db = openDb(dbPath);
       try {
         const before = aggregateRoleProb(db);
-        expect(aggregateRoleProb(db, '99.1')).toEqual([]);
+        const future = aggregateRoleProb(db, { patch: '99.1' });
+        // Future snapshot patch: existing evidence is decayed relative to it, not wiped.
+        expect(future.length).toBeGreaterThan(0);
+        for (const row of future) {
+          expect(row.gamesW).toBeLessThanOrEqual(row.games); // decayed or equal
+          expect(row.prob).toBeGreaterThan(0);
+        }
+        // Probs still sum to 1 per champion.
+        const byChampion = new Map<number, number>();
+        for (const row of future) {
+          byChampion.set(row.championId, (byChampion.get(row.championId) ?? 0) + row.prob);
+        }
+        for (const sum of byChampion.values()) {
+          expect(sum).toBeCloseTo(1);
+        }
         db.close();
+        // Table not wiped: same number of persisted rows.
         expect(openAndRead(dbPath)).toHaveLength(before.length);
       } finally {
         if (db.open) db.close();
@@ -197,8 +328,8 @@ describe('aggregateRoleProb', () => {
       const db = openDb(dbPath);
       try {
         aggregateRoleProb(db);
-        expect(() => aggregateRoleProb(db, '16')).toThrow(/Invalid patch/);
-        expect(() => aggregateRoleProb(db, '16.21.1')).toThrow(/Invalid patch/);
+        expect(() => aggregateRoleProb(db, { patch: '16' })).toThrow(/Invalid patch/);
+        expect(() => aggregateRoleProb(db, { patch: '16.21.1' })).toThrow(/Invalid patch/);
       } finally {
         db.close();
       }
@@ -220,32 +351,6 @@ describe('aggregateRoleProb', () => {
         expect(latestPatch(db)).toBe('16.21');
         insert.run('p10', '16.100');
         expect(latestPatch(db)).toBe('16.100');
-      } finally {
-        db.close();
-      }
-    });
-  });
-
-  it('drops champions whose games are only on older patches', async () => {
-    await withSeededDb(async (dbPath) => {
-      const db = openDb(dbPath);
-      try {
-        db.prepare(
-          `INSERT INTO matches (
-            match_id, platform, patch, queue_id, duration, created_at, avg_rank_score
-          ) VALUES ('old2', 'euw1', '16.20', 420, 1800, 0, 6.5)`,
-        ).run();
-        db.prepare(
-          `INSERT INTO participants (
-            match_id, puuid, team_id, champion_id, role, win, rank_score,
-            champion_games, mastery_points, is_expert, keystone, primary_style,
-            sub_style, perks_json, items_json, kills, deaths, assists
-          ) VALUES (
-            'old2', 'old', 100, 99, 'MID', 1, null, 0, NULL, NULL, 8439, 8400, 8300, '{}', '[]', 0, 0, 0
-          )`,
-        ).run();
-        const rows = aggregateRoleProb(db);
-        expect(rows.find((r) => r.championId === 99)).toBeUndefined();
       } finally {
         db.close();
       }

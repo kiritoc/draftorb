@@ -99,10 +99,7 @@ interface LaneSlot {
  * Canonical damage mix of a team's champions. Untagged champions carry no
  * signal and are ignored; with no tagged champion at all the mix is `mixed`.
  */
-export function damageMix(
-  championIds: number[],
-  tags: Map<number, string>,
-): 'AD' | 'AP' | 'mixed' {
+export function damageMix(championIds: number[], tags: Map<number, string>): 'AD' | 'AP' | 'mixed' {
   let hasAd = false;
   let hasAp = false;
   for (const id of championIds) {
@@ -354,8 +351,7 @@ export function aggregateRunesByContext(
     }
 
     for (const me of match.participants) {
-      const windowGames =
-        me.championGames - (futureGames.get(`${me.puuid}|${me.championId}`) ?? 0);
+      const windowGames = me.championGames - (futureGames.get(`${me.puuid}|${me.championId}`) ?? 0);
       if (windowGames < config.minChampGames) continue; // experts rule (SPECS §3, D-022)
 
       const myTeam = teams.get(me.teamId)!;

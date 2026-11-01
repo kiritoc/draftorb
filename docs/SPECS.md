@@ -248,7 +248,7 @@ One weight formula, stated once:
   - rune_ctx {champion} plus every rune id of the row's page (keystone, primary style, sub style, selected perks from `perks_json`; stat shards excluded). Weight computed per game from that participant's own page.
   - item_build {champion, item}
   - role_prob {champion}
-  The global entity is added to every set.
+    The global entity is added to every set.
 - Weights baked into `wins_w`, `games_w`, `games_w2`; `n_eff`, thresholds, exports, engine contracts unchanged.
 - Purity: engine `changeWeight` is pure, receives plain data (events, breakpoints); SQLite reads stay in ETL.
 - Safety: change weighting disabled by default (`changeWeightEnabled` = false; neutral weights 1.0). Enabled only after T-027.a passes the D-023 gate. With flag on and no events/breakpoints, aggregates byte-identical to current output (regression test). Every new parameter (`minWeight`, band edges/weights, default `weight_factor`) is a prior; changes only through the D-023 gate.

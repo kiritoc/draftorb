@@ -3,15 +3,15 @@
 ## Current status
 
 - Phase: 1 (Support / Diamond)
-- Current milestone: M0 Foundations (T-002.b DONE) and M1 ETL (in progress: T-014 DONE; T-015/T-015.b DONE; T-016 DONE; T-017..T-019 TODO; T-019.b..f TODO) -> M2 Engine (T-020..T-023 DONE)
-- Last updated: 2026-10-31 by Antigravity
+- Current milestone: M0 Foundations (T-002.b DONE) and M1 ETL (in progress: T-014 DONE; T-015/T-015.b DONE; T-016 DONE; T-017 DONE; T-018 DONE; T-019 DONE; T-019.b..f TODO) -> M2 Engine (T-020..T-023 DONE)
+- Last updated: 2026-11-01
 
 ## Epic status
 
 | Epic           | Status      | Notes                                                                                                                                            |
 | -------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b DONE                                                                                                                  |
-| E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e, T-014, T-015, T-015.b, T-016, T-017, T-018 DONE; T-019 TODO; T-019.b..f TODO |
+| E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e, T-014, T-015, T-015.b, T-016, T-017, T-018, T-019 DONE; T-019.b..f TODO |
 | E2 Engine      | IN PROGRESS | T-020 DONE; T-021 DONE; T-022 DONE; T-023 DONE                                                                                                   |
 | E3 Web MVP     | NOT STARTED |                                                                                                                                                  |
 | E4 Runes       | NOT STARTED |                                                                                                                                                  |
@@ -23,13 +23,13 @@
 
 - Riot key: not recorded (development keys expire every 24 h).
 - Games collected: 0 (no SQLite database exists under `data/` in this workspace) | Patch: 16.21 (static data imported: champions, items, runes).
-- Last aggregation: role_prob (T-015) and baselines (T-016) implemented; pairs/lane (T-017) and runes (T-018) implemented; export (T-019) not started.
+- Last aggregation: role_prob (T-015) and baselines (T-016) implemented; pairs/lane (T-017) and runes (T-018) implemented; export (T-019) implemented and tested (`packages/etl/src/export.ts`, `commands/export.ts`, tests).
 
 ## Next recommended ticket
 
 T-023 is **DONE** (Role-generic recommendation engine with explanations, layered shrinkage scoring, pool contract D-024, composition needs, golden test runner and golden fixtures including non-support TOP 1v1 lane group).
 Next engine tickets: **T-024** (Blind pick mode), **T-025** (Comp needs full model), **T-026** (Golden test suite 20+ scenarios) or **T-027.a** (Draft backtest harness).
-Next ETL ticket: **T-019** (Export versioned JSON + manifest, depends on T-015..T-018,T-002.b).
+Next ETL ticket: **T-019.b** (Patches table, label mapping, patch_index switch, --since-patch) or continue T-019 chain.
 
 Earlier handoff (kept for history): B-017 done (engine and shared `"types": []` plus ESLint purity guardrails in `eslint.config.mjs` with automated regression tests; T-020's engine-purity prerequisite is fully satisfied — the residual `tsc` gap caused by test files importing `vitest` is logged as B-021 and not fixed). B-022 (all Node built-ins blocked), B-023 (Date() call blocked) and B-024 (regression tests) also fixed. B-011 fixed (spec + T-002.b scope; implementation in T-002.b). Fix B-012 done. T-013.e done (typed schema-less `request()`, timeout/invalid-JSON regression tests, CLI + matches refactor below 300 lines; `pnpm check` 184 tests). **T-013.d done** (`pnpm etl status`, read-only parameterized counts and progress, empty & seeded database tests, CLI handling when database does not exist; `pnpm check` 153 tests). **D-008, D-011, D-017, D-018, D-020, D-021, D-022, D-023 accepted (2026-10-29); D-028 (formerly D-025, @types/... devDeps) renumbered and accepted.** SPECS §5/§8 are now normative. **T-002.b DONE** (shared schema parity); `packages/shared/src/index.ts` split by domain into `schemas/*.ts` (10 modules); rankBucketSchema (8 buckets), sparse role-prob with sum-to-1, Reason.with as ChampionId[], Reason.lowData, n_eff non-integer, lane reason type, DraftResult with insufficientData/poolRecommendations/poolUnavailable, championPoolSchema, manifest roles, all role-keyed export tuple schemas with games_w2, rune/build export schemas; 184 tests pass. **T-020 DONE** (rank weighting module: config + kernel + n_eff + equivalent-counts + influence matrix; 49 engine tests). **T-021 DONE** (Role inference — `inferRoles` with brute-force permutation over 120 assignments, viability check for missing champions, confidence = best/total probability mass; 15 tests). **T-022 DONE** (shrinkage + level mapping). T-014 (Participant enrichment) remains **data-blocked** (no Riot key, 0 games collected, no SQLite database under `data/`). **T-014 implementation DONE** (2026-10-29): enrichment module, mastery endpoint, 22 tests.
 
@@ -1044,3 +1044,24 @@ The 2026-10-22 entries had no timestamps; their order was reconstructed from tic
   - `docs/TESTING.md`: deleted old "Expected tests: data retention, change scoring, breakpoints (SPEC 8)" block; single section 6 with retention/weights/change-scoring/breakpoints tests plus real-fixture rule; no `soft`, `grace`, `MIN_GAMES`, `champion_stats`, `smoothing`, `SPEC` remains.
   - `docs/RIOT_API.md`: per-champion files, `versions.json` order, `runesReforged.json`, `gameVersion`->label rule already present with VERIFY markers (no change needed).
 - State left: documentation complete; no code changes. Next session: implement T-019.b (patches table).
+
+### 2026-11-01 — Kilo — Ticket T-019: Export versioned JSON + manifest
+
+- Done:
+  - `packages/etl/src/export.ts` (new): `exportJson(db, options)` — read-only export of the aggregated tables to the role-keyed DATA_MODEL.md layout plus `manifest.json`; `exportMinGames` (`n_eff`) gate on every row; sparse `role-prob.json` whose probabilities sum to 1 per champion; runes parsed from stored `perks_json`; size-budget warning for files over 5 MB.
+  - `packages/etl/src/commands/export.ts` (new): `export [patch]` CLI command; reads latest patch when omitted; "no database" message when the DB is absent.
+  - `packages/etl/src/cli.ts`: registered `exportCommand`; `packages/etl/src/index.ts`: re-exported `exportJson`/`ExportResult`.
+  - `packages/etl/src/export.test.ts`, `packages/etl/src/commands/export.test.ts` (new): unit + CLI tests (empty DB, malformed patch, sparse role-prob, tuple filtering by n_eff, rune parsing, unparseable rune skip, manifest schema v2/files/roles/rankBuckets).
+  - `docs/SETUP.md`: moved `pnpm etl export` from Planned to Implemented.
+- Files touched:
+  - `packages/etl/src/export.ts`, `packages/etl/src/export.test.ts`
+  - `packages/etl/src/commands/export.ts`, `packages/etl/src/commands/export.test.ts`
+  - `packages/etl/src/cli.ts`, `packages/etl/src/index.ts`
+  - `docs/SETUP.md`, `docs/TICKETS.md`, `docs/PROGRESS.md`
+- Tests: `pnpm check` — 0 errors (typecheck + lint green; pre-existing non-null-assertion warnings only; `docs/SPECS.md` prettier warning pre-existing and untouched). `pnpm vitest run packages/etl` — 244 tests pass.
+- State left: DONE
+- Next step: T-019.b (patches table / patch_index switch) or T-024 (engine blind pick).
+- Pitfalls / notes for next AI:
+  - Export is read-only; run `pnpm etl aggregate` first to populate tables.
+  - `my_role` must be aliased consistently as `myRole` in all export SQL (pair/lane tables previously aliased it as `role` or omitted it).
+  - `exportMinGames` defaults to 10 and must be <= `minGames` (engine config invariant).

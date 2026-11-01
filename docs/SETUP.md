@@ -38,13 +38,13 @@ pnpm etl players [platform]    # discover players by tier (--tiers, --quota, --r
 pnpm etl matches [platform]    # ingest matches, resumable, Ctrl+C safe (--since-patch, --per-player, --limit, --queue, --min-duration, --reset)
 pnpm etl status [platform]     # counts and progress
 pnpm etl aggregate             # compute aggregated tables (role probabilities and rank-weighted baselines; T-015, T-016)
+pnpm etl export                # write versioned JSON and manifest for a patch (T-019)
 pnpm etl derive-roles [patch]  # rewrite champions.json.roles from observed roles (T-015.b); run after `matches`, and re-run after every `static`
 ```
 
 Planned (target state, see TICKETS.md):
 
 ```
-pnpm etl export                # write data/public/<patch>/*.json (T-019)
 pnpm etl backtest              # offline validation (T-027.a, T-027.b)
 ```
 

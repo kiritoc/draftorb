@@ -28,6 +28,8 @@ No new bugs were identified during T-013 (match ingestion); rejected match ids a
 
 No new bugs were identified while revising T-013 patch-window and rank-known-count behavior.
 
+No new bugs were identified during T-019 (export). The `my_role` column alias inconsistency found while implementing was fixed in-PR (all export SQL now aliases `my_role AS myRole`).
+
 ### B-021 — `types: []` does not isolate the engine type-checker from Node globals — OPEN
 
 - Severity / Area: S3 / engine

@@ -292,7 +292,7 @@ Accepted by the owner on 2026-10-31. SPECS §5/§7 text derived from this decisi
 - Gate: `exportMinGames` (default 10, raw `games` floor) is used by the exporter (T-019), not by `aggregate.ts`. `n_eff` is computable from `games_w`/`games_w2` but is not used as a storage filter because `role_prob` is single-role-pair evidence (no user-bucket weighting); using `n_eff` here would mix concepts that belong to per-bucket tables like `baseline`. A raw-game floor is the simplest gate the exporter can apply before writing the bare sparse map.
 - Consequences: `aggregate.ts` signature changes from `(db, patch?)` to `(db, { patch?, config? })`; callers updated. Migration 009 applied before first real collection run. T-015.c tracks this work, sequenced with T-015.b and before T-019.
 
-### D-036 — Rune aggregation scope decisions (T-018 follow-ups) — PROPOSED
+### D-036 — Rune aggregation scope decisions (T-018 follow-ups) — ACCEPTED
 
 - Update (T-018 review, 2026-11-01): both gaps are now implemented in T-018. Mastery fallback: a participant is an expert when in-window `champion_games >= minChampGames` OR cached `mastery_points >= minMasteryPoints` (enrichment only fetches mastery for the recommended role, so the fallback is role-limited). Rank weighting: migration 011 rebuilds `rune_ctx` with a `rank_bucket` column; each game contributes to every user bucket with `expertWeight(gameBucket, userBucket, alpha, wMax)` (0 below the user bucket). The text below is kept for history.
 

@@ -318,6 +318,51 @@ describe('migration runner', () => {
     db.close();
   });
 
+  it('migration 010 backfills context_level from context_key', () => {
+    const db = openDb(':memory:');
+    db.exec(`
+      CREATE TABLE _migrations (
+        version TEXT PRIMARY KEY,
+        applied_at INTEGER NOT NULL
+      )
+    `);
+    const priorVersions = expectedVersions().filter((v) => v < '010_rune_ctx_context_level');
+    for (const version of priorVersions) {
+      db.exec(readFileSync(join(MIGRATIONS_DIR, `${version}.sql`), 'utf8'));
+      db.prepare('INSERT INTO _migrations (version, applied_at) VALUES (?, ?)').run(version, 1);
+    }
+    const insert = db.prepare(
+      `INSERT INTO rune_ctx (
+        champion_id, my_role, context_key, perks_hash, perks_json, wins_w, games_w, games_w2, players
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    );
+    insert.run(412, 'SUPPORT', 'lane:a.ADC:21,e.ADC:22,e.SUPPORT:266', 'hash1', '{}', 1, 1, 1, 1);
+    insert.run(412, 'SUPPORT', 'lane:e.ADC:22,e.SUPPORT:266', 'hash2', '{}', 1, 1, 1, 1);
+    insert.run(412, 'SUPPORT', 'lane:e.SUPPORT:266', 'hash3', '{}', 1, 1, 1, 1);
+    insert.run(412, 'SUPPORT', 'damagemix:mixed', 'hash4', '{}', 1, 1, 1, 1);
+    insert.run(412, 'SUPPORT', 'global', 'hash5', '{}', 1, 1, 1, 1);
+
+    db.exec(readFileSync(join(MIGRATIONS_DIR, '010_rune_ctx_context_level.sql'), 'utf8'));
+    db.prepare('INSERT INTO _migrations (version, applied_at) VALUES (?, ?)').run(
+      '010_rune_ctx_context_level',
+      1,
+    );
+
+    const rows = db
+      .prepare('SELECT context_key, context_level FROM rune_ctx ORDER BY context_key')
+      .all() as Array<{ context_key: string; context_level: number }>;
+    expect(
+      rows.find((r) => r.context_key === 'lane:a.ADC:21,e.ADC:22,e.SUPPORT:266')?.context_level,
+    ).toBe(1);
+    expect(rows.find((r) => r.context_key === 'lane:e.ADC:22,e.SUPPORT:266')?.context_level).toBe(
+      2,
+    );
+    expect(rows.find((r) => r.context_key === 'lane:e.SUPPORT:266')?.context_level).toBe(3);
+    expect(rows.find((r) => r.context_key === 'damagemix:mixed')?.context_level).toBe(4);
+    expect(rows.find((r) => r.context_key === 'global')?.context_level).toBe(5);
+    db.close();
+  });
+
   it('upgrades a 001-007 database with migration 008 and defaults baseline.games to 0', () => {
     const db = openDb(':memory:');
     db.exec(`

@@ -113,11 +113,12 @@ export function damageMix(championIds: number[], tags: Map<number, string>): 'AD
     const dmg = tags.get(id);
     if (dmg === 'AD') hasAd = true;
     else if (dmg === 'AP') hasAp = true;
-    else if (dmg !== undefined) {
+    else if (dmg === 'MIXED') {
       // Explicit hybrid / true-damage tags count for both sides.
       hasAd = true;
       hasAp = true;
     }
+    // 'NONE' contributes no damage signal and is ignored.
   }
   if (hasAd && !hasAp) return 'AD';
   if (hasAp && !hasAd) return 'AP';

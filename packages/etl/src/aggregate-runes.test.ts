@@ -482,6 +482,39 @@ describe('aggregateRunesByContext', () => {
     expect(damageMix([999], tags)).toBe('mixed');
   });
 
+  it('treats MIXED damage as both AD and AP', () => {
+    const tags = new Map([[1, 'MIXED']]);
+    expect(damageMix([1], tags)).toBe('mixed');
+    const tagsAdMixed = new Map([
+      [1, 'AD'],
+      [2, 'MIXED'],
+    ]);
+    expect(damageMix([1, 2], tagsAdMixed)).toBe('mixed');
+    const tagsApMixed = new Map([
+      [1, 'AP'],
+      [2, 'MIXED'],
+    ]);
+    expect(damageMix([1, 2], tagsApMixed)).toBe('mixed');
+  });
+
+  it('ignores NONE damage champions', () => {
+    const tags = new Map([
+      [1, 'NONE'],
+      [2, 'NONE'],
+    ]);
+    expect(damageMix([1, 2], tags)).toBe('mixed');
+    const tagsAdNone = new Map([
+      [1, 'AD'],
+      [2, 'NONE'],
+    ]);
+    expect(damageMix([1, 2], tagsAdNone)).toBe('AD');
+    const tagsApNone = new Map([
+      [1, 'AP'],
+      [2, 'NONE'],
+    ]);
+    expect(damageMix([1, 2], tagsApNone)).toBe('AP');
+  });
+
   it('leaves rune_ctx empty when there are no participants', () => {
     withFreshDb((dbPath) => {
       const db = openDb(dbPath);

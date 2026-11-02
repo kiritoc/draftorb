@@ -55,6 +55,16 @@ No new bugs were identified during T-019 (export). Export SQL aliases `my_role A
 
 ## Fixed
 
+### B-034 — Export stale-file test assumes POSIX recursive path separators — FIXED
+
+- Severity / Area: S3 / etl
+- Steps to reproduce: run `pnpm vitest run packages/etl/src/export/atomic.test.ts` on Windows.
+- Expected / Actual: the stale-file regression should compare the same relative file paths on every platform; Windows `readdirSync(..., { recursive: true })` returns backslash-separated relative paths, so the POSIX expected paths did not match.
+- Environment (OS, Node version, patch): Windows, Node.js 22.
+- Suspected cause: the test compared recursive `readdirSync` paths directly to slash-separated literals.
+- Fix (commit/ticket): normalize recursive relative paths to forward slashes before asserting the exported file layout (T-019 verification follow-up).
+- Verification: focused `atomic.test.ts` and `pnpm check`.
+
 ### B-033 — Baseline `games` column not populated by ETL aggregation — FIXED
 
 - Severity / Area: S3 / engine

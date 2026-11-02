@@ -89,6 +89,17 @@ Earlier handoff (kept for history): B-017 done (engine and shared `"types": []` 
 
 ## Session log (newest first)
 
+### 2026-11-02 — T-019 Windows test compatibility follow-up
+
+- Done:
+  - Normalized recursive `readdirSync` paths in the stale-file regression before comparing them with slash-separated expected paths; the assertion still checks the exact file set.
+  - Recorded the Windows-only test portability issue as fixed in `docs/BUGS.md`.
+- Files touched: `packages/etl/src/export/atomic.test.ts`, `docs/TICKETS.md`, `docs/BUGS.md`, `docs/PROGRESS.md`.
+- Tests: focused atomic exporter test passed (5 tests); `pnpm check` passed (55 test files / 702 tests, lint 0 errors and 15 pre-existing warnings).
+- State left: Windows path regression fix verified; commit the follow-up.
+- Next step: T-019.b (retention model migration).
+- Pitfalls / notes: recursive `readdirSync` paths use platform-native separators; normalize before comparing to repository-format paths.
+
 ### 2026-11-02 — Ticket T-019 (second review-fix pass)
 
 - Done:

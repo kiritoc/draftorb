@@ -62,6 +62,7 @@ describe('exportJson', () => {
     const remaining = readdirSync(join(publicDir, PATCH), { recursive: true })
       .map(String)
       .filter((relativePath) => statSync(join(publicDir, PATCH, relativePath)).isFile())
+      .map((relativePath) => relativePath.replaceAll('\\', '/'))
       .sort();
     expect(remaining).toEqual([
       'manifest.json',

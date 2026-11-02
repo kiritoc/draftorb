@@ -32,7 +32,7 @@ describe('export IO', () => {
     writeFileSync(join(targetDir, 'old.json'), 'old');
     writeFileSync(join(tempDir, 'new.json'), 'new');
 
-    publishTempDir(tempDir, targetDir);
+    expect(publishTempDir(tempDir, targetDir)).toBeNull();
 
     expect(readdirSync(targetDir)).toEqual(['new.json']);
     expect(readFileSync(join(targetDir, 'new.json'), 'utf8')).toBe('new');

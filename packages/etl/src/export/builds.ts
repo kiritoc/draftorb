@@ -128,6 +128,8 @@ export function buildBuildFiles(
       ctx.items.sort((a, b) => b.gamesW - a.gamesW || a.itemId - b.itemId);
       contexts.push(ctx);
     }
+    // No context survived the gate: do not emit an empty build file.
+    if (contexts.length === 0) continue;
     // C1: sort contexts by slotIdx, timeBucket, stateBucket, profileKey, laneKey.
     contexts.sort((a, b) => {
       if (a.slotIdx !== b.slotIdx) return a.slotIdx - b.slotIdx;

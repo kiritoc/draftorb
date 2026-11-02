@@ -4,7 +4,7 @@
 
 - Phase: 1 (Support / Diamond)
 - Current milestone: M0 Foundations (T-002.b DONE) and M1 ETL (in progress: T-014 DONE; T-015/T-015.b DONE; T-016 DONE; T-017 DONE; T-018 DONE; T-019 DONE; T-019.b..f TODO) -> M2 Engine (T-020..T-023 DONE)
-- Last updated: 2026-11-02 by Copilot
+- Last updated: 2026-11-02 by Devin (T-019 review follow-up, B-035)
 
 ## Epic status
 
@@ -23,7 +23,7 @@
 
 - Riot key: not recorded (development keys expire every 24 h).
 - Games collected: 0 (no SQLite database exists under `data/` in this workspace) | Patch: 16.21 (static data imported: champions, items, runes).
-- Last aggregation: role_prob (T-015) and baselines (T-016) implemented; pairs/lane (T-017) and runes (T-018) implemented; export (T-019) implemented and tested (`packages/etl/src/export/`, `packages/etl/src/commands/export.ts`, tests).
+- Last aggregation: role_prob (T-015) and baselines (T-016) implemented; pairs/lane (T-017) and runes (T-018) implemented; export (T-019) implemented and tested (`packages/etl/src/export/`, `packages/etl/src/commands/export.ts`, tests); export preserves static catalogs (`champions.json`, `items.json`) and lists them in the manifest (B-035).
 
 ## Next recommended ticket
 
@@ -88,6 +88,20 @@ Earlier handoff (kept for history): B-017 done (engine and shared `"types": []` 
 - Next: Owner review; then schedule T-019.b or continue T-019 (export).
 
 ## Session log (newest first)
+
+### 2026-11-02 — Devin — Ticket T-019 review follow-up (B-035)
+
+- Done:
+  - `role-prob.json`: last surviving role takes the rounding residual; output validated with `championRoleProbabilitiesSchema`.
+  - Builds: no file is emitted when no context passes the gate.
+  - `publishTempDir` returns a warning (instead of throwing) when the superseded backup cannot be removed after a successful publish.
+  - Static catalogs (`champions.json`, `items.json`) are carried into the published tree and listed in the manifest; missing catalogs warn.
+  - Warnings for mixed-platform data even with `--region`, and for exporting a patch other than the database's latest.
+- Files touched: `packages/etl/src/export/{index,io,role-prob,builds}.ts`, `packages/etl/src/export/{atomic,builds,io,region-and-config}.test.ts`, `docs/DATA_MODEL.md`, `docs/BUGS.md`, `docs/PROGRESS.md`.
+- Tests added: equal role probabilities sum to 1; all-gated builds emit no file; static catalogs survive re-export and appear in the manifest; missing-catalog warning; mixed-platform warning with `--region`; patch-mismatch warning; `publishTempDir` returns `null` on clean publish. Not run in this session — run `pnpm format` then `pnpm check`. Expected counts (+6 new tests, no new test files; `io.test.ts` only gains an assertion): `pnpm check` 55 test files / 708 tests (was 702); ETL 31 files / 281 tests (was 275); focused exporter/CLI suite 8 files / 47 tests (was 41). Replace with actual counts once green.
+- State left: DONE pending green `pnpm check` (no new test for a failing backup removal; would need an `rmSync` mock).
+- Next step: T-019.b (patches table, label mapping, patch_index switch, --since-patch).
+- Pitfalls / notes: aggregate tables are not patch- or platform-scoped; the warnings only surface this, a real fix needs patch/platform columns (T-019.b).
 
 ### 2026-11-02 — T-019 Windows test compatibility follow-up
 

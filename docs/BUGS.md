@@ -65,6 +65,16 @@ No new bugs were identified during T-019 (export). Export SQL aliases `my_role A
 - Fix (commit/ticket): normalize recursive relative paths to forward slashes before asserting the exported file layout (T-019 verification follow-up).
 - Verification: focused `atomic.test.ts` and `pnpm check`.
 
+### B-035 — Export review findings (role-prob rounding, empty builds, publish cleanup, static catalogs) — FIXED
+
+- Severity / Area: S2 / etl
+- Steps to reproduce: export a champion with three equal role probabilities; export a champion whose build items all fail `exportMinGames`; make backup removal fail after publish; run `pnpm etl static <patch>` then `pnpm etl export <patch>`.
+- Expected / Actual: probabilities should sum to 1 within 1e-6 (three `0.333333` values failed the shared schema); no build file for unqualified champions (an empty `contexts` file was emitted); a live publish should not be reported as failed (backup `rmSync` errors propagated); static catalogs should survive and be listed in the manifest (publishing replaced the patch directory and deleted them).
+- Environment (OS, Node version, patch): any OS, Node.js 22.
+- Suspected cause: independent rounding per role; no empty-contexts check in builds; backup removal inside `finally`; whole-directory publish ignored files owned by `pnpm etl static`.
+- Fix (commit/ticket): residual assignment + schema validation in `role-prob.ts`; skip empty build files; post-publish cleanup returns a warning; static catalogs carried into the temp tree. Also added warnings for mixed-platform data with `--region` and for exporting a patch other than the database's latest (T-019 review follow-up).
+- Verification: new tests in `atomic.test.ts`, `builds.test.ts`, `region-and-config.test.ts`; `pnpm check`.
+
 ### B-033 — Baseline `games` column not populated by ETL aggregation — FIXED
 
 - Severity / Area: S3 / engine

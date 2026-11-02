@@ -153,4 +153,13 @@ describe('exportJson', () => {
       /roles\/UNKNOWN\/builds\/412\.json/,
     );
   });
+
+  it('emits no build file when every item fails the export gate', () => {
+    const result = buildBuildFiles(
+      [supportBuildRow({ gamesW: 5, gamesW2: 5 }), supportBuildRow({ itemId: 3047, gamesW: 2, gamesW2: 2 })],
+      ['SUPPORT'],
+      10,
+    );
+    expect(result.files).toEqual([]);
+  });
 });

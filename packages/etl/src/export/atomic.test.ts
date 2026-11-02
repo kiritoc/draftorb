@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -166,5 +166,30 @@ describe('exportJson', () => {
       expect(existsSync(file.path)).toBe(true);
       expect(file.path).not.toContain('.tmp-');
     }
+  });
+
+  it('preserves static catalogs across re-export and lists them in the manifest', () => {
+    seed(suite.db, 'match', [{}]);
+    const patchDir = join(suite.publicDir, PATCH);
+    mkdirSync(patchDir, { recursive: true });
+    writeFileSync(join(patchDir, 'champions.json'), '{"412":{}}');
+    writeFileSync(join(patchDir, 'items.json'), '{"3340":{}}');
+
+    const first = suite.exportOnce();
+    expect(first.warnings.some((w) => w.includes('missing static catalog'))).toBe(false);
+    suite.exportOnce();
+
+    expect(readFileSync(join(patchDir, 'champions.json'), 'utf8')).toBe('{"412":{}}');
+    expect(readFileSync(join(patchDir, 'items.json'), 'utf8')).toBe('{"3340":{}}');
+    const manifest = suite.readFile<{ files: Array<{ path: string }> }>('manifest.json');
+    const paths = manifest.files.map((f) => f.path);
+    expect(paths).toContain('champions.json');
+    expect(paths).toContain('items.json');
+  });
+
+  it('warns when static catalogs are missing', () => {
+    seed(suite.db, 'match', [{}]);
+    const result = suite.exportOnce();
+    expect(result.warnings.some((w) => w.includes('missing static catalog'))).toBe(true);
   });
 });

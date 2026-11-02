@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_CONFIG } from '@draftorb/engine';
+import { championRoleProbabilitiesSchema } from '@draftorb/shared';
 import { seed } from './export.fixtures.js';
 import { createExportTestSuite, PATCH } from './export.test-utils.js';
 import { exportJson } from './index.js';
@@ -66,5 +67,41 @@ describe('exportJson', () => {
     const result = suite.exportOnce();
     expect(result.manifest.region).toBe('euw1'); // alphabetically first
     expect(result.warnings.some((warning) => warning.includes('platforms'))).toBe(true);
+  });
+
+  it('warns about mixed platforms even with an explicit region (C5)', () => {
+    seed(suite.db, 'match', [
+      { patch: '16.21', platform: 'euw1', matchId: 'm1' },
+      { patch: '16.21', platform: 'na1', matchId: 'm2' },
+    ]);
+    const result = suite.exportOnce({ region: 'kr' });
+    expect(result.manifest.region).toBe('kr');
+    expect(
+      result.warnings.some((warning) => warning.includes('aggregates combine all platforms')),
+    ).toBe(true);
+  });
+
+  it('renormalizes equal role probabilities to sum to exactly 1 (X2)', () => {
+    seed(suite.db, 'match', [{}]);
+    seed(suite.db, 'roleProb', [
+      { championId: 412, role: 'SUPPORT', gamesW: 10, gamesW2: 10, prob: 1 / 3 },
+      { championId: 412, role: 'MID', gamesW: 10, gamesW2: 10, prob: 1 / 3 },
+      { championId: 412, role: 'TOP', gamesW: 10, gamesW2: 10, prob: 1 / 3 },
+    ]);
+    suite.exportOnce();
+    const roleProb = championRoleProbabilitiesSchema.parse(suite.readFile('role-prob.json'));
+    const sum = Object.values(roleProb['412'] ?? {}).reduce((acc, p) => acc + p, 0);
+    expect(Math.abs(sum - 1)).toBeLessThanOrEqual(1e-6);
+  });
+
+  it('warns when the requested patch is not the latest patch in the database', () => {
+    seed(suite.db, 'match', [{ patch: '16.21' }]);
+    const result = suite.exportOnce({ patch: '16.20' });
+    expect(
+      result.warnings.some((warning) =>
+        warning.includes('requested patch 16.20 differs from the latest patch in the database'),
+      ),
+    ).toBe(true);
+    expect(suite.exportOnce().warnings.some((w) => w.includes('requested patch'))).toBe(false);
   });
 });

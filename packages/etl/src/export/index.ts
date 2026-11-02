@@ -41,7 +41,9 @@ import {
   createTempDir,
   oversizeWarning,
   publishTempDir,
+  readStaticCatalogs,
   removeTempDir,
+  STATIC_CATALOG_FILES,
   writeFile,
 } from './io.js';
 
@@ -94,10 +96,19 @@ export function exportJson(db: Database.Database, options: ExportOptions = {}): 
     throw new Error(`Invalid patch "${options.patch}". Expected a format like "16.21".`);
   }
 
-  const targetPatch = options.patch ?? latestPatch(db);
+  const dbLatestPatch = latestPatch(db);
+  const targetPatch = options.patch ?? dbLatestPatch;
   if (targetPatch === undefined) {
     throw new Error(
       'No patch found in the database; nothing to export. Run `pnpm etl matches` first.',
+    );
+  }
+  const warnings: string[] = [];
+  // Aggregate tables carry no patch column: they reflect the latest aggregation.
+  if (dbLatestPatch !== undefined && targetPatch !== dbLatestPatch) {
+    warnings.push(
+      `export: requested patch ${targetPatch} differs from the latest patch in the database (${dbLatestPatch}); ` +
+        'aggregate tables are not patch-scoped, so exported data reflects the last `pnpm etl aggregate` run',
     );
   }
 
@@ -140,19 +151,19 @@ export function exportJson(db: Database.Database, options: ExportOptions = {}): 
     db,
     `SELECT DISTINCT platform AS platform FROM matches ORDER BY platform`,
   );
-  let region: string;
-  const warnings: string[] = [];
-  if (options.region !== undefined) {
-    region = options.region;
-  } else {
-    const first = platformRows[0];
-    if (platformRows.length > 1 && first !== undefined) {
-      warnings.push(
-        `export: database contains ${platformRows.length} platforms (` +
-          `${platformRows.map((r) => r.platform).join(', ')}); using alphabetically first ${first.platform}`,
-      );
-    }
-    region = first?.platform ?? 'euw1';
+  const first = platformRows[0];
+  const region = options.region ?? first?.platform ?? 'euw1';
+  // Aggregates are never filtered by platform, so warn whenever data is mixed,
+  // including when --region is given explicitly.
+  if (platformRows.length > 1 && first !== undefined) {
+    const label =
+      options.region !== undefined
+        ? `labelled as ${region}`
+        : `using alphabetically first ${first.platform}`;
+    warnings.push(
+      `export: database contains ${platformRows.length} platforms (` +
+        `${platformRows.map((r) => r.platform).join(', ')}); ${label}; aggregates combine all platforms`,
+    );
   }
 
   // --- Build file contents (compact JSON for data files; manifest uses null, 2) ---
@@ -183,6 +194,15 @@ export function exportJson(db: Database.Database, options: ExportOptions = {}): 
 
   // --- Atomic write to a sibling temp dir, then publish (C4) ---
   const targetDir = join(publicDir, targetPatch);
+  // Carry over static catalogs from `pnpm etl static` so publishing does not
+  // delete them, and list them in the manifest.
+  const staticCatalogs = readStaticCatalogs(targetDir);
+  if (staticCatalogs.length < STATIC_CATALOG_FILES.length) {
+    warnings.push(
+      `export: missing static catalog(s) in ${targetDir}; run \`pnpm etl static ${targetPatch}\``,
+    );
+  }
+  filesToWrite.push(...staticCatalogs);
   const tempDir = createTempDir(publicDir, targetPatch);
   let published = false;
   try {
@@ -209,8 +229,9 @@ export function exportJson(db: Database.Database, options: ExportOptions = {}): 
     options.hooks?.afterWrite?.('manifest.json');
     written.push({ ...manifestEntry, relativePath: 'manifest.json' });
 
-    publishTempDir(tempDir, targetDir);
+    const cleanupWarning = publishTempDir(tempDir, targetDir);
     published = true;
+    if (cleanupWarning !== null) warnings.push(cleanupWarning);
     return {
       patch: targetPatch,
       manifest,

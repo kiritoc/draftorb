@@ -11,7 +11,7 @@
  * (`exports role-prob.json ... renormalizes survivors to sum to 1`).
  */
 
-import { roleSchema } from '@draftorb/shared';
+import { championRoleProbabilitiesSchema, roleSchema } from '@draftorb/shared';
 import { passesGate, round6 } from './io.js';
 
 export interface RoleProbRow {
@@ -41,7 +41,8 @@ export function computeRoleProb(
     for (const e of entries) total += e.prob;
     if (total <= 0) continue;
     const probs: Record<string, number> = {};
-    for (const e of entries) {
+    let assigned = 0;
+    entries.forEach((e, index) => {
       try {
         roleSchema.parse(e.role);
       } catch (error: unknown) {
@@ -49,8 +50,12 @@ export function computeRoleProb(
           `Invalid role-prob export for role-prob.json (champion ${championId}): ${error instanceof Error ? error.message : String(error)}`,
         );
       }
-      probs[e.role] = round6(e.prob / total);
-    }
+      // The last survivor takes the residual so rounded values sum to exactly 1.
+      const value =
+        index === entries.length - 1 ? round6(1 - assigned) : round6(e.prob / total);
+      assigned += value;
+      probs[e.role] = value;
+    });
     out[championId] = probs;
   }
   return out;
@@ -61,5 +66,12 @@ export function roleProbFile(
   exportMinGames: number,
 ): { relativePath: string; content: string } {
   const out = computeRoleProb(rows, exportMinGames);
+  try {
+    championRoleProbabilitiesSchema.parse(out);
+  } catch (error: unknown) {
+    throw new Error(
+      `Invalid role-prob export for role-prob.json: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
   return { relativePath: 'role-prob.json', content: JSON.stringify(out) };
 }

@@ -1,0 +1,211 @@
+/**
+ * @draftorb/etl — JSON export orchestration.
+ *
+ * Reads the aggregated SQLite tables and writes the versioned, role-keyed JSON
+ * layout described in DATA_MODEL.md §Exported JSON, plus `manifest.json`.
+ * Pure file-content building lives in the sibling modules; all filesystem /
+ * `node:` IO, hashing, and size checks live in `./io.js`. The public entry
+ * point remains `exportJson` (re-exported here), so `./export` keeps resolving
+ * to this module.
+ *
+ * Read-only: never writes to SQLite. Run `pnpm etl aggregate` first, then
+ * `pnpm etl export` to materialize the tables as JSON.
+ */
+
+import type Database from 'better-sqlite3';
+import { join } from 'node:path';
+
+import { DEFAULT_CONFIG, type RankWeightingConfig } from '@draftorb/engine';
+import { type Manifest, type Role } from '@draftorb/shared';
+import { latestPatch, PATCH_PATTERN } from '../aggregate';
+import { defaultPublicDataDir } from '../config/paths';
+import { log } from '../commands/shared';
+import { buildManifest } from './manifest';
+import { buildRuneFiles } from './runes';
+import { buildBuildFiles } from './builds';
+import { buildTableFile, TABLE_SPECS } from './role-tables';
+import { roleProbFile, type RoleProbRow } from './role-prob';
+import type { ItemBuildRow } from './builds';
+import type { RuneCtxRow } from './runes';
+import {
+  MAX_FILE_BYTES,
+  type ExportFile,
+  createTempDir,
+  oversizeWarning,
+  publishTempDir,
+  removeTempDir,
+  writeFile,
+} from './io';
+
+export const EXPORT_ROLES: readonly Role[] = ['SUPPORT'];
+
+export interface ExportOptions {
+  config?: RankWeightingConfig;
+  patch?: string;
+  publicDir?: string;
+  roles?: readonly Role[];
+  maxFileBytes?: number;
+  now?: () => Date;
+  region?: string;
+}
+
+export interface ExportResult {
+  patch: string;
+  manifest: Manifest;
+  files: ExportFile[];
+  warnings: string[];
+  skippedRunePages: number;
+}
+
+/** Typed wrapper around `db.prepare(sql).all()` so query results are never
+ *  cast with `as` at the call site. This is the project's single typed
+ *  `all<T>()` helper for query results. */
+function all<T>(db: Database.Database, sql: string, params: readonly unknown[] = []): T[] {
+  return db.prepare(sql).all(params) as T[];
+}
+
+export function exportJson(db: Database.Database, options: ExportOptions = {}): ExportResult {
+  const config = options.config ?? DEFAULT_CONFIG;
+  // C6: the invariant is enforced by the engine's rankWeightingConfigSchema;
+  // assert it explicitly here so programmatic misuse throws a clear error
+  // (exportJson keeps its plain Error, distinct from the CLI's UsageError).
+  if (config.exportMinGames > config.minGames) {
+    throw new Error(
+      `exportMinGames (${config.exportMinGames}) must be <= minGames (${config.minGames})`,
+    );
+  }
+  const exportMinGames = config.exportMinGames;
+  const roles = options.roles ?? EXPORT_ROLES;
+  const maxFileBytes = options.maxFileBytes ?? MAX_FILE_BYTES;
+  const now = options.now ?? (() => new Date());
+
+  if (options.patch !== undefined && !PATCH_PATTERN.test(options.patch)) {
+    throw new Error(`Invalid patch "${options.patch}". Expected a format like "16.21".`);
+  }
+
+  const targetPatch = options.patch ?? latestPatch(db);
+  if (targetPatch === undefined) {
+    throw new Error(
+      'No patch found in the database; nothing to export. Run `pnpm etl matches` first.',
+    );
+  }
+
+  const publicDir = options.publicDir ?? process.env.DRAFTORB_PUBLIC_DIR ?? defaultPublicDataDir();
+
+  // --- Query all aggregated tables (typed, ordered) ---
+  const roleProbRows = all<RoleProbRow>(
+    db,
+    `SELECT champion_id AS championId, role AS role, games_w AS gamesW, games_w2 AS gamesW2, prob AS prob
+     FROM role_prob ORDER BY champion_id, role`,
+  );
+
+  const tableRows = new Map<string, readonly unknown[]>();
+  for (const spec of TABLE_SPECS) {
+    tableRows.set(spec.name, all<unknown>(db, spec.sql));
+  }
+
+  const runeRows = all<RuneCtxRow>(
+    db,
+    `SELECT champion_id AS championId, my_role AS myRole, rank_bucket AS rankBucket,
+           context_key AS contextKey, context_level AS contextLevel,
+           perks_hash AS perksHash, perks_json AS perksJson,
+           wins_w AS winsW, games_w AS gamesW, games_w2 AS gamesW2, players AS players
+     FROM rune_ctx ORDER BY champion_id, my_role, context_key, context_level`,
+  );
+
+  const buildRows = all<ItemBuildRow>(
+    db,
+    `SELECT champion_id AS championId, my_role AS myRole, slot_idx AS slotIdx,
+           time_bucket AS timeBucket, state_bucket AS stateBucket,
+           profile_key AS profileKey, lane_key AS laneKey,
+           item_id AS itemId, wins_w AS winsW, games_w AS gamesW, games_w2 AS gamesW2
+     FROM item_build ORDER BY champion_id, my_role, slot_idx, time_bucket, state_bucket, profile_key, lane_key`,
+  );
+
+  // --- Region (C5) ---
+  const platformRows = all<{ platform: string }>(
+    db,
+    `SELECT DISTINCT platform AS platform FROM matches ORDER BY platform`,
+  );
+  let region: string;
+  if (options.region !== undefined) {
+    region = options.region;
+  } else {
+    const first = platformRows[0];
+    if (platformRows.length > 1 && first !== undefined) {
+      log.info(
+        `export: database contains ${platformRows.length} platforms (` +
+          `${platformRows.map((r) => r.platform).join(', ')}); using alphabetically first ${first.platform}`,
+      );
+    }
+    region = first?.platform ?? 'euw1';
+  }
+
+  // --- Build file contents (compact JSON for data files; manifest uses null, 2) ---
+  const filesToWrite: Array<{ relativePath: string; content: string }> = [];
+
+  filesToWrite.push(roleProbFile(roleProbRows, exportMinGames));
+
+  for (const role of roles) {
+    for (const spec of TABLE_SPECS) {
+      const rows = tableRows.get(spec.name) ?? [];
+      filesToWrite.push(buildTableFile(spec, rows, role, exportMinGames));
+    }
+  }
+
+  const runeResult = buildRuneFiles(runeRows, roles, exportMinGames);
+  filesToWrite.push(...runeResult.files);
+  const skippedRunePages = runeResult.skippedRunePages;
+  if (skippedRunePages > 0) {
+    log.info(
+      `export: skipped ${skippedRunePages} rune page(s) with unparseable or invalid perks_json`,
+    );
+  }
+
+  filesToWrite.push(...buildBuildFiles(buildRows, roles, exportMinGames).files);
+
+  // --- Atomic write to a sibling temp dir, then publish (C4) ---
+  const targetDir = join(publicDir, targetPatch);
+  const tempDir = createTempDir(publicDir, targetPatch);
+  let published = false;
+  try {
+    const written: ExportFile[] = [];
+    const warnings: string[] = [];
+    for (const { relativePath, content } of filesToWrite) {
+      const entry = writeFile(tempDir, relativePath, content);
+      const warn = oversizeWarning(relativePath, content, maxFileBytes);
+      if (warn !== null) {
+        log.info(warn);
+        warnings.push(warn);
+      }
+      written.push(entry);
+    }
+    // Manifest last, inside the temp dir.
+    const generatedAt = now().toISOString();
+    const manifest = buildManifest({
+      patch: targetPatch,
+      generatedAt,
+      region,
+      roles,
+      files: written,
+    });
+    const manifestEntry = writeFile(tempDir, 'manifest.json', JSON.stringify(manifest, null, 2));
+    written.push({ ...manifestEntry, relativePath: 'manifest.json' });
+
+    publishTempDir(tempDir, targetDir);
+    published = true;
+    return {
+      patch: targetPatch,
+      manifest,
+      files: written,
+      warnings,
+      skippedRunePages,
+    };
+  } finally {
+    if (!published) {
+      removeTempDir(tempDir);
+    }
+  }
+}
+
+export type { ExportFile };

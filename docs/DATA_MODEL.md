@@ -106,7 +106,7 @@ Validated by one zod schema family parameterized by role (`packages/shared`, T-0
 manifest.json          // { patch, generatedAt, region, rankBuckets: [the 8 §3 buckets, not 10 tiers], roles: ["SUPPORT"], files[], schemaVersion }
 champions.json         // id, name, icon, roles
 items.json             // item catalog (from Data Dragon)
-role-prob.json         // { [championId]: { SUPPORT: 0.92, ... } } — sparse: a champion entry lists only the roles in which it has been observed with a non-zero probability (roles with games); absent roles are treated as 0. Each champion's probabilities sum to 1 (tolerance 1e-6). Note for T-002.b: in zod 4, `z.record(roleSchema, numberSchema)` requires every key in `roleSchema` to be present, so a sparse map must use `z.partialRecord(roleSchema, numberSchema)` (or equivalent) instead of `z.record`.
+role-prob.json         // { [championId]: { SUPPORT: 0.92, ... } } — sparse: a champion entry lists only the roles in which it has been observed with a non-zero probability (roles with games); absent roles are treated as 0. Each champion's probabilities sum to 1 (tolerance 1e-6). Exported values are the stored `role_prob.prob` for rows passing the `exportMinGames` gate, renormalized so survivors sum to 1 (the gate can drop roles and break the sum). Note for T-002.b: in zod 4, `z.record(roleSchema, numberSchema)` requires every key in `roleSchema` to be present, so a sparse map must use `z.partialRecord(roleSchema, numberSchema)` (or equivalent) instead of `z.record`.
 roles/<ROLE>/baseline.json    // [championId, bucket, wins_w, games_w, games_w2, games] (games = raw match count; manifest schemaVersion 2)
 roles/<ROLE>/ally-pairs.json  // [championId, allyId, role, bucket, wins_w, games_w, games_w2]
 roles/<ROLE>/enemy-pairs.json // [championId, enemyId, role, bucket, wins_w, games_w, games_w2]
@@ -116,7 +116,7 @@ roles/<ROLE>/runes/<championId>.json  // contexts -> top pages
 roles/<ROLE>/builds/<championId>.json // item build stats
 ```
 
-Every exported row carries `games_w2` so the engine can compute `n_eff` (SPECS §3). Rows are exported only when `n_eff >= exportMinGames` (config, default 10), and `exportMinGames <= minGames` so tightening `minGames` never needs a re-export. Size budget: `lane-*` and `*-pairs` files are the largest; if a file would exceed 5 MB, raise `exportMinGames` for that file and record it in the manifest.
+Every exported row carries `games_w2` so the engine can compute `n_eff` (SPECS §3). Rows are exported only when `n_eff >= exportMinGames` (config, default 10), and `exportMinGames <= minGames` so tightening `minGames` never needs a re-export. Size budget: `lane-*` and `*-pairs` files are the largest; size is `zlib.gzipSync(content).length` vs `MAX_FILE_BYTES` (5 MB gzip); oversize files are reported in `ExportResult.warnings`. The export writes to a sibling temp directory and publishes by directory rename, so a failed export never leaves a partial or stale patch directory; output is deterministic for a fixed `now`.
 
 Manual files (committed, hand-written, zod-validated): `data/manual/champion-tags.json`, `data/manual/item-tags.json`, `data/manual/gameplans/*.md`.
 

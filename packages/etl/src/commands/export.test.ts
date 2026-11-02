@@ -1,7 +1,9 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import Database from 'better-sqlite3';
 
 import { openDb, migrate } from '../db';
 import { exportCommand } from './export';
@@ -10,18 +12,30 @@ describe('exportCommand', () => {
   let directory: string;
   let dbPath: string;
   let logSpy: ReturnType<typeof vi.spyOn>;
+  const originalDbPath = process.env.DRAFTORB_DB_PATH;
+  const originalPublicDir = process.env.DRAFTORB_PUBLIC_DIR;
 
   beforeEach(() => {
     directory = mkdtempSync(join(tmpdir(), 'draftorb-export-cmd-'));
-    process.env.DRAFTORB_DB_PATH = dbPath = join(directory, 'test.sqlite');
+    dbPath = join(directory, 'test.sqlite');
+    process.env.DRAFTORB_DB_PATH = dbPath;
     process.env.DRAFTORB_PUBLIC_DIR = join(directory, 'public');
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
   });
 
   afterEach(() => {
     logSpy.mockRestore();
-    if (process.env.DRAFTORB_DB_PATH === dbPath) delete process.env.DRAFTORB_DB_PATH;
-    if (process.env.DRAFTORB_PUBLIC_DIR) delete process.env.DRAFTORB_PUBLIC_DIR;
+    // Restore env exactly (reassign when previously defined, delete otherwise).
+    if (originalDbPath === undefined) {
+      delete process.env.DRAFTORB_DB_PATH;
+    } else {
+      process.env.DRAFTORB_DB_PATH = originalDbPath;
+    }
+    if (originalPublicDir === undefined) {
+      delete process.env.DRAFTORB_PUBLIC_DIR;
+    } else {
+      process.env.DRAFTORB_PUBLIC_DIR = originalPublicDir;
+    }
     rmSync(directory, { recursive: true, force: true });
   });
 
@@ -87,5 +101,57 @@ describe('exportCommand', () => {
     expect(
       manifest.files.some((f: { path: string }) => f.path === 'roles/SUPPORT/baseline.json'),
     ).toBe(true);
+  });
+
+  it('does not modify the SQLite database (read-only export)', async () => {
+    const db = openDb(dbPath);
+    migrate(db);
+    db.prepare(
+      `INSERT INTO matches (match_id, platform, patch, queue_id, duration, created_at, avg_rank_score, rank_known_count)
+       VALUES ('m1', 'euw1', '16.21', 420, 1800, 1, 6.5, 2)`,
+    ).run();
+    db.prepare(
+      `INSERT INTO role_prob (champion_id, role, games, games_w, games_w2, prob)
+       VALUES (412, 'SUPPORT', 1, 10, 10, 1)`,
+    ).run();
+    db.close();
+
+    const before = statSync(dbPath);
+    const { size: beforeSize, mtimeMs: beforeMtime } = before;
+
+    await exportCommand.run([]);
+
+    const after = statSync(dbPath);
+    expect(after.size).toBe(beforeSize);
+    expect(after.mtimeMs).toBe(beforeMtime);
+
+    // Opening read-only and attempting a write must fail.
+    const readOnly = new Database(dbPath, { readonly: true, fileMustExist: true });
+    expect(() => readOnly.prepare(`UPDATE matches SET patch = '16.22'`).run()).toThrow();
+    readOnly.close();
+  });
+
+  it('supports the --region flag', async () => {
+    const db = openDb(dbPath);
+    migrate(db);
+    db.prepare(
+      `INSERT INTO matches (match_id, platform, patch, queue_id, duration, created_at, avg_rank_score, rank_known_count)
+       VALUES ('m1', 'euw1', '16.21', 420, 1800, 1, 6.5, 2)`,
+    ).run();
+    db.prepare(
+      `INSERT INTO role_prob (champion_id, role, games, games_w, games_w2, prob)
+       VALUES (412, 'SUPPORT', 1, 10, 10, 1)`,
+    ).run();
+    db.close();
+
+    await exportCommand.run(['--region=kr']);
+    const manifest = JSON.parse(
+      readFileSync(
+        join(process.env.DRAFTORB_PUBLIC_DIR as string, '16.21', 'manifest.json'),
+        'utf8',
+      ),
+    );
+    expect(manifest.region).toBe('kr');
+    expect(output()).not.toMatch(/platforms/);
   });
 });

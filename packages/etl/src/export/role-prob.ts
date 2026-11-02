@@ -51,8 +51,7 @@ export function computeRoleProb(
         );
       }
       // The last survivor takes the residual so rounded values sum to exactly 1.
-      const value =
-        index === entries.length - 1 ? round6(1 - assigned) : round6(e.prob / total);
+      const value = index === entries.length - 1 ? round6(1 - assigned) : round6(e.prob / total);
       assigned += value;
       probs[e.role] = value;
     });

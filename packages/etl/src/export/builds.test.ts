@@ -156,7 +156,10 @@ describe('exportJson', () => {
 
   it('emits no build file when every item fails the export gate', () => {
     const result = buildBuildFiles(
-      [supportBuildRow({ gamesW: 5, gamesW2: 5 }), supportBuildRow({ itemId: 3047, gamesW: 2, gamesW2: 2 })],
+      [
+        supportBuildRow({ gamesW: 5, gamesW2: 5 }),
+        supportBuildRow({ itemId: 3047, gamesW: 2, gamesW2: 2 }),
+      ],
       ['SUPPORT'],
       10,
     );

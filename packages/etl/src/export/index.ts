@@ -19,23 +19,31 @@ import { DEFAULT_CONFIG, type RankWeightingConfig } from '@draftorb/engine';
 import { type Manifest, type Role } from '@draftorb/shared';
 import { latestPatch, PATCH_PATTERN } from '../aggregate';
 import { defaultPublicDataDir } from '../config/paths';
-import { log } from '../commands/shared';
-import { buildManifest } from './manifest';
-import { buildRuneFiles } from './runes';
-import { buildBuildFiles } from './builds';
-import { buildTableFile, TABLE_SPECS } from './role-tables';
-import { roleProbFile, type RoleProbRow } from './role-prob';
-import type { ItemBuildRow } from './builds';
-import type { RuneCtxRow } from './runes';
+import { buildManifest } from './manifest.js';
+import { buildRuneFiles } from './runes.js';
+import { buildBuildFiles } from './builds.js';
+import {
+  buildTableFile,
+  TABLE_SPECS,
+  type AllyPairRow,
+  type BaselineRow,
+  type EnemyPairRow,
+  type LaneFullRow,
+  type LaneVsRow,
+} from './role-tables.js';
+import { roleProbFile, type RoleProbRow } from './role-prob.js';
+import type { ItemBuildRow } from './builds.js';
+import type { RuneCtxRow } from './runes.js';
 import {
   MAX_FILE_BYTES,
   type ExportFile,
+  cleanupStaleExportDirs,
   createTempDir,
   oversizeWarning,
   publishTempDir,
   removeTempDir,
   writeFile,
-} from './io';
+} from './io.js';
 
 export const EXPORT_ROLES: readonly Role[] = ['SUPPORT'];
 
@@ -47,6 +55,8 @@ export interface ExportOptions {
   maxFileBytes?: number;
   now?: () => Date;
   region?: string;
+  /** @internal Runs after each file has been written to the temporary export. */
+  hooks?: { afterWrite?(relativePath: string): void };
 }
 
 export interface ExportResult {
@@ -61,7 +71,8 @@ export interface ExportResult {
  *  cast with `as` at the call site. This is the project's single typed
  *  `all<T>()` helper for query results. */
 function all<T>(db: Database.Database, sql: string, params: readonly unknown[] = []): T[] {
-  return db.prepare(sql).all(params) as T[];
+  const statement = db.prepare(sql);
+  return (params.length === 0 ? statement.all() : statement.all(...params)) as T[];
 }
 
 export function exportJson(db: Database.Database, options: ExportOptions = {}): ExportResult {
@@ -91,6 +102,7 @@ export function exportJson(db: Database.Database, options: ExportOptions = {}): 
   }
 
   const publicDir = options.publicDir ?? process.env.DRAFTORB_PUBLIC_DIR ?? defaultPublicDataDir();
+  cleanupStaleExportDirs(publicDir, targetPatch);
 
   // --- Query all aggregated tables (typed, ordered) ---
   const roleProbRows = all<RoleProbRow>(
@@ -99,10 +111,11 @@ export function exportJson(db: Database.Database, options: ExportOptions = {}): 
      FROM role_prob ORDER BY champion_id, role`,
   );
 
-  const tableRows = new Map<string, readonly unknown[]>();
-  for (const spec of TABLE_SPECS) {
-    tableRows.set(spec.name, all<unknown>(db, spec.sql));
-  }
+  const baselineRows = all<BaselineRow>(db, TABLE_SPECS[0].sql);
+  const allyPairRows = all<AllyPairRow>(db, TABLE_SPECS[1].sql);
+  const enemyPairRows = all<EnemyPairRow>(db, TABLE_SPECS[2].sql);
+  const laneVsRows = all<LaneVsRow>(db, TABLE_SPECS[3].sql);
+  const laneFullRows = all<LaneFullRow>(db, TABLE_SPECS[4].sql);
 
   const runeRows = all<RuneCtxRow>(
     db,
@@ -128,12 +141,13 @@ export function exportJson(db: Database.Database, options: ExportOptions = {}): 
     `SELECT DISTINCT platform AS platform FROM matches ORDER BY platform`,
   );
   let region: string;
+  const warnings: string[] = [];
   if (options.region !== undefined) {
     region = options.region;
   } else {
     const first = platformRows[0];
     if (platformRows.length > 1 && first !== undefined) {
-      log.info(
+      warnings.push(
         `export: database contains ${platformRows.length} platforms (` +
           `${platformRows.map((r) => r.platform).join(', ')}); using alphabetically first ${first.platform}`,
       );
@@ -147,17 +161,20 @@ export function exportJson(db: Database.Database, options: ExportOptions = {}): 
   filesToWrite.push(roleProbFile(roleProbRows, exportMinGames));
 
   for (const role of roles) {
-    for (const spec of TABLE_SPECS) {
-      const rows = tableRows.get(spec.name) ?? [];
-      filesToWrite.push(buildTableFile(spec, rows, role, exportMinGames));
-    }
+    filesToWrite.push(
+      buildTableFile(TABLE_SPECS[0], baselineRows, role, exportMinGames),
+      buildTableFile(TABLE_SPECS[1], allyPairRows, role, exportMinGames),
+      buildTableFile(TABLE_SPECS[2], enemyPairRows, role, exportMinGames),
+      buildTableFile(TABLE_SPECS[3], laneVsRows, role, exportMinGames),
+      buildTableFile(TABLE_SPECS[4], laneFullRows, role, exportMinGames),
+    );
   }
 
   const runeResult = buildRuneFiles(runeRows, roles, exportMinGames);
   filesToWrite.push(...runeResult.files);
   const skippedRunePages = runeResult.skippedRunePages;
   if (skippedRunePages > 0) {
-    log.info(
+    warnings.push(
       `export: skipped ${skippedRunePages} rune page(s) with unparseable or invalid perks_json`,
     );
   }
@@ -170,12 +187,11 @@ export function exportJson(db: Database.Database, options: ExportOptions = {}): 
   let published = false;
   try {
     const written: ExportFile[] = [];
-    const warnings: string[] = [];
     for (const { relativePath, content } of filesToWrite) {
       const entry = writeFile(tempDir, relativePath, content);
+      options.hooks?.afterWrite?.(relativePath);
       const warn = oversizeWarning(relativePath, content, maxFileBytes);
       if (warn !== null) {
-        log.info(warn);
         warnings.push(warn);
       }
       written.push(entry);
@@ -190,6 +206,7 @@ export function exportJson(db: Database.Database, options: ExportOptions = {}): 
       files: written,
     });
     const manifestEntry = writeFile(tempDir, 'manifest.json', JSON.stringify(manifest, null, 2));
+    options.hooks?.afterWrite?.('manifest.json');
     written.push({ ...manifestEntry, relativePath: 'manifest.json' });
 
     publishTempDir(tempDir, targetDir);
@@ -197,7 +214,7 @@ export function exportJson(db: Database.Database, options: ExportOptions = {}): 
     return {
       patch: targetPatch,
       manifest,
-      files: written,
+      files: written.map((file) => ({ ...file, path: join(targetDir, file.relativePath) })),
       warnings,
       skippedRunePages,
     };

@@ -4,7 +4,7 @@
 
 - Phase: 1 (Support / Diamond)
 - Current milestone: M0 Foundations (T-002.b DONE) and M1 ETL (in progress: T-014 DONE; T-015/T-015.b DONE; T-016 DONE; T-017 DONE; T-018 DONE; T-019 DONE; T-019.b..f TODO) -> M2 Engine (T-020..T-023 DONE)
-- Last updated: 2026-11-02 by Nemotron
+- Last updated: 2026-11-02 by Copilot
 
 ## Epic status
 
@@ -88,6 +88,22 @@ Earlier handoff (kept for history): B-017 done (engine and shared `"types": []` 
 - Next: Owner review; then schedule T-019.b or continue T-019 (export).
 
 ## Session log (newest first)
+
+### 2026-11-02 — Ticket T-019 (second review-fix pass)
+
+- Done:
+  - Enforced the `exportMinGames` gate for global rune contexts and centralized rune context levels between aggregation and export.
+  - Kept `role-prob.json` global regardless of selected role-keyed files; unknown exported roles now fail with a path-specific error.
+  - Calculated rune/build pick shares against raw context totals before gating and rounded only the final value.
+  - Hardened publishing with unique dot-prefixed temp/backup directories, age-based stale cleanup, recovery-backup preservation, rollback attempts, and final published file paths.
+  - Added typed table queries and path-specific schema errors; returned region, skipped-rune, and gzip-size warnings for the CLI to log once. The CLI now reports only a missing DB as absent and surfaces other open errors.
+  - Split exporter tests by topic and extracted typed seed helpers to keep exporter and command modules at or below 300 lines.
+  - Updated DATA_MODEL.md and TICKETS.md with the global role-probability scope, gate/share rules, and actual publish behavior.
+- Files touched: `packages/shared/src/rune-context.ts`, `packages/shared/src/index.ts`, `packages/etl/src/aggregate-runes.ts`, `packages/etl/src/commands/export.ts`, `packages/etl/src/commands/export.test.ts`, `packages/etl/src/export/{index,io,role-prob,role-tables,runes,builds,export.fixtures,export.seed,export.test-utils}.ts`, exporter topic tests, `docs/DATA_MODEL.md`, `docs/TICKETS.md`, `docs/PROGRESS.md`.
+- Tests: `pnpm check` passed (typecheck, formatting, 55 test files / 702 tests; lint had 0 errors and 15 pre-existing warnings). Package suites passed: ETL 31 files / 275 tests, shared 4 / 46, engine 20 / 381. Focused exporter/CLI suite passed: 8 files / 41 tests. Export and command TypeScript files are at or below 300 lines.
+- State left: T-019 review findings addressed; final checks passed.
+- Next step: T-019.b (retention model migration).
+- Pitfalls / notes: SQLite `item_build.lane_key` is `NOT NULL` and stores no-lane as `''`; exporter normalizes it to absent. `role-prob.json` is global. Dot-prefixed temp/backup directories under `data/public` are internal and must not be served; cleanup only removes matching directories older than 24 hours and retains backups when the patch directory is missing. A failed rollback preserves the backup for recovery.
 
 ### 2026-11-01 — Specification update: SPECS §12-18 (retention model, patch index, change scoring)
 

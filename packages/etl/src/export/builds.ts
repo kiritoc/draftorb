@@ -7,8 +7,8 @@
  * `laneKey` containing `|` (e.g. `lane:SUPPORT|ADC`) cannot corrupt the key.
  * A missing `laneKey` is `null`/absent (schema `laneKey?: string`), never the
  * `''` sentinel.
- * B4: pickShare = item.gamesW / sum(gamesW of all items in the same context),
- * rounded with round6; never a constant 0.
+ * Pick shares use raw gamesW divided by all rows in the context before the
+ * export gate, then are rounded once.
  * C1: items sorted by gamesW desc then itemId asc; contexts sorted by key.
  * B6: builds are grouped by (championId, myRole); written under the role's own
  * directory. myRole comes from the group key.
@@ -64,7 +64,6 @@ export function buildBuildFiles(
 
   for (const row of rows) {
     if (!roleSet.has(row.myRole)) continue;
-    if (!passesGate(row.gamesW, row.gamesW2, exportMinGames)) continue;
     const groupKey = `${String(row.championId)}::${row.myRole}`;
     const existing = byGroup.get(groupKey);
     if (existing === undefined) {
@@ -78,17 +77,16 @@ export function buildBuildFiles(
   for (const { myRole, rows: groupRows } of byGroup.values()) {
     const championId = groupRows[0]?.championId;
     if (championId === undefined) continue;
-    championIdSchema.parse(championId);
-    roleSchema.parse(myRole);
     // B5: structured grouping key; original values retained from first row.
     const byContext = new Map<string, ItemBuildContextWithKey>();
     for (const row of groupRows) {
+      const laneKey = row.laneKey === '' ? null : row.laneKey;
       const contextKey = JSON.stringify([
         row.slotIdx,
         row.timeBucket,
         row.stateBucket,
         row.profileKey,
-        row.laneKey,
+        laneKey,
       ]);
       let ctx = byContext.get(contextKey);
       if (ctx === undefined) {
@@ -97,26 +95,34 @@ export function buildBuildFiles(
           timeBucket: row.timeBucket,
           stateBucket: row.stateBucket,
           profileKey: row.profileKey,
-          laneKey: row.laneKey,
+          laneKey,
           items: [],
         };
         byContext.set(contextKey, ctx);
       }
       ctx.items.push({
         itemId: row.itemId,
-        winsW: round6(row.winsW),
-        gamesW: round6(row.gamesW),
-        gamesW2: round6(row.gamesW2),
-        winrate: row.gamesW > 0 ? round6(row.winsW / row.gamesW) : 0,
-        pickShare: 0, // filled below per context
+        winsW: row.winsW,
+        gamesW: row.gamesW,
+        gamesW2: row.gamesW2,
+        winrate: row.gamesW > 0 ? row.winsW / row.gamesW : 0,
+        pickShare: 0,
       });
     }
     const contexts: ItemBuildContextWithKey[] = [];
     for (const ctx of byContext.values()) {
-      // B4: pickShare = item.gamesW / sum(gamesW of all items in this context).
       const gamesWTotal = ctx.items.reduce((sum, item) => sum + item.gamesW, 0);
       for (const item of ctx.items) {
-        item.pickShare = gamesWTotal > 0 ? round6(item.gamesW / gamesWTotal) : 0;
+        item.pickShare = gamesWTotal > 0 ? Math.min(1, item.gamesW / gamesWTotal) : 0;
+      }
+      ctx.items = ctx.items.filter((item) => passesGate(item.gamesW, item.gamesW2, exportMinGames));
+      if (ctx.items.length === 0) continue;
+      for (const item of ctx.items) {
+        item.winsW = round6(item.winsW);
+        item.gamesW = round6(item.gamesW);
+        item.gamesW2 = round6(item.gamesW2);
+        item.winrate = round6(item.winrate);
+        item.pickShare = round6(item.pickShare);
       }
       // C1: sort items by gamesW desc, then itemId asc.
       ctx.items.sort((a, b) => b.gamesW - a.gamesW || a.itemId - b.itemId);
@@ -154,10 +160,12 @@ export function buildBuildFiles(
       ),
     };
     try {
+      championIdSchema.parse(championId);
+      roleSchema.parse(myRole);
       itemBuildExportSchema.parse(exportObj);
-    } catch (error) {
+    } catch (error: unknown) {
       throw new Error(
-        `Invalid build export for roles/${myRole}/builds/${championId}.json: ${(error as Error).message}`,
+        `Invalid build export for roles/${myRole}/builds/${championId}.json: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
     files.push({

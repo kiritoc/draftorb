@@ -1,13 +1,12 @@
 /**
  * @draftorb/etl — Exported rune files `roles/<ROLE>/runes/<championId>.json`.
  *
- * D3: the most-general back-off level (`context_level === 5`, "global") is
- * exempted from the `exportMinGames` gate so a champion always keeps a fallback
- * context (T-018 acceptance: every context level present for back-off).
+ * Every page, including the global back-off context, passes the same
+ * `exportMinGames` gate as other exported rows (DATA_MODEL.md).
  * C2: contexts are keyed by (contextKey, contextLevel); a contextKey appearing
  * with differing levels is treated as separate contexts.
- * B4: pickShare = page.gamesW / sum(gamesW of all pages in the same context),
- * rounded with round6; never a constant 0.
+ * Pick shares use raw gamesW divided by all rows in the context before the
+ * export gate, then are rounded once.
  * C3: unparseable or invalid rune rows (parseRunePage returns null, including
  * primaryStyleId <= 0) are counted and reported via skippedRunePages.
  * B6: runes are grouped by (championId, myRole); each group is written under
@@ -31,10 +30,6 @@ export interface RuneCtxRow {
   gamesW2: number;
   players: number;
 }
-
-// Most-general back-off level (global). Exempt from the exportMinGames gate so
-// every champion retains a fallback context (D3).
-const GLOBAL_CONTEXT_LEVEL = 5;
 
 function parseRunePage(perksJson: string): {
   primaryStyleId: number;
@@ -116,11 +111,6 @@ export function buildRuneFiles(
 
   for (const row of rows) {
     if (!roleSet.has(row.myRole)) continue;
-    if (
-      row.contextLevel !== GLOBAL_CONTEXT_LEVEL &&
-      !passesGate(row.gamesW, row.gamesW2, exportMinGames)
-    )
-      continue;
     const groupKey = `${String(row.championId)}::${row.myRole}`;
     const existing = byGroup.get(groupKey);
     if (existing === undefined) {
@@ -134,8 +124,6 @@ export function buildRuneFiles(
   for (const { myRole, rows: groupRows } of byGroup.values()) {
     const championId = groupRows[0]?.championId;
     if (championId === undefined) continue;
-    championIdSchema.parse(championId);
-    roleSchema.parse(myRole);
     // C2: key contexts by (contextKey, contextLevel).
     const byContext = new Map<string, RuneCtxRow[]>();
     for (const row of groupRows) {
@@ -151,7 +139,9 @@ export function buildRuneFiles(
       [];
     for (const [contextKeyFull, ctxRows] of byContext) {
       const pages: RunePageWithHash[] = [];
+      const gamesWTotal = ctxRows.reduce((sum, row) => sum + row.gamesW, 0);
       for (const row of ctxRows) {
+        if (!passesGate(row.gamesW, row.gamesW2, exportMinGames)) continue;
         const page = parseRunePage(row.perksJson);
         if (page === null) {
           skipped += 1;
@@ -163,17 +153,12 @@ export function buildRuneFiles(
           gamesW: round6(row.gamesW),
           gamesW2: round6(row.gamesW2),
           winrate: row.gamesW > 0 ? round6(row.winsW / row.gamesW) : 0,
-          pickShare: 0, // filled below per context
+          pickShare: gamesWTotal > 0 ? round6(Math.min(1, row.gamesW / gamesWTotal)) : 0,
           players: row.players,
           perksHash: row.perksHash,
         });
       }
       if (pages.length === 0) continue;
-      // B4: pickShare = page.gamesW / sum(gamesW of all pages in this context).
-      const gamesWTotal = pages.reduce((sum, p) => sum + p.gamesW, 0);
-      for (const p of pages) {
-        p.pickShare = gamesWTotal > 0 ? round6(p.gamesW / gamesWTotal) : 0;
-      }
       // C1: sort pages by gamesW desc, then perksHash asc.
       pages.sort((a, b) => b.gamesW - a.gamesW || a.perksHash.localeCompare(b.perksHash));
       const [contextKey = '', contextLevelStr = '0'] = contextKeyFull.split('::');
@@ -199,10 +184,12 @@ export function buildRuneFiles(
       })),
     };
     try {
+      championIdSchema.parse(championId);
+      roleSchema.parse(myRole);
       runeExportSchema.parse(exportObj);
-    } catch (error) {
+    } catch (error: unknown) {
       throw new Error(
-        `Invalid rune export for roles/${myRole}/runes/${championId}.json: ${(error as Error).message}`,
+        `Invalid rune export for roles/${myRole}/runes/${championId}.json: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
     files.push({

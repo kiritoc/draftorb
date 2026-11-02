@@ -7,15 +7,25 @@
  * directly.
  */
 
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
-import { mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import {
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  readdirSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { basename, dirname, join } from 'node:path';
 
 import { nEff } from '@draftorb/engine';
 
 /** Size budget per exported file (gzip), DATA_MODEL.md §Exported JSON. */
 export const MAX_FILE_BYTES = 5 * 1024 * 1024;
+const STALE_EXPORT_DIR_AGE_MS = 24 * 60 * 60 * 1000;
 
 export function round6(value: number): number {
   return Math.round(value * 1e6) / 1e6;
@@ -63,16 +73,65 @@ export function oversizeWarning(
 }
 
 export function createTempDir(publicDir: string, patch: string): string {
-  const tempDir = join(publicDir, `.${patch}.tmp-${process.pid}`);
-  mkdirSync(tempDir, { recursive: true });
-  return tempDir;
+  mkdirSync(publicDir, { recursive: true });
+  return mkdtempSync(join(publicDir, `.${patch}.tmp-`));
 }
 
 export function publishTempDir(tempDir: string, targetDir: string): void {
-  rmSync(targetDir, { recursive: true, force: true });
-  renameSync(tempDir, targetDir);
+  const parentDir = dirname(targetDir);
+  const backupDir = join(parentDir, `.${basename(targetDir)}.old-${randomUUID()}`);
+  const hadTarget = existsSync(targetDir);
+  let backupExists = false;
+  let preserveBackup = false;
+
+  try {
+    if (hadTarget) {
+      renameSync(targetDir, backupDir);
+      backupExists = true;
+    }
+
+    try {
+      renameSync(tempDir, targetDir);
+    } catch (publishError: unknown) {
+      if (backupExists) {
+        try {
+          renameSync(backupDir, targetDir);
+          backupExists = false;
+        } catch (rollbackError: unknown) {
+          preserveBackup = true;
+          throw new AggregateError(
+            [publishError, rollbackError],
+            `Failed to publish ${targetDir} and restore its previous directory`,
+          );
+        }
+      }
+      throw publishError;
+    }
+  } finally {
+    if (backupExists && !preserveBackup) {
+      rmSync(backupDir, { recursive: true, force: true });
+    }
+  }
 }
 
 export function removeTempDir(tempDir: string): void {
   rmSync(tempDir, { recursive: true, force: true });
+}
+
+export function cleanupStaleExportDirs(publicDir: string, patch: string): void {
+  mkdirSync(publicDir, { recursive: true });
+  const targetExists = existsSync(join(publicDir, patch));
+  const staleBefore = Date.now() - STALE_EXPORT_DIR_AGE_MS;
+  const tempPrefix = `.${patch}.tmp-`;
+  const backupPrefix = `.${patch}.old-`;
+  for (const entry of readdirSync(publicDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const isTemp = entry.name.startsWith(tempPrefix);
+    const isBackup = entry.name.startsWith(backupPrefix);
+    if (!isTemp && !(targetExists && isBackup)) continue;
+    const path = join(publicDir, entry.name);
+    if (statSync(path).mtimeMs <= staleBefore) {
+      rmSync(path, { recursive: true, force: true });
+    }
+  }
 }

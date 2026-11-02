@@ -12,6 +12,7 @@ export {
   MANIFEST_SCHEMA_VERSION,
   DRAFT_RESULT_SCHEMA_VERSION,
 } from './schemas/core.js';
+export { RUNE_CONTEXT_LEVELS } from './rune-context.js';
 
 export {
   roleSchema,

@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import { existsSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import { join, resolve } from 'node:path';
 
@@ -45,15 +46,11 @@ async function runExport(args: string[]): Promise<void> {
   }
   const dbPath = resolveDbPath();
 
-  let db: Database.Database;
-  try {
-    // Read-only: the export must not be able to write to SQLite. fileMustExist
-    // keeps the friendly "no database at ..." message without a separate existsSync.
-    db = new Database(dbPath, { readonly: true, fileMustExist: true });
-  } catch {
+  if (!existsSync(dbPath)) {
     log.info(`no database at ${dbPath}`);
     return;
   }
+  const db: Database.Database = new Database(dbPath, { readonly: true, fileMustExist: true });
   try {
     // UsageError is for CLI argument problems; exportJson keeps its own plain
     // Error for programmatic misuse.
@@ -61,7 +58,7 @@ async function runExport(args: string[]): Promise<void> {
       patch,
       region: typeof values.region === 'string' ? values.region : undefined,
     });
-    const { manifest, files, warnings, skippedRunePages } = result;
+    const { manifest, files, warnings } = result;
     log.info(
       `Exported patch ${manifest.patch} (schema v${manifest.schemaVersion}, roles: ${manifest.roles.join(', ')}) to ${result.files.length} file(s):`,
     );
@@ -70,11 +67,6 @@ async function runExport(args: string[]): Promise<void> {
     }
     for (const warning of warnings) {
       log.info(warning);
-    }
-    if (skippedRunePages > 0) {
-      log.info(
-        `export: skipped ${skippedRunePages} rune page(s) with unparseable or invalid perks_json`,
-      );
     }
   } finally {
     db.close();

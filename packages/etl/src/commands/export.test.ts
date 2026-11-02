@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -45,6 +45,15 @@ describe('exportCommand', () => {
     process.env.DRAFTORB_DB_PATH = join(directory, 'missing.sqlite');
     await expect(exportCommand.run([])).resolves.toBeUndefined();
     expect(output()).toMatch(/no database at/);
+  });
+
+  it('surfaces database open errors instead of reporting a missing database', async () => {
+    const invalidDbPath = join(directory, 'not-a-database');
+    mkdirSync(invalidDbPath);
+    process.env.DRAFTORB_DB_PATH = invalidDbPath;
+
+    await expect(exportCommand.run([])).rejects.toThrow();
+    expect(output()).not.toMatch(/no database at/);
   });
 
   it('rejects a malformed patch with a usage error', async () => {
@@ -131,7 +140,7 @@ describe('exportCommand', () => {
     readOnly.close();
   });
 
-  it('supports the --region flag', async () => {
+  it('uses the single platform without a multi-platform warning', async () => {
     const db = openDb(dbPath);
     migrate(db);
     db.prepare(
@@ -144,6 +153,50 @@ describe('exportCommand', () => {
     ).run();
     db.close();
 
+    await exportCommand.run([]);
+    const manifest = JSON.parse(
+      readFileSync(
+        join(process.env.DRAFTORB_PUBLIC_DIR as string, '16.21', 'manifest.json'),
+        'utf8',
+      ),
+    );
+    expect(manifest.region).toBe('euw1');
+    expect(output()).not.toMatch(/database contains .* platforms/);
+  });
+
+  it('prints a warning and picks the first platform when multiple platforms are present', async () => {
+    const db = openDb(dbPath);
+    migrate(db);
+    db.prepare(
+      `INSERT INTO matches (match_id, platform, patch, queue_id, duration, created_at, avg_rank_score, rank_known_count)
+       VALUES ('m1', 'euw1', '16.21', 420, 1800, 1, 6.5, 2),
+              ('m2', 'na1', '16.21', 420, 1800, 2, 6.5, 2)`,
+    ).run();
+    db.close();
+
+    await exportCommand.run([]);
+
+    expect(output()).toContain(
+      'database contains 2 platforms (euw1, na1); using alphabetically first euw1',
+    );
+    const manifest = JSON.parse(
+      readFileSync(
+        join(process.env.DRAFTORB_PUBLIC_DIR as string, '16.21', 'manifest.json'),
+        'utf8',
+      ),
+    );
+    expect(manifest.region).toBe('euw1');
+  });
+
+  it('supports the --region flag', async () => {
+    const db = openDb(dbPath);
+    migrate(db);
+    db.prepare(
+      `INSERT INTO matches (match_id, platform, patch, queue_id, duration, created_at, avg_rank_score, rank_known_count)
+       VALUES ('m1', 'euw1', '16.21', 420, 1800, 1, 6.5, 2)`,
+    ).run();
+    db.close();
+
     await exportCommand.run(['--region=kr']);
     const manifest = JSON.parse(
       readFileSync(
@@ -152,6 +205,26 @@ describe('exportCommand', () => {
       ),
     );
     expect(manifest.region).toBe('kr');
-    expect(output()).not.toMatch(/platforms/);
+  });
+
+  it('prints the skipped rune page summary exactly once (C2)', async () => {
+    const db = openDb(dbPath);
+    migrate(db);
+    db.prepare(
+      `INSERT INTO matches (match_id, platform, patch, queue_id, duration, created_at, avg_rank_score, rank_known_count)
+       VALUES ('m1', 'euw1', '16.21', 420, 1800, 1, 6.5, 2)`,
+    ).run();
+    db.prepare(
+      `INSERT INTO rune_ctx (
+         champion_id, my_role, rank_bucket, context_key, context_level, perks_hash,
+         perks_json, wins_w, games_w, games_w2, players
+       ) VALUES (412, 'SUPPORT', 'IRON', 'global', 5, 'bad', 'not json', 1, 10, 10, 1)`,
+    ).run();
+    db.close();
+
+    await exportCommand.run([]);
+
+    const summary = 'skipped 1 rune page(s) with unparseable or invalid perks_json';
+    expect(output().split(summary)).toHaveLength(2);
   });
 });

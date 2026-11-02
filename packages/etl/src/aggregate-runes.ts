@@ -27,7 +27,12 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import type { ChampionTagsMap, RankBucket, Role } from '@draftorb/shared';
+import {
+  RUNE_CONTEXT_LEVELS,
+  type ChampionTagsMap,
+  type RankBucket,
+  type Role,
+} from '@draftorb/shared';
 import {
   DEFAULT_CONFIG,
   DEFAULT_LANE_GROUPS,
@@ -65,10 +70,6 @@ export interface AggregateRunesOptions {
 
 // Back-off context levels (most specific = lowest number, SPECS §8.1).
 // Lane contexts increment as slots are dropped (3-slot → 2-slot → 1-slot).
-const CONTEXT_LEVEL_LANE_BASE = 1;
-const CONTEXT_LEVEL_DAMAGE_MIX = 4;
-const CONTEXT_LEVEL_GLOBAL = 5;
-
 const ROLE_ORDER: readonly string[] = ['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT'];
 
 interface RuneAccum {
@@ -386,7 +387,8 @@ export function aggregateRunesByContext(
         me.masteryPoints !== null && me.masteryPoints >= config.minMasteryPoints;
       if (windowGames < config.minChampGames && !masteryExpert) continue;
 
-      const myTeam = teams.get(me.teamId)!;
+      const myTeam = teams.get(me.teamId);
+      if (myTeam === undefined) continue;
       const allies = myTeam.filter((p) => p.puuid !== me.puuid);
       const enemies = [...teams.values()].filter((t) => t !== myTeam).flat();
 
@@ -404,12 +406,12 @@ export function aggregateRunesByContext(
           contextKey: `lane:${slots.slice(0, n).map(formatSlot).join(',')}`,
           // Fixed 3-slot hierarchy: level depends only on n (3=1, 2=2, 1=3), so
           // one-slot keys from TOP or partial lanes match one-slot back-offs.
-          contextLevel: Math.max(CONTEXT_LEVEL_LANE_BASE, CONTEXT_LEVEL_DAMAGE_MIX - n),
+          contextLevel: Math.max(RUNE_CONTEXT_LEVELS.laneBase, RUNE_CONTEXT_LEVELS.damageMix - n),
         });
       }
       contexts.push(
-        { contextKey: `damagemix:${mix}`, contextLevel: CONTEXT_LEVEL_DAMAGE_MIX },
-        { contextKey: 'global', contextLevel: CONTEXT_LEVEL_GLOBAL },
+        { contextKey: `damagemix:${mix}`, contextLevel: RUNE_CONTEXT_LEVELS.damageMix },
+        { contextKey: 'global', contextLevel: RUNE_CONTEXT_LEVELS.global },
       );
 
       const targets = bucketWeights.flatMap(({ rankBucket, w }) =>

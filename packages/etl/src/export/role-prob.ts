@@ -42,7 +42,13 @@ export function computeRoleProb(
     if (total <= 0) continue;
     const probs: Record<string, number> = {};
     for (const e of entries) {
-      roleSchema.parse(e.role);
+      try {
+        roleSchema.parse(e.role);
+      } catch (error: unknown) {
+        throw new Error(
+          `Invalid role-prob export for role-prob.json (champion ${championId}): ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
       probs[e.role] = round6(e.prob / total);
     }
     out[championId] = probs;

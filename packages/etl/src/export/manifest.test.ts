@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -45,7 +45,7 @@ describe('exportJson', () => {
     seed(suite.db, 'baseline', [supportBaselineRow()]);
     const result = suite.exportOnce();
     const manifest = result.manifest;
-    expect(manifest.schemaVersion).toBe(2);
+    expect(manifest.schemaVersion).toBe(3);
     expect(manifest.roles).toEqual(['SUPPORT']);
     expect(manifest.rankBuckets).toEqual([
       'IRON',
@@ -76,6 +76,44 @@ describe('exportJson', () => {
       // B2: recompute hash from disk and compare.
       const disk = readFileSync(join(suite.publicDir, PATCH, file.path), 'utf8');
       expect(createHash('sha256').update(disk, 'utf8').digest('hex')).toBe(file.sha256);
+    }
+  });
+
+  it('retains static catalogs and role snapshots, hashing only the catalogs', () => {
+    seed(suite.db, 'match', [{}]);
+    seed(suite.db, 'roleProb', [
+      { championId: 412, role: 'SUPPORT', gamesW: 10, gamesW2: 10, prob: 1 },
+    ]);
+
+    const patchDir = join(suite.publicDir, PATCH);
+    mkdirSync(patchDir, { recursive: true });
+    const catalogs = {
+      'champions.json': '{"412":{"id":412}}',
+      'items.json': '{"1001":{"id":1001}}',
+      'runes.json': '[{"id":8000}]',
+    };
+    const snapshots = {
+      'champions.bootstrap.json': '{"bootstrap":true}',
+      'champions.derived.json': '{"derived":true}',
+    };
+    for (const [name, content] of Object.entries({ ...catalogs, ...snapshots })) {
+      writeFileSync(join(patchDir, name), content, 'utf8');
+    }
+
+    const result = suite.exportOnce();
+
+    for (const [name, content] of Object.entries({ ...catalogs, ...snapshots })) {
+      expect(readFileSync(join(patchDir, name), 'utf8')).toBe(content);
+    }
+    const manifestFiles = new Map(result.manifest.files.map((file) => [file.path, file.sha256]));
+    for (const [name, content] of Object.entries(catalogs)) {
+      expect(manifestFiles.get(name)).toBe(
+        createHash('sha256').update(content, 'utf8').digest('hex'),
+      );
+      expect(existsSync(join(patchDir, name))).toBe(true);
+    }
+    for (const name of Object.keys(snapshots)) {
+      expect(manifestFiles.has(name)).toBe(false);
     }
   });
 

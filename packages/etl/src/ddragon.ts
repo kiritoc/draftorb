@@ -6,6 +6,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { defaultPublicDataDir } from './config/paths';
+import { invalidateManifest } from './public-data';
 import {
   type ChampionsMap,
   championsMapSchema,
@@ -286,6 +287,7 @@ export async function importStaticData(options: ImportOptions = {}): Promise<Imp
   ]);
 
   await mkdir(patchDir, { recursive: true });
+  invalidateManifest(patchDir);
 
   const championsPath = path.join(patchDir, 'champions.json');
   const itemsPath = path.join(patchDir, 'items.json');

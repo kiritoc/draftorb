@@ -106,25 +106,30 @@ Validated by one zod schema family parameterized by role (`packages/shared`, T-0
 manifest.json          // { patch, generatedAt, region, rankBuckets: [the 8 §3 buckets, not 10 tiers], roles: ["SUPPORT"], files[], schemaVersion }
 champions.json         // id, name, icon, roles
 items.json             // item catalog (from Data Dragon)
+runes.json             // rune tree catalog (from Data Dragon)
 role-prob.json         // Global across roles, independent of manifest.roles: { [championId]: { SUPPORT: 0.92, ... } }. Sparse roles with games only; absent roles are 0. Probabilities sum to 1 (tolerance 1e-6). Gated-in rows use stored `role_prob.prob` and are renormalized per champion; an unknown exported role fails the export with a role-prob.json error.
-roles/<ROLE>/baseline.json    // [championId, bucket, wins_w, games_w, games_w2, games] (games = raw match count; manifest schemaVersion 2)
-roles/<ROLE>/ally-pairs.json  // [championId, allyId, role, bucket, wins_w, games_w, games_w2]
-roles/<ROLE>/enemy-pairs.json // [championId, enemyId, role, bucket, wins_w, games_w, games_w2]
+roles/<ROLE>/baseline.json    // [championId, bucket, wins_w, games_w, games_w2, games] (games = raw match count)
+roles/<ROLE>/ally-pairs.json  // [championId, allyId, otherRole, bucket, wins_w, games_w, games_w2]
+roles/<ROLE>/enemy-pairs.json // [championId, enemyId, otherRole, bucket, wins_w, games_w, games_w2]
 roles/<ROLE>/lane-vs.json     // [championId, opp1Id, opp2Id, bucket, wins_w, games_w, games_w2]
 roles/<ROLE>/lane-full.json   // [championId, partnerId, opp1Id, opp2Id, bucket, wins_w, games_w, games_w2]
-roles/<ROLE>/runes/<championId>.json  // contexts -> top pages
+roles/<ROLE>/runes/<championId>.json  // contexts (rankBucket, contextKey, contextLevel) -> top pages
 roles/<ROLE>/builds/<championId>.json // item build stats
 ```
 
 Every exported row carries `games_w2` so the engine can compute `n_eff` (SPECS §3). Rows, including rune global-context rows, are exported only when `n_eff >= exportMinGames` (default 10), and `exportMinGames <= minGames`. Rune and build `pickShare` values use each context's raw `games_w` total before this gate and are rounded once. Size budget: `lane-*` and `*-pairs` files are the largest; size is `zlib.gzipSync(content).length` vs `MAX_FILE_BYTES` (5 MB gzip); oversize files are returned in `ExportResult.warnings`.
 
-The exporter builds in a unique dot-prefixed temp directory, renames any previous patch directory to a dot-prefixed backup, then renames the new directory into place; if publish fails it attempts to restore the previous directory. It only removes matching temp/backup directories older than 24 hours, and preserves backups while the patch directory is missing. Temporary and backup directories under `data/public` are internal and must not be served as static assets. A failure to remove the superseded backup after a successful publish is returned as a warning (the backup is left for stale cleanup), not as an export failure. Existing static catalogs (`champions.json`, `items.json` from `pnpm etl static`) are carried into the new tree and listed in `manifest.files`; a missing catalog produces a warning. Builds with no context passing the gate produce no file. Rounded role probabilities assign the residual to the last surviving role and `role-prob.json` is validated against `championRoleProbabilitiesSchema` before writing. Aggregate tables are not patch- or platform-scoped: exporting a patch other than the latest in the database warns, and a multi-platform database always warns (even with `--region`) that aggregates combine all platforms.
+Pair tuple roles are the paired champion's `other_role`, not the row owner's `my_role`. Rune contexts remain separate by `rank_bucket`; each exported context includes that bucket so rank-weighted rune statistics are not combined. Manifest schema version 3 adds `rankBucket` to rune contexts.
+
+When present, `champions.json`, `items.json`, and `runes.json` are retained in the export and included in `manifest.files` with hashes; missing catalogs produce a warning. The `champions.bootstrap.json` and `champions.derived.json` role-derivation snapshots are preserved across exports but are internal state and are not listed in the manifest. The `static` and `derive-roles` commands invalidate an existing manifest before changing catalog data; run `export` afterward to publish fresh catalog hashes.
+
+The exporter builds in a unique dot-prefixed temp directory, renames any previous patch directory to a dot-prefixed backup, then renames the new directory into place; if publish fails it attempts to restore the previous directory. A failure to remove the superseded backup after a successful publish is returned as a warning (the backup is left for stale cleanup), not as an export failure. It only removes matching temp/backup directories older than 24 hours, and preserves backups while the patch directory is missing. Temporary and backup directories under `data/public` are internal and must not be served as static assets. Builds with no context passing the gate produce no file. Rounded role probabilities assign the residual to the last surviving role and `role-prob.json` is validated against `championRoleProbabilitiesSchema` before writing. Aggregate tables are not patch- or platform-scoped: exporting a patch other than the latest in the database warns, and a multi-platform database always warns (even with `--region`) that aggregates combine all platforms.
 
 Manual files (committed, hand-written, zod-validated): `data/manual/champion-tags.json`, `data/manual/item-tags.json`, `data/manual/gameplans/*.md`.
 
-`schemaVersion` is bumped once for this role-keyed layout, and again whenever a JSON format changes; the web app checks it and shows a clear error on mismatch.
+`schemaVersion` is bumped once for this role-keyed layout, and again whenever a JSON format changes; the web app checks it and shows a clear error on mismatch. The exporter warns if an explicit patch differs from the latest stored patch or if data spans multiple platforms; `region` labels the manifest and does not filter aggregate data.
 
-Exported JSON format and engine contracts are unchanged (SPECS §14, D-045). `n_eff` thresholds and D-021..D-027 semantics unchanged.
+Core scoring and engine contracts are unchanged (SPECS §14, D-045). The exported JSON format changes described above do not alter `n_eff` thresholds or D-021..D-027 semantics.
 
 ## Browser storage (apps/web, not exported, D-024)
 

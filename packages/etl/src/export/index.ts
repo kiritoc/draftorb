@@ -13,6 +13,7 @@
  */
 
 import type Database from 'better-sqlite3';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { DEFAULT_CONFIG, type RankWeightingConfig } from '@draftorb/engine';
@@ -114,6 +115,13 @@ export function exportJson(db: Database.Database, options: ExportOptions = {}): 
 
   const publicDir = options.publicDir ?? process.env.DRAFTORB_PUBLIC_DIR ?? defaultPublicDataDir();
   cleanupStaleExportDirs(publicDir, targetPatch);
+  const sourcePatchDir = join(publicDir, targetPatch);
+  const roleSnapshots = ['champions.bootstrap.json', 'champions.derived.json']
+    .filter((name) => existsSync(join(sourcePatchDir, name)))
+    .map((name) => ({
+      relativePath: name,
+      content: readFileSync(join(sourcePatchDir, name), 'utf8'),
+    }));
 
   // --- Query all aggregated tables (typed, ordered) ---
   const roleProbRows = all<RoleProbRow>(
@@ -134,7 +142,7 @@ export function exportJson(db: Database.Database, options: ExportOptions = {}): 
            context_key AS contextKey, context_level AS contextLevel,
            perks_hash AS perksHash, perks_json AS perksJson,
            wins_w AS winsW, games_w AS gamesW, games_w2 AS gamesW2, players AS players
-     FROM rune_ctx ORDER BY champion_id, my_role, context_key, context_level`,
+     FROM rune_ctx ORDER BY champion_id, my_role, rank_bucket, context_key, context_level`,
   );
 
   const buildRows = all<ItemBuildRow>(
@@ -206,6 +214,10 @@ export function exportJson(db: Database.Database, options: ExportOptions = {}): 
   const tempDir = createTempDir(publicDir, targetPatch);
   let published = false;
   try {
+    for (const { relativePath, content } of roleSnapshots) {
+      writeFile(tempDir, relativePath, content);
+    }
+
     const written: ExportFile[] = [];
     for (const { relativePath, content } of filesToWrite) {
       const entry = writeFile(tempDir, relativePath, content);

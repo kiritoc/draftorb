@@ -39,6 +39,27 @@ describe('export IO', () => {
     expect(readdirSync(directory).filter((name) => name.startsWith('.16.21.old-'))).toEqual([]);
   });
 
+  it('returns a warning and preserves the backup when cleanup fails after publish', () => {
+    const targetDir = join(directory, '16.21');
+    const tempDir = join(directory, '.16.21.tmp-next');
+    mkdirSync(targetDir);
+    mkdirSync(tempDir);
+    writeFileSync(join(targetDir, 'old.json'), 'old');
+    writeFileSync(join(tempDir, 'new.json'), 'new');
+
+    const warning = publishTempDir(tempDir, targetDir, () => {
+      throw new Error('injected cleanup failure');
+    });
+
+    expect(warning).toContain('published');
+    expect(warning).toContain('injected cleanup failure');
+    expect(readFileSync(join(targetDir, 'new.json'), 'utf8')).toBe('new');
+    const backupName = readdirSync(directory).find((name) => name.startsWith('.16.21.old-'));
+    expect(backupName).toBeDefined();
+    if (backupName === undefined) throw new Error('missing preserved backup');
+    expect(readFileSync(join(directory, backupName, 'old.json'), 'utf8')).toBe('old');
+  });
+
   it('restores the previous directory when publishing the temp directory fails', () => {
     const targetDir = join(directory, '16.21');
     mkdirSync(targetDir);

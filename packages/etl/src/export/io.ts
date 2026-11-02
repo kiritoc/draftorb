@@ -80,48 +80,59 @@ export function createTempDir(publicDir: string, patch: string): string {
 
 /** Publishes `tempDir` as `targetDir`. Returns a warning when the new tree is
  *  live but the superseded backup could not be removed (left for stale cleanup). */
-export function publishTempDir(tempDir: string, targetDir: string): string | null {
+export function publishTempDir(
+  tempDir: string,
+  targetDir: string,
+  removeBackup: (backupDir: string) => void = (backupDir) =>
+    rmSync(backupDir, { recursive: true, force: true }),
+): string | null {
   const parentDir = dirname(targetDir);
   const backupDir = join(parentDir, `.${basename(targetDir)}.old-${randomUUID()}`);
   const hadTarget = existsSync(targetDir);
   let backupExists = false;
-
-  if (hadTarget) {
-    renameSync(targetDir, backupDir);
-    backupExists = true;
-  }
+  let published = false;
+  let preserveBackup = false;
+  let cleanupWarning: string | null = null;
 
   try {
-    renameSync(tempDir, targetDir);
-  } catch (publishError: unknown) {
-    if (backupExists) {
+    if (hadTarget) {
+      renameSync(targetDir, backupDir);
+      backupExists = true;
+    }
+
+    try {
+      renameSync(tempDir, targetDir);
+      published = true;
+    } catch (publishError: unknown) {
+      if (backupExists) {
+        try {
+          renameSync(backupDir, targetDir);
+          backupExists = false;
+        } catch (rollbackError: unknown) {
+          preserveBackup = true;
+          throw new AggregateError(
+            [publishError, rollbackError],
+            `Failed to publish ${targetDir} and restore its previous directory`,
+          );
+        }
+      }
+      throw publishError;
+    }
+  } finally {
+    if (published && backupExists && !preserveBackup) {
       try {
-        renameSync(backupDir, targetDir);
-      } catch (rollbackError: unknown) {
-        throw new AggregateError(
-          [publishError, rollbackError],
-          `Failed to publish ${targetDir} and restore its previous directory`,
-        );
+        removeBackup(backupDir);
+      } catch (cleanupError: unknown) {
+        const message = cleanupError instanceof Error ? cleanupError.message : String(cleanupError);
+        cleanupWarning = `export: published ${targetDir} but could not remove backup ${backupDir} (${message}); it will be removed by stale cleanup`;
       }
     }
-    throw publishError;
   }
-
-  // Post-publish cleanup: the new tree is live, so a failure here must not be
-  // reported as a failed export.
-  if (backupExists) {
-    try {
-      rmSync(backupDir, { recursive: true, force: true });
-    } catch (cleanupError: unknown) {
-      const message = cleanupError instanceof Error ? cleanupError.message : String(cleanupError);
-      return `export: published ${targetDir} but could not remove backup ${backupDir} (${message}); it will be removed by stale cleanup`;
-    }
-  }
-  return null;
+  return cleanupWarning;
 }
 
 /** Static catalogs written by `pnpm etl static` into the same patch directory. */
-export const STATIC_CATALOG_FILES = ['champions.json', 'items.json'] as const;
+export const STATIC_CATALOG_FILES = ['champions.json', 'items.json', 'runes.json'] as const;
 
 /** Reads existing static catalogs from `patchDir` so they survive re-publish. */
 export function readStaticCatalogs(

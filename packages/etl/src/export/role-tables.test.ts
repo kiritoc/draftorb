@@ -43,7 +43,7 @@ describe('exportJson', () => {
         championId: 412,
         myRole: 'SUPPORT',
         otherId: 21,
-        otherRole: 'SUPPORT',
+        otherRole: 'ADC',
         rankBucket: 'IRON',
         gamesW: 10,
         gamesW2: 10,
@@ -67,10 +67,10 @@ describe('exportJson', () => {
         otherId: 22,
         otherRole: 'ADC',
         rankBucket: 'IRON',
-        gamesW: 3,
-        gamesW2: 9,
-        winsW: 1,
-      }, // nEff=1 -> dropped (E4)
+        gamesW: 10,
+        gamesW2: 10,
+        winsW: 5,
+      },
       {
         championId: 412,
         myRole: 'SUPPORT',
@@ -150,7 +150,7 @@ describe('exportJson', () => {
       number,
       number,
     ][];
-    expect(ally).toEqual([[412, 21, 'SUPPORT', 'IRON', 7, 10, 10]]);
+    expect(ally).toEqual([[412, 21, 'ADC', 'IRON', 7, 10, 10]]);
 
     // E1: exact enemy-pairs tuple, dropped row excluded.
     const enemy = suite.readFile('roles/SUPPORT/enemy-pairs.json') as [
@@ -162,7 +162,10 @@ describe('exportJson', () => {
       number,
       number,
     ][];
-    expect(enemy).toEqual([[412, 23, 'SUPPORT', 'IRON', 8, 10, 10]]);
+    expect(enemy).toEqual([
+      [412, 22, 'ADC', 'IRON', 5, 10, 10],
+      [412, 23, 'SUPPORT', 'IRON', 8, 10, 10],
+    ]);
 
     // E3: lane id order preserved — SUPPORT: opp1=enemy SUPPORT(21), opp2=enemy ADC(26).
     const laneVs = suite.readFile('roles/SUPPORT/lane-vs.json') as [

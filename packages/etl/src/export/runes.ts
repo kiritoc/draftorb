@@ -3,8 +3,8 @@
  *
  * Every page, including the global back-off context, passes the same
  * `exportMinGames` gate as other exported rows (DATA_MODEL.md).
- * C2: contexts are keyed by (contextKey, contextLevel); a contextKey appearing
- * with differing levels is treated as separate contexts.
+ * Contexts are keyed by (rankBucket, contextKey, contextLevel); differing
+ * buckets or levels stay separate.
  * Pick shares use raw gamesW divided by all rows in the context before the
  * export gate, then are rounded once.
  * C3: unparseable or invalid rune rows (parseRunePage returns null, including
@@ -14,13 +14,14 @@
  * from rows[0].
  */
 
-import { championIdSchema, roleSchema, runeExportSchema } from '@draftorb/shared';
+import { RANK_BUCKET_ORDER } from '@draftorb/engine';
+import { championIdSchema, roleSchema, runeExportSchema, type RankBucket } from '@draftorb/shared';
 import { passesGate, round6 } from './io.js';
 
 export interface RuneCtxRow {
   championId: number;
   myRole: string;
-  rankBucket: string;
+  rankBucket: RankBucket;
   contextKey: string;
   contextLevel: number;
   perksHash: string;
@@ -124,20 +125,32 @@ export function buildRuneFiles(
   for (const { myRole, rows: groupRows } of byGroup.values()) {
     const championId = groupRows[0]?.championId;
     if (championId === undefined) continue;
-    // C2: key contexts by (contextKey, contextLevel).
-    const byContext = new Map<string, RuneCtxRow[]>();
+    // Keep rank-specific rune statistics in separate contexts.
+    const byContext = new Map<
+      string,
+      { rankBucket: RankBucket; contextKey: string; contextLevel: number; rows: RuneCtxRow[] }
+    >();
     for (const row of groupRows) {
-      const contextKeyFull = `${row.contextKey}::${row.contextLevel}`;
-      const existing = byContext.get(contextKeyFull);
+      const contextId = JSON.stringify([row.rankBucket, row.contextKey, row.contextLevel]);
+      const existing = byContext.get(contextId);
       if (existing === undefined) {
-        byContext.set(contextKeyFull, [row]);
+        byContext.set(contextId, {
+          rankBucket: row.rankBucket,
+          contextKey: row.contextKey,
+          contextLevel: row.contextLevel,
+          rows: [row],
+        });
       } else {
-        existing.push(row);
+        existing.rows.push(row);
       }
     }
-    const contexts: Array<{ contextKey: string; contextLevel: number; pages: RunePageWithHash[] }> =
-      [];
-    for (const [contextKeyFull, ctxRows] of byContext) {
+    const contexts: Array<{
+      rankBucket: RankBucket;
+      contextKey: string;
+      contextLevel: number;
+      pages: RunePageWithHash[];
+    }> = [];
+    for (const { rankBucket, contextKey, contextLevel, rows: ctxRows } of byContext.values()) {
       const pages: RunePageWithHash[] = [];
       const gamesWTotal = ctxRows.reduce((sum, row) => sum + row.gamesW, 0);
       for (const row of ctxRows) {
@@ -161,23 +174,26 @@ export function buildRuneFiles(
       if (pages.length === 0) continue;
       // C1: sort pages by gamesW desc, then perksHash asc.
       pages.sort((a, b) => b.gamesW - a.gamesW || a.perksHash.localeCompare(b.perksHash));
-      const [contextKey = '', contextLevelStr = '0'] = contextKeyFull.split('::');
-      const contextLevel = Number(contextLevelStr);
       contexts.push({
+        rankBucket,
         contextKey,
         contextLevel,
         pages,
       });
     }
     if (contexts.length === 0) continue;
-    // C1: sort contexts by level asc, then key asc.
+    // Keep rank-specific contexts together in a stable rank order.
     contexts.sort(
-      (a, b) => a.contextLevel - b.contextLevel || a.contextKey.localeCompare(b.contextKey),
+      (a, b) =>
+        RANK_BUCKET_ORDER.indexOf(a.rankBucket) - RANK_BUCKET_ORDER.indexOf(b.rankBucket) ||
+        a.contextLevel - b.contextLevel ||
+        a.contextKey.localeCompare(b.contextKey),
     );
     const exportObj = {
       championId,
       myRole,
-      contexts: contexts.map(({ contextKey, contextLevel, pages }) => ({
+      contexts: contexts.map(({ rankBucket, contextKey, contextLevel, pages }) => ({
+        rankBucket,
         contextKey,
         contextLevel,
         pages: pages.map(({ perksHash: _ph, ...rest }) => rest),

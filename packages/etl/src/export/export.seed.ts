@@ -21,6 +21,7 @@ type PairSeed = WeightedSeed & { otherId: number; otherRole: string };
 type LaneVsSeed = WeightedSeed & { opp1Id: number; opp2Id: number | null };
 type LaneFullSeed = LaneVsSeed & { partnerId: number | null };
 export type RuneCtxSeed = Omit<WeightedSeed, 'rankBucket'> & {
+  rankBucket?: string;
   contextKey: string;
   contextLevel: number;
   perksHash: string;
@@ -197,7 +198,7 @@ const TABLES = {
     toRow: (row: RuneCtxSeed) => [
       row.championId,
       row.myRole,
-      'IRON',
+      row.rankBucket ?? 'IRON',
       row.contextKey,
       row.contextLevel,
       row.perksHash,

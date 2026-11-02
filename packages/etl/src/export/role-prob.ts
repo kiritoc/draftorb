@@ -57,7 +57,13 @@ export function computeRoleProb(
     });
     out[championId] = probs;
   }
-  return out;
+  try {
+    return championRoleProbabilitiesSchema.parse(out);
+  } catch (error: unknown) {
+    throw new Error(
+      `Invalid role-prob export for role-prob.json: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
 }
 
 export function roleProbFile(

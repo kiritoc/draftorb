@@ -4,7 +4,7 @@
 
 - Phase: 1 (Support / Diamond)
 - Current milestone: M0 Foundations (T-002.b DONE) and M1 ETL (in progress: T-014 DONE; T-015/T-015.b DONE; T-016 DONE; T-017 DONE; T-018 DONE; T-019 DONE; T-019.b..f TODO) -> M2 Engine (T-020..T-023 DONE)
-- Last updated: 2026-11-02 by Devin (T-019 review follow-up, B-035)
+- Last updated: 2026-11-03 by Copilot (T-019 rebase conflict resolution)
 
 ## Epic status
 
@@ -23,7 +23,7 @@
 
 - Riot key: not recorded (development keys expire every 24 h).
 - Games collected: 0 (no SQLite database exists under `data/` in this workspace) | Patch: 16.21 (static data imported: champions, items, runes).
-- Last aggregation: role_prob (T-015) and baselines (T-016) implemented; pairs/lane (T-017) and runes (T-018) implemented; export (T-019) implemented and tested (`packages/etl/src/export/`, `packages/etl/src/commands/export.ts`, tests); export preserves static catalogs (`champions.json`, `items.json`) and lists them in the manifest (B-035).
+- Last aggregation: role_prob (T-015) and baselines (T-016) implemented; pairs/lane (T-017) and runes (T-018) implemented; export (T-019) implemented and tested (`packages/etl/src/export/`, `packages/etl/src/commands/export.ts`, tests); export preserves static catalogs (`champions.json`, `items.json`, `runes.json`) and lists them in the manifest (B-035).
 
 ## Next recommended ticket
 
@@ -36,6 +36,21 @@ Earlier handoff (kept for history): B-017 done (engine and shared `"types": []` 
 ## Open questions for the owner
 
 ---
+
+### 2026-11-03 — Copilot — T-019 review follow-up rebase
+
+- Done:
+  - Fixed paired aggregate exports to serialize `other_role`.
+  - Kept rune pages grouped and exported by rank bucket; bumped the manifest contract to schema v3 (D-049 is PROPOSED).
+  - Adjusted role-probability rounding residuals deterministically and validate the final sparse maps against the shared schema.
+  - Warned when explicit patch labels differ from the latest stored patch and when aggregates span multiple platforms, including with an explicit region label.
+  - Kept successful publication successful when backup cleanup fails; preserve the backup and return a warning.
+  - Retained catalog files and role snapshots across exports, and invalidated manifests before static catalog writes.
+- Files touched: export orchestration/builders/IO and tests, shared rune/manifest schemas and tests, catalog-writing commands and tests, `DATA_MODEL.md`, `DECISIONS.md`, `TICKETS.md`, `BUGS.md`, and this log.
+- Tests: focused export/shared tests pass (12 files, 95 tests); `pnpm check` passes (55 files, 710 tests); lint reports 0 errors and 15 pre-existing warnings.
+- State left: DONE (T-019 review follow-up implemented; D-049 awaits owner decision).
+- Next step: T-019.b (patches table, label mapping, patch_index switch, --since-patch).
+- Pitfalls / notes: manifest schema v2 is no longer accepted; rune consumers must read `rankBucket` on each context.
 
 ### 2026-11-02 — Nemotron — Ticket T-019 (review-fix pass)
 
@@ -89,19 +104,18 @@ Earlier handoff (kept for history): B-017 done (engine and shared `"types": []` 
 
 ## Session log (newest first)
 
-### 2026-11-02 — Devin — Ticket T-019 review follow-up (B-035)
+### 2026-11-02 — Copilot — T-019 review follow-up
 
 - Done:
-  - `role-prob.json`: last surviving role takes the rounding residual; output validated with `championRoleProbabilitiesSchema`.
-  - Builds: no file is emitted when no context passes the gate.
-  - `publishTempDir` returns a warning (instead of throwing) when the superseded backup cannot be removed after a successful publish.
-  - Static catalogs (`champions.json`, `items.json`) are carried into the published tree and listed in the manifest; missing catalogs warn.
-  - Warnings for mixed-platform data even with `--region`, and for exporting a patch other than the database's latest.
-- Files touched: `packages/etl/src/export/{index,io,role-prob,builds}.ts`, `packages/etl/src/export/{atomic,builds,io,region-and-config}.test.ts`, `docs/DATA_MODEL.md`, `docs/BUGS.md`, `docs/PROGRESS.md`.
-- Tests added: equal role probabilities sum to 1; all-gated builds emit no file; static catalogs survive re-export and appear in the manifest; missing-catalog warning; mixed-platform warning with `--region`; patch-mismatch warning; `publishTempDir` returns `null` on clean publish. Not run in this session — run `pnpm format` then `pnpm check`. Expected counts (+6 new tests, no new test files; `io.test.ts` only gains an assertion): `pnpm check` 55 test files / 708 tests (was 702); ETL 31 files / 281 tests (was 275); focused exporter/CLI suite 8 files / 47 tests (was 41). Replace with actual counts once green.
-- State left: DONE pending green `pnpm check` (no new test for a failing backup removal; would need an `rmSync` mock).
+  - Preserved `champions.json`, `items.json`, and `runes.json` across exports and included available catalogs in manifest hashes; missing catalogs warn. Role-derivation snapshots also survive directory replacement without being listed as public assets.
+  - Invalidated manifests before `static` and `derive-roles` modify catalog files.
+  - Corrected pair-role serialization, preserved rune rank buckets (manifest schema v3), and rounded role probabilities so the final surviving role receives the residual; validated the resulting role map against the shared schema.
+  - Added warnings for explicit patch mismatches and mixed-platform aggregates, including with an explicit region. Backup cleanup failures after publication now preserve the backup and return a warning. Builds with no gated-in context emit no file.
+- Files touched: exporter orchestration/builders/IO and tests, shared rune/manifest schemas and tests, catalog-writing commands and tests, and `DATA_MODEL.md`, `DECISIONS.md`, `TICKETS.md`, `BUGS.md`, and this log.
+- Tests: focused export/shared tests pass (12 files, 92 tests); `pnpm check` passes (55 files, 707 tests); lint reports 0 errors and 15 pre-existing warnings.
+- State left: DONE (T-019 review follow-up implemented; D-049 awaits owner decision).
 - Next step: T-019.b (patches table, label mapping, patch_index switch, --since-patch).
-- Pitfalls / notes: aggregate tables are not patch- or platform-scoped; the warnings only surface this, a real fix needs patch/platform columns (T-019.b).
+- Pitfalls / notes: aggregate tables are not patch- or platform-scoped; warnings report this limitation. Rune consumers must read `rankBucket` on each context; manifest schema v2 is no longer accepted.
 
 ### 2026-11-02 — T-019 Windows test compatibility follow-up
 

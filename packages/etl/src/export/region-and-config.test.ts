@@ -5,6 +5,7 @@ import { championRoleProbabilitiesSchema } from '@draftorb/shared';
 import { seed } from './export.fixtures.js';
 import { createExportTestSuite, PATCH } from './export.test-utils.js';
 import { exportJson } from './index.js';
+import { computeRoleProb } from './role-prob.js';
 
 const suite = createExportTestSuite();
 
@@ -34,7 +35,7 @@ describe('exportJson', () => {
     expect(roleProb['26']).toBeUndefined();
     expect(roleProb['412']?.MID).toBeUndefined();
     expect(result.patch).toBe(PATCH);
-    expect(result.manifest.schemaVersion).toBe(2);
+    expect(result.manifest.schemaVersion).toBe(3);
   });
 
   it('keeps global roles even when the roles option selects only SUPPORT (X2)', () => {
@@ -57,7 +58,7 @@ describe('exportJson', () => {
     expect(() => suite.exportOnce()).toThrow(/Invalid role-prob export for role-prob\.json/);
   });
 
-  it('warns only when region is inferred from multiple platforms (C5)', () => {
+  it('warns when aggregated data spans multiple platforms, including with an explicit region', () => {
     seed(suite.db, 'match', [{ patch: '16.21', platform: 'euw1', matchId: 'm1' }]);
     const singlePlatform = suite.exportOnce();
     expect(singlePlatform.manifest.region).toBe('euw1');
@@ -67,31 +68,29 @@ describe('exportJson', () => {
     const result = suite.exportOnce();
     expect(result.manifest.region).toBe('euw1'); // alphabetically first
     expect(result.warnings.some((warning) => warning.includes('platforms'))).toBe(true);
+
+    const explicitlyLabeled = suite.exportOnce({ region: 'kr' });
+    expect(explicitlyLabeled.manifest.region).toBe('kr');
+    expect(explicitlyLabeled.warnings).toContain(
+      'export: database contains 2 platforms (euw1, na1); labelled as kr; aggregates combine all platforms',
+    );
   });
 
-  it('warns about mixed platforms even with an explicit region (C5)', () => {
-    seed(suite.db, 'match', [
-      { patch: '16.21', platform: 'euw1', matchId: 'm1' },
-      { patch: '16.21', platform: 'na1', matchId: 'm2' },
-    ]);
-    const result = suite.exportOnce({ region: 'kr' });
-    expect(result.manifest.region).toBe('kr');
-    expect(
-      result.warnings.some((warning) => warning.includes('aggregates combine all platforms')),
-    ).toBe(true);
-  });
+  it('rounds equal role probabilities without violating the sum-to-one schema', () => {
+    const roleProbabilities = computeRoleProb(
+      (['TOP', 'MID', 'SUPPORT'] as const).map((role) => ({
+        championId: 412,
+        role,
+        gamesW: 10,
+        gamesW2: 10,
+        prob: 1 / 3,
+      })),
+      0,
+    );
 
-  it('renormalizes equal role probabilities to sum to exactly 1 (X2)', () => {
-    seed(suite.db, 'match', [{}]);
-    seed(suite.db, 'roleProb', [
-      { championId: 412, role: 'SUPPORT', gamesW: 10, gamesW2: 10, prob: 1 / 3 },
-      { championId: 412, role: 'MID', gamesW: 10, gamesW2: 10, prob: 1 / 3 },
-      { championId: 412, role: 'TOP', gamesW: 10, gamesW2: 10, prob: 1 / 3 },
-    ]);
-    suite.exportOnce();
-    const roleProb = championRoleProbabilitiesSchema.parse(suite.readFile('role-prob.json'));
-    const sum = Object.values(roleProb['412'] ?? {}).reduce((acc, p) => acc + p, 0);
-    expect(Math.abs(sum - 1)).toBeLessThanOrEqual(1e-6);
+    expect(championRoleProbabilitiesSchema.parse(roleProbabilities)).toEqual({
+      '412': { TOP: 0.333333, MID: 0.333333, SUPPORT: 0.333334 },
+    });
   });
 
   it('warns when the requested patch is not the latest patch in the database', () => {
@@ -99,7 +98,9 @@ describe('exportJson', () => {
     const result = suite.exportOnce({ patch: '16.20' });
     expect(
       result.warnings.some((warning) =>
-        warning.includes('requested patch 16.20 differs from the latest patch in the database'),
+        warning.includes(
+          'requested patch 16.20 differs from the latest patch in the database (16.21)',
+        ),
       ),
     ).toBe(true);
     expect(suite.exportOnce().warnings.some((w) => w.includes('requested patch'))).toBe(false);

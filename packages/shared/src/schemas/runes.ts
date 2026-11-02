@@ -12,7 +12,7 @@
 
 import { z } from 'zod';
 
-import { championIdSchema, roleSchema } from './core.js';
+import { championIdSchema, rankBucketSchema, roleSchema } from './core.js';
 
 export const runePerkSchema = z
   .object({
@@ -82,6 +82,7 @@ export type RuneContextPage = z.infer<typeof runeContextPageSchema>;
 
 export const runeContextEntrySchema = z
   .object({
+    rankBucket: rankBucketSchema,
     contextKey: z.string().min(1),
     contextLevel: z.number().int().nonnegative(),
     pages: z.array(runeContextPageSchema),

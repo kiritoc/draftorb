@@ -98,6 +98,7 @@ describe('deriveRolesCommand', () => {
       }),
       'utf-8',
     );
+    await fs.writeFile(join(patchDir, 'manifest.json'), '{"files":[]}', 'utf8');
 
     await deriveRolesCommand.run([]);
 
@@ -105,6 +106,16 @@ describe('deriveRolesCommand', () => {
     expect(written['412'].roles).toEqual(['SUPPORT']);
     expect(written['267'].roles).toEqual(['MID', 'SUPPORT']);
     expect(written['99'].roles).toEqual(['MID']);
+    await expect(fs.readFile(join(patchDir, 'manifest.json'), 'utf8')).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
+    const bootstrap = JSON.parse(
+      await fs.readFile(join(patchDir, 'champions.bootstrap.json'), 'utf8'),
+    );
+    expect(bootstrap['412'].roles).toEqual(['SUPPORT', 'TOP']);
+    expect(await fs.readFile(join(patchDir, 'champions.derived.json'), 'utf8')).toBe(
+      await fs.readFile(join(patchDir, 'champions.json'), 'utf8'),
+    );
     expect(output()).toMatch(/Derived champion roles/);
   });
 

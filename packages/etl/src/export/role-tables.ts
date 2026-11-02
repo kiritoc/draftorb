@@ -35,11 +35,13 @@ export interface BaselineRow extends WeightedRow {
 
 export interface AllyPairRow extends WeightedRow {
   allyId: number;
+  otherRole: Role;
   rankBucket: RankBucket;
 }
 
 export interface EnemyPairRow extends WeightedRow {
   enemyId: number;
+  otherRole: Role;
   rankBucket: RankBucket;
 }
 
@@ -87,23 +89,25 @@ export const TABLE_SPECS = [
   },
   {
     name: 'ally-pairs.json',
-    sql: `SELECT my_champion_id AS championId, other_champion_id AS allyId, my_role AS myRole,
+    sql: `SELECT my_champion_id AS championId, other_champion_id AS allyId, other_role AS otherRole,
+             my_role AS myRole,
              rank_bucket AS rankBucket, wins_w AS winsW, games_w AS gamesW, games_w2 AS gamesW2
           FROM pair_ally ORDER BY my_champion_id, my_role, other_champion_id`,
     toTuple: (row: AllyPairRow, exportMinGames: number): AllyPairEntry | null => {
       if (!passesGate(row.gamesW, row.gamesW2, exportMinGames)) return null;
-      return [row.championId, row.allyId, row.myRole, row.rankBucket, ...WEIGHTS(row)];
+      return [row.championId, row.allyId, row.otherRole, row.rankBucket, ...WEIGHTS(row)];
     },
     schema: allyPairEntrySchema,
   },
   {
     name: 'enemy-pairs.json',
-    sql: `SELECT my_champion_id AS championId, other_champion_id AS enemyId, my_role AS myRole,
+    sql: `SELECT my_champion_id AS championId, other_champion_id AS enemyId, other_role AS otherRole,
+             my_role AS myRole,
              rank_bucket AS rankBucket, wins_w AS winsW, games_w AS gamesW, games_w2 AS gamesW2
           FROM pair_enemy ORDER BY my_champion_id, my_role, other_champion_id`,
     toTuple: (row: EnemyPairRow, exportMinGames: number): EnemyPairEntry | null => {
       if (!passesGate(row.gamesW, row.gamesW2, exportMinGames)) return null;
-      return [row.championId, row.enemyId, row.myRole, row.rankBucket, ...WEIGHTS(row)];
+      return [row.championId, row.enemyId, row.otherRole, row.rankBucket, ...WEIGHTS(row)];
     },
     schema: enemyPairEntrySchema,
   },

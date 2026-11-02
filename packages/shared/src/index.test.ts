@@ -217,7 +217,7 @@ describe('shared schemas', () => {
       rankBuckets: ['DIAMOND'],
       roles: ['SUPPORT'],
       files: [{ path: 'champions.json' }],
-      schemaVersion: 2,
+      schemaVersion: 3,
     };
     expect(manifestSchema.parse(manifest)).toEqual(manifest);
   });
@@ -433,6 +433,7 @@ describe('shared schemas', () => {
       myRole: 'SUPPORT',
       contexts: [
         {
+          rankBucket: 'DIAMOND',
           contextKey: 'lane:enemySupport,enemyAdc',
           contextLevel: 1,
           pages: [

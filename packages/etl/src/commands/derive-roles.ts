@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path';
 import type { ChampionRoleProbabilities, ChampionsMap, Role } from '@draftorb/shared';
 
 import { defaultPublicDataDir, resolveRepoRoot } from '../config/paths';
+import { invalidateManifest } from '../public-data';
 import { applyDerivedRoles } from '../derive-roles';
 import { computeRoleProb, latestPatch, PATCH_PATTERN } from '../aggregate';
 import { UsageError } from '../cli-args';
@@ -72,6 +73,7 @@ export async function runDeriveRoles(args: string[]): Promise<void> {
   const champions = JSON.parse(readFileSync(bootstrapPath, 'utf8')) as unknown;
   const updated = applyDerivedRoles(champions as ChampionsMap, roleProbabilities);
   const serialized = JSON.stringify(updated, null, 2);
+  invalidateManifest(join(publicDir, targetPatch));
   writeFileSync(championsPath, serialized, 'utf-8');
   writeFileSync(marker, serialized, 'utf-8');
 

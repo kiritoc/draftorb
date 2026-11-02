@@ -162,6 +162,32 @@ describe('exportJson', () => {
     );
   });
 
+  it('keeps rune contexts separate by rank bucket', () => {
+    seed(suite.db, 'match', [{}]);
+    seed(suite.db, 'runeCtx', [
+      supportRuneRow({
+        rankBucket: 'IRON',
+        perksHash: 'iron-page',
+        gamesW: 10,
+        gamesW2: 10,
+      }),
+      supportRuneRow({
+        rankBucket: 'DIAMOND',
+        perksHash: 'diamond-page',
+        gamesW: 10,
+        gamesW2: 10,
+      }),
+    ]);
+
+    suite.exportOnce();
+    const output = suite.readFile<{
+      contexts: Array<{ rankBucket: string; pages: Array<{ gamesW: number }> }>;
+    }>('roles/SUPPORT/runes/412.json');
+
+    expect(output.contexts.map((context) => context.rankBucket)).toEqual(['IRON', 'DIAMOND']);
+    expect(output.contexts.map((context) => context.pages[0]?.gamesW)).toEqual([10, 10]);
+  });
+
   it('wraps invalid role errors with the rune export path (A6)', () => {
     expect(() =>
       buildRuneFiles(

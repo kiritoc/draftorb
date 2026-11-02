@@ -84,7 +84,7 @@ describe('exportCommand', () => {
     db.close();
 
     await exportCommand.run([]);
-    expect(output()).toMatch(/schema v2/);
+    expect(output()).toMatch(/schema v3/);
     expect(output()).toMatch(/roles: SUPPORT/);
 
     const manifest = JSON.parse(
@@ -93,7 +93,7 @@ describe('exportCommand', () => {
         'utf8',
       ),
     );
-    expect(manifest.schemaVersion).toBe(2);
+    expect(manifest.schemaVersion).toBe(3);
     expect(manifest.patch).toBe('16.21');
     expect(manifest.roles).toEqual(['SUPPORT']);
     expect(manifest.rankBuckets).toEqual([
@@ -175,9 +175,8 @@ describe('exportCommand', () => {
     db.close();
 
     await exportCommand.run([]);
-
     expect(output()).toContain(
-      'database contains 2 platforms (euw1, na1); using alphabetically first euw1',
+      'database contains 2 platforms (euw1, na1); using alphabetically first euw1; aggregates combine all platforms',
     );
     const manifest = JSON.parse(
       readFileSync(

@@ -28,7 +28,7 @@ No new bugs were identified during T-013 (match ingestion); rejected match ids a
 
 No new bugs were identified while revising T-013 patch-window and rank-known-count behavior.
 
-No new bugs were identified during T-019 (export). Export SQL aliases `my_role AS myRole` consistently across all role-keyed tables (baseline, ally-pairs, enemy-pairs, lane-vs, lane-full); no aggregate SQL change was needed.
+T-019 review follow-up found export regressions in paired-role serialization, rank-specific rune grouping, probability rounding, warnings, and post-publish backup cleanup; these are recorded as B-037 through B-042 below and fixed in this pass.
 
 ### B-021 — `types: []` does not isolate the engine type-checker from Node globals — OPEN
 
@@ -54,6 +54,62 @@ No new bugs were identified during T-019 (export). Export SQL aliases `my_role A
 ```
 
 ## Fixed
+
+### B-042 — Explicit patch exports can mislabel aggregates — FIXED
+
+- Severity / Area: S3 / etl
+- Expected / Actual: an explicit patch different from the latest stored match patch must warn that the aggregate data may not represent the requested patch; the exporter previously accepted the label silently.
+- Fix (commit/ticket): exporter warns on the mismatch (T-019 review).
+
+### B-041 — Backup cleanup failure reports a successful publish as failure — FIXED
+
+- Severity / Area: S2 / etl
+- Expected / Actual: once the new patch directory is published, a failure deleting the previous backup must not make the export appear unpublished; the backup must be retained and the cleanup issue surfaced as a warning.
+- Fix (commit/ticket): `publishTempDir` returns a warning and keeps the backup; deterministic failure-injection test (T-019 review).
+
+### B-040 — Explicit region suppresses mixed-platform warning — FIXED
+
+- Severity / Area: S3 / etl
+- Expected / Actual: aggregates combine all platforms regardless of the manifest region label, so the exporter must warn about mixed-platform data even when `--region` is explicit.
+- Fix (commit/ticket): mixed-platform warning now explains that region labels do not filter data (T-019 review).
+
+### B-039 — Role probability rounding can violate the sum invariant — FIXED
+
+- Severity / Area: S3 / etl
+- Expected / Actual: independently rounding each probability to six decimals could produce a sum outside the schema tolerance.
+- Fix (commit/ticket): rounding residual is applied to the largest probability and the result is validated against the shared schema (T-019 review).
+
+### B-038 — Rune exports merge rank buckets — FIXED
+
+- Severity / Area: S2 / etl
+- Expected / Actual: rank-weighted rune contexts must retain their source bucket; grouping only by context key and level combined distinct populations.
+- Fix (commit/ticket): `rankBucket` is included in each context and its grouping key; manifest schema version is 3 (T-019 review, D-049 PROPOSED).
+
+### B-037 — Pair exports serialize the row owner's role — FIXED
+
+- Severity / Area: S2 / etl
+- Expected / Actual: pair tuple role means the paired champion's role, but the exporter previously serialized `my_role`.
+- Fix (commit/ticket): pair SQL selects and serializes `other_role` for ally and enemy tuples (T-019 review).
+
+### B-036 — Catalog updates leave stale manifest checksums — FIXED
+
+- Severity / Area: S2 / etl
+- Steps to reproduce: export a patch, then run `pnpm etl static` or `pnpm etl derive-roles` for that patch.
+- Expected / Actual: consumers must not see a manifest whose catalog hashes describe older content; catalog writers previously changed listed files without updating or invalidating the manifest.
+- Environment (OS, Node version, patch): any, Node.js 22.
+- Logs / screenshot: regression tests assert that static import and role derivation remove the existing manifest before updating catalogs.
+- Suspected cause: catalog writers operated independently of the manifest created by export.
+- Fix (commit/ticket): both catalog-writing paths now invalidate the patch manifest before changing catalog files (T-019 review).
+
+### B-035 — Export removes static catalogs and role-derivation snapshots — FIXED
+
+- Severity / Area: S2 / etl
+- Steps to reproduce: import static data, run `derive-roles`, then export the same patch.
+- Expected / Actual: exports must retain the Data Dragon catalogs and derivation snapshots; atomic publication previously replaced the whole patch directory with only statistical export files.
+- Environment (OS, Node version, patch): any, Node.js 22.
+- Logs / screenshot: exporter regression verifies catalog retention, catalog checksums, and preservation of bootstrap/derived snapshots.
+- Suspected cause: staged export contents omitted pre-existing catalog and derivation files.
+- Fix (commit/ticket): export copies available `champions.json`, `items.json`, and `runes.json` into the published tree and hashes them in the manifest; role snapshots are retained but are not manifest entries (T-019 review).
 
 ### B-034 — Export stale-file test assumes POSIX recursive path separators — FIXED
 

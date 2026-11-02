@@ -76,7 +76,7 @@ export type BaselineTable = z.infer<typeof baselineTableSchema>;
 export const allyPairEntrySchema = z.tuple([
   championIdSchema,
   championIdSchema, // allyId
-  roleSchema,
+  roleSchema, // ally role
   rankBucketSchema,
   ...WEIGHTS,
 ]);
@@ -88,7 +88,7 @@ export type AllyPairTable = z.infer<typeof allyPairTableSchema>;
 export const enemyPairEntrySchema = z.tuple([
   championIdSchema,
   championIdSchema, // enemyId
-  roleSchema,
+  roleSchema, // enemy role
   rankBucketSchema,
   ...WEIGHTS,
 ]);

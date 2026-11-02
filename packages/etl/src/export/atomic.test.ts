@@ -174,6 +174,7 @@ describe('exportJson', () => {
     mkdirSync(patchDir, { recursive: true });
     writeFileSync(join(patchDir, 'champions.json'), '{"412":{}}');
     writeFileSync(join(patchDir, 'items.json'), '{"3340":{}}');
+    writeFileSync(join(patchDir, 'runes.json'), '[{"id":8000}]');
 
     const first = suite.exportOnce();
     expect(first.warnings.some((w) => w.includes('missing static catalog'))).toBe(false);
@@ -181,10 +182,12 @@ describe('exportJson', () => {
 
     expect(readFileSync(join(patchDir, 'champions.json'), 'utf8')).toBe('{"412":{}}');
     expect(readFileSync(join(patchDir, 'items.json'), 'utf8')).toBe('{"3340":{}}');
+    expect(readFileSync(join(patchDir, 'runes.json'), 'utf8')).toBe('[{"id":8000}]');
     const manifest = suite.readFile<{ files: Array<{ path: string }> }>('manifest.json');
     const paths = manifest.files.map((f) => f.path);
     expect(paths).toContain('champions.json');
     expect(paths).toContain('items.json');
+    expect(paths).toContain('runes.json');
   });
 
   it('warns when static catalogs are missing', () => {

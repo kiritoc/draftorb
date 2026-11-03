@@ -246,3 +246,45 @@ describe('recommend: hard-counter warnings', () => {
     expect(rec?.warnings).toEqual(['counteredBy:SUPPORT:200']);
   });
 });
+
+describe('recommend: ally role reservation (B-043)', () => {
+  // Senna-like ally: prefers SUPPORT (the user's role) but can play ADC.
+  const sennaProb = asRoleProb({
+    '1': { SUPPORT: 1 },
+    '235': { SUPPORT: 0.6, ADC: 0.4 },
+  });
+  const sennaPairs = makeAllyPairs([
+    { championId: 1, allyId: 235, role: 'ADC', ...HIGH_GAMES, winsW: 40 },
+  ]);
+
+  it('an unfixed flex ally never takes the user role and gives its synergy', () => {
+    const data = makeData({ champions: [1, 235], allyPairs: sennaPairs, roleProb: sennaProb });
+    const unfixed = recommend(makeInput({ allies: [{ championId: 235 }] }), data)
+      .recommendations[0];
+    const fixed = recommend(makeInput({ allies: [{ championId: 235, role: 'ADC' }] }), data)
+      .recommendations[0];
+    expect(unfixed?.reasons.some((r) => r.type === 'synergy')).toBe(true);
+    expect(unfixed?.reasons).toEqual(fixed?.reasons);
+    expect(unfixed?.score).toBe(fixed?.score);
+  });
+
+  it('an ally fixed to the user role gives no synergy but still counts for comp', () => {
+    const tags = {
+      ...makeChampionTags([1, 235]),
+      '1': makeTag(1, { hardEngage: false, poke: true, waveclear: false }),
+    };
+    const data = makeData({ champions: [1, 235], roleProb: sennaProb, tags });
+    const rec = recommend(makeInput({ allies: [{ championId: 235, role: 'SUPPORT' }] }), data)
+      .recommendations[0];
+    expect(rec?.reasons.some((r) => r.type === 'synergy')).toBe(false);
+
+    // Comp reads input.allies directly: the dropped ally still fills needs, so
+    // the score matches an ally fixed to a non-reserved role and differs from
+    // having no ally at all.
+    const otherRole = recommend(makeInput({ allies: [{ championId: 235, role: 'MID' }] }), data)
+      .recommendations[0];
+    const noAlly = recommend(makeInput({ allies: [] }), data).recommendations[0];
+    expect(rec?.score).toBe(otherRole?.score);
+    expect(rec?.score).not.toBe(noAlly?.score);
+  });
+});

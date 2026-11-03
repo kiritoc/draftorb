@@ -431,6 +431,19 @@ Owner decision 2026-10-31.
   - Export separate files per bucket — rejected: adds path complexity without changing the rune-context contract.
 - Consequences: consumers must accept schema version 3 and read `rankBucket` on rune contexts.
 
+### D-050 — Reserve the user's role during ally role inference — PROPOSED
+
+- Context: B-043. Ally role inference ran with all 5 roles available, so an unfixed ally could be assigned `userRole` even though the user occupies it (e.g. an unfixed Senna ally inferred as SUPPORT while the user plays support). The ally then produced no ally-pair synergy for the role it actually plays.
+- Decision:
+  - `inferRoles` takes `excludedRoles` (default `[]`, keeping existing behavior): the exact solver skips any assignment that puts an excluded role on an unfixed slot, and a fixed slot holding an excluded role makes the call return `null`.
+  - `resolveViableSubset` forwards `excludedRoles` to its `inferRoles` calls.
+  - `resolveKnownSlots` takes `reservedRoles` (default `[]`): slots fixed to a reserved role are dropped first (they conflict with the user and lose only role-dependent effects — pairs and lane — like the D-030 ambiguous case; they still count for comp via `input.allies` and stay excluded from candidates via `buildCandidateSet`). Dedup, inference and the viable-subset fallback then run with `reservedRoles` as `excludedRoles`. An unfixed ally that can only play a reserved role fails inference and is dropped by the existing fallback.
+  - `recommend` passes `[userRole]` for the allies call; the enemies call is unchanged.
+- Alternatives:
+  - Treat a conflicting fixed ally as authoritative and drop the user's role — rejected: `userRole` is the input that defines the request.
+  - Keep the current behavior — rejected: the ally is scored against the wrong role and its real synergy is lost (e.g. an ADC Senna ally contributes no ADC synergy).
+- Consequences: no output-shape change (`DRAFT_RESULT_SCHEMA_VERSION` unchanged). Enemy inference is untouched: every enemy role is legitimately possible.
+
 ### Template
 
 ```

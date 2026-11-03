@@ -4,7 +4,7 @@
 
 - Phase: 1 (Support / Diamond)
 - Current milestone: M0 Foundations (T-002.b DONE) and M1 ETL (in progress: T-014 DONE; T-015/T-015.b DONE; T-016 DONE; T-017 DONE; T-018 DONE; T-019 DONE; T-019.b..f TODO) -> M2 Engine (T-020..T-023 DONE)
-- Last updated: 2026-11-03 by Copilot (T-019 rebase conflict resolution)
+- Last updated: 2026-11-03 by Devin (B-043 ally role reservation)
 
 ## Epic status
 
@@ -103,6 +103,17 @@ Earlier handoff (kept for history): B-017 done (engine and shared `"types": []` 
 - Next: Owner review; then schedule T-019.b or continue T-019 (export).
 
 ## Session log (newest first)
+
+### 2026-11-03 — Devin — Bug B-043
+
+- Done:
+  - Reserved the user's role during ally role inference: `inferRoles` gained `excludedRoles`, `resolveKnownSlots` gained `reservedRoles`, and `recommend` passes `[userRole]` for the ally team (D-050, PROPOSED).
+  - Allies fixed to `userRole` are dropped from role-dependent layers (pairs, lane) but still count for comp and stay excluded from candidates; unfixed allies that can only play the reserved role are dropped by the existing viable-subset fallback.
+  - Documented the behavior in SPECS §4 and recorded the fix in BUGS.md (B-043, FIXED).
+- Files touched: `packages/engine/src/roles.ts`, `recommend-role-conflicts.ts`, `recommend-slots.ts`, `recommend.ts`; tests `roles.test.ts`, `recommend-slots.test.ts`, `recommend-pairs.test.ts`, new golden `test/golden/support_ally_flex_reserved_role.json`; docs `SPECS.md`, `DECISIONS.md`, `BUGS.md`, `PROGRESS.md`.
+- Tests: new B-043 tests failed before the fix (8 failures) and pass after; engine suite green.
+- State left: DONE pending review/commit (branch `fix/b-043-ally-role-reservation`).
+- Next step: T-019.b (retention model migration).
 
 ### 2026-11-02 — Copilot — T-019 review follow-up
 

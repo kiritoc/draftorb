@@ -96,7 +96,8 @@ export function recommend(
   const laneFullIdx = indexLaneFull(data.laneFull, userBucket);
 
   // --- Infer roles for ally and enemy teams ---
-  const allySlots = resolveKnownSlots(input.allies, 'ally', data.roleProb);
+  // The user's own role is reserved on the ally team (D-050).
+  const allySlots = resolveKnownSlots(input.allies, 'ally', data.roleProb, [myRole]);
   const enemySlots = resolveKnownSlots(input.enemies, 'enemy', data.roleProb);
 
   // --- Infer lane-group champions from known enemies/allies ---

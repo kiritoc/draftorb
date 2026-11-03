@@ -349,6 +349,53 @@ describe('inferRoles — fixed-role regressions', () => {
   });
 });
 
+describe('inferRoles — excluded roles (B-043)', () => {
+  it('assigns a flex champion its best non-excluded role with confidence 1', () => {
+    // Senna-like: prefers SUPPORT, can play ADC. SUPPORT excluded -> ADC.
+    const roleProb = makeRoleProb({ 235: { SUPPORT: 0.6, ADC: 0.4 } });
+    const result = expectAssignment(inferRoles([{ championId: 235 }], roleProb, ['SUPPORT']));
+
+    expect(result.slots[0]?.role).toBe('ADC');
+    expect(result.slots[0]?.confidence).toBe(1);
+  });
+
+  it('never assigns an excluded role to any unfixed slot', () => {
+    const roleProb = makeRoleProb({
+      1: { TOP: 0.9, SUPPORT: 0.1 },
+      2: { JUNGLE: 0.9, SUPPORT: 0.1 },
+      3: { MID: 0.9, SUPPORT: 0.1 },
+      4: { ADC: 0.9, SUPPORT: 0.1 },
+    });
+    const slots: Slot[] = [
+      { championId: 1 },
+      { championId: 2 },
+      { championId: 3 },
+      { championId: 4 },
+    ];
+    const result = expectAssignment(inferRoles(slots, roleProb, ['SUPPORT']));
+
+    expect(result.slots.map((s) => s.role)).toEqual(['TOP', 'JUNGLE', 'MID', 'ADC']);
+    expect(result.slots.map((s) => s.role)).not.toContain('SUPPORT');
+  });
+
+  it('returns null when a fixed slot holds an excluded role', () => {
+    const roleProb = makeRoleProb({ 1: { SUPPORT: 1 }, 2: { ADC: 1 } });
+    const slots: Slot[] = [{ championId: 1, role: 'SUPPORT' }, { championId: 2 }];
+    expect(inferRoles(slots, roleProb, ['SUPPORT'])).toBeNull();
+  });
+
+  it('returns null when an unfixed champion can only play excluded roles', () => {
+    const roleProb = makeRoleProb({ 1: { SUPPORT: 1 } });
+    expect(inferRoles([{ championId: 1 }], roleProb, ['SUPPORT'])).toBeNull();
+  });
+
+  it('keeps the default behavior when excludedRoles is omitted', () => {
+    const roleProb = makeRoleProb({ 235: { SUPPORT: 0.6, ADC: 0.4 } });
+    const result = expectAssignment(inferRoles([{ championId: 235 }], roleProb));
+    expect(result.slots[0]?.role).toBe('SUPPORT');
+  });
+});
+
 describe('assignmentConfidence', () => {
   it('returns 0 when both probs are 0', () => {
     expect(assignmentConfidence(0, 0)).toBe(0);

@@ -32,6 +32,9 @@ export type { InferredSlot, RoleAssignment } from './roles-types.js';
  *
  * @param slots    The team's draft slots (1–5 entries). Fixed roles honored.
  * @param roleProb The `role-prob.json` map of champion -> role probabilities.
+ * @param excludedRoles Roles no unfixed slot may take (e.g. the user's own
+ *                 role on the ally team, D-050). A fixed slot holding an
+ *                 excluded role makes the call return `null`.
  * @returns        `RoleAssignment` with per-slot role + confidence, or `null`
  *                 if no valid assignment exists (e.g., a fixed-role conflict
  *                 or a champion missing from the map).
@@ -39,23 +42,26 @@ export type { InferredSlot, RoleAssignment } from './roles-types.js';
 export function inferRoles(
   slots: ReadonlyArray<Slot>,
   roleProb: ChampionRoleProbabilities,
+  excludedRoles: readonly Role[] = [],
 ): RoleAssignment | null {
   if (slots.length === 0 || slots.length > 5) {
     return null;
   }
 
-  // Reject duplicate fixed roles (one champion per role).
+  // Reject duplicate fixed roles (one champion per role) and fixed roles that
+  // are excluded (callers drop those slots beforehand; a leftover one is a
+  // conflict).
   const fixedRoles = new Set<Role>();
   for (const s of slots) {
     if (s.role !== undefined) {
-      if (fixedRoles.has(s.role)) {
+      if (fixedRoles.has(s.role) || excludedRoles.includes(s.role)) {
         return null;
       }
       fixedRoles.add(s.role);
     }
   }
 
-  return inferRolesExact(slots, roleProb);
+  return inferRolesExact(slots, roleProb, excludedRoles);
 }
 
 /**
@@ -67,6 +73,7 @@ export function inferRoles(
 function inferRolesExact(
   slots: ReadonlyArray<Slot>,
   roleProb: ChampionRoleProbabilities,
+  excludedRoles: readonly Role[] = [],
 ): RoleAssignment | null {
   let bestLogProb = -Infinity;
   let bestProb = 0;
@@ -85,6 +92,21 @@ function inferRolesExact(
 
     if (!assignmentIsValid(slots, perm) || !assignmentIsViable(slots, roleProb, perm)) {
       continue;
+    }
+
+    // An excluded role may never land on an unfixed slot (fixed slots with an
+    // excluded role were already rejected in `inferRoles`).
+    if (excludedRoles.length > 0) {
+      let excluded = false;
+      for (let i = 0; i < slots.length; i++) {
+        if (slots[i]?.role === undefined && excludedRoles.includes(perm[i] as Role)) {
+          excluded = true;
+          break;
+        }
+      }
+      if (excluded) {
+        continue;
+      }
     }
 
     const logProb = assignmentLogProb(slots, roleProb, perm);

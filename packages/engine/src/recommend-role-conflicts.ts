@@ -37,12 +37,14 @@ export interface ViableSubset {
 export function resolveViableSubset(
   slots: ReadonlyArray<Slot>,
   roleProb: ChampionRoleProbabilities,
+  excludedRoles: readonly Role[] = [],
 ): ViableSubset {
   let subset: Slot[] = slots.filter((s) => s.role !== undefined);
-  let resolved: RoleAssignment | null = subset.length > 0 ? inferRoles(subset, roleProb) : null;
+  let resolved: RoleAssignment | null =
+    subset.length > 0 ? inferRoles(subset, roleProb, excludedRoles) : null;
   for (const s of slots) {
     if (s.role !== undefined) continue;
-    const attempt = inferRoles([...subset, s], roleProb);
+    const attempt = inferRoles([...subset, s], roleProb, excludedRoles);
     if (attempt) {
       subset = [...subset, s];
       resolved = attempt;

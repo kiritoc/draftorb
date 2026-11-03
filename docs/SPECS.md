@@ -55,6 +55,7 @@ Rank buckets for weighting (distinct from persisted `rank_score` in DATA_MODEL.m
 - Output also the **confidence** of each assignment (probability mass of the best assignment vs alternatives). Confidence scales how much that champion's synergy/counter terms count.
 - UI lets the user override a role; override = confidence 1.
 - If inference fails for a team, the engine keeps the largest greedily built resolvable subset (fixed slots first). If that fails too, only fixed slots are kept, and a fixed role used by two or more slots of the same team is dropped as ambiguous (D-030). Dropped slots lose only role-dependent effects (pairs, lane); they stay excluded from candidates and still count for comp.
+- The user's own role is reserved on the user's team: allies are never assigned `userRole`. An ally fixed to `userRole` is dropped from role-dependent layers (pairs, lane) but still counts for comp and stays excluded from candidates (D-050).
 
 ## 5. Scoring a candidate `c` for `myRole` (Phase 1: `myRole` = SUPPORT)
 

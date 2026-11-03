@@ -55,6 +55,16 @@ T-019 review follow-up found export regressions in paired-role serialization, ra
 
 ## Fixed
 
+### B-043 — Ally role inference can assign the user's own role — FIXED
+
+- Severity / Area: S2 / engine
+- Steps to reproduce: `userRole = SUPPORT`, an unfixed ally whose roleProb prefers SUPPORT (e.g. Senna, `{SUPPORT: 0.6, ADC: 0.4}`), then call `recommend` and inspect the candidate's reasons.
+- Expected / Actual: the ally must be inferred to its best non-user role (ADC) and produce its synergy reason; instead it was inferred SUPPORT, the ally self-role influence is `null` -> 0, and the synergy vanished (verified ~+9.26pp lost).
+- Environment (OS, Node version, patch): any; engine-level bug, patch-independent.
+- Suspected cause: `recommend` called `resolveKnownSlots(input.allies, ...)` -> `inferRoles` with all 5 roles available, so the user's occupied role was assignable to allies.
+- Fix (commit/ticket): `inferRoles`/`resolveViableSubset`/`resolveKnownSlots` accept excluded/reserved roles; `recommend` passes `[userRole]` for the ally team (D-050). An ally fixed to `userRole` is dropped from role-dependent layers but still counts for comp and stays excluded from candidates.
+- Verification: new unit tests in `roles.test.ts` and `recommend-slots.test.ts`, a recommend-level regression in `recommend-pairs.test.ts`, and golden fixture `support_ally_flex_reserved_role.json`; all failed before the fix and pass after.
+
 ### B-042 — Explicit patch exports can mislabel aggregates — FIXED
 
 - Severity / Area: S3 / etl

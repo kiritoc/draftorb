@@ -55,6 +55,66 @@ T-019 review follow-up found export regressions in paired-role serialization, ra
 
 ## Fixed
 
+### B-049 — Role-prob export residual can go to a tiny role; duplicate validation; name clash — FIXED
+
+- Severity / Area: S4 / etl
+- Steps to reproduce: export role probabilities for a champion whose last surviving role (row order) is tiny while rounding produces a nonzero residual, e.g. `{SUPPORT: 0.7, TOP: 0.1500005, ADC: 0.1499995}`.
+- Expected / Actual: the largest surviving role should absorb the rounding residual; instead the residual always went to the last surviving role, which could push a marginal role to <= 0 or make a tiny role the residual target. `computeRoleProb` also clashed by name with `aggregate.ts`'s `computeRoleProb`, and `roleProbFile` re-validated the map a second time.
+- Environment (OS, Node version, patch): any; export-layer bug.
+- Suspected cause: the residual was assigned positionally (`index === entries.length - 1`) instead of by magnitude.
+- Fix (commit/ticket): renamed to `exportRoleProbabilities`; the largest surviving probability (first in row order on ties) absorbs the residual; removed the duplicate schema validation in `roleProbFile`.
+- Verification: `region-and-config.test.ts` — "assigns the rounding residual to the largest surviving role (B-049)" fails with the old positional rule and passes now; the equal-thirds rounding test updated to the largest-role residual.
+
+### B-048 — DB-reading commands bypass `openDb` and duplicate path logic — FIXED
+
+- Severity / Area: S3 / etl
+- Steps to reproduce: run `pnpm etl aggregate` or `pnpm etl derive-roles` on a database whose `_migrations` table is behind the migration files.
+- Expected / Actual: the command should refuse and tell the user to migrate first; instead it ran on a stale schema. Each DB-reading command also re-implemented path resolution instead of using `config/paths.ts`.
+- Environment (OS, Node version, patch): any.
+- Suspected cause: local `resolveDbPath()` copies and ad-hoc `new Database(...)` calls in `commands/aggregate.ts`, `commands/derive-roles.ts`, `commands/export.ts`, `commands/status.ts`.
+- Fix (commit/ticket): `config/paths.ts` gained `DB_ENV_VAR`, `DEFAULT_DB_FILENAME` and `dbPathFromEnv()`; commands share it. `aggregate` opens via `openDb` and `derive-roles` opens read-only; both throw a `CliError` when `getMigrationStatus(db).pending > 0` ("Database schema is out of date (N pending migration(s)); run `pnpm etl migrate` first."). The aggregate output prints one summary line `Aggregated role probabilities: X row(s) for Y champion(s) written to role_prob.` instead of per-row lines.
+- Verification: `commands/aggregate.test.ts` — "refuses to run on a database with pending migrations (B-048)" fails before (resolved instead of rejecting) and passes now.
+
+### B-047 — Rune aggregation silently ignores a missing/invalid tags file — FIXED
+
+- Severity / Area: S3 / etl
+- Steps to reproduce: run `pnpm etl aggregate` with `data/manual/champion-tags.json` missing, unparseable, or failing `championTagsMapSchema`.
+- Expected / Actual: the aggregation should fail loudly; instead `loadChampionTags()` swallowed every error and returned an empty map, degrading every enemy damage mix to `mixed` silently.
+- Environment (OS, Node version, patch): any.
+- Suspected cause: a bare `try { JSON.parse(readFileSync(...)) } catch { return new Map(); }`.
+- Fix (commit/ticket): `AggregateRunesOptions.tagsPath` (default `data/manual/champion-tags.json`); the file is parsed and validated with `championTagsMapSchema`, and any failure throws `Cannot load champion tags from <path>: <reason>`.
+- Verification: `aggregate-runes.test.ts` — "champion tags loading (B-047)": nonexistent path, invalid JSON and schema-invalid content all threw nothing before and throw now.
+
+### B-046 — `derive-roles` keeps any role with probability > 0 — FIXED
+
+- Severity / Area: S3 / etl
+- Steps to reproduce: `deriveChampionRoles({ '412': { SUPPORT: 0.97, TOP: 0.03 } })`.
+- Expected / Actual: roles should match the engine's candidate threshold; instead any probability > 0 kept the role (`['TOP', 'SUPPORT']` for a 3% TOP pick).
+- Environment (OS, Node version, patch): any.
+- Suspected cause: the derivation used `> 0` instead of the shared `roleProbThreshold`.
+- Fix (commit/ticket): `deriveChampionRoles`/`applyDerivedRoles` keep roles with `prob >= minProb` (default `DEFAULT_RECOMMEND_CONFIG.roleProbThreshold`), canonical order; a champion with no qualifying role keeps its single highest-probability role.
+- Verification: `derive-roles.test.ts` — "drops roles below the role-probability threshold (B-046)", "keeps the single highest-probability role when none reaches the threshold", "honors an explicit minimum probability"; all failed before and pass now.
+
+### B-045 — CLI help lists `export` as planned and pads to ~117 chars — FIXED
+
+- Severity / Area: S3 / etl
+- Steps to reproduce: `pnpm etl help`.
+- Expected / Actual: implemented commands should not appear under "Target state commands"; instead `export` (already implemented) was listed as planned, and the single-line layout padded every row to the longest usage (~117 chars).
+- Environment (OS, Node version, patch): any.
+- Suspected cause: stale `PLANNED_COMMANDS` entry and width-computed `padEnd` layout.
+- Fix (commit/ticket): `PLANNED_COMMANDS` now lists only `backtest`; `formatHelp` uses a two-line layout (usage line, then a 6-space-indented description line) with no width computation. Stale `cli.ts` header: `DRAFTORB_DB_PATH` overrides the SQLite path for every database command.
+- Verification: `commands/shared.test.ts` (new) — planned section lists `backtest` and not `export`, every implemented command appears, and each description sits on its own indented line.
+
+### B-044 — Retry pass for unenriched matches is not awaited — FIXED
+
+- Severity / Area: S2 / etl
+- Steps to reproduce: seed a stored match with `enriched = 0` and 10 participants, call `await ingestMatches(...)`, and check `enriched` immediately after it resolves.
+- Expected / Actual: the retry pass should finish before `ingestMatches` returns; instead `void reprocessUnenrichedMatches(...)` floated, so the match was still `enriched = 0` right after the await — and when `ingestMatches` owns the DB, the `finally` closes the connection under the running pass after its first network await.
+- Environment (OS, Node version, patch): any.
+- Suspected cause: fire-and-forget `void` on the async retry pass inside the `try`/`finally`.
+- Fix (commit/ticket): `await reprocessUnenrichedMatches(...)` inside the `try`. Hard-coded `minChampGames` defaults (`30` in two places in `matches.ts`, `DEFAULT_MIN_CHAMP_GAMES` in `enrichment.ts`) now use `DEFAULT_CONFIG.minChampGames` from `@draftorb/engine`.
+- Verification: `matches.test.ts` — "awaits the unenriched-match reprocess pass before returning (B-044)": `expected +0 to be 1` before the fix, passes now.
+
 ### B-043 — Ally role inference can assign the user's own role — FIXED
 
 - Severity / Area: S2 / engine

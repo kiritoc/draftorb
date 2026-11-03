@@ -68,7 +68,9 @@ describe('aggregateCommand', () => {
     db.close();
 
     await aggregateCommand.run(['16.21']);
-    expect(output()).toMatch(/1 row\(s\) written to role_prob/);
+    expect(output()).toMatch(
+      /Aggregated role probabilities: 1 row\(s\) for 1 champion\(s\) written to role_prob/,
+    );
 
     logSpy.mockClear();
     await aggregateCommand.run(['16.20']);
@@ -135,7 +137,9 @@ describe('aggregateCommand', () => {
     // <= snapshot and contributes with decay. role_prob is aggregated (not left
     // unchanged), and baseline aggregates the stored 16.20 games.
     await aggregateCommand.run(['16.21']);
-    expect(output()).toMatch(/Aggregated role probabilities: 1 row\(s\) written to role_prob/);
+    expect(output()).toMatch(
+      /Aggregated role probabilities: 1 row\(s\) for 1 champion\(s\) written to role_prob/,
+    );
     expect(output()).toMatch(/Aggregated baselines:/);
 
     const db2 = openDb(dbPath);
@@ -149,5 +153,20 @@ describe('aggregateCommand', () => {
     } finally {
       db2.close();
     }
+  });
+
+  it('refuses to run on a database with pending migrations (B-048)', async () => {
+    const dbPath = join(directory, 'test.sqlite');
+    process.env.DRAFTORB_DB_PATH = dbPath;
+    const db = openDb(dbPath);
+    migrate(db);
+    db.prepare(
+      'DELETE FROM _migrations WHERE version = (SELECT MAX(version) FROM _migrations)',
+    ).run();
+    db.close();
+
+    await expect(aggregateCommand.run([])).rejects.toThrow(
+      'Database schema is out of date (1 pending migration(s)); run `pnpm etl migrate` first.',
+    );
   });
 });

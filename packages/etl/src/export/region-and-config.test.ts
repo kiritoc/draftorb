@@ -5,7 +5,7 @@ import { championRoleProbabilitiesSchema } from '@draftorb/shared';
 import { seed } from './export.fixtures.js';
 import { createExportTestSuite, PATCH } from './export.test-utils.js';
 import { exportJson } from './index.js';
-import { computeRoleProb } from './role-prob.js';
+import { exportRoleProbabilities } from './role-prob.js';
 
 const suite = createExportTestSuite();
 
@@ -77,7 +77,7 @@ describe('exportJson', () => {
   });
 
   it('rounds equal role probabilities without violating the sum-to-one schema', () => {
-    const roleProbabilities = computeRoleProb(
+    const roleProbabilities = exportRoleProbabilities(
       (['TOP', 'MID', 'SUPPORT'] as const).map((role) => ({
         championId: 412,
         role,
@@ -89,8 +89,27 @@ describe('exportJson', () => {
     );
 
     expect(championRoleProbabilitiesSchema.parse(roleProbabilities)).toEqual({
-      '412': { TOP: 0.333333, MID: 0.333333, SUPPORT: 0.333334 },
+      '412': { TOP: 0.333334, MID: 0.333333, SUPPORT: 0.333333 },
     });
+  });
+
+  it('assigns the rounding residual to the largest surviving role (B-049)', () => {
+    // Old behavior gave the residual to the last survivor; here that would be
+    // ADC (0.149999), while the largest role SUPPORT must absorb it instead.
+    const roleProbabilities = exportRoleProbabilities(
+      [
+        { championId: 412, role: 'SUPPORT', gamesW: 10, gamesW2: 10, prob: 0.7 },
+        { championId: 412, role: 'TOP', gamesW: 10, gamesW2: 10, prob: 0.1500005 },
+        { championId: 412, role: 'ADC', gamesW: 10, gamesW2: 10, prob: 0.1499995 },
+      ],
+      0,
+    );
+
+    expect(championRoleProbabilitiesSchema.parse(roleProbabilities)).toEqual({
+      '412': { SUPPORT: 0.699999, TOP: 0.150001, ADC: 0.15 },
+    });
+    const sum = Object.values(roleProbabilities['412'] ?? {}).reduce((a, b) => a + b, 0);
+    expect(Math.abs(sum - 1)).toBeLessThanOrEqual(1e-6);
   });
 
   it('warns when the requested patch is not the latest patch in the database', () => {

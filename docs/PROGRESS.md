@@ -4,7 +4,7 @@
 
 - Phase: 1 (Support / Diamond)
 - Current milestone: M0 Foundations (T-002.b DONE) and M1 ETL (in progress: T-014 DONE; T-015/T-015.b DONE; T-016 DONE; T-017 DONE; T-018 DONE; T-019 DONE; T-019.b..f TODO) -> M2 Engine (T-020..T-023 DONE)
-- Last updated: 2026-11-03 by Devin (B-043 ally role reservation)
+- Last updated: 2026-11-03 by Devin (B-044..B-049 ETL review findings)
 
 ## Epic status
 
@@ -103,6 +103,21 @@ Earlier handoff (kept for history): B-017 done (engine and shared `"types": []` 
 - Next: Owner review; then schedule T-019.b or continue T-019 (export).
 
 ## Session log (newest first)
+
+### 2026-11-03 — Devin — Bugs B-044..B-049
+
+- Done:
+  - B-044: `ingestMatches` now awaits the unenriched-match reprocess pass; `minChampGames` defaults unified on `DEFAULT_CONFIG.minChampGames`.
+  - B-045: `formatHelp` two-line layout; `PLANNED_COMMANDS` lists only `backtest`; `cli.ts` env comment fixed.
+  - B-046: `deriveChampionRoles`/`applyDerivedRoles` keep roles with `prob >= roleProbThreshold` with a highest-role fallback.
+  - B-047: rune aggregation validates `champion-tags.json` via `championTagsMapSchema` and throws `Cannot load champion tags from <path>` on any failure (`tagsPath` option added).
+  - B-048: shared `dbPathFromEnv`/`DB_ENV_VAR`/`DEFAULT_DB_FILENAME` in `config/paths.ts`; `aggregate` uses `openDb`, `derive-roles` opens read-only, both refuse pending migrations; aggregate prints a single role_prob summary line.
+  - B-049: `exportRoleProbabilities` (renamed) assigns the rounding residual to the largest surviving role; duplicate validation removed.
+  - Docs: BUGS.md B-044..B-049 FIXED, SETUP.md command list + pending-migration note, DATA_MODEL.md threshold + residual wording, DECISIONS D-034 consequence.
+- Files touched: `packages/etl/src/matches.ts`, `enrichment.ts`, `commands/shared.ts`, `cli.ts`, `derive-roles.ts`, `aggregate-runes.ts`, `config/paths.ts`, `commands/{aggregate,derive-roles,export,status,migrate}.ts`, `export/role-prob.ts`; tests `matches.test.ts`, `derive-roles.test.ts`, `aggregate-runes.test.ts`, `commands/shared.test.ts` (new), `commands/aggregate.test.ts`, `export/region-and-config.test.ts`; docs above.
+- Tests: new/updated tests failed before the fixes (16 failures) and pass after.
+- State left: DONE pending review/commit (branch `fix/etl-review-findings`).
+- Next step: T-019.b (retention model migration).
 
 ### 2026-11-03 — Devin — Bug B-043
 

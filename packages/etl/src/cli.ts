@@ -12,7 +12,7 @@
  *   3  Riot API authentication error
  *
  * Environment:
- *   DRAFTORB_DB_PATH  Overrides the default SQLite path (used by `migrate`, `players` and `matches`).
+ *   DRAFTORB_DB_PATH  Overrides the default SQLite path for every database command.
  */
 import { RiotAuthError } from './riot';
 import { CliError, EXIT, UsageError } from './cli-args';

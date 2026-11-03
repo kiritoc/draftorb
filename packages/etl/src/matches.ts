@@ -2,6 +2,7 @@ import type Database from 'better-sqlite3';
 
 import { RiotClient, RiotAuthError, type Platform } from './riot';
 import type { Role } from '@draftorb/shared';
+import { DEFAULT_CONFIG } from '@draftorb/engine';
 import { openDb, migrate } from './db';
 import { resolveDbPath } from './config/paths';
 import { enrichParticipants, type EnrichmentOptions } from './enrichment';
@@ -315,7 +316,7 @@ export async function ingestMatches(
           myRole: options.myRole ?? 'SUPPORT',
           seedPuuid: player.puuid,
           seedRankScore: player.rank_score,
-          minChampGames: options.minChampGames ?? 30,
+          minChampGames: options.minChampGames ?? DEFAULT_CONFIG.minChampGames,
           onProgress: log,
         },
       };
@@ -355,12 +356,14 @@ export async function ingestMatches(
       );
     }
 
-    void reprocessUnenrichedMatches(
+    // Awaited (B-044): a floating retry pass would outlive `ingestMatches` and
+    // hit a closed connection when this call owns the database.
+    await reprocessUnenrichedMatches(
       db,
       client,
       {
         myRole: options.myRole ?? 'SUPPORT',
-        minChampGames: options.minChampGames ?? 30,
+        minChampGames: options.minChampGames ?? DEFAULT_CONFIG.minChampGames,
       },
       log,
     );

@@ -1,6 +1,6 @@
-import { resolveDbPath } from '../config/paths';
+import { DB_ENV_VAR, DEFAULT_DB_FILENAME, resolveDbPath } from '../config/paths';
 import { openDb, migrate, getMigrationStatus } from '../db';
-import { log, parsePositionals, type Command, DB_ENV_VAR, DEFAULT_DB_FILENAME } from './shared';
+import { log, parsePositionals, type Command } from './shared';
 
 async function runMigrate(args: string[]): Promise<void> {
   const [dbPathArg] = parsePositionals(args, 1, 'migrate [db-path]');

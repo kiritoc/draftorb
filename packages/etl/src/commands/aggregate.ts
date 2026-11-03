@@ -1,46 +1,45 @@
-import Database from 'better-sqlite3';
 import { existsSync } from 'node:fs';
-import { join, resolve } from 'node:path';
 
-import { resolveRepoRoot } from '../config/paths';
+import { dbPathFromEnv } from '../config/paths';
+import { getMigrationStatus, openDb } from '../db';
 import { aggregateBaseline } from '../aggregate-baseline';
 import { aggregatePairTables } from '../aggregate-pairs';
 import { aggregateRunesByContext } from '../aggregate-runes';
 import { aggregateRoleProb, PATCH_PATTERN } from '../aggregate';
-import { UsageError } from '../cli-args';
+import { CliError, UsageError } from '../cli-args';
 import { parsePositionals, type Command } from './shared';
-
-function resolveDbPath(): string {
-  const chosen = process.env.DRAFTORB_DB_PATH ?? join(resolveRepoRoot(), 'data', 'DraftOrb.sqlite');
-  return resolve(chosen);
-}
 
 async function runAggregate(args: string[]): Promise<void> {
   const [patch] = parsePositionals(args, 1, 'aggregate [patch]');
   if (patch !== undefined && !PATCH_PATTERN.test(patch)) {
     throw new UsageError(`Invalid patch "${patch}". Expected a format like "16.21".`);
   }
-  const dbPath = resolveDbPath();
+  const dbPath = dbPathFromEnv();
 
   if (!existsSync(dbPath)) {
     console.log(`no database at ${dbPath}`);
     return;
   }
 
-  const db = new Database(dbPath);
+  const db = openDb(dbPath);
   try {
+    const { pending } = getMigrationStatus(db);
+    if (pending > 0) {
+      throw new CliError(
+        `Database schema is out of date (${pending} pending migration(s)); run \`pnpm etl migrate\` first.`,
+      );
+    }
+
     const rows = aggregateRoleProb(db, { patch });
     if (rows.length === 0) {
       console.log(
         `No participants found${patch === undefined ? '' : ` for patch ${patch}`}; role_prob left unchanged.`,
       );
     } else {
-      console.log(`Aggregated role probabilities: ${rows.length} row(s) written to role_prob.`);
-      for (const row of rows) {
-        console.log(
-          `  champion ${row.championId} ${row.role}: games=${row.games} prob=${(row.prob * 100).toFixed(2)}%`,
-        );
-      }
+      const champions = new Set(rows.map((row) => row.championId)).size;
+      console.log(
+        `Aggregated role probabilities: ${rows.length} row(s) for ${champions} champion(s) written to role_prob.`,
+      );
     }
 
     const baselineRows = aggregateBaseline(db, { patch });

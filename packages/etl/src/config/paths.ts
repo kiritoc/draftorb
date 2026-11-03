@@ -31,10 +31,19 @@ export function defaultPublicDataDir(): string {
 export function defaultManualDataDir(): string {
   return join(resolveRepoRoot(), 'data', 'manual');
 }
-export function resolveDbPath(explicit?: string): string {
+export const DB_ENV_VAR = 'DRAFTORB_DB_PATH';
+// Kept as-is to avoid orphaning existing databases; centralised so renaming is a one-line change.
+export const DEFAULT_DB_FILENAME = 'DraftOrb.sqlite';
+
+/** Resolves the SQLite path (explicit arg, env override, repo default). No mkdir. */
+export function dbPathFromEnv(explicit?: string): string {
   const chosen =
-    explicit ?? process.env.DRAFTORB_DB_PATH ?? join(resolveRepoRoot(), 'data', 'DraftOrb.sqlite');
-  const resolved = resolve(chosen);
+    explicit ?? process.env[DB_ENV_VAR] ?? join(resolveRepoRoot(), 'data', DEFAULT_DB_FILENAME);
+  return resolve(chosen);
+}
+
+export function resolveDbPath(explicit?: string): string {
+  const resolved = dbPathFromEnv(explicit);
   mkdirSync(dirname(resolved), { recursive: true });
   return resolved;
 }

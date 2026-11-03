@@ -29,6 +29,7 @@ import { join } from 'node:path';
 
 import {
   RUNE_CONTEXT_LEVELS,
+  championTagsMapSchema,
   type ChampionTagsMap,
   type RankBucket,
   type Role,
@@ -66,6 +67,8 @@ export interface AggregateRunesOptions {
   config?: RankWeightingConfig;
   /** Snapshot patch: newer matches are excluded and recency is relative to it. */
   patch?: string;
+  /** Champion tags file for the damage-mix context; defaults to data/manual/champion-tags.json. */
+  tagsPath?: string;
 }
 
 // Back-off context levels (most specific = lowest number, SPECS §8.1).
@@ -169,13 +172,15 @@ function formatSlot(slot: LaneSlot): string {
   return `${slot.side}.${slot.role}:${slot.championId}`;
 }
 
-function loadChampionTags(): Map<number, string> {
-  const tagsPath = join(defaultManualDataDir(), 'champion-tags.json');
+function loadChampionTags(tagsPath: string): Map<number, string> {
+  // A missing or invalid tags file must fail loudly (B-047): silently using an
+  // empty map would degrade every damage mix to `mixed`.
   let raw: ChampionTagsMap;
   try {
-    raw = JSON.parse(readFileSync(tagsPath, 'utf8'));
-  } catch {
-    return new Map();
+    raw = championTagsMapSchema.parse(JSON.parse(readFileSync(tagsPath, 'utf8')));
+  } catch (error: unknown) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(`Cannot load champion tags from ${tagsPath}: ${reason}`);
   }
   const tags = new Map<number, string>();
   for (const [key, tag] of Object.entries(raw)) {
@@ -271,7 +276,9 @@ export function aggregateRunesByContext(
   });
   const currentPatchIndex = patches.length - 1;
 
-  const tags = loadChampionTags();
+  const tags = loadChampionTags(
+    options.tagsPath ?? join(defaultManualDataDir(), 'champion-tags.json'),
+  );
 
   // Experts must be judged within the patch window (D-022): `champion_games`
   // counts the whole DB, so subtract games newer than the snapshot.

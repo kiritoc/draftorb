@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -177,6 +177,10 @@ describe('ddragon ETL utilities', () => {
     const tempDir = await mkdtemp(path.join(tmpdir(), 'draftorb-test-'));
 
     try {
+      const patchDir = path.join(tempDir, '14.23');
+      await mkdir(patchDir, { recursive: true });
+      await writeFile(path.join(patchDir, 'manifest.json'), '{"files":[]}', 'utf8');
+
       const mockFetch: typeof fetch = async (input) => {
         const url = String(input);
         if (url.endsWith('/api/versions.json')) {
@@ -260,6 +264,9 @@ describe('ddragon ETL utilities', () => {
       expect(championsMapSchema.parse(champsFile)).toEqual(champsFile);
       expect(itemsMapSchema.parse(itemsFile)).toEqual(itemsFile);
       expect(runeTreesSchema.parse(runesFile)).toEqual(runesFile);
+      await expect(readFile(path.join(patchDir, 'manifest.json'), 'utf8')).rejects.toMatchObject({
+        code: 'ENOENT',
+      });
     } finally {
       await rm(tempDir, { recursive: true, force: true });
     }

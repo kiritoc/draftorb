@@ -28,6 +28,8 @@ No new bugs were identified during T-013 (match ingestion); rejected match ids a
 
 No new bugs were identified while revising T-013 patch-window and rank-known-count behavior.
 
+T-019 review follow-up found export regressions in paired-role serialization, rank-specific rune grouping, probability rounding, warnings, and post-publish backup cleanup; these are recorded as B-037 through B-042 below and fixed in this pass.
+
 ### B-021 — `types: []` does not isolate the engine type-checker from Node globals — OPEN
 
 - Severity / Area: S3 / engine
@@ -52,6 +54,82 @@ No new bugs were identified while revising T-013 patch-window and rank-known-cou
 ```
 
 ## Fixed
+
+### B-042 — Explicit patch exports can mislabel aggregates — FIXED
+
+- Severity / Area: S3 / etl
+- Expected / Actual: an explicit patch different from the latest stored match patch must warn that the aggregate data may not represent the requested patch; the exporter previously accepted the label silently.
+- Fix (commit/ticket): exporter warns on the mismatch (T-019 review).
+
+### B-041 — Backup cleanup failure reports a successful publish as failure — FIXED
+
+- Severity / Area: S2 / etl
+- Expected / Actual: once the new patch directory is published, a failure deleting the previous backup must not make the export appear unpublished; the backup must be retained and the cleanup issue surfaced as a warning.
+- Fix (commit/ticket): `publishTempDir` returns a warning and keeps the backup; deterministic failure-injection test (T-019 review).
+
+### B-040 — Explicit region suppresses mixed-platform warning — FIXED
+
+- Severity / Area: S3 / etl
+- Expected / Actual: aggregates combine all platforms regardless of the manifest region label, so the exporter must warn about mixed-platform data even when `--region` is explicit.
+- Fix (commit/ticket): mixed-platform warning now explains that region labels do not filter data (T-019 review).
+
+### B-039 — Role probability rounding can violate the sum invariant — FIXED
+
+- Severity / Area: S3 / etl
+- Expected / Actual: independently rounding each probability to six decimals could produce a sum outside the schema tolerance.
+- Fix (commit/ticket): rounding residual is applied to the largest probability and the result is validated against the shared schema (T-019 review).
+
+### B-038 — Rune exports merge rank buckets — FIXED
+
+- Severity / Area: S2 / etl
+- Expected / Actual: rank-weighted rune contexts must retain their source bucket; grouping only by context key and level combined distinct populations.
+- Fix (commit/ticket): `rankBucket` is included in each context and its grouping key; manifest schema version is 3 (T-019 review, D-049 PROPOSED).
+
+### B-037 — Pair exports serialize the row owner's role — FIXED
+
+- Severity / Area: S2 / etl
+- Expected / Actual: pair tuple role means the paired champion's role, but the exporter previously serialized `my_role`.
+- Fix (commit/ticket): pair SQL selects and serializes `other_role` for ally and enemy tuples (T-019 review).
+
+### B-036 — Catalog updates leave stale manifest checksums — FIXED
+
+- Severity / Area: S2 / etl
+- Steps to reproduce: export a patch, then run `pnpm etl static` or `pnpm etl derive-roles` for that patch.
+- Expected / Actual: consumers must not see a manifest whose catalog hashes describe older content; catalog writers previously changed listed files without updating or invalidating the manifest.
+- Environment (OS, Node version, patch): any, Node.js 22.
+- Logs / screenshot: regression tests assert that static import and role derivation remove the existing manifest before updating catalogs.
+- Suspected cause: catalog writers operated independently of the manifest created by export.
+- Fix (commit/ticket): both catalog-writing paths now invalidate the patch manifest before changing catalog files (T-019 review).
+
+### B-035 — Export removes static catalogs and role-derivation snapshots — FIXED
+
+- Severity / Area: S2 / etl
+- Steps to reproduce: import static data, run `derive-roles`, then export the same patch.
+- Expected / Actual: exports must retain the Data Dragon catalogs and derivation snapshots; atomic publication previously replaced the whole patch directory with only statistical export files.
+- Environment (OS, Node version, patch): any, Node.js 22.
+- Logs / screenshot: exporter regression verifies catalog retention, catalog checksums, and preservation of bootstrap/derived snapshots.
+- Suspected cause: staged export contents omitted pre-existing catalog and derivation files.
+- Fix (commit/ticket): export copies available `champions.json`, `items.json`, and `runes.json` into the published tree and hashes them in the manifest; role snapshots are retained but are not manifest entries (T-019 review).
+
+### B-034 — Export stale-file test assumes POSIX recursive path separators — FIXED
+
+- Severity / Area: S3 / etl
+- Steps to reproduce: run `pnpm vitest run packages/etl/src/export/atomic.test.ts` on Windows.
+- Expected / Actual: the stale-file regression should compare the same relative file paths on every platform; Windows `readdirSync(..., { recursive: true })` returns backslash-separated relative paths, so the POSIX expected paths did not match.
+- Environment (OS, Node version, patch): Windows, Node.js 22.
+- Suspected cause: the test compared recursive `readdirSync` paths directly to slash-separated literals.
+- Fix (commit/ticket): normalize recursive relative paths to forward slashes before asserting the exported file layout (T-019 verification follow-up).
+- Verification: focused `atomic.test.ts` and `pnpm check`.
+
+### B-035 — Export review findings (role-prob rounding, empty builds, publish cleanup, static catalogs) — FIXED
+
+- Severity / Area: S2 / etl
+- Steps to reproduce: export a champion with three equal role probabilities; export a champion whose build items all fail `exportMinGames`; make backup removal fail after publish; run `pnpm etl static <patch>` then `pnpm etl export <patch>`.
+- Expected / Actual: probabilities should sum to 1 within 1e-6 (three `0.333333` values failed the shared schema); no build file for unqualified champions (an empty `contexts` file was emitted); a live publish should not be reported as failed (backup `rmSync` errors propagated); static catalogs should survive and be listed in the manifest (publishing replaced the patch directory and deleted them).
+- Environment (OS, Node version, patch): any OS, Node.js 22.
+- Suspected cause: independent rounding per role; no empty-contexts check in builds; backup removal inside `finally`; whole-directory publish ignored files owned by `pnpm etl static`.
+- Fix (commit/ticket): residual assignment + schema validation in `role-prob.ts`; skip empty build files; post-publish cleanup returns a warning; static catalogs carried into the temp tree. Also added warnings for mixed-platform data with `--region` and for exporting a patch other than the database's latest (T-019 review follow-up).
+- Verification: new tests in `atomic.test.ts`, `builds.test.ts`, `region-and-config.test.ts`; `pnpm check`.
 
 ### B-033 — Baseline `games` column not populated by ETL aggregation — FIXED
 

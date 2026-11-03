@@ -422,6 +422,15 @@ Owner decision 2026-10-31.
   - Adopt with equivalent-count conversion — rejected: still redundant; D-021 shrinkage is the single smoothing mechanism.
 - Consequences: no `K`, `p0`, or smoothing table. Edge cases in §17 reference §5/D-021 for confidence.
 
+### D-049 — Preserve rank buckets in rune exports — PROPOSED
+
+- Context: `rune_ctx` stores rank-specific aggregates because expert weighting depends on the user's rank bucket. The export grouped pages only by context key and level, which merged these distinct statistics.
+- Decision: include `rankBucket` on every exported rune context, group by it, and bump `MANIFEST_SCHEMA_VERSION` to 3.
+- Alternatives:
+  - Keep the existing payload and merge buckets — rejected: consumers cannot distinguish rank-specific data, and exported rates combine different populations.
+  - Export separate files per bucket — rejected: adds path complexity without changing the rune-context contract.
+- Consequences: consumers must accept schema version 3 and read `rankBucket` on rune contexts.
+
 ### Template
 
 ```

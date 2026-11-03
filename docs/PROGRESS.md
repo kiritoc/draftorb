@@ -3,37 +3,77 @@
 ## Current status
 
 - Phase: 1 (Support / Diamond)
-- Current milestone: M0 Foundations (T-002.b DONE) and M1 ETL (in progress: T-014 DONE; T-015/T-015.b DONE; T-016 DONE; T-017..T-019 TODO; T-019.b..f TODO) -> M2 Engine (T-020..T-023 DONE)
-- Last updated: 2026-10-31 by Antigravity
+- Current milestone: M0 Foundations (T-002.b DONE) and M1 ETL (in progress: T-014 DONE; T-015/T-015.b DONE; T-016 DONE; T-017 DONE; T-018 DONE; T-019 DONE; T-019.b..f TODO) -> M2 Engine (T-020..T-023 DONE)
+- Last updated: 2026-11-03 by Copilot (T-019 rebase conflict resolution)
 
 ## Epic status
 
-| Epic           | Status      | Notes                                                                                                                                            |
-| -------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b DONE                                                                                                                  |
-| E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e, T-014, T-015, T-015.b, T-016, T-017, T-018 DONE; T-019 TODO; T-019.b..f TODO |
-| E2 Engine      | IN PROGRESS | T-020 DONE; T-021 DONE; T-022 DONE; T-023 DONE                                                                                                   |
-| E3 Web MVP     | NOT STARTED |                                                                                                                                                  |
-| E4 Runes       | NOT STARTED |                                                                                                                                                  |
-| E5 Items       | NOT STARTED |                                                                                                                                                  |
-| E6 Live        | NOT STARTED |                                                                                                                                                  |
-| E7 Vision      | NOT STARTED |                                                                                                                                                  |
+| Epic           | Status      | Notes                                                                                                                                       |
+| -------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b DONE                                                                                                             |
+| E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e, T-014, T-015, T-015.b, T-016, T-017, T-018, T-019 DONE; T-019.b..f TODO |
+| E2 Engine      | IN PROGRESS | T-020 DONE; T-021 DONE; T-022 DONE; T-023 DONE                                                                                              |
+| E3 Web MVP     | NOT STARTED |                                                                                                                                             |
+| E4 Runes       | NOT STARTED |                                                                                                                                             |
+| E5 Items       | NOT STARTED |                                                                                                                                             |
+| E6 Live        | NOT STARTED |                                                                                                                                             |
+| E7 Vision      | NOT STARTED |                                                                                                                                             |
 
 ## Data collection status
 
 - Riot key: not recorded (development keys expire every 24 h).
 - Games collected: 0 (no SQLite database exists under `data/` in this workspace) | Patch: 16.21 (static data imported: champions, items, runes).
-- Last aggregation: role_prob (T-015) and baselines (T-016) implemented; pairs/lane (T-017) and runes (T-018) implemented; export (T-019) not started.
+- Last aggregation: role_prob (T-015) and baselines (T-016) implemented; pairs/lane (T-017) and runes (T-018) implemented; export (T-019) implemented and tested (`packages/etl/src/export/`, `packages/etl/src/commands/export.ts`, tests); export preserves static catalogs (`champions.json`, `items.json`, `runes.json`) and lists them in the manifest (B-035).
 
 ## Next recommended ticket
 
 T-023 is **DONE** (Role-generic recommendation engine with explanations, layered shrinkage scoring, pool contract D-024, composition needs, golden test runner and golden fixtures including non-support TOP 1v1 lane group).
 Next engine tickets: **T-024** (Blind pick mode), **T-025** (Comp needs full model), **T-026** (Golden test suite 20+ scenarios) or **T-027.a** (Draft backtest harness).
-Next ETL ticket: **T-019** (Export versioned JSON + manifest, depends on T-015..T-018,T-002.b).
+Next ETL ticket: **T-019.b** (Patches table, label mapping, patch_index switch, --since-patch).
 
 Earlier handoff (kept for history): B-017 done (engine and shared `"types": []` plus ESLint purity guardrails in `eslint.config.mjs` with automated regression tests; T-020's engine-purity prerequisite is fully satisfied — the residual `tsc` gap caused by test files importing `vitest` is logged as B-021 and not fixed). B-022 (all Node built-ins blocked), B-023 (Date() call blocked) and B-024 (regression tests) also fixed. B-011 fixed (spec + T-002.b scope; implementation in T-002.b). Fix B-012 done. T-013.e done (typed schema-less `request()`, timeout/invalid-JSON regression tests, CLI + matches refactor below 300 lines; `pnpm check` 184 tests). **T-013.d done** (`pnpm etl status`, read-only parameterized counts and progress, empty & seeded database tests, CLI handling when database does not exist; `pnpm check` 153 tests). **D-008, D-011, D-017, D-018, D-020, D-021, D-022, D-023 accepted (2026-10-29); D-028 (formerly D-025, @types/... devDeps) renumbered and accepted.** SPECS §5/§8 are now normative. **T-002.b DONE** (shared schema parity); `packages/shared/src/index.ts` split by domain into `schemas/*.ts` (10 modules); rankBucketSchema (8 buckets), sparse role-prob with sum-to-1, Reason.with as ChampionId[], Reason.lowData, n_eff non-integer, lane reason type, DraftResult with insufficientData/poolRecommendations/poolUnavailable, championPoolSchema, manifest roles, all role-keyed export tuple schemas with games_w2, rune/build export schemas; 184 tests pass. **T-020 DONE** (rank weighting module: config + kernel + n_eff + equivalent-counts + influence matrix; 49 engine tests). **T-021 DONE** (Role inference — `inferRoles` with brute-force permutation over 120 assignments, viability check for missing champions, confidence = best/total probability mass; 15 tests). **T-022 DONE** (shrinkage + level mapping). T-014 (Participant enrichment) remains **data-blocked** (no Riot key, 0 games collected, no SQLite database under `data/`). **T-014 implementation DONE** (2026-10-29): enrichment module, mastery endpoint, 22 tests.
 
 ## Open questions for the owner
+
+---
+
+### 2026-11-03 — Copilot — T-019 review follow-up rebase
+
+- Done:
+  - Fixed paired aggregate exports to serialize `other_role`.
+  - Kept rune pages grouped and exported by rank bucket; bumped the manifest contract to schema v3 (D-049 is PROPOSED).
+  - Adjusted role-probability rounding residuals deterministically and validate the final sparse maps against the shared schema.
+  - Warned when explicit patch labels differ from the latest stored patch and when aggregates span multiple platforms, including with an explicit region label.
+  - Kept successful publication successful when backup cleanup fails; preserve the backup and return a warning.
+  - Retained catalog files and role snapshots across exports, and invalidated manifests before static catalog writes.
+- Files touched: export orchestration/builders/IO and tests, shared rune/manifest schemas and tests, catalog-writing commands and tests, `DATA_MODEL.md`, `DECISIONS.md`, `TICKETS.md`, `BUGS.md`, and this log.
+- Tests: focused export/shared tests pass (12 files, 95 tests); `pnpm check` passes (55 files, 710 tests); lint reports 0 errors and 15 pre-existing warnings.
+- State left: DONE (T-019 review follow-up implemented; D-049 awaits owner decision).
+- Next step: T-019.b (patches table, label mapping, patch_index switch, --since-patch).
+- Pitfalls / notes: manifest schema v2 is no longer accepted; rune consumers must read `rankBucket` on each context.
+
+### 2026-11-02 — Nemotron — Ticket T-019 (review-fix pass)
+
+- Done:
+  - Split `packages/etl/src/export.ts` into `packages/etl/src/export/{index,io,manifest,role-prob,role-tables,runes,builds}.ts` (all under 300 lines), keeping `exportJson`/`ExportResult` re-exported from `./export`.
+  - Replaced `AnyWeightedRow`/if-else chain with a table-driven spec (`TABLE_SPECS`) with typed rows and shared zod schema validation; single `@draftorb/shared` import.
+  - D1: role-prob exports the stored `role_prob.prob`, renormalizing surviving roles to sum to 1 per champion.
+  - B2: sha256 over the exact bytes written for each file, in every manifest `files[]` entry.
+  - B3: compact JSON for data files (`null, 2` only for manifest); gzip size check in `io.ts` vs `MAX_FILE_BYTES`; `maxFileBytes` option; `warnings` and `skippedRunePages` in `ExportResult`.
+  - B4: `pickShare` computed per context (`gamesW / context total`, `round6`), never constant 0.
+  - B5: builds grouped by a structured `JSON.stringify([...])` key (no `split('|')`); `laneKey` null/absent (never `''`); rune/build files validated against shared schemas before writing.
+  - B6: runes/builds grouped by `(championId, myRole)`, written under `roles/<myRole>/`; new `roles` option.
+  - C1: explicit `ORDER BY` plus JS sorts; `now` option for byte-identical deterministic output.
+  - C3/C4: rune skip logging plus skipped count; atomic temp-dir write + publish, stale-file removal.
+  - C5: `region` option plus `--region` CLI flag; multi-platform warning.
+  - C6: `exportMinGames <= minGames` invariant assertion.
+  - D1-D4: CLI imports `PATCH_PATTERN` from aggregate, opens the DB read-only, prints warnings + skipped count.
+  - Rewrote tests: `export/export.fixtures.ts` (generic `insertRows`), `export/export.test.ts` (16 tests), `commands/export.test.ts` (env save/restore, DB-not-modified, `--region`).
+- Files touched: `packages/etl/src/export.ts` (deleted), `packages/etl/src/export/{index,io,manifest,role-prob,role-tables,runes,builds}.ts` (new), `packages/etl/src/export/export.fixtures.ts` (new), `packages/etl/src/export/export.test.ts` (new), `packages/etl/src/commands/export.ts`, `packages/etl/src/commands/export.test.ts`, `docs/BUGS.md`, `docs/TICKETS.md`, `docs/PROGRESS.md`.
+- Tests: `pnpm check` green — 49 test files, 683 tests passed; `pnpm vitest run packages/etl packages/shared` — 302 tests passed.
+- State left: DONE (T-019 review findings addressed).
+- Next step: T-019.b (patches table).
+- Pitfalls / notes for next AI: `lane_key` is `NOT NULL` in SQLite (stored as `''` sentinel) but exported as absent; `role-prob.json` is global (not role-keyed). Do not add `bytes` to manifest entries — `manifestFileSchema` does not allow it.
 
 ---
 
@@ -63,6 +103,46 @@ Earlier handoff (kept for history): B-017 done (engine and shared `"types": []` 
 - Next: Owner review; then schedule T-019.b or continue T-019 (export).
 
 ## Session log (newest first)
+
+### 2026-11-02 — Copilot — T-019 review follow-up
+
+- Done:
+  - Preserved `champions.json`, `items.json`, and `runes.json` across exports and included available catalogs in manifest hashes; missing catalogs warn. Role-derivation snapshots also survive directory replacement without being listed as public assets.
+  - Invalidated manifests before `static` and `derive-roles` modify catalog files.
+  - Corrected pair-role serialization, preserved rune rank buckets (manifest schema v3), and rounded role probabilities so the final surviving role receives the residual; validated the resulting role map against the shared schema.
+  - Added warnings for explicit patch mismatches and mixed-platform aggregates, including with an explicit region. Backup cleanup failures after publication now preserve the backup and return a warning. Builds with no gated-in context emit no file.
+- Files touched: exporter orchestration/builders/IO and tests, shared rune/manifest schemas and tests, catalog-writing commands and tests, and `DATA_MODEL.md`, `DECISIONS.md`, `TICKETS.md`, `BUGS.md`, and this log.
+- Tests: focused export/shared tests pass (12 files, 92 tests); `pnpm check` passes (55 files, 707 tests); lint reports 0 errors and 15 pre-existing warnings.
+- State left: DONE (T-019 review follow-up implemented; D-049 awaits owner decision).
+- Next step: T-019.b (patches table, label mapping, patch_index switch, --since-patch).
+- Pitfalls / notes: aggregate tables are not patch- or platform-scoped; warnings report this limitation. Rune consumers must read `rankBucket` on each context; manifest schema v2 is no longer accepted.
+
+### 2026-11-02 — T-019 Windows test compatibility follow-up
+
+- Done:
+  - Normalized recursive `readdirSync` paths in the stale-file regression before comparing them with slash-separated expected paths; the assertion still checks the exact file set.
+  - Recorded the Windows-only test portability issue as fixed in `docs/BUGS.md`.
+- Files touched: `packages/etl/src/export/atomic.test.ts`, `docs/TICKETS.md`, `docs/BUGS.md`, `docs/PROGRESS.md`.
+- Tests: focused atomic exporter test passed (5 tests); `pnpm check` passed (55 test files / 702 tests, lint 0 errors and 15 pre-existing warnings).
+- State left: Windows path regression fix verified; commit the follow-up.
+- Next step: T-019.b (retention model migration).
+- Pitfalls / notes: recursive `readdirSync` paths use platform-native separators; normalize before comparing to repository-format paths.
+
+### 2026-11-02 — Ticket T-019 (second review-fix pass)
+
+- Done:
+  - Enforced the `exportMinGames` gate for global rune contexts and centralized rune context levels between aggregation and export.
+  - Kept `role-prob.json` global regardless of selected role-keyed files; unknown exported roles now fail with a path-specific error.
+  - Calculated rune/build pick shares against raw context totals before gating and rounded only the final value.
+  - Hardened publishing with unique dot-prefixed temp/backup directories, age-based stale cleanup, recovery-backup preservation, rollback attempts, and final published file paths.
+  - Added typed table queries and path-specific schema errors; returned region, skipped-rune, and gzip-size warnings for the CLI to log once. The CLI now reports only a missing DB as absent and surfaces other open errors.
+  - Split exporter tests by topic and extracted typed seed helpers to keep exporter and command modules at or below 300 lines.
+  - Updated DATA_MODEL.md and TICKETS.md with the global role-probability scope, gate/share rules, and actual publish behavior.
+- Files touched: `packages/shared/src/rune-context.ts`, `packages/shared/src/index.ts`, `packages/etl/src/aggregate-runes.ts`, `packages/etl/src/commands/export.ts`, `packages/etl/src/commands/export.test.ts`, `packages/etl/src/export/{index,io,role-prob,role-tables,runes,builds,export.fixtures,export.seed,export.test-utils}.ts`, exporter topic tests, `docs/DATA_MODEL.md`, `docs/TICKETS.md`, `docs/PROGRESS.md`.
+- Tests: `pnpm check` passed (typecheck, formatting, 55 test files / 702 tests; lint had 0 errors and 15 pre-existing warnings). Package suites passed: ETL 31 files / 275 tests, shared 4 / 46, engine 20 / 381. Focused exporter/CLI suite passed: 8 files / 41 tests. Export and command TypeScript files are at or below 300 lines.
+- State left: T-019 review findings addressed; final checks passed.
+- Next step: T-019.b (retention model migration).
+- Pitfalls / notes: SQLite `item_build.lane_key` is `NOT NULL` and stores no-lane as `''`; exporter normalizes it to absent. `role-prob.json` is global. Dot-prefixed temp/backup directories under `data/public` are internal and must not be served; cleanup only removes matching directories older than 24 hours and retains backups when the patch directory is missing. A failed rollback preserves the backup for recovery.
 
 ### 2026-11-01 — Specification update: SPECS §12-18 (retention model, patch index, change scoring)
 
@@ -1044,3 +1124,24 @@ The 2026-10-22 entries had no timestamps; their order was reconstructed from tic
   - `docs/TESTING.md`: deleted old "Expected tests: data retention, change scoring, breakpoints (SPEC 8)" block; single section 6 with retention/weights/change-scoring/breakpoints tests plus real-fixture rule; no `soft`, `grace`, `MIN_GAMES`, `champion_stats`, `smoothing`, `SPEC` remains.
   - `docs/RIOT_API.md`: per-champion files, `versions.json` order, `runesReforged.json`, `gameVersion`->label rule already present with VERIFY markers (no change needed).
 - State left: documentation complete; no code changes. Next session: implement T-019.b (patches table).
+
+### 2026-11-01 — Kilo — Ticket T-019: Export versioned JSON + manifest
+
+- Done:
+  - `packages/etl/src/export.ts` (new): `exportJson(db, options)` — read-only export of the aggregated tables to the role-keyed DATA_MODEL.md layout plus `manifest.json`; `exportMinGames` (`n_eff`) gate on every row; sparse `role-prob.json` whose probabilities sum to 1 per champion; runes parsed from stored `perks_json`; size-budget warning for files over 5 MB.
+  - `packages/etl/src/commands/export.ts` (new): `export [patch]` CLI command; reads latest patch when omitted; "no database" message when the DB is absent.
+  - `packages/etl/src/cli.ts`: registered `exportCommand`; `packages/etl/src/index.ts`: re-exported `exportJson`/`ExportResult`.
+  - `packages/etl/src/export.test.ts`, `packages/etl/src/commands/export.test.ts` (new): unit + CLI tests (empty DB, malformed patch, sparse role-prob, tuple filtering by n_eff, rune parsing, unparseable rune skip, manifest schema v2/files/roles/rankBuckets).
+  - `docs/SETUP.md`: moved `pnpm etl export` from Planned to Implemented.
+- Files touched:
+  - `packages/etl/src/export.ts`, `packages/etl/src/export.test.ts`
+  - `packages/etl/src/commands/export.ts`, `packages/etl/src/commands/export.test.ts`
+  - `packages/etl/src/cli.ts`, `packages/etl/src/index.ts`
+  - `docs/SETUP.md`, `docs/TICKETS.md`, `docs/PROGRESS.md`
+- Tests: `pnpm check` — 0 errors (typecheck + lint green; pre-existing non-null-assertion warnings only; `docs/SPECS.md` prettier warning pre-existing and untouched). `pnpm vitest run packages/etl` — 244 tests pass.
+- State left: DONE
+- Next step: T-019.b (patches table / patch_index switch) or T-024 (engine blind pick).
+- Pitfalls / notes for next AI:
+  - Export is read-only; run `pnpm etl aggregate` first to populate tables.
+  - `my_role` must be aliased consistently as `myRole` in all export SQL (pair/lane tables previously aliased it as `role` or omitted it).
+  - `exportMinGames` defaults to 10 and must be <= `minGames` (engine config invariant).

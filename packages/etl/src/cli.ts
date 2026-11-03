@@ -24,6 +24,7 @@ import { matchesCommand } from './commands/matches';
 import { migrateCommand } from './commands/migrate';
 import { aggregateCommand } from './commands/aggregate';
 import { deriveRolesCommand } from './commands/derive-roles';
+import { exportCommand } from './commands/export';
 import { statusCommand } from './commands/status';
 import { log, type Command, findCommand, formatHelp, isHelpFlag } from './commands/shared';
 
@@ -35,6 +36,7 @@ const COMMANDS: readonly Command[] = [
   matchesCommand,
   migrateCommand,
   aggregateCommand,
+  exportCommand,
   deriveRolesCommand,
   statusCommand,
 ];

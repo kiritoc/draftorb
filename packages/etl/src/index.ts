@@ -111,6 +111,8 @@ export {
 
 export { enrichParticipants, type EnrichmentOptions, type EnrichmentSummary } from './enrichment';
 
+export { exportJson, type ExportResult } from './export';
+
 export { aggregateRoleProb, type RoleProbRow } from './aggregate';
 
 export { applyDerivedRoles, deriveChampionRoles } from './derive-roles';

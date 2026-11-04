@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { loadChampions, loadLatest, loadManifest } from './loader';
+import { loadChampionTags, loadChampions, loadExportFiles, loadLatest, loadManifest } from './loader';
+import { manifestSchema } from '@draftorb/shared';
 
 const originalFetch = globalThis.fetch;
 
@@ -68,10 +69,41 @@ describe('data loader', () => {
       },
     );
     const latest = await loadLatest();
-    const manifest = await loadManifest(latest.patch);
+    const manifest = await loadManifest(latest.manifest);
     expect(manifest.patch).toBe('16.21');
     expect(manifest.roles).toEqual(['SUPPORT']);
     expect(calls).toEqual(['latest.json', '16.21/manifest.json']);
+  });
+
+  it('loads export files relative to the manifest patch', async () => {
+    const calls: string[] = [];
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockImplementation(
+      async (input: RequestInfo | URL): Promise<Response> => {
+        const url = String(input);
+        calls.push(url);
+        if (url === '16.21/role-prob.json') {
+          return new Response(JSON.stringify({ '412': { SUPPORT: 1 } }), { status: 200 });
+        }
+        return new Response(JSON.stringify([[412, 'IRON', 6, 10, 10, 3]]), { status: 200 });
+      },
+    );
+
+    const manifest = manifestSchema.parse({
+      ...manifestJson,
+      files: [
+        { path: 'role-prob.json', sha256: 'abc' },
+        { path: 'roles/SUPPORT/baseline.json', sha256: 'def' },
+      ],
+    });
+    const result = await loadExportFiles(manifest);
+
+    expect(calls).toEqual([
+      '16.21/role-prob.json',
+      '16.21/roles/SUPPORT/baseline.json',
+    ]);
+    expect(result.files['roles/SUPPORT/baseline.json']).toEqual([
+      [412, 'IRON', 6, 10, 10, 3],
+    ]);
   });
 
   it('propagates a failed fetch as an error', async () => {
@@ -93,5 +125,27 @@ describe('data loader', () => {
     expect(champions).toHaveLength(2);
     expect(champions.map((c) => c.name).sort()).toEqual(['Annie', 'Soraka']);
     expect(globalThis.fetch).toHaveBeenCalledWith('16.21/champions.json');
+  });
+
+  it('loads and validates manual champion tags', async () => {
+    const tags = {
+      '412': {
+        championId: 412,
+        damageType: 'AP',
+        archetype: 'enchanter',
+        hardEngage: false,
+        peel: true,
+        poke: false,
+        waveclear: false,
+        scaling: { early: false, mid: true, late: true },
+        range: 'RANGED',
+        ccCount: 1,
+      },
+    };
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      new Response(JSON.stringify(tags), { status: 200 }),
+    );
+    await expect(loadChampionTags()).resolves.toEqual(tags);
+    expect(globalThis.fetch).toHaveBeenCalledWith('champion-tags.json');
   });
 });

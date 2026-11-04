@@ -6,7 +6,13 @@
  * catalogue to resolve ids to names.
  */
 
-import { type Champion, type Recommendation } from '@draftorb/shared';
+import {
+  COUNTERED_BY_WARNING,
+  OFF_ROLE_WARNING,
+  type Champion,
+  type Recommendation,
+} from '@draftorb/shared';
+import { strings } from '../strings.js';
 
 export interface RecommendationCardProps {
   recommendation: Recommendation;
@@ -14,13 +20,13 @@ export interface RecommendationCardProps {
 }
 
 const LEVEL_LABEL: Record<number, string> = {
-  '-3': 'Strong counter',
-  '-2': 'Counter',
-  '-1': 'Weak counter',
-  '0': 'Neutral',
-  '1': 'Weak synergy',
-  '2': 'Synergy',
-  '3': 'Strong synergy',
+  '-3': strings.strongCounter,
+  '-2': strings.counter,
+  '-1': strings.weakCounter,
+  '0': strings.neutral,
+  '1': strings.weakSynergy,
+  '2': strings.synergy,
+  '3': strings.strongSynergy,
 };
 
 const LEVEL_CLASS: Record<number, string> = {
@@ -34,12 +40,12 @@ const LEVEL_CLASS: Record<number, string> = {
 };
 
 function championName(champions: Champion[], id: number): string {
-  return champions.find((c) => c.id === id)?.name ?? `Champion ${id}`;
+  return champions.find((c) => c.id === id)?.name ?? strings.championFallback(id);
 }
 
 function formatDeltaPp(deltaPp: number | undefined): string {
   if (deltaPp === undefined) {
-    return '—';
+    return strings.deltaUnavailable;
   }
   const sign = deltaPp >= 0 ? '+' : '−';
   return `${sign}${Math.abs(deltaPp).toFixed(1)}pp`;
@@ -47,9 +53,23 @@ function formatDeltaPp(deltaPp: number | undefined): string {
 
 function formatSampleSize(n: number | undefined): string {
   if (n === undefined) {
-    return '—';
+    return strings.deltaUnavailable;
   }
   return `${n.toFixed(0)}`;
+}
+
+export function warningText(warning: string, champions: Champion[]): string {
+  if (warning === OFF_ROLE_WARNING) {
+    return strings.offRoleWarning;
+  }
+  const [code, role, championId] = warning.split(':');
+  if (code === COUNTERED_BY_WARNING && role !== undefined && championId !== undefined) {
+    const id = Number(championId);
+    if (Number.isSafeInteger(id) && id > 0) {
+      return strings.counteredBy(role, championName(champions, id));
+    }
+  }
+  return warning;
 }
 
 export function RecommendationCard({ recommendation, champions }: RecommendationCardProps) {
@@ -65,17 +85,19 @@ export function RecommendationCard({ recommendation, champions }: Recommendation
           <h3 className="text-base font-bold text-gray-100">{name}</h3>
           {poolRank !== undefined && (
             <span className="ml-2 px-1.5 py-0.5 rounded text-xs font-bold bg-indigo-900/50 text-indigo-300 border border-indigo-600/30">
-              In your pool · #{poolRank}
+              {strings.inPool(poolRank)}
             </span>
           )}
         </div>
-        <span className="text-sm font-mono text-indigo-400">{winProb}% win</span>
+        <span className="text-sm font-mono text-indigo-400">
+          {winProb}% {strings.win}
+        </span>
       </div>
 
       <div className="flex flex-wrap gap-2 mb-3 text-xs">
         {reasons.map((reason, index) => {
           const level = reason.level ?? 0;
-          const label = LEVEL_LABEL[level] ?? 'Neutral';
+          const label = LEVEL_LABEL[level] ?? strings.neutral;
           const withFirst = reason.with?.[0];
           return (
             <span
@@ -84,9 +106,11 @@ export function RecommendationCard({ recommendation, champions }: Recommendation
               title={`${label} · ${formatDeltaPp(reason.deltaPp)}`}
             >
               {reason.type === 'comp' || reason.type === 'blind'
-                ? reason.type.toUpperCase()
+                ? reason.type === 'comp'
+                  ? strings.comp
+                  : strings.blind
                 : label.split(' ')[0]}
-              {withFirst != null && ` vs ${championName(champions, withFirst)}`}
+              {withFirst != null && strings.reasonVs(championName(champions, withFirst))}
               {reason.deltaPp != null && ` ${formatDeltaPp(reason.deltaPp)}`}
             </span>
           );
@@ -95,17 +119,22 @@ export function RecommendationCard({ recommendation, champions }: Recommendation
 
       <div className="flex items-center justify-between gap-3 text-xs text-gray-400">
         <div className="flex items-center gap-1.5">
-          <span>Sample:</span>
+          <span>{strings.sample}</span>
           <span className="font-mono">{formatSampleSize(reliability.nEff)}</span>
           {reliability.lowData && (
-            <span className="text-amber-400" title="Low effective sample size">
-              ⚠ low data
+            <span className="text-amber-400" title={strings.lowEffectiveSample}>
+              ⚠ {strings.lowData}
             </span>
           )}
         </div>
         {warnings.length > 0 && (
-          <span className="text-red-400" title={warnings.join(', ')}>
-            ⚠ {warnings.join(', ')}
+          <span
+            className="text-red-400"
+            title={strings.warningLabel(
+              warnings.map((warning) => warningText(warning, champions)).join(', '),
+            )}
+          >
+            ⚠ {warnings.map((warning) => warningText(warning, champions)).join(', ')}
           </span>
         )}
       </div>

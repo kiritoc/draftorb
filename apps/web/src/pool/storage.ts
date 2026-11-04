@@ -8,6 +8,7 @@
  */
 
 import { championPoolSchema, type ChampionPool, type Role } from '@draftorb/shared';
+import { poolMaxSize } from '../config.js';
 
 export const POOL_STORAGE_KEY = 'draftorb.pool.v1';
 
@@ -17,44 +18,76 @@ export interface PoolStorage {
   removeItem(key: string): void;
 }
 
-const ALL_ROLES: readonly Role[] = ['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT'];
-
-function defaultStorage(): PoolStorage {
-  if (typeof globalThis.localStorage !== 'undefined') {
-    return globalThis.localStorage;
-  }
-  return { getItem: () => null, setItem: () => undefined, removeItem: () => undefined };
+export interface PoolReadResult {
+  pool: ChampionPool | null;
+  issue: 'corrupt' | 'unavailable' | null;
 }
 
-/** Load and validate the pool. Returns null when absent, corrupt, or
- *  unreadable (corruption → empty pool, never a crash). */
-export function loadPool(storage: PoolStorage = defaultStorage()): ChampionPool | null {
+const ALL_ROLES: readonly Role[] = ['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT'];
+
+function browserStorage(): PoolStorage | null {
   try {
-    const raw = storage.getItem(POOL_STORAGE_KEY);
-    if (raw === null || raw === '') {
-      return null;
-    }
-    return championPoolSchema.parse(JSON.parse(raw));
+    return globalThis.localStorage;
   } catch {
     return null;
   }
 }
 
-/** Persist the pool. Silently ignores storage errors (quota/blocked). */
-export function savePool(pool: ChampionPool, storage: PoolStorage = defaultStorage()): void {
+/** Load the pool and distinguish missing data from storage or schema failures. */
+export function readPool(storage?: PoolStorage): PoolReadResult {
   try {
-    storage.setItem(POOL_STORAGE_KEY, JSON.stringify(pool));
+    const activeStorage = storage ?? browserStorage();
+    if (activeStorage === null) {
+      return { pool: null, issue: 'unavailable' };
+    }
+    const raw = activeStorage.getItem(POOL_STORAGE_KEY);
+    if (raw === null || raw === '') {
+      return { pool: null, issue: null };
+    }
+    try {
+      const pool = championPoolSchema.parse(JSON.parse(raw));
+      if (Object.values(pool.pools).some((ids) => ids.length > poolMaxSize)) {
+        return { pool: null, issue: 'corrupt' };
+      }
+      return { pool, issue: null };
+    } catch {
+      return { pool: null, issue: 'corrupt' };
+    }
   } catch {
-    // Storage blocked or over quota: pool lives in memory only this session.
+    return { pool: null, issue: 'unavailable' };
   }
 }
 
-/** Remove the persisted pool. */
-export function clearPool(storage: PoolStorage = defaultStorage()): void {
+/** Load and validate the pool. Returns null when absent, corrupt, or unreadable. */
+export function loadPool(storage?: PoolStorage): ChampionPool | null {
+  return readPool(storage).pool;
+}
+
+/** Persist the pool and report whether browser storage accepted the write. */
+export function savePool(pool: ChampionPool, storage?: PoolStorage): boolean {
   try {
-    storage.removeItem(POOL_STORAGE_KEY);
+    const activeStorage = storage ?? browserStorage();
+    if (activeStorage === null) {
+      return false;
+    }
+    activeStorage.setItem(POOL_STORAGE_KEY, JSON.stringify(pool));
+    return true;
   } catch {
-    // Ignore.
+    return false;
+  }
+}
+
+/** Remove the persisted pool and report whether browser storage accepted it. */
+export function clearPool(storage?: PoolStorage): boolean {
+  try {
+    const activeStorage = storage ?? browserStorage();
+    if (activeStorage === null) {
+      return false;
+    }
+    activeStorage.removeItem(POOL_STORAGE_KEY);
+    return true;
+  } catch {
+    return false;
   }
 }
 

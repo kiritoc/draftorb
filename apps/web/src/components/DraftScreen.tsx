@@ -12,23 +12,31 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
-  type BaselineEntry,
   type Champion,
   type ChampionPool,
-  type ChampionRoleProbabilities,
   type DraftInput,
+  type InsufficientDataEntry,
+  type PoolUnavailableEntry,
   type Rank,
   type RecommendData,
   type Recommendation,
   type Role,
 } from '@draftorb/shared';
 import { recommend } from '@draftorb/engine';
-import { loadChampions, loadExportFiles, loadLatest, loadManifest } from '../data/loader.js';
+import {
+  loadChampionTags,
+  loadChampions,
+  loadExportFiles,
+  loadLatest,
+  loadManifest,
+} from '../data/loader.js';
+import { createRecommendData } from '../data/recommend-data.js';
 import { recommendationPageSize } from '../config.js';
+import { strings } from '../strings.js';
 import { DraftSlot, type DraftSlotState } from './DraftSlot.js';
 import { RecommendationsList } from './RecommendationsList.js';
 import { PoolEditor } from './PoolEditor.js';
-import { filterPoolByCatalogue, loadPool } from '../pool/storage.js';
+import { filterPoolByCatalogue, readPool, savePool } from '../pool/storage.js';
 
 const USER_ROLE: Role = 'SUPPORT';
 const DEFAULT_RANK: Rank = 'DIAMOND';
@@ -43,20 +51,14 @@ function isFilled(slot: DraftSlotState): slot is { championId: number; role?: Ro
   return slot.championId != null;
 }
 
-function flattenPool(pool: ChampionPool | null): number[] {
-  const ids: number[] = [];
-  for (const roleIds of Object.values(pool?.pools ?? {})) {
-    ids.push(...roleIds);
-  }
-  return ids;
-}
-
 export function DraftScreen() {
   const [patch, setPatch] = useState<string | null>(null);
   const [champions, setChampions] = useState<Champion[]>([]);
-  const [files, setFiles] = useState<Record<string, unknown>>({});
+  const [data, setData] = useState<RecommendData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [recommendationError, setRecommendationError] = useState<string | null>(null);
   const [pool, setPool] = useState<ChampionPool | null>(null);
+  const [poolStorageIssue, setPoolStorageIssue] = useState<'corrupt' | 'unavailable' | null>(null);
   const [poolDropped, setPoolDropped] = useState<number[]>([]);
   const [user, setUser] = useState<DraftSlotState>(emptySlot(USER_ROLE));
   const [allies, setAllies] = useState<DraftSlotState[]>(
@@ -76,23 +78,34 @@ export function DraftScreen() {
     void (async () => {
       try {
         const latest = await loadLatest();
+        const manifest = await loadManifest(latest.manifest);
+        if (manifest.patch !== latest.patch) {
+          throw new Error(
+            `Latest pointer patch ${latest.patch} does not match manifest patch ${manifest.patch}`,
+          );
+        }
         const loadedChampions = await loadChampions(latest.patch);
-        const loadedFiles = await loadManifest(latest.patch).then((manifest) =>
+        const [loadedFiles, tags] = await Promise.all([
           loadExportFiles(manifest),
-        );
-        const loadedPool = await loadPool();
+          loadChampionTags(),
+        ]);
+        const loadedPool = readPool();
         if (cancelled) {
           return;
         }
         setPatch(latest.patch);
         setChampions(loadedChampions);
-        setFiles(loadedFiles.files);
+        setData(createRecommendData(loadedFiles.files, loadedChampions, tags));
         const { pool: filteredPool, dropped } = filterPoolByCatalogue(
-          loadedPool ?? { version: 1, pools: {} },
+          loadedPool.pool ?? { version: 1, pools: {} },
           loadedChampions.map((champion) => champion.id),
         );
         setPool(filteredPool);
+        setPoolStorageIssue(loadedPool.issue);
         setPoolDropped(dropped);
+        if (dropped.length > 0 && !savePool(filteredPool)) {
+          setPoolStorageIssue('unavailable');
+        }
       } catch (err) {
         if (cancelled) {
           return;
@@ -105,22 +118,8 @@ export function DraftScreen() {
     };
   }, []);
 
-  const poolChampionIds = useMemo(() => flattenPool(pool), [pool]);
+  const poolChampionIds = useMemo(() => pool?.pools[USER_ROLE] ?? [], [pool]);
   const poolSet = useMemo(() => new Set(poolChampionIds), [poolChampionIds]);
-
-  const data: RecommendData = useMemo(
-    () => ({
-      baselines: (files['roles/SUPPORT/baseline.json'] as BaselineEntry[] | undefined) ?? [],
-      allyPairs: [],
-      enemyPairs: [],
-      laneVs: [],
-      laneFull: [],
-      roleProb: (files['role-prob.json'] as ChampionRoleProbabilities | undefined) ?? {},
-      tags: {},
-      championIds: champions.map((champion) => champion.id),
-    }),
-    [files, champions],
-  );
 
   const draftInput: DraftInput = useMemo(
     () => ({
@@ -141,17 +140,24 @@ export function DraftScreen() {
   );
 
   useEffect(() => {
+    if (data === null) {
+      return;
+    }
     let cancelled = false;
     try {
       const result = recommend(draftInput, data);
       if (!cancelled) {
         setRecommendations(result.recommendations);
         setPoolUnavailable(result.poolUnavailable ?? []);
+        setInsufficientData(result.insufficientData);
+        setRecommendationError(null);
       }
-    } catch {
+    } catch (err) {
       if (!cancelled) {
         setRecommendations([]);
         setPoolUnavailable([]);
+        setInsufficientData([]);
+        setRecommendationError(err instanceof Error ? err.message : String(err));
       }
     }
     return () => {
@@ -159,9 +165,8 @@ export function DraftScreen() {
     };
   }, [draftInput, data]);
 
-  const [poolUnavailable, setPoolUnavailable] = useState<{ championId: number; reason: string }[]>(
-    [],
-  );
+  const [poolUnavailable, setPoolUnavailable] = useState<PoolUnavailableEntry[]>([]);
+  const [insufficientData, setInsufficientData] = useState<InsufficientDataEntry[]>([]);
 
   const setUserSlot = useCallback((slot: DraftSlotState) => setUser(slot), []);
   const setAlly = useCallback((index: number, slot: DraftSlotState) => {
@@ -188,8 +193,8 @@ export function DraftScreen() {
   if (error) {
     return (
       <div className="p-6 text-center text-red-400">
-        <h1 className="text-xl font-bold">DraftOrb</h1>
-        <p>Failed to load data: {error}</p>
+        <h1 className="text-xl font-bold">{strings.appTitle}</h1>
+        <p>{strings.loadFailed(error)}</p>
       </div>
     );
   }
@@ -200,22 +205,22 @@ export function DraftScreen() {
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <h1 className="text-xl font-bold text-indigo-400">DraftOrb</h1>
+              <h1 className="text-xl font-bold text-indigo-400">{strings.appTitle}</h1>
               {patch === null ? (
-                <p className="text-sm text-gray-400">Loading data…</p>
+                <p className="text-sm text-gray-400">{strings.loading}</p>
               ) : (
                 <p className="text-sm text-gray-400">
-                  Patch: <span className="font-mono text-indigo-300">{patch}</span>
+                  {strings.patchLabel}: <span className="font-mono text-indigo-300">{patch}</span>
                   {' · '}
-                  Champions: {champions.length}
+                  {strings.championsLabel}: {champions.length}
                   {' · '}
-                  Pool: {poolSize}
+                  {strings.poolLabel}: {poolSize}
                 </p>
               )}
             </div>
             <div className="flex flex-wrap items-center gap-4">
               <div className="flex items-center gap-2">
-                <label className="text-sm text-gray-400">Blind pick</label>
+                <label className="text-sm text-gray-400">{strings.blindPick}</label>
                 <button
                   role="switch"
                   aria-checked={blindPick}
@@ -229,7 +234,7 @@ export function DraftScreen() {
                 </button>
               </div>
               <div className="flex items-center gap-2">
-                <label className="text-sm text-gray-400">Rank</label>
+                <label className="text-sm text-gray-400">{strings.rank}</label>
                 <select
                   value={userRank}
                   onChange={(event) => setUserRank(event.target.value as Rank)}
@@ -256,7 +261,7 @@ export function DraftScreen() {
                 onClick={() => setPoolEditorOpen(true)}
                 className="px-3 py-1.5 text-sm bg-gray-800 hover:bg-gray-700 text-gray-200 rounded border border-gray-600"
               >
-                Edit pool
+                {strings.editPool}
               </button>
             </div>
           </div>
@@ -267,11 +272,11 @@ export function DraftScreen() {
         <div className="flex flex-col lg:flex-row gap-8">
           <section className="flex-1">
             <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
-              Your team
+              {strings.yourTeam}
             </h2>
             <div className="grid grid-cols-2 gap-4">
               <DraftSlot
-                label="You (SUPPORT)"
+                label={strings.userSlot}
                 slot={user}
                 onChange={setUserSlot}
                 champions={champions}
@@ -279,7 +284,7 @@ export function DraftScreen() {
               {allies.map((slot, index) => (
                 <DraftSlot
                   key={index}
-                  label={`Ally ${index + 1}`}
+                  label={strings.allySlot(index + 1)}
                   slot={slot}
                   onChange={(next) => setAlly(index, next)}
                   champions={champions}
@@ -290,13 +295,13 @@ export function DraftScreen() {
 
           <section className="flex-1">
             <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
-              Enemy team
+              {strings.enemyTeam}
             </h2>
             <div className="grid grid-cols-2 gap-4">
               {enemies.map((slot, index) => (
                 <DraftSlot
                   key={index}
-                  label={`Enemy ${index + 1}`}
+                  label={strings.enemySlot(index + 1)}
                   slot={slot}
                   onChange={(next) => setEnemy(index, next)}
                   champions={champions}
@@ -308,65 +313,90 @@ export function DraftScreen() {
 
         {poolSize > 0 && (
           <div className="mb-4">
-            <h3 className="text-sm font-bold text-indigo-300 mb-2">From your pool</h3>
+            <h3 className="text-sm font-bold text-indigo-300 mb-2">{strings.fromYourPool}</h3>
             <RecommendationsList
-              title="From your pool"
+              title={strings.fromYourPool}
               recommendations={recommendations.filter((r) => poolSet.has(r.championId))}
               champions={champions}
               pageSize={recommendationPageSize}
+              resetKey={draftInput}
             />
             {poolUnavailable.length > 0 && (
               <div className="mt-3 p-3 rounded bg-amber-900/20 border border-amber-600/30 text-xs text-amber-300">
-                Pool champions not recommended:{' '}
+                {strings.poolUnavailable}{' '}
                 {poolUnavailable
-                  .map((e) => `${championName(champions, e.championId)} (${e.reason})`)
+                  .map((entry) => {
+                    const sample = insufficientData.find(
+                      (item) => item.championId === entry.championId,
+                    );
+                    const reason =
+                      entry.reason === 'insufficientData' && sample !== undefined
+                        ? strings.insufficientData(sample.nEff)
+                        : entry.reason;
+                    return strings.dataReason(championName(champions, entry.championId), reason);
+                  })
                   .join(', ')}
               </div>
             )}
-            {poolDropped.length > 0 && (
-              <div className="mt-3 p-3 rounded bg-amber-900/20 border border-amber-600/30 text-xs text-amber-300">
-                Dropped from pool (no longer in catalogue):{' '}
-                {poolDropped.map((id) => `Champion ${id}`).join(', ')}
-              </div>
-            )}
+          </div>
+        )}
+
+        {poolStorageIssue !== null && (
+          <div
+            role="status"
+            className="mb-4 p-3 rounded bg-amber-900/20 border border-amber-600/30 text-sm text-amber-300"
+          >
+            {poolStorageIssue === 'corrupt' ? strings.corruptPool : strings.unavailableStorage}
+          </div>
+        )}
+        {poolDropped.length > 0 && (
+          <div
+            role="status"
+            className="mb-4 p-3 rounded bg-amber-900/20 border border-amber-600/30 text-xs text-amber-300"
+          >
+            {strings.poolDropped} {poolDropped.map((id) => `Champion ${id}`).join(', ')}
           </div>
         )}
 
         {poolSize === 0 && (
           <div className="mb-4 p-4 rounded bg-gray-800/30 border border-gray-800 text-center text-sm text-gray-400">
-            Your champion pool is empty.{' '}
+            {strings.poolEmpty}{' '}
             <button
               type="button"
               onClick={() => setPoolEditorOpen(true)}
               className="underline underline-offset-4 hover:text-indigo-300"
             >
-              Edit your pool
+              {strings.editPoolCta}
             </button>{' '}
-            to get personalized "From your pool" recommendations.
+            {strings.personalizedPool}
           </div>
         )}
 
         <div className="flex items-center gap-3 mb-2">
-          <h3 className="text-sm font-bold text-indigo-300">Best overall</h3>
+          <h3 className="text-sm font-bold text-indigo-300">{strings.bestOverall}</h3>
           <label className="flex items-center gap-1.5 text-xs text-gray-400 cursor-pointer select-none">
             <input
               type="checkbox"
               checked={hideMyPool}
               onChange={(event) => setHideMyPool(event.target.checked)}
             />
-            Hide my pool
+            {strings.hideMyPool}
           </label>
         </div>
         <RecommendationsList
-          title="Best overall"
+          title={strings.bestOverall}
           recommendations={overallRecommendations}
           champions={champions}
           pageSize={recommendationPageSize}
+          resetKey={draftInput}
         />
+        {recommendationError !== null && (
+          <p role="alert" className="mt-3 text-sm text-red-400">
+            {strings.recommendationFailed(recommendationError)}
+          </p>
+        )}
 
-        <p className="mt-4 text-xs text-gray-500 text-center">
-          {totalKnown} of 10 slots filled &mdash; any subset of inputs is valid.
-        </p>
+        <p className="mt-4 text-xs text-gray-500 text-center">{strings.slotsFilled(totalKnown)}</p>
       </main>
 
       <PoolEditor
@@ -375,7 +405,13 @@ export function DraftScreen() {
         pool={pool}
         champions={champions}
         onSave={(nextPool) => {
-          setPool(nextPool);
+          const { pool: filteredPool, dropped } = filterPoolByCatalogue(
+            nextPool,
+            champions.map((champion) => champion.id),
+          );
+          setPool(filteredPool);
+          setPoolDropped(dropped);
+          setPoolStorageIssue(savePool(filteredPool) ? null : 'unavailable');
           setPoolEditorOpen(false);
         }}
       />
@@ -384,5 +420,5 @@ export function DraftScreen() {
 }
 
 function championName(champions: Champion[], id: number): string {
-  return champions.find((c) => c.id === id)?.name ?? `Champion ${id}`;
+  return champions.find((c) => c.id === id)?.name ?? strings.championFallback(id);
 }

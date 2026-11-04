@@ -6,6 +6,7 @@
  */
 
 import { type ChampionId, type Role } from '@draftorb/shared';
+import { strings } from '../strings.js';
 import { ChampionPicker } from './ChampionPicker.js';
 
 export type DraftSlotState = {
@@ -56,7 +57,7 @@ export function DraftSlot({ label, slot, onChange, champions, disabled = false }
         disabled={disabled || !hasChampion}
         className="w-full px-2 py-1.5 bg-gray-800 border border-gray-600 rounded text-gray-200 focus:outline-none focus:border-indigo-400"
       >
-        <option value="">Role (optional)</option>
+        <option value="">{strings.roleOptional}</option>
         {ROLES.map((role) => (
           <option key={role} value={role}>
             {role}

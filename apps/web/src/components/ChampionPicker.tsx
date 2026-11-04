@@ -8,6 +8,7 @@
 import { useState, useCallback } from 'react';
 
 import { type Champion, type ChampionId } from '@draftorb/shared';
+import { strings } from '../strings.js';
 
 export interface ChampionPickerProps {
   /** Currently selected champion id, or null when none is selected. */
@@ -25,7 +26,7 @@ export function ChampionPicker({
   value,
   onChange,
   champions,
-  placeholder = 'Search a champion…',
+  placeholder = strings.championSearch,
   disabled = false,
 }: ChampionPickerProps) {
   const [query, setQuery] = useState('');
@@ -71,7 +72,7 @@ export function ChampionPicker({
             aria-controls="champion-picker-options"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search…"
+            placeholder={strings.search}
             className="w-full px-3 py-2 bg-gray-900 border-b border-gray-600 text-gray-100 focus:outline-none focus:border-indigo-400"
           />
           {selected ? (
@@ -81,7 +82,7 @@ export function ChampionPicker({
               onClick={() => handleSelect(null)}
               className="w-full text-left px-3 py-2 text-gray-400 hover:bg-gray-700"
             >
-              Clear
+              {strings.clear}
             </button>
           ) : null}
           {filtered.map((champion) => (
@@ -97,7 +98,7 @@ export function ChampionPicker({
             </button>
           ))}
           {filtered.length === 0 && query.length > 0 && (
-            <div className="px-3 py-2 text-gray-500 text-sm">No champions match</div>
+            <div className="px-3 py-2 text-gray-500 text-sm">{strings.noChampionMatches}</div>
           )}
         </div>
       )}

@@ -11,7 +11,9 @@ import {
   type Champion,
   type Latest,
   type Manifest,
+  type ChampionTagsMap,
   championsMapSchema,
+  championTagsMapSchema,
   latestSchema,
   manifestSchema,
 } from '@draftorb/shared';
@@ -41,9 +43,9 @@ export async function loadLatest(): Promise<Latest> {
   return fetchJson('latest.json', latestSchema);
 }
 
-/** Load the manifest for a patch. */
-export async function loadManifest(patch: string): Promise<Manifest> {
-  return fetchJson(`${patch}/manifest.json`, manifestSchema);
+/** Load the manifest referenced by the latest-patch pointer. */
+export async function loadManifest(path: string): Promise<Manifest> {
+  return fetchJson(path, manifestSchema);
 }
 
 /** Load every export file listed in the manifest. */
@@ -56,7 +58,7 @@ export interface LoadedExport {
 export async function loadExportFiles(manifest: Manifest): Promise<LoadedExport> {
   const files: Record<string, unknown> = {};
   for (const file of manifest.files) {
-    const response = await fetch(`${DATA_BASE}${file.path}`);
+    const response = await fetch(`${DATA_BASE}${manifest.patch}/${file.path}`);
     files[file.path] = await fetchJsonBody(response, file.path);
   }
   return { patch: manifest.patch, manifest, files };
@@ -66,4 +68,9 @@ export async function loadExportFiles(manifest: Manifest): Promise<LoadedExport>
 export async function loadChampions(patch: string): Promise<Champion[]> {
   const map = await fetchJson(`${patch}/champions.json`, championsMapSchema);
   return Object.values(map);
+}
+
+/** Load the checked-in manual champion tags published with the web app. */
+export async function loadChampionTags(): Promise<ChampionTagsMap> {
+  return fetchJson('champion-tags.json', championTagsMapSchema);
 }

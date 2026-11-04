@@ -16,9 +16,11 @@ import {
   type Role,
 } from '@draftorb/shared';
 import { poolMaxSize } from '../config.js';
+import { strings } from '../strings.js';
 import { ChampionPicker } from './ChampionPicker.js';
 
-const ALL_ROLES: readonly Role[] = ['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT'];
+const USER_ROLE: Role = 'SUPPORT';
+const STORED_ROLES: readonly Role[] = ['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT'];
 
 function emptyPools(): Record<Role, number[]> {
   return { TOP: [], JUNGLE: [], MID: [], ADC: [], SUPPORT: [] };
@@ -40,7 +42,7 @@ export function PoolEditor({ open, onClose, pool, champions, onSave }: PoolEdito
   useEffect(() => {
     if (!open) return;
     const next = emptyPools();
-    for (const role of ALL_ROLES) {
+    for (const role of STORED_ROLES) {
       next[role] = pool?.pools[role] ?? [];
     }
     setWorking(next);
@@ -62,7 +64,7 @@ export function PoolEditor({ open, onClose, pool, champions, onSave }: PoolEdito
       if (championId === null) return;
       if (working[role].includes(championId)) return;
       if (countFor(role) >= poolMaxSize) {
-        setMessage({ text: `Pool for ${role} is full (${poolMaxSize} max).`, kind: 'error' });
+        setMessage({ text: strings.poolFull(role, poolMaxSize), kind: 'error' });
         return;
       }
       setWorking((current) => ({ ...current, [role]: [...current[role], championId] }));
@@ -80,7 +82,7 @@ export function PoolEditor({ open, onClose, pool, champions, onSave }: PoolEdito
 
   const handleSave = () => {
     const pools: ChampionPool['pools'] = {};
-    for (const role of ALL_ROLES) {
+    for (const role of STORED_ROLES) {
       if (working[role].length > 0) {
         pools[role] = working[role];
       }
@@ -96,37 +98,48 @@ export function PoolEditor({ open, onClose, pool, champions, onSave }: PoolEdito
     try {
       const text = await file.text();
       const parsed = championPoolSchema.parse(JSON.parse(text));
+      for (const role of STORED_ROLES) {
+        if ((parsed.pools[role]?.length ?? 0) > poolMaxSize) {
+          throw new Error(strings.poolTooLarge(role, poolMaxSize));
+        }
+      }
       onSave(parsed);
-      setMessage({ text: 'Pool imported.', kind: 'info' });
+      setMessage({ text: strings.poolImported, kind: 'info' });
       onClose();
     } catch (err) {
-      setImportError(err instanceof Error ? err.message : 'Invalid pool file.');
+      setImportError(err instanceof Error ? err.message : strings.poolInvalid);
     }
   };
 
   const handleExport = () => {
-    const blob = new Blob([JSON.stringify(pool ?? { version: 1, pools: {} })], {
+    const pools: ChampionPool['pools'] = {};
+    for (const role of STORED_ROLES) {
+      if (working[role].length > 0) {
+        pools[role] = working[role];
+      }
+    }
+    const blob = new Blob([JSON.stringify({ version: 1, pools })], {
       type: 'application/json',
     });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = 'draftorb-pool.json';
+    anchor.download = strings.exportFileName;
     anchor.click();
     URL.revokeObjectURL(url);
-    setMessage({ text: 'Pool exported.', kind: 'info' });
+    setMessage({ text: strings.poolExported, kind: 'info' });
   };
 
   if (!open) return null;
 
-  const total = ALL_ROLES.reduce((sum, role) => sum + working[role].length, 0);
+  const total = working[USER_ROLE].length;
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center"
       role="dialog"
       aria-modal="true"
-      aria-label="Champion pool editor"
+      aria-label={strings.poolEditorLabel}
     >
       <div
         className="fixed inset-0 bg-black/60 backdrop-blur-sm"
@@ -135,8 +148,13 @@ export function PoolEditor({ open, onClose, pool, champions, onSave }: PoolEdito
       />
       <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-indigo-300">Champion pool editor</h2>
-          <button type="button" onClick={onClose} className="text-gray-400 hover:text-white">
+          <h2 className="text-lg font-bold text-indigo-300">{strings.poolEditorTitle}</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-gray-400 hover:text-white"
+            aria-label={strings.close}
+          >
             ✕
           </button>
         </div>
@@ -150,12 +168,12 @@ export function PoolEditor({ open, onClose, pool, champions, onSave }: PoolEdito
         )}
         {importError && (
           <div className="mb-4 p-3 rounded bg-red-900/30 text-red-400 border border-red-600/30 text-sm">
-            Failed to import pool: {importError}
+            {strings.importFailed(importError)}
           </div>
         )}
 
         <div className="space-y-4">
-          {ALL_ROLES.map((role) => {
+          {[USER_ROLE].map((role) => {
             const ids = working[role];
             return (
               <div key={role} className="border border-gray-800 rounded p-3">
@@ -164,7 +182,7 @@ export function PoolEditor({ open, onClose, pool, champions, onSave }: PoolEdito
                     {role}
                   </label>
                   <span className="text-xs text-gray-500">
-                    {countFor(role)} / {poolMaxSize}
+                    {strings.poolCount(countFor(role), poolMaxSize)}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 mb-2">
@@ -172,20 +190,22 @@ export function PoolEditor({ open, onClose, pool, champions, onSave }: PoolEdito
                     value={null}
                     onChange={(championId) => addChampion(role, championId)}
                     champions={champions}
-                    placeholder={`Add ${role}…`}
+                    placeholder={strings.addRole(role)}
                     disabled={countFor(role) >= poolMaxSize}
                   />
                   <button
                     type="button"
-                    onClick={() => setWorking(emptyPools())}
+                    onClick={() => setWorking((current) => ({ ...current, [USER_ROLE]: [] }))}
                     disabled={total === 0}
                     className="px-2 py-1 text-xs text-gray-400 hover:text-red-400 disabled:opacity-50"
                   >
-                    Clear all
+                    {strings.clearAll}
                   </button>
                 </div>
                 <div className="flex flex-wrap gap-1">
-                  {ids.length === 0 && <span className="text-xs text-gray-500 italic">Empty</span>}
+                  {ids.length === 0 && (
+                    <span className="text-xs text-gray-500 italic">{strings.empty}</span>
+                  )}
                   {ids.map((championId) => {
                     const champion = championById.get(championId);
                     const offRole = isOffRole(role, championId);
@@ -197,20 +217,23 @@ export function PoolEditor({ open, onClose, pool, champions, onSave }: PoolEdito
                             ? 'bg-amber-900/30 text-amber-300 border-amber-600/30'
                             : 'bg-gray-800 text-gray-300 border-gray-600/30'
                         }`}
-                        title={offRole ? `Off-role for ${role}` : undefined}
+                        title={offRole ? strings.offRole(role) : undefined}
                       >
-                        {champion?.name ?? `Champion ${championId}`}
+                        {champion?.name ?? strings.championFallback(championId)}
                         <button
                           type="button"
                           onClick={() => removeChampion(role, championId)}
                           className="ml-1.5 text-gray-500 hover:text-white"
-                          aria-label={`Remove ${champion?.name ?? championId} from ${role}`}
+                          aria-label={strings.removeFromRole(
+                            champion?.name ?? String(championId),
+                            role,
+                          )}
                         >
                           ✕
                         </button>
                         {offRole && (
                           <span className="text-[10px] text-amber-400" aria-hidden="true">
-                            off-role
+                            {strings.offRoleLabel}
                           </span>
                         )}
                       </span>
@@ -224,8 +247,8 @@ export function PoolEditor({ open, onClose, pool, champions, onSave }: PoolEdito
 
         <div className="mt-6 flex items-center justify-between">
           <div className="flex items-center gap-3 text-xs text-gray-400">
-            <span>{total} champion(s) across all roles.</span>
-            <span className="text-amber-400">· off-role hints in amber</span>
+            <span>{strings.poolCountSummary(total)}</span>
+            <span className="text-amber-400">{strings.offRoleHints}</span>
           </div>
           <div className="flex gap-2">
             <button
@@ -233,10 +256,10 @@ export function PoolEditor({ open, onClose, pool, champions, onSave }: PoolEdito
               onClick={handleExport}
               className="px-3 py-1.5 text-sm bg-gray-800 hover:bg-gray-700 text-gray-200 rounded border border-gray-600"
             >
-              Export JSON
+              {strings.exportJson}
             </button>
             <label className="cursor-pointer px-3 py-1.5 text-sm bg-gray-800 hover:bg-gray-700 text-gray-200 rounded border border-gray-600">
-              Import JSON
+              {strings.importJson}
               <input type="file" accept=".json" className="hidden" onChange={handleImport} />
             </label>
             <button
@@ -244,7 +267,7 @@ export function PoolEditor({ open, onClose, pool, champions, onSave }: PoolEdito
               onClick={handleSave}
               className="px-4 py-1.5 text-sm bg-indigo-600 hover:bg-indigo-500 text-white rounded"
             >
-              Save
+              {strings.save}
             </button>
           </div>
         </div>

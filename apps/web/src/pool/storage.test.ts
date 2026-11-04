@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import { championPoolSchema, type ChampionPool } from '@draftorb/shared';
-import { type PoolStorage, clearPool, filterPoolByCatalogue, loadPool, savePool } from './storage';
+import {
+  type PoolStorage,
+  clearPool,
+  filterPoolByCatalogue,
+  loadPool,
+  readPool,
+  savePool,
+} from './storage';
 
 function fakeStorage(): PoolStorage {
   const map = new Map<string, string>();
@@ -26,17 +33,32 @@ describe('pool storage', () => {
 
   it('returns null for an absent pool', () => {
     expect(loadPool(fakeStorage())).toBeNull();
+    expect(readPool(fakeStorage()).issue).toBeNull();
   });
 
   it('returns null for a corrupt pool instead of throwing', () => {
     const storage = fakeStorage();
     storage.setItem('draftorb.pool.v1', 'not json');
     expect(loadPool(storage)).toBeNull();
+    expect(readPool(storage).issue).toBe('corrupt');
   });
 
   it('returns null for a schema-invalid pool', () => {
     const storage = fakeStorage();
     storage.setItem('draftorb.pool.v1', JSON.stringify({ version: 2, pools: {} }));
+    expect(loadPool(storage)).toBeNull();
+  });
+
+  it('treats a pool larger than the configured maximum as corrupt', () => {
+    const storage = fakeStorage();
+    storage.setItem(
+      'draftorb.pool.v1',
+      JSON.stringify({
+        version: 1,
+        pools: { SUPPORT: Array.from({ length: 41 }, (_, i) => i + 1) },
+      }),
+    );
+    expect(readPool(storage).issue).toBe('corrupt');
     expect(loadPool(storage)).toBeNull();
   });
 
@@ -62,14 +84,31 @@ describe('pool storage', () => {
       },
       removeItem: () => undefined,
     };
-    expect(() => savePool({ version: 1, pools: {} }, storage)).not.toThrow();
+    expect(savePool({ version: 1, pools: {} }, storage)).toBe(false);
   });
 
   it('clearPool removes the persisted pool', () => {
     const storage = fakeStorage();
     savePool({ version: 1, pools: { SUPPORT: [412] } }, storage);
-    clearPool(storage);
+    expect(clearPool(storage)).toBe(true);
     expect(loadPool(storage)).toBeNull();
+  });
+
+  it('reports blocked storage access', () => {
+    const storage: PoolStorage = {
+      getItem: () => {
+        throw new Error('blocked');
+      },
+      setItem: () => {
+        throw new Error('blocked');
+      },
+      removeItem: () => {
+        throw new Error('blocked');
+      },
+    };
+    expect(readPool(storage).issue).toBe('unavailable');
+    expect(savePool({ version: 1, pools: {} }, storage)).toBe(false);
+    expect(clearPool(storage)).toBe(false);
   });
 
   it('filterPoolByCatalogue drops ids absent from the catalogue', () => {

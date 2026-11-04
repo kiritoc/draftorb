@@ -23,30 +23,40 @@
  */
 
 import type Database from 'better-sqlite3';
-import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import {
-  RUNE_CONTEXT_LEVELS,
-  type ChampionTagsMap,
-  type RankBucket,
-  type Role,
-} from '@draftorb/shared';
+import { RUNE_CONTEXT_LEVELS, type RankBucket } from '@draftorb/shared';
 import {
   DEFAULT_CONFIG,
-  DEFAULT_LANE_GROUPS,
   RANK_BUCKET_ORDER,
   bucketIndex,
   expertWeight,
-  getInfluence,
   recencyFactor,
   reliabilityFactor,
   type RankWeightingConfig,
 } from '@draftorb/engine';
-import { PATCH_PATTERN } from './aggregate';
 import { comparePatches } from './matches-store';
 import { defaultManualDataDir } from './config/paths';
+import {
+  accumulateWeighted,
+  assertPatchFormat,
+  gameBucketIndex,
+  groupRowsByMatch,
+  loadPatchWindow,
+  partitionByTeam,
+} from './aggregate-shared';
+import {
+  canonicalPerksJson,
+  contextSlots,
+  damageMix,
+  formatSlot,
+  loadChampionTags,
+  perksHash,
+  type MatchParticipant,
+} from './aggregate-runes-context';
+
+export { canonicalPerksJson, damageMix } from './aggregate-runes-context';
+export type { MatchParticipant } from './aggregate-runes-context';
 
 export interface RuneCtxRow {
   championId: number;
@@ -66,11 +76,9 @@ export interface AggregateRunesOptions {
   config?: RankWeightingConfig;
   /** Snapshot patch: newer matches are excluded and recency is relative to it. */
   patch?: string;
+  /** Champion tags file for the damage-mix context; defaults to data/manual/champion-tags.json. */
+  tagsPath?: string;
 }
-
-// Back-off context levels (most specific = lowest number, SPECS §8.1).
-// Lane contexts increment as slots are dropped (3-slot → 2-slot → 1-slot).
-const ROLE_ORDER: readonly string[] = ['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT'];
 
 interface RuneAccum {
   championId: number;
@@ -86,164 +94,41 @@ interface RuneAccum {
   puuids: Set<string>;
 }
 
-interface MatchParticipant {
-  championId: number;
-  role: string;
-  win: number;
-  puuid: string;
-  teamId: number;
-  championGames: number;
-  masteryPoints: number | null;
-  perksJson: string;
+interface MatchParticipantRow extends MatchParticipant {
+  matchId: string;
+  patch: string;
+  rankKnownCount: number;
+  rankScore: number;
 }
 
-interface LaneSlot {
-  championId: number;
-  side: 'a' | 'e';
-  role: string;
-}
-
-/**
- * Canonical damage mix of a team's champions. Untagged champions carry no
- * signal and are ignored; with no tagged champion at all the mix is `mixed`.
- */
-export function damageMix(championIds: number[], tags: Map<number, string>): 'AD' | 'AP' | 'mixed' {
-  let hasAd = false;
-  let hasAp = false;
-  for (const id of championIds) {
-    const dmg = tags.get(id);
-    if (dmg === 'AD') hasAd = true;
-    else if (dmg === 'AP') hasAp = true;
-    else if (dmg === 'MIXED') {
-      // Explicit hybrid / true-damage tags count for both sides.
-      hasAd = true;
-      hasAp = true;
+/** Clears `rune_ctx` and rewrites it in one transaction (idempotent). */
+function writeRuneCtxRows(db: Database.Database, result: RuneCtxRow[]): void {
+  const clear = db.prepare('DELETE FROM rune_ctx');
+  const insert = db.prepare(
+    `INSERT INTO rune_ctx (
+      champion_id, my_role, rank_bucket, context_key, context_level, perks_hash, perks_json,
+      wins_w, games_w, games_w2, players
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  );
+  const write = db.transaction(() => {
+    clear.run();
+    for (const row of result) {
+      insert.run(
+        row.championId,
+        row.myRole,
+        row.rankBucket,
+        row.contextKey,
+        row.contextLevel,
+        row.perksHash,
+        row.perksJson,
+        row.winsW,
+        row.gamesW,
+        row.gamesW2,
+        row.players,
+      );
     }
-    // 'NONE' contributes no damage signal and is ignored.
-  }
-  if (hasAd && !hasAp) return 'AD';
-  if (hasAp && !hasAd) return 'AP';
-  return 'mixed';
-}
-
-interface RiotPerksLike {
-  statPerks?: { defense?: number; flex?: number; offense?: number };
-  styles?: Array<{
-    description?: string;
-    style?: number;
-    selections?: Array<{ perk?: number }>;
-  }>;
-}
-
-/**
- * Canonical rune page: keeps only selected style / perk / shard ids and drops
- * match-specific `var1..var3` statistics, so identical pages share one hash.
- * Non Riot-shaped JSON is returned unchanged.
- */
-export function canonicalPerksJson(perksJson: string): string {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(perksJson);
-  } catch {
-    return perksJson;
-  }
-  if (typeof parsed !== 'object' || parsed === null) return perksJson;
-  const perks = parsed as RiotPerksLike;
-  if (!Array.isArray(perks.styles)) return perksJson;
-  const stat = perks.statPerks ?? {};
-  return JSON.stringify({
-    statPerks: {
-      defense: stat.defense ?? null,
-      flex: stat.flex ?? null,
-      offense: stat.offense ?? null,
-    },
-    styles: perks.styles.map((s) => ({
-      description: s.description ?? null,
-      style: s.style ?? null,
-      selections: (s.selections ?? []).map((sel) => ({ perk: sel.perk ?? null })),
-    })),
   });
-}
-
-function formatSlot(slot: LaneSlot): string {
-  return `${slot.side}.${slot.role}:${slot.championId}`;
-}
-
-function loadChampionTags(): Map<number, string> {
-  const tagsPath = join(defaultManualDataDir(), 'champion-tags.json');
-  let raw: ChampionTagsMap;
-  try {
-    raw = JSON.parse(readFileSync(tagsPath, 'utf8'));
-  } catch {
-    return new Map();
-  }
-  const tags = new Map<number, string>();
-  for (const [key, tag] of Object.entries(raw)) {
-    const id = Number(key);
-    if (Number.isFinite(id) && tag?.damageType) {
-      tags.set(id, tag.damageType);
-    }
-  }
-  return tags;
-}
-
-function perksHash(perksJson: string): string {
-  return createHash('sha256').update(perksJson).digest('hex');
-}
-
-/** Top `contextSlots` lane-context champions for `myRole`, by lane influence. */
-function contextSlots(
-  me: MatchParticipant,
-  allies: MatchParticipant[],
-  enemies: MatchParticipant[],
-  config: RankWeightingConfig,
-): LaneSlot[] {
-  const laneGroup = DEFAULT_LANE_GROUPS[me.role as Role];
-  if (laneGroup === undefined) return [];
-  const candidates: Array<{
-    championId: number;
-    role: string;
-    influence: number;
-    side: number;
-    roleOrder: number;
-  }> = [];
-
-  for (const role of laneGroup.allies) {
-    const ally = allies.find((p) => p.role === role);
-    if (!ally) continue;
-    candidates.push({
-      championId: ally.championId,
-      role,
-      influence: getInfluence(me.role as Role, 'ally', role, 'lane', config),
-      side: 0,
-      roleOrder: ROLE_ORDER.indexOf(role),
-    });
-  }
-  for (const role of laneGroup.enemies) {
-    const enemy = enemies.find((p) => p.role === role);
-    if (!enemy) continue;
-    candidates.push({
-      championId: enemy.championId,
-      role,
-      influence: getInfluence(me.role as Role, 'enemy', role, 'lane', config),
-      side: 1,
-      roleOrder: ROLE_ORDER.indexOf(role),
-    });
-  }
-
-  candidates.sort((a, b) => {
-    if (b.influence !== a.influence) return b.influence - a.influence;
-    if (a.side !== b.side) return a.side - b.side; // ally (0) before enemy (1)
-    return a.roleOrder - b.roleOrder;
-  });
-
-  // Keep influence order (most influential first) and side/role in the key so
-  // swapped ally/enemy matchups never share a row.
-  return candidates.slice(0, config.contextSlots).map((c) => ({
-    championId: c.championId,
-    side: c.side === 0 ? 'a' : 'e',
-    role: c.role,
-  }));
+  write.immediate();
 }
 
 export function aggregateRunesByContext(
@@ -251,27 +136,14 @@ export function aggregateRunesByContext(
   options: AggregateRunesOptions = {},
 ): RuneCtxRow[] {
   const config = options.config ?? DEFAULT_CONFIG;
-  if (options.patch !== undefined && !PATCH_PATTERN.test(options.patch)) {
-    throw new Error(`Invalid patch "${options.patch}". Expected a format like "16.21".`);
-  }
+  assertPatchFormat(options.patch);
 
   const snapshotPatch = options.patch;
+  const { patchIndex, currentPatchIndex } = loadPatchWindow(db, snapshotPatch);
 
-  const storedPatches = (
-    db.prepare('SELECT DISTINCT patch FROM matches').all() as Array<{ patch: string }>
-  )
-    .map((row) => row.patch)
-    .filter((patch) => snapshotPatch === undefined || comparePatches(patch, snapshotPatch) <= 0);
-  const patchSet = new Set(storedPatches);
-  if (snapshotPatch !== undefined && patchSet.size > 0) patchSet.add(snapshotPatch);
-  const patches = [...patchSet].sort(comparePatches);
-  const patchIndex = new Map<string, number>();
-  patches.forEach((patch, i) => {
-    patchIndex.set(patch, i);
-  });
-  const currentPatchIndex = patches.length - 1;
-
-  const tags = loadChampionTags();
+  const tags = loadChampionTags(
+    options.tagsPath ?? join(defaultManualDataDir(), 'champion-tags.json'),
+  );
 
   // Experts must be judged within the patch window (D-022): `champion_games`
   // counts the whole DB, so subtract games newer than the snapshot.
@@ -314,51 +186,20 @@ export function aggregateRunesByContext(
        JOIN matches m ON m.match_id = p.match_id
        ORDER BY p.match_id`,
     )
-    .iterate() as IterableIterator<{
-    matchId: string;
-    championId: number;
-    role: string;
-    win: number;
-    puuid: string;
-    teamId: number;
-    championGames: number;
-    masteryPoints: number | null;
-    perksJson: string;
-    patch: string;
-    rankKnownCount: number;
-    rankScore: number;
-  }>;
+    .iterate() as IterableIterator<MatchParticipantRow>;
 
-  const maxBucket = RANK_BUCKET_ORDER.length - 1;
-
-  // Group participants by match so lane context (needs all participants of a
-  // match) can be resolved one match at a time.
-  let current:
-    | {
-        matchId: string;
-        patch: string;
-        rankKnownCount: number;
-        rankScore: number;
-        participants: MatchParticipant[];
-      }
-    | undefined;
-
-  const processMatch = (match: {
-    patch: string;
-    rankKnownCount: number;
-    rankScore: number;
-    participants: MatchParticipant[];
-  }): void => {
-    const pIdx = patchIndex.get(match.patch);
+  const processMatch = (group: MatchParticipantRow[]): void => {
+    const first = group[0];
+    if (first === undefined) return;
+    const pIdx = patchIndex.get(first.patch);
     if (pIdx === undefined) return;
 
     const baseW =
       recencyFactor(pIdx, currentPatchIndex, config.decay) *
-      reliabilityFactor(match.rankKnownCount, config.unknownRankFactor);
+      reliabilityFactor(first.rankKnownCount, config.unknownRankFactor);
     if (baseW <= 0) return;
 
-    // rank_score scale: integer part = RANK_BUCKET_ORDER index (6.5 = DIAMOND).
-    const gameBucketIdx = Math.max(0, Math.min(Math.floor(match.rankScore), maxBucket));
+    const gameBucketIdx = gameBucketIndex(first.rankScore);
     // expertWeight per user bucket (SPECS §3): 0 below the user bucket, bonus above.
     const bucketWeights: Array<{ rankBucket: RankBucket; w: number }> = [];
     for (const rankBucket of RANK_BUCKET_ORDER) {
@@ -368,17 +209,9 @@ export function aggregateRunesByContext(
     }
     if (bucketWeights.length === 0) return;
 
-    const teams = new Map<number, MatchParticipant[]>();
-    for (const p of match.participants) {
-      const team = teams.get(p.teamId);
-      if (team === undefined) {
-        teams.set(p.teamId, [p]);
-      } else {
-        team.push(p);
-      }
-    }
+    const teams = partitionByTeam(group);
 
-    for (const me of match.participants) {
+    for (const me of group) {
       const windowGames = me.championGames - (futureGames.get(`${me.puuid}|${me.championId}`) ?? 0);
       // Experts rule (SPECS §3, D-022): enough in-window games, or the mastery
       // fallback. Enrichment only fetches mastery for participants of the
@@ -419,55 +252,27 @@ export function aggregateRunesByContext(
       );
       for (const { rankBucket, w, ctx } of targets) {
         const key = `${me.championId}|${me.role}|${rankBucket}|${ctx.contextKey}|${phash}`;
-        const existing = accum.get(key);
-        if (existing === undefined) {
-          accum.set(key, {
-            championId: me.championId,
-            myRole: me.role,
-            rankBucket,
-            contextKey: ctx.contextKey,
-            contextLevel: ctx.contextLevel,
-            perksHash: phash,
-            perksJson: canonical,
-            winsW: w * me.win,
-            gamesW: w,
-            gamesW2: w * w,
-            puuids: new Set([me.puuid]),
-          });
-        } else {
-          existing.winsW += w * me.win;
-          existing.gamesW += w;
-          existing.gamesW2 += w * w;
-          existing.puuids.add(me.puuid);
-        }
+        accumulateWeighted(accum, key, w, me.win, () => ({
+          championId: me.championId,
+          myRole: me.role,
+          rankBucket,
+          contextKey: ctx.contextKey,
+          contextLevel: ctx.contextLevel,
+          perksHash: phash,
+          perksJson: canonical,
+          winsW: 0,
+          gamesW: 0,
+          gamesW2: 0,
+          puuids: new Set<string>(),
+        })).puuids.add(me.puuid);
       }
     }
   };
 
-  for (const row of rows) {
-    if (!patchIndex.has(row.patch)) continue;
-    if (current === undefined || current.matchId !== row.matchId) {
-      if (current !== undefined) processMatch(current);
-      current = {
-        matchId: row.matchId,
-        patch: row.patch,
-        rankKnownCount: row.rankKnownCount,
-        rankScore: row.rankScore,
-        participants: [],
-      };
-    }
-    current.participants.push({
-      championId: row.championId,
-      role: row.role,
-      win: row.win,
-      puuid: row.puuid,
-      teamId: row.teamId,
-      championGames: row.championGames,
-      masteryPoints: row.masteryPoints,
-      perksJson: row.perksJson,
-    });
+  for (const group of groupRowsByMatch(rows)) {
+    if (group[0] !== undefined && !patchIndex.has(group[0].patch)) continue;
+    processMatch(group);
   }
-  if (current !== undefined) processMatch(current);
 
   const result: RuneCtxRow[] = [];
   for (const entry of accum.values()) {
@@ -489,32 +294,7 @@ export function aggregateRunesByContext(
   // No contributing games: leave existing rows unchanged (same as baseline / pairs).
   if (result.length === 0) return result;
 
-  const clear = db.prepare('DELETE FROM rune_ctx');
-  const insert = db.prepare(
-    `INSERT INTO rune_ctx (
-      champion_id, my_role, rank_bucket, context_key, context_level, perks_hash, perks_json,
-      wins_w, games_w, games_w2, players
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  );
-  const write = db.transaction(() => {
-    clear.run();
-    for (const row of result) {
-      insert.run(
-        row.championId,
-        row.myRole,
-        row.rankBucket,
-        row.contextKey,
-        row.contextLevel,
-        row.perksHash,
-        row.perksJson,
-        row.winsW,
-        row.gamesW,
-        row.gamesW2,
-        row.players,
-      );
-    }
-  });
-  write.immediate();
+  writeRuneCtxRows(db, result);
 
   return result;
 }

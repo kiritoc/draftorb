@@ -55,6 +55,7 @@ Rank buckets for weighting (distinct from persisted `rank_score` in DATA_MODEL.m
 - Output also the **confidence** of each assignment (probability mass of the best assignment vs alternatives). Confidence scales how much that champion's synergy/counter terms count.
 - UI lets the user override a role; override = confidence 1.
 - If inference fails for a team, the engine keeps the largest greedily built resolvable subset (fixed slots first). If that fails too, only fixed slots are kept, and a fixed role used by two or more slots of the same team is dropped as ambiguous (D-030). Dropped slots lose only role-dependent effects (pairs, lane); they stay excluded from candidates and still count for comp.
+- The user's own role is reserved on the user's team: allies are never assigned `userRole`. An ally fixed to `userRole` is dropped from role-dependent layers (pairs, lane) but still counts for comp and stays excluded from candidates (D-050).
 
 ## 5. Scoring a candidate `c` for `myRole` (Phase 1: `myRole` = SUPPORT)
 
@@ -197,9 +198,7 @@ Non-support roles, accounts/login, pool sync across devices or auto-import of th
 
 ## 12-17. Storage, retention, weights, change scoring, breakpoints (target model)
 
-**Target model, implemented by T-019.b..T-019.f. Until T-019.b lands, section 3 recency uses D-033's index over stored patches and aggregation stays clear-and-rewrite; until T-019.f lands and T-027.a passes the D-023 gate, change weighting is off (`changeWeightEnabled = false`).**
-
-These sections describe the **target** storage and weighting model, implemented by tickets T-019.b through T-019.f. Until those tickets are complete, SPECS §3 (recency with the dense stored-patch index from D-033) and clear-and-rewrite aggregation (DATA_MODEL.md, T-015..T-018) govern. Sections 12-17 are normative once implemented; they do not describe current code. No new tables are created and no rows are soft-deleted until T-019.b..f are done.
+**Target model, implemented by T-019.b..T-019.f.** These sections describe the target storage and weighting model; they are normative once implemented and do not describe current code. Until T-019.b lands, SPECS §3 recency uses the dense stored-patch index from D-033 and aggregation stays clear-and-rewrite (DATA_MODEL.md, T-015..T-018); until T-019.f lands and T-027.a passes the D-023 gate, change weighting is off (`changeWeightEnabled = false`). No new tables are created and no rows are soft-deleted until T-019.b..f are done.
 
 ## 12. Patch index (D-043)
 
@@ -215,15 +214,15 @@ Table `patches(patch_index INTEGER PRIMARY KEY, version_label TEXT NOT NULL UNIQ
 
 No parallel stats tables. Existing aggregate tables (`baseline`, `pair_ally`, `pair_enemy`, `lane_vs`, `lane_full`, `rune_ctx`, `item_build`, `role_prob`) are the only statistics store; recomputed on every `aggregate` run with weights baked in (SPECS §14, D-045).
 
-- Raw `matches`/`participants`/`item_events` kept for the last N patches only (`retentionPatches`, default 8, ETL config). The retention window must contain the frozen holdout plus the training window (D-023/T-027.a).
-- `pnpm etl prune --keep-patches N [--dry-run]`: in ONE transaction, for matches with `patch_index <= latest - N`, write a `match_rejects` tombstone with reason `pruned` (actual `patch`, `checked_at`) and delete the match (cascade removes `participants`/`item_events`). Idempotent. `--dry-run` prints counts only.
+- Raw `matches`/`participants`/`item_events` kept for the last N patches only (`retentionPatches`, default 20, ETL config). The retention window must contain the frozen holdout plus the training window (D-023/T-027.a). With `decay = 0.85`, data 20 patches back weighs 0.85^20 ≈ 0.04, so the default prune drops under 5% of the recency weight mass.
+- `pnpm etl prune [--keep-patches N] [--dry-run]` (`N` defaults to `retentionPatches`): in ONE transaction, for matches with `patch_index <= latest - N`, write a `match_rejects` tombstone with reason `pruned` (actual `patch`, `checked_at`) and delete the match (cascade removes `participants`/`item_events`). Idempotent. `--dry-run` prints counts only. Manual use: after a major game rework (e.g. a season start or an item-system overhaul) the owner may run it once with a smaller `N` to delete older data for good; the tombstones keep that data from being re-ingested even though the default ingestion window is wider. A global `reset` breakpoint (D-047) is the reversible alternative: it zeroes the old data at aggregation without deleting it.
 - `match_rejects.reason` becomes `queue|short|patch|invalid|pruned`. This extends D-017's list; do not edit D-017. `patch` keeps its D-017 meaning (re-evaluated when a run's window includes it). `pruned` is permanent: `findRejection` never deletes or re-evaluates it, whatever `--since-patch` says.
 - `--reset` (D-018) clears `queue|short|patch|invalid` rejects and keeps `pruned`. Only the explicit flag `--reset-tombstones` clears `pruned`; its help text warns that pruned matches become fetchable again.
 - Default ingestion window: `patch_index >= latest - retentionPatches + 1`, so ingestion never re-adds data the next prune would delete. An explicit `--since-patch` below this bound is a usage error unless `--reset-tombstones` is also given.
 - If `match_rejects.reason` has a CHECK or enum in the real migrations, T-019.c adds a migration (next free number) allowing `pruned`. If not, none.
 - Aggregate tables are rebuilt each run: no purge, no soft delete, no grace period. `reset` breakpoints give weight 0 at aggregation; they do not delete data. Retention and weighting are independent.
 - Invariant: rows are never deleted to express a weight; they are deleted only for retention (outside the window).
-- Size estimate (assumptions stated): assume `M` matches per patch (unknown; parameterize), ~20 stored rows per match (1 match + 10 participants + ~8 item events + 1 tombstone), ~150 bytes per row. Retained rows ≈ N × M × 20 × 150 bytes. For N=8, M=1000: ≈ 2.4 MB. Tombstones ≈ N × M × 1 row × ~60 bytes ≈ 0.5 MB. Aggregate tables bounded by key cardinality × 8 rank buckets × N patches, not by match count.
+- Size estimate (assumptions stated): assume `M` matches per patch (unknown; parameterize), ~20 stored rows per match (1 match + 10 participants + ~8 item events + 1 tombstone), ~150 bytes per row. Retained rows ≈ N × M × 20 × 150 bytes. For N=20, M=1000: ≈ 6 MB. Tombstones ≈ N × M × 1 row × ~60 bytes ≈ 1.2 MB. Aggregate tables bounded by key cardinality × 8 rank buckets × N patches, not by match count.
 
 ## 14. Weights (D-045)
 
@@ -255,29 +254,46 @@ One weight formula, stated once:
 
 ## 15. Change score (D-046)
 
-Command `pnpm etl changes <patch>` writes `entity_change_scores(entity_type, entity_id, patch_index, content_hash, change_score, details)`; `entity_type` IN (`champion`,`item`,`rune`); unique key `(entity_type, entity_id, patch_index)`; re-run overwrites. `change_score` REAL in [0,1] or NULL, rounded to 4 decimals. `content_hash` + `details` only (no snapshots). Data Dragon versions assumed immutable on CDN; previous patch's files re-downloaded when needed (VERIFY immutability).
+Source: CommunityDragon game data, `https://raw.communitydragon.org/<major.minor>/` (same label as `matches.patch`). Data Dragon is not used for scoring (its champion files carry no ability values); it stays the source of the published catalogs and of the Summoner's Rift item filter. Files:
+
+- champions: `plugins/rcp-be-lol-game-data/global/default/v1/champion-summary.json` (numeric id -> alias), then `game/data/characters/<alias>/<alias>.bin.json` (alias lowercased);
+- items: `game/items.cdtb.bin.json` (`Items/<id>` records);
+- runes: `game/perks.cdtb.bin.json` (`Perks/Styles/<Tree>/<Name>` records with `mPerkId`).
+
+Entity sets: champions whose id is in the Data Dragon champion catalog (this drops game-mode variants such as `Jade_*`, ids >= 60001); items with Data Dragon `item.json` `maps["11"] == true` (read from the raw file: the published `items.json` does not keep `maps`); every perk.
+
+Command `pnpm etl changes <patch>` writes `entity_change_scores(entity_type, entity_id, patch_index, content_hash, change_score, details)`; `entity_type` IN (`champion`,`item`,`rune`); `entity_id` = numeric champion/item/perk id; unique key `(entity_type, entity_id, patch_index)`; re-run overwrites. `change_score` REAL in [0,1] or NULL, rounded to 4 decimals. `content_hash` + `details` only (no snapshots). The previous patch's files are re-downloaded when needed.
+
+Folder lifetime: a patch folder can still change while that patch is live (hotfix extractions; observed 10-12 days after release), and has stayed unchanged once the next patch is out. A score for the latest patch is therefore provisional: the command warns when `<patch>` is the latest patch, and re-running it after the next patch is released makes the score final.
 
 Algorithm (TypeScript terms):
 
-1. Flatten entity into `Map<string, Leaf>` (key -> leaf). Leaf typed as `number | number[] | text | other`.
-2. Ignored keys (configurable): `image`, `tags`, `blurb`, `lore`, `skins`, `allytips`, `enemytips`, `partype`, burn strings (`cooldownBurn`, `effectBurn`), other cosmetic/UI keys.
-3. `content_hash` = sha256 of canonical JSON (sorted keys) of the filtered map (`node:crypto`, no new dependency). Equal -> `change_score = 0`.
-4. Otherwise sum contributions:
+1. Allowlist extraction (configurable). Only these fields are read; everything else (skins, VFX, animation, icons, client/tooltip data) is ignored:
+   - champion: numeric base and per-level stats of `Characters/<Name>/CharacterRecords/Root` (including `primaryAbilityResource`); for every ability of the record's `mAbilities` list, its root spell and child spells: `mSpell.DataValues`, `mSpell.mSpellCalculations` formula parts (referenced data value names and numeric parts such as `mCoefficient`), `cooldownTime`, `mana`, `castRange`.
+   - item: `price`, `recipeItemLinks`, numeric `mFlat*`/`mPercent*` mods, `mDataValues`.
+   - rune: `mScript.mSpellScriptData.mEffectAmount` and `mScript.mSpellScriptData.mCalculations`; per-mode overrides (`mEffectAmountGameMode`, e.g. ARAM, URF) are ignored.
+2. Name normalization: every entry path and field name is compared in hashed form, FNV-1a 32-bit of the lowercased name written `{xxxxxxxx}`, because CommunityDragon resolves more hashed names over time (observed: `{89aa48b5}` became `Characters/Jade_Galio/Spells/Jade_GalioEAbility/Jade_GalioE_Haste`, field `{72c5c2a8}` became `DamageType`).
+3. Named lists are keyed by name, never by position: spell `DataValues` by `name`, item `mDataValues` by `mName`.
+4. Flatten into `Map<string, Leaf>` (path -> leaf), leaf `number | number[]`; numbers rounded to 6 decimals (the files store float32 values such as `0.30000001192092896`).
+5. `content_hash` = sha256 of canonical JSON (sorted keys) of the map (`node:crypto`, no new dependency). Equal -> `change_score = 0`.
+6. Otherwise sum contributions:
    - number: `min(1, abs(new-old) / max(abs(old), 1e-6)) * 0.5`, per-leaf cap 0.5.
    - number[] same length: `mean(relative change per index) * 0.5` (one contribution per array). Different length: 0.3.
-   - text: strip HTML, remove digits, lowercase; char-bigram Dice similarity; if < 0.9 -> 0.3; total text contribution per entity capped at 0.3.
-   - structural: ability/passive/effect added or removed -> 0.6 each, counted once (no text double count).
-   - item-only: recipe (`from[]`) changed -> 0.3; stat key added/removed -> 0.3; gold cost is a normal numeric leaf; only Summoner's Rift items (`maps["11"] == true`).
-   - runes: same rules as champion (no special casing beyond `entity_type`).
-5. `change_score = min(1, sum)`, rounded to 4 decimals.
+   - duplicates: the same change (same value name, same old and new value) repeated inside one entity counts once (e.g. one Q value copied into four elemental sub-spells).
+   - structural: a root spell (`mRootSpell` of an ability) added, removed or replaced -> 0.6 each; child spells (missiles, helpers) only count through their values; a data value or calculation added or removed -> 0.3 each; item recipe changed -> 0.3; stat mod added or removed -> 0.3.
+7. `change_score = min(1, sum)`, rounded to 4 decimals.
 
-Properties (tested): pure reword alone can never reach suggested band (text capped at 0.3 < 0.6); magnitude matters beyond per-leaf cap; monotone in change size for fixed keys; key order never changes result (canonical JSON).
+Text is never compared, so tooltip rewording cannot change a score.
+
+Properties (tested): rewording, reordering and hash resolution never change the score (allowlist, canonical JSON, name keys, hashed names); magnitude matters beyond the per-leaf cap; monotone in change size for fixed keys.
 
 Bands (half-open): [0, 0.1) x1.0; [0.1, 0.3) x0.9; [0.3, 0.6) x0.5; [0.6, 1] creates `suggested` breakpoint (source `auto`, mode `downweight`, `weight_factor` 0.2). While a suggestion is pending or after rejection: effective weight = [0.3, 0.6) band weight (x0.5), never 1.0.
 
 Fallback (stated once here): missing/unreadable/incomplete source, or no previous patch with data -> `change_score = NULL`, weight 1.0, warning logged (first patch: NULL, no warning). Never invent a score, never block the pipeline. All other sections reference this fallback.
 
-Fixtures (arithmetic shown): cooldown scalar 10->9 = 0.05 ([0,0.1) x1.0); armor 30->36 (0.1) + cooldown 10->9 (0.05) = 0.15 ([0.1,0.3) x0.9); cooldown array [10,9,8,7,6]->[9,8,7,6,5] ≈ 0.065 ([0,0.1) x1.0); ability replaced = 0.6 ([0.6,1] suggested); identical = 0; reword only = 0.3 (capped, [0.3,0.6) x0.5, not suggested); ignored key / ARAM-only item = 0. Real-JSON fixtures: two consecutive real patches under `packages/etl/test/fixtures` (VERIFY Data Dragon structure before asserting).
+Fixtures (arithmetic shown): cooldown scalar 10->9 = 0.05 ([0,0.1) x1.0); armor 30->36 (0.1) + cooldown 10->9 (0.05) = 0.15 ([0.1,0.3) x0.9); damage array [10,9,8,7,6]->[9,8,7,6,5] ≈ 0.065 ([0,0.1) x1.0); AP ratio 0.5->0.55 = 0.05 ([0,0.1) x1.0); root spell replaced = 0.6 ([0.6,1] suggested); identical = 0; skin/VFX-only change = 0; child missile added = 0; hash resolved to a name = 0; ARAM-only item = 0; ARAM-only perk override = 0. Real-JSON fixtures: trimmed CommunityDragon files of two consecutive real patches under `packages/etl/test/fixtures`.
+
+Verification (2026-11-04, prototype on 16.20 -> 16.21 and 16.21 -> 16.22, see PROGRESS.md): of 173 champions, 145 and 53 raw files changed but only 21 and 15 champions have allowlisted changes, all of them balance values (e.g. 16.21 Caitlyn Q base damage, Varus W, Sion R ratio; 16.22 Mel base stats, Smolder, Naafiri). Items: 15 and 2 changed catalog items before the Summoner's Rift filter. Runes: no value changes in either pair. Remaining known false-positive class: internal data refactors with the same in-game effect (16.22 Orianna: `ReducedDamagePercent` 30 -> 0.7 with recalculated formulas, scored 1); these surface as `suggested` breakpoints and are rejected in review (§16). Still to do before the allowlist is frozen: compare these lists with the official patch notes. Manual breakpoints (§16, T-019.e) ship first.
 
 ## 16. Breakpoints (D-047)
 
@@ -298,8 +314,7 @@ DDL with table-level constraints (exact text in DATA_MODEL.md §5.4): CHECKs for
 Only edge cases not owned by sections 12-16; all other rules reference those sections (one normative statement per rule).
 
 - Missing source data: `change_score = NULL`, weight 1.0, warning logged (first patch: NULL, no warning). Stated once in SPECS §15; referenced here.
-- Entity renamed / ID changed between patches: new `entity_id` = new row; cross-patch comparison uses `entity_id`, so renamed entities are separate rows. Champion keyed by name id (e.g. `MonkeyKing`), mapped to the numeric key via the `key` field (VERIFY against Data Dragon).
-- Burn strings (`cooldownBurn`, `effectBurn`) ignored (duplicate numeric arrays).
-- Item passives living in description HTML: VERIFY against real `item.json` before asserting structural detection.
-- Runes are scored: `rune_ctx` rows whose page contains a rune affected by a rune breakpoint are downweighted; `baseline` is identical. Per-champion Data Dragon files are needed (summary `champion.json` has no spell data; T-003 only fetches summaries).
+- Entity renamed / ID changed between patches: new `entity_id` = new row; cross-patch comparison uses `entity_id`, so renamed entities are separate rows. Champions are keyed by numeric id from CommunityDragon `champion-summary.json` (alias such as `monkeyking` only builds the file path).
+- Item passives: numeric values come from the item `DataValues` in `items.cdtb.bin.json`; description HTML is never parsed.
+- Runes are scored: `rune_ctx` rows whose page contains a rune affected by a rune breakpoint are downweighted; `baseline` is identical. Change scoring downloads CommunityDragon files itself (§15); the T-003 Data Dragon import is unchanged.
 - One normative statement per rule; cross-references (§14, §15, §16) used elsewhere.

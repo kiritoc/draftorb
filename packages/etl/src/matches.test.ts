@@ -469,4 +469,62 @@ describe('match ingestion', () => {
     expect(lines.some((l) => l.includes('Ingestion complete'))).toBe(true);
     db.close();
   });
+
+  it('awaits the unenriched-match reprocess pass before returning (B-044)', async () => {
+    const db = openDb(':memory:');
+    migrate(db);
+    db.prepare(
+      `INSERT INTO matches (match_id, platform, patch, queue_id, duration, created_at,
+        avg_rank_score, rank_known_count)
+       VALUES ('EUW1_OLD', 'euw1', '16.21', 420, 1800, 1, 6.5, 1)`,
+    ).run();
+    const insert = db.prepare(
+      `INSERT INTO participants (
+        match_id, puuid, team_id, champion_id, role, win, rank_score,
+        champion_games, keystone, primary_style, sub_style, perks_json,
+        items_json, kills, deaths, assists
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    );
+    const roles = ['SUPPORT', 'ADC', 'TOP', 'JUNGLE', 'MID'] as const;
+    for (let i = 0; i < 10; i += 1) {
+      // p-0 is a ranked bot-lane seed; p-1 (ADC) is unranked so the pass must
+      // hit the league-entries endpoint before it can finish.
+      insert.run(
+        'EUW1_OLD',
+        `p-${i}`,
+        i < 5 ? 100 : 200,
+        100 + i,
+        roles[i % 5],
+        1,
+        i === 0 ? 6.5 : null,
+        100,
+        8000,
+        8000,
+        8000,
+        '{}',
+        '[]',
+        0,
+        0,
+        0,
+      );
+    }
+
+    const client = mockClient({}, {});
+    client.getLeagueEntriesByPuuid.mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      return [];
+    });
+    client.getChampionMastery.mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      return null;
+    });
+
+    await ingestMatches({ platform: PLATFORM, db, client });
+
+    const row = db.prepare('SELECT enriched FROM matches WHERE match_id = ?').get('EUW1_OLD') as {
+      enriched: number;
+    };
+    expect(row.enriched).toBe(1);
+    db.close();
+  });
 });

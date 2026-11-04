@@ -46,7 +46,7 @@
 - Pending/rejected suggestion: effective weight x0.5 (never 1.0); monotonicity (score never decreases as change size grows for fixed keys).
 - Breakpoint uniqueness and CHECK constraints; combination rule (reset dominates; downweight factors multiply).
 - Key-order invariance of change score; weight in [0,1]; non-increasing with age for fixed change events; prune idempotent.
-- Change-score fixtures on toy data (with shown arithmetic) AND real JSON fixtures: two consecutive real patches under `packages/etl/test/fixtures` (VERIFY Data Dragon structure).
+- Change-score fixtures on toy data (with shown arithmetic) AND real JSON fixtures: trimmed CommunityDragon files of two consecutive real patches under `packages/etl/test/fixtures` (D-046, SPECS §15).
 - `pruned` tombstone is permanent: `--reset` keeps `pruned` rows; a widened `--since-patch` does not resurrect them; `--reset-tombstones` does; `--since-patch` below the retention bound without `--reset-tombstones` is a usage error.
 - Rune `reset` zeroes only `rune_ctx` rows whose page contains that rune while `baseline` is identical; global breakpoint lowers every aggregate table.
 - One failing insert per CHECK of both new tables (`data_breakpoints`, `entity_change_scores`) plus the duplicate-breakpoint test (NULL `scope_id` included).

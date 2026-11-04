@@ -1,12 +1,11 @@
 import type Database from 'better-sqlite3';
 import type { Role } from '@draftorb/shared';
+import { DEFAULT_CONFIG } from '@draftorb/engine';
 
 import { playerRankScore } from './players';
 import { rankSummary, createRankLoader, updateMatchRankStats } from './matches-store';
 import type { ParticipantRow } from './participants';
 import type { Platform, RiotChampionMastery, RiotClient } from './riot';
-
-const DEFAULT_MIN_CHAMP_GAMES = 30;
 
 const BOT_LANE_ROLES: ReadonlySet<Role> = new Set(['ADC', 'SUPPORT']);
 
@@ -243,7 +242,7 @@ export async function enrichParticipants(
     db,
     client,
     platform,
-    minChampGames = DEFAULT_MIN_CHAMP_GAMES,
+    minChampGames = DEFAULT_CONFIG.minChampGames,
     myRole,
     seedPuuid,
     seedRankScore,

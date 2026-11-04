@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -527,6 +527,46 @@ describe('aggregateRunesByContext', () => {
         });
       } finally {
         db.close();
+      }
+    });
+  });
+});
+
+describe('champion tags loading (B-047)', () => {
+  it('throws when the tags file does not exist', () => {
+    withSeededDb([{ patch: PATCH_16_21 }], (db) => {
+      expect(() =>
+        aggregateRunesByContext(db, { tagsPath: '/nonexistent/champion-tags.json' }),
+      ).toThrow(/Cannot load champion tags from \/nonexistent\/champion-tags\.json/);
+    });
+  });
+
+  it('throws when the tags file is not valid JSON', () => {
+    withSeededDb([{ patch: PATCH_16_21 }], (db) => {
+      const directory = mkdtempSync(join(tmpdir(), 'draftorb-tags-'));
+      try {
+        const tagsPath = join(directory, 'champion-tags.json');
+        writeFileSync(tagsPath, '{not json', 'utf-8');
+        expect(() => aggregateRunesByContext(db, { tagsPath })).toThrow(
+          /Cannot load champion tags/,
+        );
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
+    });
+  });
+
+  it('throws when the tags file fails schema validation', () => {
+    withSeededDb([{ patch: PATCH_16_21 }], (db) => {
+      const directory = mkdtempSync(join(tmpdir(), 'draftorb-tags-'));
+      try {
+        const tagsPath = join(directory, 'champion-tags.json');
+        writeFileSync(tagsPath, JSON.stringify({ '1': { damageType: 'BOGUS' } }), 'utf-8');
+        expect(() => aggregateRunesByContext(db, { tagsPath })).toThrow(
+          /Cannot load champion tags/,
+        );
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
       }
     });
   });

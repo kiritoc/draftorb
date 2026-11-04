@@ -6,6 +6,22 @@ import { describe, expect, it } from 'vitest';
 import { migrate, openDb } from './db';
 import { aggregateRoleProb, latestPatch, type RoleProbRow } from './aggregate';
 
+function requireRow(rows: RoleProbRow[], championId: number, role: string): RoleProbRow {
+  const row = rows.find((r) => r.championId === championId && r.role === role);
+  if (!row) {
+    throw new Error(`expected role_prob row for champion ${championId} role ${role}`);
+  }
+  return row;
+}
+
+function requireAt<T>(list: readonly T[], index: number): T {
+  const item = list[index];
+  if (item === undefined) {
+    throw new Error(`expected an item at index ${index}`);
+  }
+  return item;
+}
+
 async function withSeededDb(run: (dbPath: string) => Promise<void>, seed = true): Promise<void> {
   const directory = mkdtempSync(join(tmpdir(), 'draftorb-aggregate-'));
   const dbPath = join(directory, 'test.sqlite');
@@ -98,10 +114,10 @@ describe('aggregateRoleProb', () => {
         }
 
         // Soraka: 10 support / 2 mid = 12 total, same patch so weights are equal.
-        const soraka = byChampion.get(412)!;
+        const soraka = byChampion.get(412) ?? [];
         expect(soraka.map((r) => r.role).sort()).toEqual(['MID', 'SUPPORT']);
-        const support = soraka.find((r) => r.role === 'SUPPORT')!;
-        const mid = soraka.find((r) => r.role === 'MID')!;
+        const support = requireRow(soraka, 412, 'SUPPORT');
+        const mid = requireRow(soraka, 412, 'MID');
         expect(support.games).toBe(10);
         expect(mid.games).toBe(2);
         expect(support.prob).toBeCloseTo(10 / 12);
@@ -109,8 +125,8 @@ describe('aggregateRoleProb', () => {
         expect(support.prob + mid.prob).toBeCloseTo(1);
 
         // Aatrox: 4 top games only -> prob 1.
-        const aatrox = byChampion.get(266)!;
-        const aatroxRow = aatrox[0]!;
+        const aatrox = byChampion.get(266) ?? [];
+        const aatroxRow = requireAt(aatrox, 0);
         expect(aatrox).toHaveLength(1);
         expect(aatroxRow.role).toBe('TOP');
         expect(aatroxRow.games).toBe(4);
@@ -171,12 +187,11 @@ describe('aggregateRoleProb', () => {
 
         // Default (latest patch 16.21): Aatrox mid from 16.20 is decayed but retained.
         const current = aggregateRoleProb(db);
-        const aatroxMid = current.find((r) => r.championId === 266 && r.role === 'MID');
-        expect(aatroxMid).toBeDefined();
-        expect(aatroxMid!.prob).toBeGreaterThan(0);
-        expect(aatroxMid!.games).toBe(1);
+        const aatroxMid = requireRow(current, 266, 'MID');
+        expect(aatroxMid.prob).toBeGreaterThan(0);
+        expect(aatroxMid.games).toBe(1);
         // Decay weight < 1 so gamesW < games.
-        expect(aatroxMid!.gamesW).toBeLessThan(aatroxMid!.games);
+        expect(aatroxMid.gamesW).toBeLessThan(aatroxMid.games);
 
         // Explicit 16.20: only the old patch's evidence counts.
         const old = aggregateRoleProb(db, { patch: '16.20' });
@@ -231,7 +246,7 @@ describe('aggregateRoleProb', () => {
       try {
         // 16.21: Soraka support games.
         const before = aggregateRoleProb(db);
-        const sorakaBefore = before.find((r) => r.championId === 412 && r.role === 'SUPPORT')!;
+        const sorakaBefore = requireRow(before, 412, 'SUPPORT');
         expect(sorakaBefore.games).toBe(10);
 
         // Ingest only on a newer patch without Soraka.
@@ -251,11 +266,10 @@ describe('aggregateRoleProb', () => {
         ).run();
 
         const after = aggregateRoleProb(db);
-        const sorakaAfter = after.find((r) => r.championId === 412 && r.role === 'SUPPORT');
-        expect(sorakaAfter).toBeDefined();
+        const sorakaAfter = requireRow(after, 412, 'SUPPORT');
         // Decayed: gamesW < games because older patch evidence is down-weighted.
-        expect(sorakaAfter!.gamesW).toBeLessThan(sorakaAfter!.games);
-        expect(sorakaAfter!.games).toBe(10); // raw count unchanged
+        expect(sorakaAfter.gamesW).toBeLessThan(sorakaAfter.games);
+        expect(sorakaAfter.games).toBe(10); // raw count unchanged
       } finally {
         db.close();
       }
@@ -283,7 +297,7 @@ describe('aggregateRoleProb', () => {
         ).run();
 
         const rows = aggregateRoleProb(db);
-        const sorakaSupport = rows.find((r) => r.championId === 412 && r.role === 'SUPPORT')!;
+        const sorakaSupport = requireRow(rows, 412, 'SUPPORT');
         // 11 raw games but uneven weights -> n_eff < 11.
         const nEff = sorakaSupport.gamesW ** 2 / sorakaSupport.gamesW2;
         expect(nEff).toBeLessThan(sorakaSupport.games);

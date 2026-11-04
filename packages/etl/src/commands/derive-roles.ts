@@ -1,20 +1,16 @@
 import Database from 'better-sqlite3';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 
 import type { ChampionRoleProbabilities, ChampionsMap, Role } from '@draftorb/shared';
 
-import { defaultPublicDataDir, resolveRepoRoot } from '../config/paths';
+import { dbPathFromEnv, defaultPublicDataDir } from '../config/paths';
+import { getMigrationStatus } from '../db';
 import { invalidateManifest } from '../public-data';
 import { applyDerivedRoles } from '../derive-roles';
 import { computeRoleProb, latestPatch, PATCH_PATTERN } from '../aggregate';
-import { UsageError } from '../cli-args';
+import { CliError, UsageError } from '../cli-args';
 import { log, parsePositionals, type Command } from './shared';
-
-function resolveDbPath(): string {
-  const chosen = process.env.DRAFTORB_DB_PATH ?? join(resolveRepoRoot(), 'data', 'DraftOrb.sqlite');
-  return resolve(chosen);
-}
 
 export async function runDeriveRoles(args: string[]): Promise<void> {
   const [patch] = parsePositionals(args, 1, 'derive-roles [patch]');
@@ -22,16 +18,29 @@ export async function runDeriveRoles(args: string[]): Promise<void> {
     throw new UsageError(`Invalid patch "${patch}". Expected a format like "16.21".`);
   }
 
-  const dbPath = resolveDbPath();
+  const dbPath = dbPathFromEnv();
   if (!existsSync(dbPath)) {
     log.info(`no database at ${dbPath}`);
     return;
   }
 
-  const db = new Database(dbPath);
+  const db = new Database(dbPath, { readonly: true, fileMustExist: true });
   let targetPatch: string | undefined;
   let rows: { championId: number; role: string; prob: number }[] = [];
   try {
+    // On a legacy schema, getMigrationStatus tries to upgrade `_migrations`,
+    // which fails on this read-only connection: treat that as pending too.
+    let pending: number;
+    try {
+      ({ pending } = getMigrationStatus(db));
+    } catch {
+      throw new CliError('Database schema is out of date; run `pnpm etl migrate` first.');
+    }
+    if (pending > 0) {
+      throw new CliError(
+        `Database schema is out of date (${pending} pending migration(s)); run \`pnpm etl migrate\` first.`,
+      );
+    }
     targetPatch = patch ?? latestPatch(db);
     if (targetPatch !== undefined) {
       // Compute for the target patch directly: `role_prob` has no patch column

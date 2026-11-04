@@ -37,6 +37,21 @@ describe('deriveChampionRoles', () => {
   it('returns an empty record for an empty role-probability map', () => {
     expect(deriveChampionRoles({})).toEqual({});
   });
+
+  it('drops roles below the role-probability threshold (B-046)', () => {
+    const roleProb: ChampionRoleProbabilities = { '412': { SUPPORT: 0.97, TOP: 0.03 } };
+    expect(deriveChampionRoles(roleProb)).toEqual({ '412': ['SUPPORT'] });
+  });
+
+  it('keeps the single highest-probability role when none reaches the threshold', () => {
+    const roleProb: ChampionRoleProbabilities = { '1': { TOP: 0.02, MID: 0.03 } };
+    expect(deriveChampionRoles(roleProb)).toEqual({ '1': ['MID'] });
+  });
+
+  it('honors an explicit minimum probability', () => {
+    const roleProb: ChampionRoleProbabilities = { '99': { MID: 0.7, SUPPORT: 0.3 } };
+    expect(deriveChampionRoles(roleProb, 0.5)).toEqual({ '99': ['MID'] });
+  });
 });
 
 describe('applyDerivedRoles', () => {

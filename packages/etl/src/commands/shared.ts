@@ -4,9 +4,6 @@ import { PLATFORMS, type Platform } from '../riot';
 import { EXIT, UsageError } from '../cli-args';
 
 export const DEFAULT_PLATFORM: Platform = 'euw1';
-export const DB_ENV_VAR = 'DRAFTORB_DB_PATH';
-// Kept as-is to avoid orphaning existing databases; centralised so renaming is a one-line change.
-export const DEFAULT_DB_FILENAME = 'DraftOrb.sqlite';
 
 /** Data Dragon versions look like "14.5.1" (or "14.5"). */
 const VERSION_PATTERN = /^\d+\.\d+(\.\d+)?$/;
@@ -82,7 +79,10 @@ export function parseVersion(value: string | undefined): string | undefined {
 }
 
 export const PLANNED_COMMANDS = [
-  { name: 'export', description: 'Write versioned JSON and manifest' },
+  {
+    name: 'backtest',
+    description: 'Offline validation of draft and item recommendations (T-027.a, T-027.b)',
+  },
 ] as const;
 
 export function findCommand(commands: readonly Command[], name: string): Command | undefined {
@@ -96,21 +96,18 @@ export function formatHelp(commands: readonly Command[]): string {
   const labelOf = (c: Command): string =>
     c.aliases?.length ? `${c.usage} (alias: ${c.aliases.join(', ')})` : c.usage;
 
-  const labels = [...commands.map(labelOf), 'help'];
-  const width = Math.max(
-    ...labels.map((l) => l.length),
-    ...PLANNED_COMMANDS.map((c) => c.name.length),
-  );
-
+  // Two-line layout: usage on one line, description indented on the next, so
+  // long usages never push the column past a readable width (B-045).
   const lines = [
     'DraftOrb ETL CLI',
     '',
     'Commands:',
-    ...commands.map((c) => `  ${labelOf(c).padEnd(width)}  ${c.description}`),
-    `  ${'help'.padEnd(width)}  Show this help message`,
+    ...commands.flatMap((c) => [`  ${labelOf(c)}`, `      ${c.description}`]),
+    '  help',
+    '      Show this help message',
     '',
     'Target state commands (in development):',
-    ...PLANNED_COMMANDS.map((c) => `  ${c.name.padEnd(width)}  ${c.description}`),
+    ...PLANNED_COMMANDS.flatMap((c) => [`  ${c.name}`, `      ${c.description}`]),
     '',
     'Run "<command> --help" for a command usage line.',
     `Exit codes: ${EXIT.OK} ok, ${EXIT.FAILURE} failure, ${EXIT.USAGE} usage error, ${EXIT.AUTH} Riot auth error.`,

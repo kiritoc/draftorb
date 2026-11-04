@@ -13,6 +13,7 @@
 
 import type { ChampionRoleProbabilities, ChampionsMap, Role } from '@draftorb/shared';
 import { roleSchema } from '@draftorb/shared';
+import { DEFAULT_RECOMMEND_CONFIG } from '@draftorb/engine';
 
 /** All roles in canonical order (matches `roleSchema` enum order). */
 export const CANONICAL_ROLES: readonly Role[] = roleSchema.options as unknown as readonly Role[];
@@ -20,20 +21,28 @@ export const CANONICAL_ROLES: readonly Role[] = roleSchema.options as unknown as
 /**
  * Derives the roles of every champion observed in `roleProbabilities`.
  *
- * A champion's roles are the roles it has been observed in (probability >
- * 0), in canonical order. Champions absent from the map are not included —
- * callers keep their existing (bootstrap) roles for unobserved champions.
+ * A champion's roles are the roles with probability >= `minProb`
+ * (`roleProbThreshold`, B-046), in canonical order. Champions absent from the
+ * map are not included — callers keep their existing (bootstrap) roles for
+ * unobserved champions.
  */
 export function deriveChampionRoles(
   roleProbabilities: ChampionRoleProbabilities,
+  minProb: number = DEFAULT_RECOMMEND_CONFIG.roleProbThreshold,
 ): Record<string, Role[]> {
   const result: Record<string, Role[]> = {};
   for (const [championId, probs] of Object.entries(roleProbabilities)) {
     const roles: Role[] = [];
     for (const role of CANONICAL_ROLES) {
-      if ((probs[role] ?? 0) > 0) {
+      if ((probs[role] ?? 0) >= minProb) {
         roles.push(role);
       }
+    }
+    if (roles.length === 0) {
+      // Cannot happen with five roles summing to 1, but a champion must always
+      // keep at least one role: fall back to the highest-probability one.
+      const best = CANONICAL_ROLES.reduce((a, b) => ((probs[b] ?? 0) > (probs[a] ?? 0) ? b : a));
+      roles.push(best);
     }
     result[championId] = roles;
   }
@@ -48,8 +57,9 @@ export function deriveChampionRoles(
 export function applyDerivedRoles(
   champions: ChampionsMap,
   roleProbabilities: ChampionRoleProbabilities,
+  minProb: number = DEFAULT_RECOMMEND_CONFIG.roleProbThreshold,
 ): ChampionsMap {
-  const derived = deriveChampionRoles(roleProbabilities);
+  const derived = deriveChampionRoles(roleProbabilities, minProb);
   const result: ChampionsMap = {};
   for (const [championId, champion] of Object.entries(champions)) {
     result[championId] = { ...champion, roles: derived[championId] ?? champion.roles };

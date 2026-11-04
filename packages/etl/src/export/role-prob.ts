@@ -23,7 +23,7 @@ export interface RoleProbRow {
 }
 
 /** Exports the stored `prob` for gated-in rows, renormalized per champion to sum to 1. */
-export function computeRoleProb(
+export function exportRoleProbabilities(
   rows: readonly RoleProbRow[],
   exportMinGames: number,
 ): Record<string, Record<string, number>> {
@@ -40,9 +40,15 @@ export function computeRoleProb(
     let total = 0;
     for (const e of entries) total += e.prob;
     if (total <= 0) continue;
+    // The largest surviving probability absorbs the rounding residual so the
+    // adjusted role is always the dominant one (B-049).
+    let residualIndex = 0;
+    entries.forEach((e, index) => {
+      if (e.prob > (entries[residualIndex]?.prob ?? 0)) residualIndex = index;
+    });
     const probs: Record<string, number> = {};
     let assigned = 0;
-    entries.forEach((e, index) => {
+    const values = entries.map((e, index) => {
       try {
         roleSchema.parse(e.role);
       } catch (error: unknown) {
@@ -50,10 +56,13 @@ export function computeRoleProb(
           `Invalid role-prob export for role-prob.json (champion ${championId}): ${error instanceof Error ? error.message : String(error)}`,
         );
       }
-      // The last survivor takes the residual so rounded values sum to exactly 1.
-      const value = index === entries.length - 1 ? round6(1 - assigned) : round6(e.prob / total);
+      if (index === residualIndex) return 0;
+      const value = round6(e.prob / total);
       assigned += value;
-      probs[e.role] = value;
+      return value;
+    });
+    entries.forEach((e, index) => {
+      probs[e.role] = index === residualIndex ? round6(1 - assigned) : (values[index] ?? 0);
     });
     out[championId] = probs;
   }
@@ -70,13 +79,6 @@ export function roleProbFile(
   rows: readonly RoleProbRow[],
   exportMinGames: number,
 ): { relativePath: string; content: string } {
-  const out = computeRoleProb(rows, exportMinGames);
-  try {
-    championRoleProbabilitiesSchema.parse(out);
-  } catch (error: unknown) {
-    throw new Error(
-      `Invalid role-prob export for role-prob.json: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
+  const out = exportRoleProbabilities(rows, exportMinGames);
   return { relativePath: 'role-prob.json', content: JSON.stringify(out) };
 }

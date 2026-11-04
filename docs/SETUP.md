@@ -37,10 +37,12 @@ pnpm etl check-key [platform]  # test the Riot API key (default: euw1)
 pnpm etl players [platform]    # discover players by tier (--tiers, --quota, --reset)
 pnpm etl matches [platform]    # ingest matches, resumable, Ctrl+C safe (--since-patch, --per-player, --limit, --queue, --min-duration, --reset)
 pnpm etl status [platform]     # counts and progress
-pnpm etl aggregate             # compute aggregated tables (role probabilities and rank-weighted baselines; T-015, T-016)
+pnpm etl aggregate [patch]     # compute every aggregated table (role probabilities, baselines, pair and lane tables, rune contexts; T-015..T-018)
 pnpm etl export [patch] [--region=<platform>]  # write versioned JSON and manifest for a patch (T-019)
 pnpm etl derive-roles [patch]  # rewrite champions.json.roles from observed roles (T-015.b); run after `matches`, and re-run after every `static`
 ```
+
+Database commands (`aggregate`, `derive-roles`, `export`, `status`, `matches`, `players`, `migrate`) resolve the SQLite path the same way (`DRAFTORB_DB_PATH` env or repo default). `aggregate` and `derive-roles` refuse to run on a database with pending migrations — run `pnpm etl migrate` first.
 
 Planned (target state, see TICKETS.md):
 

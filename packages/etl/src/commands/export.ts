@@ -1,20 +1,14 @@
 import Database from 'better-sqlite3';
 import { existsSync } from 'node:fs';
 import { parseArgs } from 'node:util';
-import { join, resolve } from 'node:path';
 
-import { resolveRepoRoot } from '../config/paths';
+import { dbPathFromEnv } from '../config/paths';
 import { exportJson } from '../export';
 import { PATCH_PATTERN } from '../aggregate';
 import { UsageError } from '../cli-args';
 import { log, type Command } from './shared';
 
 const USAGE = 'export [patch] [--region=<platform>]';
-
-function resolveDbPath(): string {
-  const chosen = process.env.DRAFTORB_DB_PATH ?? join(resolveRepoRoot(), 'data', 'DraftOrb.sqlite');
-  return resolve(chosen);
-}
 
 async function runExport(args: string[]): Promise<void> {
   let parsed: ReturnType<typeof parseArgs>;
@@ -44,7 +38,7 @@ async function runExport(args: string[]): Promise<void> {
       throw new UsageError(`Invalid patch "${patch}". Expected a format like "16.21".`);
     }
   }
-  const dbPath = resolveDbPath();
+  const dbPath = dbPathFromEnv();
 
   if (!existsSync(dbPath)) {
     log.info(`no database at ${dbPath}`);

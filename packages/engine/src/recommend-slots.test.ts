@@ -12,6 +12,7 @@ const roleProb = {
   '50': { MID: 0.8, SUPPORT: 0.2 },
   '200': { SUPPORT: 1 },
   '201': { ADC: 1 },
+  '235': { SUPPORT: 0.6, ADC: 0.4 },
   '300': { ADC: 1 },
   '302': { MID: 1 },
 } as ChampionRoleProbabilities;
@@ -75,6 +76,40 @@ describe('resolveKnownSlots', () => {
     expect(slots).toEqual([
       { championId: 201, role: 'ADC', side: 'enemy', confidence: 1, fixed: true },
     ]);
+  });
+});
+
+describe('resolveKnownSlots — reserved roles (B-043)', () => {
+  it('infers a flex ally to a non-reserved role', () => {
+    const slots = resolveKnownSlots([{ championId: 235 }], 'ally', roleProb, ['SUPPORT']);
+    expect(slots).toEqual([
+      { championId: 235, role: 'ADC', side: 'ally', confidence: 1, fixed: false },
+    ]);
+  });
+
+  it('drops an ally fixed to a reserved role', () => {
+    expect(
+      resolveKnownSlots([{ championId: 200, role: 'SUPPORT' }], 'ally', roleProb, ['SUPPORT']),
+    ).toEqual([]);
+  });
+
+  it('drops an ally that can only play a reserved role and keeps the rest', () => {
+    const slots = resolveKnownSlots([{ championId: 200 }, { championId: 201 }], 'ally', roleProb, [
+      'SUPPORT',
+    ]);
+    expect(slots.map((s) => [s.championId, s.role])).toEqual([[201, 'ADC']]);
+  });
+
+  it('drops a reserved-role ally even when an unfixed duplicate exists', () => {
+    const fixed = { championId: 235, role: 'SUPPORT' as const };
+    const unfixed = { championId: 235 };
+    expect(resolveKnownSlots([unfixed, fixed], 'ally', roleProb, ['SUPPORT'])).toEqual([]);
+    expect(resolveKnownSlots([fixed, unfixed], 'ally', roleProb, ['SUPPORT'])).toEqual([]);
+  });
+
+  it('leaves the enemy call unchanged without reserved roles', () => {
+    const slots = resolveKnownSlots([{ championId: 235 }], 'enemy', roleProb);
+    expect(slots[0]?.role).toBe('SUPPORT');
   });
 });
 

@@ -1,17 +1,30 @@
 /**
- * @draftorb/web — Draft screen (T-031).
+ * @draftorb/web — Draft screen (T-031/T-032).
  *
  * Ten draft slots (user, four allies, five enemies), each with a searchable
  * champion picker and an optional role. A blind-pick toggle and a rank
  * selector (Diamond default) complete the draft input. Any subset of inputs
- * is valid. The built `DraftInput` is exposed downstream (T-032).
+ * is valid. The built `DraftInput` is scored by the engine and rendered as a
+ * paginated "Best overall" recommendations list (T-032).
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { type ChampionId, type DraftInput, type Rank, type Role } from '@draftorb/shared';
-import { loadChampions, loadLatest } from '../data/loader.js';
+import {
+  type BaselineEntry,
+  type Champion,
+  type ChampionRoleProbabilities,
+  type DraftInput,
+  type Rank,
+  type RecommendData,
+  type Recommendation,
+  type Role,
+} from '@draftorb/shared';
+import { recommend } from '@draftorb/engine';
+import { loadChampions, loadExportFiles, loadLatest, loadManifest } from '../data/loader.js';
+import { recommendationPageSize } from '../config.js';
 import { DraftSlot, type DraftSlotState } from './DraftSlot.js';
+import { RecommendationsList } from './RecommendationsList.js';
 
 const USER_ROLE: Role = 'SUPPORT';
 const DEFAULT_RANK: Rank = 'DIAMOND';
@@ -22,13 +35,14 @@ function emptySlot(role?: Role): DraftSlotState {
   return { championId: null, role };
 }
 
-function isFilled(slot: DraftSlotState): slot is { championId: ChampionId; role?: Role } {
+function isFilled(slot: DraftSlotState): slot is { championId: number; role?: Role } {
   return slot.championId != null;
 }
 
 export function DraftScreen() {
   const [patch, setPatch] = useState<string | null>(null);
-  const [champions, setChampions] = useState<import('@draftorb/shared').Champion[]>([]);
+  const [champions, setChampions] = useState<Champion[]>([]);
+  const [files, setFiles] = useState<Record<string, unknown>>({});
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<DraftSlotState>(emptySlot(USER_ROLE));
   const [allies, setAllies] = useState<DraftSlotState[]>(
@@ -39,18 +53,23 @@ export function DraftScreen() {
   );
   const [blindPick, setBlindPick] = useState(false);
   const [userRank, setUserRank] = useState<Rank>(DEFAULT_RANK);
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
         const latest = await loadLatest();
-        const loadedChampions = await loadChampions(latest.patch);
+        const [loadedChampions, loadedFiles] = await Promise.all([
+          loadChampions(latest.patch),
+          loadManifest(latest.patch).then((manifest) => loadExportFiles(manifest)),
+        ]);
         if (cancelled) {
           return;
         }
         setPatch(latest.patch);
         setChampions(loadedChampions);
+        setFiles(loadedFiles.files);
       } catch (err) {
         if (cancelled) {
           return;
@@ -62,6 +81,54 @@ export function DraftScreen() {
       cancelled = true;
     };
   }, []);
+
+  const data: RecommendData = useMemo(
+    () => ({
+      baselines: (files['roles/SUPPORT/baseline.json'] as BaselineEntry[] | undefined) ?? [],
+      allyPairs: [],
+      enemyPairs: [],
+      laneVs: [],
+      laneFull: [],
+      roleProb: (files['role-prob.json'] as ChampionRoleProbabilities | undefined) ?? {},
+      tags: {},
+      championIds: champions.map((champion) => champion.id),
+    }),
+    [files, champions],
+  );
+
+  const draftInput: DraftInput = useMemo(
+    () => ({
+      userRank,
+      userRole: USER_ROLE,
+      allies: allies.filter(isFilled).map((slot) => ({
+        championId: slot.championId,
+        role: slot.role,
+      })),
+      enemies: enemies.filter(isFilled).map((slot) => ({
+        championId: slot.championId,
+        role: slot.role,
+      })),
+      blindPick,
+    }),
+    [userRank, allies, enemies, blindPick],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    try {
+      const result = recommend(draftInput, data);
+      if (!cancelled) {
+        setRecommendations(result.recommendations);
+      }
+    } catch {
+      if (!cancelled) {
+        setRecommendations([]);
+      }
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [draftInput, data]);
 
   const setUserSlot = useCallback((slot: DraftSlotState) => setUser(slot), []);
   const setAlly = useCallback((index: number, slot: DraftSlotState) => {
@@ -78,18 +145,6 @@ export function DraftScreen() {
       return next;
     });
   }, []);
-
-  const draftInput: DraftInput = {
-    userRank,
-    userRole: USER_ROLE,
-    allies: allies
-      .filter(isFilled)
-      .map((slot) => ({ championId: slot.championId, role: slot.role })),
-    enemies: enemies
-      .filter(isFilled)
-      .map((slot) => ({ championId: slot.championId, role: slot.role })),
-    blindPick,
-  };
 
   const totalKnown = [user, ...allies, ...enemies].filter(isFilled).length;
 
@@ -205,17 +260,15 @@ export function DraftScreen() {
           </section>
         </div>
 
-        <div className="mt-6 p-4 bg-gray-800/50 border border-gray-800 rounded">
-          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-            Draft input ({totalKnown} of 10 slots filled)
-          </h3>
-          <pre className="text-xs text-gray-400 overflow-x-auto">
-            {JSON.stringify(draftInput, null, 2)}
-          </pre>
-        </div>
+        <RecommendationsList
+          title="Best overall"
+          recommendations={recommendations}
+          champions={champions}
+          pageSize={recommendationPageSize}
+        />
 
         <p className="mt-4 text-xs text-gray-500 text-center">
-          Any subset of inputs is valid. Recommendations appear once data is loaded (T-032).
+          {totalKnown} of 10 slots filled &mdash; any subset of inputs is valid.
         </p>
       </main>
     </div>

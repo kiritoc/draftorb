@@ -254,35 +254,46 @@ One weight formula, stated once:
 
 ## 15. Change score (D-046)
 
-Source: CommunityDragon game data, `https://raw.communitydragon.org/<major.minor>/` (same label as `matches.patch`). Data Dragon is not used for scoring (its champion files carry no ability values); it stays the source of the published catalogs and of the Summoner's Rift item filter (`item.json` `maps["11"]`). Files: champions — `plugins/rcp-be-lol-game-data/global/default/v1/champion-summary.json` (numeric id -> alias; ids < 0 skipped), then `game/data/characters/<alias>/<alias>.bin.json` (alias lowercased); items — `game/items.cdtb.bin.json`; runes — location of numeric rune values VERIFY in the T-019.d check.
+Source: CommunityDragon game data, `https://raw.communitydragon.org/<major.minor>/` (same label as `matches.patch`). Data Dragon is not used for scoring (its champion files carry no ability values); it stays the source of the published catalogs and of the Summoner's Rift item filter. Files:
+
+- champions: `plugins/rcp-be-lol-game-data/global/default/v1/champion-summary.json` (numeric id -> alias), then `game/data/characters/<alias>/<alias>.bin.json` (alias lowercased);
+- items: `game/items.cdtb.bin.json` (`Items/<id>` records);
+- runes: `game/perks.cdtb.bin.json` (`Perks/Styles/<Tree>/<Name>` records with `mPerkId`).
+
+Entity sets: champions whose id is in the Data Dragon champion catalog (this drops game-mode variants such as `Jade_*`, ids >= 60001); items with Data Dragon `item.json` `maps["11"] == true` (read from the raw file: the published `items.json` does not keep `maps`); every perk.
 
 Command `pnpm etl changes <patch>` writes `entity_change_scores(entity_type, entity_id, patch_index, content_hash, change_score, details)`; `entity_type` IN (`champion`,`item`,`rune`); `entity_id` = numeric champion/item/perk id; unique key `(entity_type, entity_id, patch_index)`; re-run overwrites. `change_score` REAL in [0,1] or NULL, rounded to 4 decimals. `content_hash` + `details` only (no snapshots). The previous patch's files are re-downloaded when needed.
 
+Folder lifetime: a patch folder can still change while that patch is live (hotfix extractions; observed 10-12 days after release), and has stayed unchanged once the next patch is out. A score for the latest patch is therefore provisional: the command warns when `<patch>` is the latest patch, and re-running it after the next patch is released makes the score final.
+
 Algorithm (TypeScript terms):
 
-1. Allowlist extraction (configurable). Only these fields are read; everything else (skins, VFX, animation, icons, client/tooltip data, unresolved `{hash}` names) is ignored:
-   - champion: numeric base and per-level stats of `Characters/<Name>/CharacterRecords/Root`; for every spell of the record's ability list, `mSpell.DataValues` (keyed by `name`), `mSpell.mSpellCalculations` formula parts (referenced data value names and `mCoefficient`s), `cooldownTime`, `mana`, `castRange`.
-   - item (`Items/<id>`, Summoner's Rift items only): `price`, `recipeItemLinks`, numeric `mFlat*`/`mPercent*` mods, item `DataValues`.
-   - rune: numeric values once located (VERIFY).
-2. Flatten into `Map<string, Leaf>` (path -> leaf), leaf `number | number[]`; numbers rounded to 6 decimals (the files store float32 values such as `0.30000001192092896`).
-3. `content_hash` = sha256 of canonical JSON (sorted keys) of the map (`node:crypto`, no new dependency). Equal -> `change_score = 0`.
-4. Otherwise sum contributions:
+1. Allowlist extraction (configurable). Only these fields are read; everything else (skins, VFX, animation, icons, client/tooltip data) is ignored:
+   - champion: numeric base and per-level stats of `Characters/<Name>/CharacterRecords/Root` (including `primaryAbilityResource`); for every ability of the record's `mAbilities` list, its root spell and child spells: `mSpell.DataValues`, `mSpell.mSpellCalculations` formula parts (referenced data value names and numeric parts such as `mCoefficient`), `cooldownTime`, `mana`, `castRange`.
+   - item: `price`, `recipeItemLinks`, numeric `mFlat*`/`mPercent*` mods, `mDataValues`.
+   - rune: `mScript.mSpellScriptData.mEffectAmount` and `mScript.mSpellScriptData.mCalculations`; per-mode overrides (`mEffectAmountGameMode`, e.g. ARAM, URF) are ignored.
+2. Name normalization: every entry path and field name is compared in hashed form, FNV-1a 32-bit of the lowercased name written `{xxxxxxxx}`, because CommunityDragon resolves more hashed names over time (observed: `{89aa48b5}` became `Characters/Jade_Galio/Spells/Jade_GalioEAbility/Jade_GalioE_Haste`, field `{72c5c2a8}` became `DamageType`).
+3. Named lists are keyed by name, never by position: spell `DataValues` by `name`, item `mDataValues` by `mName`.
+4. Flatten into `Map<string, Leaf>` (path -> leaf), leaf `number | number[]`; numbers rounded to 6 decimals (the files store float32 values such as `0.30000001192092896`).
+5. `content_hash` = sha256 of canonical JSON (sorted keys) of the map (`node:crypto`, no new dependency). Equal -> `change_score = 0`.
+6. Otherwise sum contributions:
    - number: `min(1, abs(new-old) / max(abs(old), 1e-6)) * 0.5`, per-leaf cap 0.5.
    - number[] same length: `mean(relative change per index) * 0.5` (one contribution per array). Different length: 0.3.
-   - structural: spell added, removed or replaced in the ability list -> 0.6 each; data value or calculation added or removed -> 0.3 each; item recipe changed -> 0.3; stat mod added or removed -> 0.3.
-5. `change_score = min(1, sum)`, rounded to 4 decimals.
+   - duplicates: the same change (same value name, same old and new value) repeated inside one entity counts once (e.g. one Q value copied into four elemental sub-spells).
+   - structural: a root spell (`mRootSpell` of an ability) added, removed or replaced -> 0.6 each; child spells (missiles, helpers) only count through their values; a data value or calculation added or removed -> 0.3 each; item recipe changed -> 0.3; stat mod added or removed -> 0.3.
+7. `change_score = min(1, sum)`, rounded to 4 decimals.
 
 Text is never compared, so tooltip rewording cannot change a score.
 
-Properties (tested): rewording or reordering never changes the score (allowlist, canonical JSON, data values keyed by name); magnitude matters beyond the per-leaf cap; monotone in change size for fixed keys.
+Properties (tested): rewording, reordering and hash resolution never change the score (allowlist, canonical JSON, name keys, hashed names); magnitude matters beyond the per-leaf cap; monotone in change size for fixed keys.
 
 Bands (half-open): [0, 0.1) x1.0; [0.1, 0.3) x0.9; [0.3, 0.6) x0.5; [0.6, 1] creates `suggested` breakpoint (source `auto`, mode `downweight`, `weight_factor` 0.2). While a suggestion is pending or after rejection: effective weight = [0.3, 0.6) band weight (x0.5), never 1.0.
 
 Fallback (stated once here): missing/unreadable/incomplete source, or no previous patch with data -> `change_score = NULL`, weight 1.0, warning logged (first patch: NULL, no warning). Never invent a score, never block the pipeline. All other sections reference this fallback.
 
-Fixtures (arithmetic shown): cooldown scalar 10->9 = 0.05 ([0,0.1) x1.0); armor 30->36 (0.1) + cooldown 10->9 (0.05) = 0.15 ([0.1,0.3) x0.9); damage array [10,9,8,7,6]->[9,8,7,6,5] ≈ 0.065 ([0,0.1) x1.0); AP ratio 0.5->0.55 = 0.05 ([0,0.1) x1.0); ability replaced = 0.6 ([0.6,1] suggested); identical = 0; skin/VFX-only change = 0; ARAM-only item = 0. Real-JSON fixtures: trimmed CommunityDragon files of two consecutive real patches under `packages/etl/test/fixtures`.
+Fixtures (arithmetic shown): cooldown scalar 10->9 = 0.05 ([0,0.1) x1.0); armor 30->36 (0.1) + cooldown 10->9 (0.05) = 0.15 ([0.1,0.3) x0.9); damage array [10,9,8,7,6]->[9,8,7,6,5] ≈ 0.065 ([0,0.1) x1.0); AP ratio 0.5->0.55 = 0.05 ([0,0.1) x1.0); root spell replaced = 0.6 ([0.6,1] suggested); identical = 0; skin/VFX-only change = 0; child missile added = 0; hash resolved to a name = 0; ARAM-only item = 0; ARAM-only perk override = 0. Real-JSON fixtures: trimmed CommunityDragon files of two consecutive real patches under `packages/etl/test/fixtures`.
 
-Verification before the allowlist is frozen (T-019.d): on two real consecutive patches, every champion and item change listed in the official patch notes gets a non-zero score and unchanged entities score 0; misses and false positives are recorded in PROGRESS.md. Manual breakpoints (§16, T-019.e) ship first.
+Verification (2026-11-04, prototype on 16.20 -> 16.21 and 16.21 -> 16.22, see PROGRESS.md): of 173 champions, 145 and 53 raw files changed but only 21 and 15 champions have allowlisted changes, all of them balance values (e.g. 16.21 Caitlyn Q base damage, Varus W, Sion R ratio; 16.22 Mel base stats, Smolder, Naafiri). Items: 15 and 2 changed catalog items before the Summoner's Rift filter. Runes: no value changes in either pair. Remaining known false-positive class: internal data refactors with the same in-game effect (16.22 Orianna: `ReducedDamagePercent` 30 -> 0.7 with recalculated formulas, scored 1); these surface as `suggested` breakpoints and are rejected in review (§16). Still to do before the allowlist is frozen: compare these lists with the official patch notes. Manual breakpoints (§16, T-019.e) ship first.
 
 ## 16. Breakpoints (D-047)
 

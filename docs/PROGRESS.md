@@ -4,7 +4,7 @@
 
 - Phase: 1 (Support / Diamond)
 - Current milestone: M0 Foundations (T-002.b DONE) and M1 ETL (in progress: T-014 DONE; T-015/T-015.b DONE; T-016 DONE; T-017 DONE; T-018 DONE; T-019 DONE; T-019.b..f TODO) -> M2 Engine (T-020..T-023 DONE)
-- Last updated: 2026-11-04 by Devin (D-046 rewritten and accepted)
+- Last updated: 2026-11-04 by Devin (T-019.d verification step)
 
 ## Epic status
 
@@ -37,7 +37,25 @@ Session entries before 2026-10-29 live in [PROGRESS_ARCHIVE.md](./PROGRESS_ARCHI
 
 Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-050 and D-051 ACCEPTED; D-044 ACCEPTED with 20 patches; D-046 ACCEPTED with CommunityDragon as the source. No PROPOSED decisions are open.
 
+- T-019.d verification: please compare the champion and item lists in the 2026-11-04 "T-019.d verification step" entry below with the official 16.21 and 16.22 patch notes (misses and false positives).
+
 ## Session log (newest first)
+
+### 2026-11-04 — Devin — T-019.d verification step (CommunityDragon change-score prototype)
+
+- Done: scratch prototype (outside the repo) of the SPECS §15 algorithm run on CommunityDragon 16.20 -> 16.21 and 16.21 -> 16.22 for the 173 Data Dragon catalog champions, catalog items and perks.
+  - Champions 16.20 -> 16.21: raw files changed for 145, allowlisted changes for 21. Scores: Varus 1, Locke 1, Caitlyn 0.4154, MonkeyKing 0.4107, MissFortune 0.3543, Viktor 0.2682, Sion 0.2662, Taliyah 0.2419, Nunu 0.2104, Ryze 0.2027, Nidalee 0.1665, XinZhao 0.1625, Rammus 0.1412, Azir 0.125, Velkoz 0.1111, Tristana 0.0918, Qiyana 0.0914, Orianna 0.0767, Jinx 0.0543, LeeSin 0.0527, Yone 0.0227.
+  - Champions 16.21 -> 16.22: raw files changed for 53, allowlisted changes for 15. Scores: Orianna 1 (internal refactor, see below), Mel 1, Varus 0.9442, AurelionSol 0.4497, Thresh 0.3333, Aurora 0.3, Smolder 0.2216, Naafiri 0.1943, Locke 0.1611, Viktor 0.125, Maokai 0.0949, Corki 0.0804, Rumble 0.0714, Shen 0.0551, Yasuo 0.0238.
+  - Items: 15 (16.21) and 2 (16.22) changed catalog items before the Summoner's Rift filter (e.g. 3008 price 700 -> 800; 1086 AD 8 -> 7; 2501 AD 30 -> 40). Runes: no value change in either pair.
+  - False positives found and fixed in the spec: `Jade_*` game-mode champions (now limited to the catalog); hashed names resolved between patches (now compared in FNV-1a form, algorithm confirmed on `DamageType` = `{72c5c2a8}`); item `mDataValues` keyed by position (now by `mName`); one value repeated in sub-spells (Qiyana Q 0.37 -> 0.09, Caitlyn 1 -> 0.42; now counted once); child missile spells added/renamed (Veigar, Lux 0.6 -> 0; root spells only).
+  - Remaining false-positive class: internal data refactors with the same in-game effect (16.22 Orianna `ReducedDamagePercent` 30 -> 0.7 with recalculated formulas). Handled by rejecting the suggested breakpoint (D-047).
+  - Folder lifetime: 16.20 files last changed 2026-10-19 (folder created 10-07), none after the 16.21 release (10-21); 16.21 files changed again on 10-31 (`Jade_Amumu`, `champion-summary.json`). Rule added: scores for the live patch are provisional.
+  - Docs: SPECS §15 rewritten with the refinements and results, D-046 verification update, RIOT_API.md VERIFY items resolved (`maps["11"]` confirmed on Data Dragon 16.21.1; the published `items.json` does not keep `maps`), T-019.d step 1 updated.
+- Files touched: `docs/SPECS.md`, `docs/DECISIONS.md`, `docs/RIOT_API.md`, `docs/TICKETS.md`, `docs/PROGRESS.md`.
+- Tests: none (docs and a scratch prototype only); `pnpm format:check`.
+- State left: T-019.d step 1 done except the comparison with the official patch notes (owner).
+- Next step: owner checks the two lists above against the 16.21 and 16.22 patch notes; then T-019.b -> T-019.e -> T-019.d.
+- Pitfalls / notes for next AI: CommunityDragon arrays hold 7 entries (rank 0..6), so a per-rank change is averaged over 7; `items.cdtb.bin.json` is about 16 MB per patch.
 
 ### 2026-11-04 — Devin — D-046 rewritten for CommunityDragon and accepted
 

@@ -37,8 +37,8 @@ Not implemented in `RiotClient` yet: `getMatchTimeline` exists but is not used y
 - Rank of a player is the CURRENT rank at collection time (approximation of rank at game time). Document in DECISIONS.md.
 - Use `teamPosition` for roles (can be empty in remakes — drop those). Filter queue 420, duration > 15 min.
 - Keep `patch` = first two numbers of `gameVersion`.
-- VERIFY: `maps["11"]` field name for Summoner's Rift filtering (D-046).
-- VERIFY: CommunityDragon location of numeric rune values, and whether patch folders stay unchanged after release (T-019.d).
+- Verified 2026-11-04: Data Dragon `item.json` `maps["11"]` is the Summoner's Rift flag (315 of 863 items on 16.21.1).
+- Verified 2026-11-04: CommunityDragon rune values are in `game/perks.cdtb.bin.json`; patch folders change while the patch is live (hotfixes) and have stayed unchanged once the next patch is out (SPECS §15).
 
 ## Third-party/in-game tools (E6/E7)
 

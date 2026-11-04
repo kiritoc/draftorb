@@ -8,8 +8,10 @@
  */
 
 import {
+  type Champion,
   type Latest,
   type Manifest,
+  championsMapSchema,
   latestSchema,
   manifestSchema,
 } from '@draftorb/shared';
@@ -58,4 +60,10 @@ export async function loadExportFiles(manifest: Manifest): Promise<LoadedExport>
     files[file.path] = await fetchJsonBody(response, file.path);
   }
   return { patch: manifest.patch, manifest, files };
+}
+
+/** Load the champion catalog for a patch (values of the champions map). */
+export async function loadChampions(patch: string): Promise<Champion[]> {
+  const map = await fetchJson(`${patch}/champions.json`, championsMapSchema);
+  return Object.values(map);
 }

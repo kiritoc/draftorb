@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { loadLatest, loadManifest } from './loader';
+import { loadChampions, loadLatest, loadManifest } from './loader';
 
 const originalFetch = globalThis.fetch;
 
@@ -79,5 +79,19 @@ describe('data loader', () => {
       new Error('network down'),
     );
     await expect(loadLatest()).rejects.toThrow(/network down/);
+  });
+
+  it('loads the champion catalogue for a patch', async () => {
+    const championsMap = {
+      '412': { id: 412, name: 'Soraka', icon: 'Soraka.png', roles: ['SUPPORT'] },
+      '1': { id: 1, name: 'Annie', icon: 'Annie.png', roles: ['MID', 'SUPPORT'] },
+    };
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      new Response(JSON.stringify(championsMap), { status: 200 }),
+    );
+    const champions = await loadChampions('16.21');
+    expect(champions).toHaveLength(2);
+    expect(champions.map((c) => c.name).sort()).toEqual(['Annie', 'Soraka']);
+    expect(globalThis.fetch).toHaveBeenCalledWith('16.21/champions.json');
   });
 });

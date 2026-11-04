@@ -25,7 +25,6 @@ function makeMatch({
   champAt?: { role: import('@draftorb/shared').Role; championId: number; side: 'blue' | 'red' };
 }): DraftRow[] {
   const rows: DraftRow[] = [];
-  const teamChampions: Record<number, number[]> = { 100: [], 200: [] };
   let placed = false;
   for (const teamId of [100, 200]) {
     let index = 0;
@@ -40,7 +39,6 @@ function makeMatch({
         championId = champAt.championId;
         placed = true;
       }
-      teamChampions[teamId]!.push(championId);
       rows.push({
         matchId,
         patch,
@@ -66,11 +64,11 @@ describe('runBacktestDraft', () => {
 
   it('excludes the holdout patch from the training aggregates', () => {
     const rows: DraftRow[] = [];
-    // 8 training games on patch 16.20
+    // 8 training matches on patch 16.20
     for (let i = 0; i < 8; i += 1) {
       rows.push(...makeMatch({ matchId: `t${i}`, patch: '16.20', blueWins: i % 2 === 0 }));
     }
-    // 4 holdout games on patch 16.21
+    // 4 holdout matches on patch 16.21
     for (let i = 0; i < 4; i += 1) {
       rows.push(...makeMatch({ matchId: `h${i}`, patch: '16.21', blueWins: true }));
     }
@@ -78,9 +76,22 @@ describe('runBacktestDraft', () => {
     const report = runBacktestDraft(rows);
     expect(report.holdoutPatch).toBe('16.21');
     expect(report.trainingPatches).toEqual(['16.20']);
-    expect(report.trainingGames).toBe(80);
-    expect(report.holdoutGames).toBe(40);
+    expect(report.trainingGames).toBe(8);
+    expect(report.holdoutGames).toBe(4);
+    expect(report.baselineLogLoss).toBeCloseTo(Math.log(2));
     expect(report.insufficientData).toBe(false);
+    expect(report.validationStatus).toBe('unvalidated');
+  });
+
+  it('counts matches, not participant rows, for the minimum training window', () => {
+    const report = runBacktestDraft([
+      ...makeMatch({ matchId: 'train', patch: '16.20', blueWins: true }),
+      ...makeMatch({ matchId: 'holdout', patch: '16.21', blueWins: false }),
+    ]);
+
+    expect(report.insufficientData).toBe(true);
+    expect(report.trainingGames).toBe(1);
+    expect(report.holdoutGames).toBe(1);
   });
 
   it('detects a planted matchup effect for TOP and SUPPORT', () => {
@@ -159,12 +170,16 @@ describe('runBacktestDraft', () => {
     const report = runBacktestDraft(rows);
     expect(report.holdoutPatch).toBe('16.21');
     expect(report.insufficientData).toBe(false);
+    expect(report.validationStatus).toBe('unvalidated');
     expect(report.perRole.TOP.effectDetected).toBe(true);
     expect(report.perRole.SUPPORT.effectDetected).toBe(true);
     expect(report.perRole.TOP.effectSize).not.toBeNull();
     expect(report.perRole.SUPPORT.effectSize).not.toBeNull();
     expect(report.perRole.TOP.effectSize as number).toBeGreaterThan(0);
     expect(report.perRole.SUPPORT.effectSize as number).toBeGreaterThan(0);
-    expect(report.logLoss).toBeLessThan(report.baselineLogLoss!);
+    if (report.logLoss === null || report.baselineLogLoss === null) {
+      throw new Error('Expected finite holdout and baseline log-loss values.');
+    }
+    expect(report.logLoss).toBeLessThan(report.baselineLogLoss);
   });
 });

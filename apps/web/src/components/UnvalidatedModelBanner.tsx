@@ -7,11 +7,8 @@
  */
 
 import { useEffect, useState } from 'react';
-
-interface BacktestReport {
-  logLoss: number | null;
-  baselineLogLoss: number | null;
-}
+import { backtestPassedValidation } from '../data/backtest-validation.js';
+import { strings } from '../strings.js';
 
 export function UnvalidatedModelBanner() {
   const [show, setShow] = useState<boolean | null>(null);
@@ -24,12 +21,7 @@ export function UnvalidatedModelBanner() {
           setShow(true);
           return;
         }
-        const report = (await response.json()) as BacktestReport;
-        const validated =
-          report.logLoss != null &&
-          report.baselineLogLoss != null &&
-          report.logLoss < report.baselineLogLoss;
-        setShow(!validated);
+        setShow(!backtestPassedValidation(await response.json()));
       } catch {
         setShow(true);
       }
@@ -42,8 +34,7 @@ export function UnvalidatedModelBanner() {
 
   return (
     <div className="bg-amber-900/50 border border-amber-600/30 text-amber-300 p-3 mx-6 mb-4 rounded text-sm">
-      <strong>Unvalidated model:</strong> recommendations are not backed by a backtest report with
-      log-loss better than baseline-only on a frozen holdout. Use at your own risk.
+      <strong>{strings.unvalidatedTitle}</strong> {strings.unvalidatedBody}
     </div>
   );
 }

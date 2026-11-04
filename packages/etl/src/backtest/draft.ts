@@ -46,6 +46,7 @@ export interface BacktestReport {
   calibration: CalibrationBin[];
   perRole: Record<Role, RoleEffect>;
   insufficientData: boolean;
+  validationStatus: 'unvalidated';
   message: string;
 }
 
@@ -105,12 +106,12 @@ function trainModel(rows: DraftRow[]): WinRateModel {
 function winRate(model: WinRateModel, championId: number, role: Role, bucket: RankBucket): number {
   const key = `${championId}|${role}|${bucket}`;
   const g = model.games.get(key) ?? 0;
-  if (g < MIN_TRAINING_GAMES) {
+  const wins = model.wins.get(key);
+  if (g < MIN_TRAINING_GAMES || wins === undefined) {
     const ro = model.roleOverall.get(role);
-    const rg = ro?.games ?? 0;
-    return rg > 0 ? ro!.wins / rg : 0.5;
+    return ro !== undefined && ro.games > 0 ? ro.wins / ro.games : 0.5;
   }
-  return model.wins.get(key)! / g;
+  return wins / g;
 }
 
 function groupByMatch(rows: DraftRow[]): Map<string, DraftRow[]> {
@@ -186,6 +187,7 @@ export function runBacktestDraft(rows: DraftRow[]): BacktestReport {
       calibration: [],
       perRole,
       insufficientData: true,
+      validationStatus: 'unvalidated',
       message: 'No matches in the database; nothing to backtest.',
     };
   }
@@ -197,12 +199,14 @@ export function runBacktestDraft(rows: DraftRow[]): BacktestReport {
   const holdoutRows = rows.filter((r) => r.patch === holdoutPatch);
   const trainingRows = rows.filter((r) => trainingPatches.includes(r.patch));
 
-  if (trainingRows.length < MIN_TRAINING_GAMES || holdoutRows.length === 0) {
+  const trainingMatches = groupByMatch(trainingRows);
+  const holdoutMatches = groupByMatch(holdoutRows);
+  if (trainingMatches.size < MIN_TRAINING_GAMES || holdoutMatches.size === 0) {
     return {
       holdoutPatch,
       trainingPatches,
-      holdoutGames: holdoutRows.length,
-      trainingGames: trainingRows.length,
+      holdoutGames: holdoutMatches.size,
+      trainingGames: trainingMatches.size,
       logLoss: null,
       brier: null,
       baselineLogLoss: null,
@@ -210,16 +214,17 @@ export function runBacktestDraft(rows: DraftRow[]): BacktestReport {
       calibration: [],
       perRole,
       insufficientData: true,
+      validationStatus: 'unvalidated',
       message:
-        'Insufficient data for a backtest (need at least 5 training games and a non-empty holdout patch).',
+        'Insufficient data for a backtest (need at least 5 training matches and a non-empty holdout patch).',
     };
   }
 
   const model = trainModel(trainingRows);
 
   const bucketForMatch = (rows: DraftRow[]): RankBucket => {
-    const scores = rows.map((r) => r.rankScore);
-    const median = scores.length > 0 ? scores[Math.floor(scores.length / 2)]! : 0;
+    const scores = rows.map((r) => r.rankScore).sort((a, b) => a - b);
+    const median = scores.length > 0 ? (scores[Math.floor(scores.length / 2)] ?? 0) : 0;
     return scoreToBucket(median);
   };
 
@@ -232,7 +237,8 @@ export function runBacktestDraft(rows: DraftRow[]): BacktestReport {
   }
 
   const baselineRate =
-    holdoutRows.reduce((sum, r) => sum + (r.teamId === 100 ? r.win : 0), 0) / holdoutRows.length;
+    [...trainingMatches.values()].reduce((sum, matchRows) => sum + matchBlueWin(matchRows), 0) /
+    trainingMatches.size;
 
   let logLoss = 0;
   let brier = 0;
@@ -288,8 +294,8 @@ export function runBacktestDraft(rows: DraftRow[]): BacktestReport {
   return {
     holdoutPatch,
     trainingPatches,
-    holdoutGames: holdoutRows.length,
-    trainingGames: trainingRows.length,
+    holdoutGames: holdoutMatches.size,
+    trainingGames: trainingMatches.size,
     logLoss,
     brier,
     baselineLogLoss,
@@ -297,6 +303,8 @@ export function runBacktestDraft(rows: DraftRow[]): BacktestReport {
     calibration: calibrationBins(points.map(({ pred, actual }) => ({ pred, actual }))),
     perRole,
     insufficientData: false,
-    message: 'Backtest complete.',
+    validationStatus: 'unvalidated',
+    message:
+      'Backtest complete. This report is not validated because the D-023 paired-bootstrap gate is not implemented.',
   };
 }

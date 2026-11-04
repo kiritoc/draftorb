@@ -44,7 +44,11 @@ describe('backtestCommand', () => {
        VALUES ('m1', 'euw1', '16.20', 420, 1800, 1, 2500, 10),
               ('m2', 'euw1', '16.20', 420, 1800, 2, 2500, 10),
               ('m3', 'euw1', '16.21', 420, 1800, 3, 2500, 10),
-              ('m4', 'euw1', '16.21', 420, 1800, 4, 2500, 10)`,
+              ('m4', 'euw1', '16.21', 420, 1800, 4, 2500, 10),
+              ('m5', 'euw1', '16.20', 420, 1800, 5, 2500, 10),
+              ('m6', 'euw1', '16.20', 420, 1800, 6, 2500, 10),
+              ('m7', 'euw1', '16.20', 420, 1800, 7, 2500, 10),
+              ('m8', 'euw1', '16.21', 420, 1800, 8, 2500, 10)`,
     ).run();
     // Every match: 5 blue (team 100), 5 red (team 200), TOP is champion 100 on both sides.
     // Blue wins m1, m3; red wins m2, m4 -> planted TOP effect.
@@ -53,6 +57,10 @@ describe('backtestCommand', () => {
       ['m2', false],
       ['m3', true],
       ['m4', false],
+      ['m5', true],
+      ['m6', false],
+      ['m7', true],
+      ['m8', true],
     ]) {
       for (let i = 0; i < 5; i += 1) {
         const puuidBlue = `puuid-${matchId}-${100 + i}`;
@@ -82,10 +90,11 @@ describe('backtestCommand', () => {
     );
     expect(report.holdoutPatch).toBe('16.21');
     expect(report.trainingPatches).toEqual(['16.20']);
-    expect(report.trainingGames).toBe(20);
-    expect(report.holdoutGames).toBe(20);
+    expect(report.trainingGames).toBe(5);
+    expect(report.holdoutGames).toBe(3);
     expect(report.insufficientData).toBe(false);
-    expect(report.logLoss).toBeLessThan(report.baselineLogLoss!);
+    expect(report.validationStatus).toBe('unvalidated');
+    expect(report.logLoss).toBeTypeOf('number');
   });
 
   it('reports insufficient data when there are no matches', async () => {

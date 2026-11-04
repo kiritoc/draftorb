@@ -44,6 +44,16 @@ Review notes that predate the bug log live in [Review history](#review-history) 
 
 ## Fixed
 
+### B-050 — Reserved-role ally reappears through an unfixed duplicate slot — FIXED
+
+- Severity / Area: S3 / engine
+- Steps to reproduce: `userRole = SUPPORT`, allies `[{ championId: 235 }, { championId: 235, role: 'SUPPORT' }]` (either order) with roleProb `{SUPPORT: 0.6, ADC: 0.4}`, then call `resolveKnownSlots(..., ['SUPPORT'])`.
+- Expected / Actual: the champion is fixed to the user's role, so it must give no pair or lane effect; instead the unfixed copy survived and was inferred ADC.
+- Environment (OS, Node version, patch): any; engine-level bug, patch-independent.
+- Suspected cause: the B-043 fix filtered reserved-role fixed slots before `dedupeTeamSlots`, which reversed its fixed-role-wins priority.
+- Fix (commit/ticket): `resolveKnownSlots` dedupes first, then drops slots fixed to a reserved role (D-050).
+- Verification: `packages/engine/src/recommend-slots.test.ts` — "drops a reserved-role ally even when an unfixed duplicate exists" (both orders); fails with the old filter order and passes now.
+
 ### B-049 — Role-prob export residual can go to a tiny role; duplicate validation; name clash — FIXED
 
 - Severity / Area: S4 / etl

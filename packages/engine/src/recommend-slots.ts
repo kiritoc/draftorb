@@ -30,8 +30,10 @@ export function resolveKnownSlots(
   roleProb: ChampionRoleProbabilities,
   reservedRoles: readonly Role[] = [],
 ): KnownSlot[] {
-  const unique = dedupeTeamSlots(
-    slots.filter((s) => s.role === undefined || !reservedRoles.includes(s.role)),
+  // Dedupe first so a fixed-role copy keeps priority over an unfixed duplicate;
+  // a champion fixed to a reserved role is then dropped entirely.
+  const unique = dedupeTeamSlots(slots).filter(
+    (s) => s.role === undefined || !reservedRoles.includes(s.role),
   );
   if (unique.length === 0) return [];
   let source: ReadonlyArray<Slot> = unique;

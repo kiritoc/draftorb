@@ -100,6 +100,13 @@ describe('resolveKnownSlots — reserved roles (B-043)', () => {
     expect(slots.map((s) => [s.championId, s.role])).toEqual([[201, 'ADC']]);
   });
 
+  it('drops a reserved-role ally even when an unfixed duplicate exists', () => {
+    const fixed = { championId: 235, role: 'SUPPORT' as const };
+    const unfixed = { championId: 235 };
+    expect(resolveKnownSlots([unfixed, fixed], 'ally', roleProb, ['SUPPORT'])).toEqual([]);
+    expect(resolveKnownSlots([fixed, unfixed], 'ally', roleProb, ['SUPPORT'])).toEqual([]);
+  });
+
   it('leaves the enemy call unchanged without reserved roles', () => {
     const slots = resolveKnownSlots([{ championId: 235 }], 'enemy', roleProb);
     expect(slots[0]?.role).toBe('SUPPORT');

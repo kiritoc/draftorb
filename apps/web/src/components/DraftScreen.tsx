@@ -1,11 +1,12 @@
 /**
- * @draftorb/web — Draft screen (T-031/T-032).
+ * @draftorb/web — Draft screen (T-031/T-032/T-033).
  *
  * Ten draft slots (user, four allies, five enemies), each with a searchable
  * champion picker and an optional role. A blind-pick toggle and a rank
  * selector (Diamond default) complete the draft input. Any subset of inputs
- * is valid. The built `DraftInput` is scored by the engine and rendered as a
- * paginated "Best overall" recommendations list (T-032).
+ * is valid. The built `DraftInput` (including the personal pool) is scored by
+ * the engine and rendered as a paginated "Best overall" list plus a
+ * "From your pool" list (T-032/T-033).
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -13,6 +14,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   type BaselineEntry,
   type Champion,
+  type ChampionPool,
   type ChampionRoleProbabilities,
   type DraftInput,
   type Rank,
@@ -25,6 +27,8 @@ import { loadChampions, loadExportFiles, loadLatest, loadManifest } from '../dat
 import { recommendationPageSize } from '../config.js';
 import { DraftSlot, type DraftSlotState } from './DraftSlot.js';
 import { RecommendationsList } from './RecommendationsList.js';
+import { PoolEditor } from './PoolEditor.js';
+import { filterPoolByCatalogue, loadPool } from '../pool/storage.js';
 
 const USER_ROLE: Role = 'SUPPORT';
 const DEFAULT_RANK: Rank = 'DIAMOND';
@@ -39,11 +43,21 @@ function isFilled(slot: DraftSlotState): slot is { championId: number; role?: Ro
   return slot.championId != null;
 }
 
+function flattenPool(pool: ChampionPool | null): number[] {
+  const ids: number[] = [];
+  for (const roleIds of Object.values(pool?.pools ?? {})) {
+    ids.push(...roleIds);
+  }
+  return ids;
+}
+
 export function DraftScreen() {
   const [patch, setPatch] = useState<string | null>(null);
   const [champions, setChampions] = useState<Champion[]>([]);
   const [files, setFiles] = useState<Record<string, unknown>>({});
   const [error, setError] = useState<string | null>(null);
+  const [pool, setPool] = useState<ChampionPool | null>(null);
+  const [poolDropped, setPoolDropped] = useState<number[]>([]);
   const [user, setUser] = useState<DraftSlotState>(emptySlot(USER_ROLE));
   const [allies, setAllies] = useState<DraftSlotState[]>(
     Array.from({ length: ALLY_COUNT }, () => emptySlot()),
@@ -53,6 +67,8 @@ export function DraftScreen() {
   );
   const [blindPick, setBlindPick] = useState(false);
   const [userRank, setUserRank] = useState<Rank>(DEFAULT_RANK);
+  const [poolEditorOpen, setPoolEditorOpen] = useState(false);
+  const [hideMyPool, setHideMyPool] = useState(false);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
 
   useEffect(() => {
@@ -60,16 +76,23 @@ export function DraftScreen() {
     void (async () => {
       try {
         const latest = await loadLatest();
-        const [loadedChampions, loadedFiles] = await Promise.all([
-          loadChampions(latest.patch),
-          loadManifest(latest.patch).then((manifest) => loadExportFiles(manifest)),
-        ]);
+        const loadedChampions = await loadChampions(latest.patch);
+        const loadedFiles = await loadManifest(latest.patch).then((manifest) =>
+          loadExportFiles(manifest),
+        );
+        const loadedPool = await loadPool();
         if (cancelled) {
           return;
         }
         setPatch(latest.patch);
         setChampions(loadedChampions);
         setFiles(loadedFiles.files);
+        const { pool: filteredPool, dropped } = filterPoolByCatalogue(
+          loadedPool ?? { version: 1, pools: {} },
+          loadedChampions.map((champion) => champion.id),
+        );
+        setPool(filteredPool);
+        setPoolDropped(dropped);
       } catch (err) {
         if (cancelled) {
           return;
@@ -81,6 +104,9 @@ export function DraftScreen() {
       cancelled = true;
     };
   }, []);
+
+  const poolChampionIds = useMemo(() => flattenPool(pool), [pool]);
+  const poolSet = useMemo(() => new Set(poolChampionIds), [poolChampionIds]);
 
   const data: RecommendData = useMemo(
     () => ({
@@ -109,8 +135,9 @@ export function DraftScreen() {
         role: slot.role,
       })),
       blindPick,
+      pool: poolChampionIds,
     }),
-    [userRank, allies, enemies, blindPick],
+    [userRank, allies, enemies, blindPick, poolChampionIds],
   );
 
   useEffect(() => {
@@ -119,16 +146,22 @@ export function DraftScreen() {
       const result = recommend(draftInput, data);
       if (!cancelled) {
         setRecommendations(result.recommendations);
+        setPoolUnavailable(result.poolUnavailable ?? []);
       }
     } catch {
       if (!cancelled) {
         setRecommendations([]);
+        setPoolUnavailable([]);
       }
     }
     return () => {
       cancelled = true;
     };
   }, [draftInput, data]);
+
+  const [poolUnavailable, setPoolUnavailable] = useState<{ championId: number; reason: string }[]>(
+    [],
+  );
 
   const setUserSlot = useCallback((slot: DraftSlotState) => setUser(slot), []);
   const setAlly = useCallback((index: number, slot: DraftSlotState) => {
@@ -147,6 +180,10 @@ export function DraftScreen() {
   }, []);
 
   const totalKnown = [user, ...allies, ...enemies].filter(isFilled).length;
+  const poolSize = poolChampionIds.length;
+  const overallRecommendations = hideMyPool
+    ? recommendations.filter((r) => !poolSet.has(r.championId))
+    : recommendations;
 
   if (error) {
     return (
@@ -171,6 +208,8 @@ export function DraftScreen() {
                   Patch: <span className="font-mono text-indigo-300">{patch}</span>
                   {' · '}
                   Champions: {champions.length}
+                  {' · '}
+                  Pool: {poolSize}
                 </p>
               )}
             </div>
@@ -212,6 +251,13 @@ export function DraftScreen() {
                   ))}
                 </select>
               </div>
+              <button
+                type="button"
+                onClick={() => setPoolEditorOpen(true)}
+                className="px-3 py-1.5 text-sm bg-gray-800 hover:bg-gray-700 text-gray-200 rounded border border-gray-600"
+              >
+                Edit pool
+              </button>
             </div>
           </div>
         </div>
@@ -260,9 +306,60 @@ export function DraftScreen() {
           </section>
         </div>
 
+        {poolSize > 0 && (
+          <div className="mb-4">
+            <h3 className="text-sm font-bold text-indigo-300 mb-2">From your pool</h3>
+            <RecommendationsList
+              title="From your pool"
+              recommendations={recommendations.filter((r) => poolSet.has(r.championId))}
+              champions={champions}
+              pageSize={recommendationPageSize}
+            />
+            {poolUnavailable.length > 0 && (
+              <div className="mt-3 p-3 rounded bg-amber-900/20 border border-amber-600/30 text-xs text-amber-300">
+                Pool champions not recommended:{' '}
+                {poolUnavailable
+                  .map((e) => `${championName(champions, e.championId)} (${e.reason})`)
+                  .join(', ')}
+              </div>
+            )}
+            {poolDropped.length > 0 && (
+              <div className="mt-3 p-3 rounded bg-amber-900/20 border border-amber-600/30 text-xs text-amber-300">
+                Dropped from pool (no longer in catalogue):{' '}
+                {poolDropped.map((id) => `Champion ${id}`).join(', ')}
+              </div>
+            )}
+          </div>
+        )}
+
+        {poolSize === 0 && (
+          <div className="mb-4 p-4 rounded bg-gray-800/30 border border-gray-800 text-center text-sm text-gray-400">
+            Your champion pool is empty.{' '}
+            <button
+              type="button"
+              onClick={() => setPoolEditorOpen(true)}
+              className="underline underline-offset-4 hover:text-indigo-300"
+            >
+              Edit your pool
+            </button>{' '}
+            to get personalized "From your pool" recommendations.
+          </div>
+        )}
+
+        <div className="flex items-center gap-3 mb-2">
+          <h3 className="text-sm font-bold text-indigo-300">Best overall</h3>
+          <label className="flex items-center gap-1.5 text-xs text-gray-400 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={hideMyPool}
+              onChange={(event) => setHideMyPool(event.target.checked)}
+            />
+            Hide my pool
+          </label>
+        </div>
         <RecommendationsList
           title="Best overall"
-          recommendations={recommendations}
+          recommendations={overallRecommendations}
           champions={champions}
           pageSize={recommendationPageSize}
         />
@@ -271,6 +368,21 @@ export function DraftScreen() {
           {totalKnown} of 10 slots filled &mdash; any subset of inputs is valid.
         </p>
       </main>
+
+      <PoolEditor
+        open={poolEditorOpen}
+        onClose={() => setPoolEditorOpen(false)}
+        pool={pool}
+        champions={champions}
+        onSave={(nextPool) => {
+          setPool(nextPool);
+          setPoolEditorOpen(false);
+        }}
+      />
     </div>
   );
+}
+
+function championName(champions: Champion[], id: number): string {
+  return champions.find((c) => c.id === id)?.name ?? `Champion ${id}`;
 }

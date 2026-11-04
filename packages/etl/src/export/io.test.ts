@@ -11,12 +11,7 @@ import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import {
-  cleanupStaleExportDirs,
-  createTempDir,
-  publishTempDir,
-  writeFileAtomic,
-} from './io.js';
+import { cleanupStaleExportDirs, createTempDir, publishTempDir, writeFileAtomic } from './io.js';
 
 describe('export IO', () => {
   let directory: string;

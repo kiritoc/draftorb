@@ -4,12 +4,12 @@ Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATI
 
 ## Open
 
-| ID    | Sev | Area   | Title                                                                                                                                                      | Status | Found by/date                     | Ticket |
-| ----- | --- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | --------------------------------- | ------ |
+| ID    | Sev | Area   | Title                                                                                                                                                      | Status | Found by/date                     | Ticket  |
+| ----- | --- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | --------------------------------- | ------- |
 | B-053 | S2  | etl    | Draft backtest scores a per-champion win-rate model, not `recommend`; its loss does not validate the deployed engine (D-023)                               | OPEN   | T-035 review 2026-11-04           | T-027.a |
-| B-052 | S2  | data   | Sample `data/public/16.21` baseline (n_eff 10, IRON only) is below `minGames` 25, so every draft shows empty lists; needs real aggregates                  | OPEN   | T-035 review 2026-11-04           | T-019  |
-| B-026 | S3  | engine | `blindSafety` approximates `pickShare(e)` with roleProb (no pick-rate export)                                                                              | OPEN   | T-023 review 2026-10-30           | –      |
-| B-021 | S3  | engine | `types: []` in engine/shared tsconfigs is circumvented by test files importing vitest, so the type-checker still resolves Node globals in production files | OPEN   | B-017 fix verification 2026-10-28 | –      |
+| B-052 | S2  | data   | Sample `data/public/16.21` baseline (n_eff 10, IRON only) is below `minGames` 25, so every draft shows empty lists; needs real aggregates                  | OPEN   | T-035 review 2026-11-04           | T-019   |
+| B-026 | S3  | engine | `blindSafety` approximates `pickShare(e)` with roleProb (no pick-rate export)                                                                              | OPEN   | T-023 review 2026-10-30           | –       |
+| B-021 | S3  | engine | `types: []` in engine/shared tsconfigs is circumvented by test files importing vitest, so the type-checker still resolves Node globals in production files | OPEN   | B-017 fix verification 2026-10-28 | –       |
 
 ## Duplicate bug IDs (not renumbered)
 

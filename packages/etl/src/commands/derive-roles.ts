@@ -28,7 +28,14 @@ export async function runDeriveRoles(args: string[]): Promise<void> {
   let targetPatch: string | undefined;
   let rows: { championId: number; role: string; prob: number }[] = [];
   try {
-    const { pending } = getMigrationStatus(db);
+    // On a legacy schema, getMigrationStatus tries to upgrade `_migrations`,
+    // which fails on this read-only connection: treat that as pending too.
+    let pending: number;
+    try {
+      ({ pending } = getMigrationStatus(db));
+    } catch {
+      throw new CliError('Database schema is out of date; run `pnpm etl migrate` first.');
+    }
     if (pending > 0) {
       throw new CliError(
         `Database schema is out of date (${pending} pending migration(s)); run \`pnpm etl migrate\` first.`,

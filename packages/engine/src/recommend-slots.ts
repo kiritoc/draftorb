@@ -30,9 +30,15 @@ export function resolveKnownSlots(
   roleProb: ChampionRoleProbabilities,
   reservedRoles: readonly Role[] = [],
 ): KnownSlot[] {
-  // Dedupe first so a fixed-role copy keeps priority over an unfixed duplicate;
-  // a champion fixed to a reserved role is then dropped entirely.
-  const unique = dedupeTeamSlots(slots).filter(
+  // A copy fixed to a non-reserved role wins over a reserved-role copy, whatever
+  // the order. Then dedupe so a fixed-role copy keeps priority over an unfixed
+  // duplicate; a champion fixed only to a reserved role is dropped entirely.
+  const isReserved = (s: Slot): boolean => s.role !== undefined && reservedRoles.includes(s.role);
+  const validFixedIds = new Set(
+    slots.filter((s) => s.role !== undefined && !isReserved(s)).map((s) => s.championId),
+  );
+  const preferred = slots.filter((s) => !(isReserved(s) && validFixedIds.has(s.championId)));
+  const unique = dedupeTeamSlots(preferred).filter(
     (s) => s.role === undefined || !reservedRoles.includes(s.role),
   );
   if (unique.length === 0) return [];

@@ -250,7 +250,7 @@ Owner decision 2026-10-29.
 
 Accepted by the owner on 2026-10-31. SPECS §5/§7 text derived from this decision is normative.
 
-### D-031 — `role_prob` counts a single patch, no recency decay — SUPERSEDED by D-035 (implemented in T-015.c; D-035 still PROPOSED)
+### D-031 — `role_prob` counts a single patch, no recency decay — SUPERSEDED by D-035
 
 - Context: SPECS §3 applies recency decay `decay^(currentPatchIndex - gamePatchIndex)` at aggregation time and D-017 keeps older patches for that purpose. §3 names draft probabilities (pairs, matchups, baselines) but not `role_prob`, and DATA_MODEL.md says aggregated tables are "recomputed per patch". T-015 had to choose between single-patch counts and decay-weighted counts across patches.
 - Assumption (T-015): `aggregateRoleProb` counts only participants of one target patch (default: highest stored patch, numeric major.minor compare as in D-017). `role_prob` has no `patch` column and holds one patch at a time. A target patch with no participants leaves the table unchanged; a malformed patch is a usage error.
@@ -276,16 +276,18 @@ Owner decision 2026-10-31.
 
 Owner decision 2026-10-31.
 
-### D-034 — Champion roles derived from role-prob data, `champions.json.roles` kept — PROPOSED
+### D-034 — Champion roles derived from role-prob data, `champions.json.roles` kept — ACCEPTED
 
 - Context: `TICKETS.md` T-015.b says "replace the Data Dragon champion-tag bootstrap roles with roles derived from `role-prob.json`; remove `champions.json.roles`." However `championSchema.roles` is required (SPECS/shared), `champions.json` is documented as `id, name, icon, roles` in `DATA_MODEL.md`, and the tag-coverage validation (`packages/etl/src/tags.ts`) reads `champion.roles`. `role-prob.json` itself is not produced until T-019, so T-015.b can only derive roles from the SQLite `role_prob` table produced by T-015.
 - Assumption (T-015.b): keep `champions.json.roles` as a required field, but replace its source where observed data exists: roles are derived from `role_prob` (roles with observed probability, canonical order), falling back to the Data Dragon tag bootstrap for champions without role-prob data. Add a pure, tested `deriveChampionRoles` function and a `derive-roles` ETL command that rewrites `champions.json.roles` from `role_prob`. The Data Dragon tag mapping stays as the fallback and remains covered by its existing tests.
 - Alternatives: remove `roles` from `champions.json` and the shared schema. Rejected: breaks the shared contract, DATA_MODEL.md, and tag coverage; `role-prob.json` is a separate file that does not yet exist.
 - Consequences: `transformChampions` gains an optional `roleProbabilities` parameter (tag fallback when absent, backward compatible). `champions.json.roles` now reflects observed probabilities once `pnpm etl derive-roles` runs after `pnpm etl aggregate`. Only roles with probability >= `roleProbThreshold` (default 0.05) are kept, and a champion always keeps at least its highest-probability role (B-046).
 
-### D-035 — Decay-weighted `role_prob` evidence, superseding D-031 single-patch assumption — PROPOSED
+Owner decision 2026-11-04.
 
-- Status note (2026-11-04): implemented in T-015.c; awaiting owner acceptance.
+### D-035 — Decay-weighted `role_prob` evidence, superseding D-031 single-patch assumption — ACCEPTED
+
+- Status note (2026-11-04): implemented in T-015.c; accepted by the owner 2026-11-04.
 
 - Context: D-031 (PROPOSED) made `aggregateRoleProb` count one target patch only, with `role_prob` having no `games_w`/`games_w2` columns and no recency decay. SPECS §3 applies recency decay at aggregation time and never drops older patches. The single-patch implementation wipes `role_prob` on every aggregate: after one newer-patch match is ingested, the next `pnpm etl aggregate` rebuilds the table from ~10 participants, dropping champions absent from that patch. The `role-prob.json` export carries no `games` signal, so D-031's mitigation ("consumers should check games") cannot work. Baselines (T-016/D-033) already use cross-patch decay with a dense patch index — the two tables followed different rules.
 - Decision: `aggregateRoleProb` stores decay-weighted evidence like the other aggregate tables: `games` (raw count), `games_w` (sum of recency weights), `games_w2` (sum of squared weights). Weight = `recencyFactor(patchIndex, currentPatchIndex, decay) * reliabilityFactor(rankKnownCount, unknownRankFactor)`, using the same dense patch index and snapshot-patch rules as D-033. `prob = games_w(champion, role) / sum_roles games_w(champion, role)`, preserving the sum-to-1 invariant. `role-prob.json` stays a bare sparse map of probabilities (no `p`, `games` wrapper), so D-027, D-029, the shared schema, parity tests, and engine consumers do NOT change. Migration 009 adds `games_w` and `games_w2` to `role_prob`. The exporter (T-019) drops champions below `exportMinGames`; aggregate.ts itself does not filter.
@@ -295,6 +297,8 @@ Owner decision 2026-10-31.
   - Change export to `{ [championId]: { role: { p, games } } }`. Rejected: breaks D-027/D-029 sparse-map contract, shared schema, parity tests, engine `roleProb` consumers, and would require a manifest schemaVersion bump plus engine consumer work outside this ticket.
 - Gate: `exportMinGames` (default 10, raw `games` floor) is used by the exporter (T-019), not by `aggregate.ts`. `n_eff` is computable from `games_w`/`games_w2` but is not used as a storage filter because `role_prob` is single-role-pair evidence (no user-bucket weighting); using `n_eff` here would mix concepts that belong to per-bucket tables like `baseline`. A raw-game floor is the simplest gate the exporter can apply before writing the bare sparse map.
 - Consequences: `aggregate.ts` signature changes from `(db, patch?)` to `(db, { patch?, config? })`; callers updated. Migration 009 applied before first real collection run. T-015.c tracks this work, sequenced with T-015.b and before T-019.
+
+Owner decision 2026-11-04.
 
 ### D-036 — Rune aggregation scope decisions (T-018 follow-ups) — ACCEPTED
 
@@ -310,7 +314,7 @@ Owner decision 2026-10-31.
 
 _Note: D-037..D-042 were never assigned; numbering resumes at D-043._
 
-### D-043 — Patch index from Data Dragon versions.json — PROPOSED
+### D-043 — Patch index from Data Dragon versions.json — ACCEPTED
 
 - Context: SPECS §12 requires a `patches(patch_index, version_label, released_at)` table. `matches.patch` is TEXT `major.minor` (RIOT_API.md). Data Dragon `versions.json` lists versions newest-first; hotfixes share a `major.minor` label.
 - Decision:
@@ -325,6 +329,9 @@ _Note: D-037..D-042 were never assigned; numbering resumes at D-043._
   - Numeric version comparison for age — rejected: the source ordinal is the source of truth; parse-once maps to `patch_index`, then only ordinals are used.
   - Dense-over-stored-patches index (D-033) — rejected: gaps in collected data distort recency.
 - Consequences: D-033's dense-over-stored-patches index and the numeric-compare part of D-017 are superseded by T-019.b (not before). Aggregate tables are rebuilt each run, so switching is a code change plus re-run, not a data migration. With gaps in collected data, recency follows real patch distance, not stored-patch distance.
+- Implementation note (2026-11-04): `versions.json` also lists legacy entries that are not `major.minor.patch` (e.g. `lolpatch_7.20`, `lolpatch_3.7`); T-019.b ignores them when building `patches`.
+
+Owner decision 2026-11-04.
 
 ### D-044 — Retention and prune — PROPOSED
 
@@ -345,8 +352,9 @@ _Note: D-037..D-042 were never assigned; numbering resumes at D-043._
   - Soft-delete + grace period — rejected: complexity without benefit since aggregates are rebuilt.
   - Parallel stats tables (`champion_stats`, `matchup_stats`, `item_stats`, `build_stats`) — rejected: no producer/consumer, cannot represent engine consumption (F2/F3).
 - Consequences: prune must run before backtest evaluation; the holdout patch must be inside the window. Pruned matches cannot return through any ingestion or reset path except `--reset-tombstones`.
+- Review note (2026-11-04, kept PROPOSED): the default `retentionPatches = 8` drops data that recency still weights heavily. With `decay = 0.85`, a patch 8 steps back keeps weight 0.85^8 ≈ 0.27, and the pruned tail is ≈ 27% of the total recency weight mass. Keeping that tail costs little (≈ 0.3 MB per 1000 matches per patch by the estimate above), while Riot API data is slow to collect. Open question for the owner: raise the default so the pruned tail is negligible (e.g. 19 patches, where 0.85^19 < 0.05), or keep 8 on purpose to forget old metas faster.
 
-### D-045 — Weight formula — PROPOSED
+### D-045 — Weight formula — ACCEPTED
 
 - Context: SPECS §14 needs one weight formula combining rank kernel, reliability, recency, and change weight. Two decays (0.85 in section 3, 0.7 in the PR) conflict; keep one: `decay = 0.85`.
 - Decision:
@@ -363,6 +371,8 @@ _Note: D-037..D-042 were never assigned; numbering resumes at D-043._
   - A second decay constant distinct from `decay=0.85` — rejected: two decays on same rows.
   - Read-time weights in the web app — rejected: D-002 precomputes JSON; only aggregation/export time is coherent.
 - Consequences: config names camelCase (`changeWeightEnabled`, `minWeight`, `retentionPatches`) in ETL config; engine parameters stay in `engine/config.ts`.
+
+Owner decision 2026-11-04.
 
 ### D-046 — Automatic change score — PROPOSED
 
@@ -392,8 +402,9 @@ _Note: D-037..D-042 were never assigned; numbering resumes at D-043._
   - LLM scoring — rejected: non-deterministic (D-006).
   - Pending suggestion = weight 1.0 — rejected: biggest changes get least protection.
 - Consequences: no new dependency (`node:crypto` is built-in). `content_hash`/`details` stored, not snapshots.
+- Review note (2026-11-04, kept PROPOSED): the data source does not carry most champion balance changes. Checked on Data Dragon 16.22.1 `champion/Ahri.json`: for Q, `effect` holds only `null`/zero arrays, `vars` is empty and the tooltip uses placeholders (`{{ totaldamage }}`). Only `cooldown`, `cost`, `range` and base `stats` hold real values. Ability damage and ratio changes, the most common balance changes, are therefore invisible to this algorithm, while rewording of tooltips is visible. Item stats/gold and rune descriptions were not checked in detail and must be verified in T-019.d. Options for the owner: (a) keep Data Dragon and accept that champion scores cover only base stats, cooldowns and costs (manual D-047 breakpoints cover the rest); (b) use CommunityDragon game-data files for champions (free, game data rather than a third-party stats site, but a new data source to record in a decision); (c) restrict automatic scoring to items and runes and use manual breakpoints for champions. Change weighting stays disabled (`changeWeightEnabled = false`) until this is resolved, so nothing is blocked before T-019.d.
 
-### D-047 — Breakpoints — PROPOSED
+### D-047 — Breakpoints — ACCEPTED
 
 - Context: SPECS §16 needs manual/validated override of automatic change weights. The PR's table lacks uniqueness, CHECK constraints, and a lifecycle.
 - Decision:
@@ -412,8 +423,11 @@ _Note: D-037..D-042 were never assigned; numbering resumes at D-043._
   - item breakpoint cascades to champion tables — rejected: champion/global breakpoints are the tool.
   - `weight_factor = 0` as reset — rejected: reset is its own mode; require 0 < weight_factor <= 1.
 - Consequences: `status` enum has no `validated` (use `active`); `weight_factor` NOT NULL required only for downweight.
+- Note (2026-11-04): manual breakpoints do not depend on D-046. Rows with `source = 'auto'` only appear once the automatic change score (D-046, still PROPOSED) is settled.
 
-### D-048 — No separate Bayesian smoothing — PROPOSED
+Owner decision 2026-11-04.
+
+### D-048 — No separate Bayesian smoothing — ACCEPTED
 
 - Context: SPECS §17 proposed smoothing `smoothed_winrate = (weighted_wins + K × p0) / (effective_games + K)` with data-driven `p0`.
 - Decision: NOT adopted.
@@ -426,9 +440,11 @@ _Note: D-037..D-042 were never assigned; numbering resumes at D-043._
   - Adopt with equivalent-count conversion — rejected: still redundant; D-021 shrinkage is the single smoothing mechanism.
 - Consequences: no `K`, `p0`, or smoothing table. Edge cases in §17 reference §5/D-021 for confidence.
 
-### D-049 — Preserve rank buckets in rune exports — PROPOSED
+Owner decision 2026-11-04.
 
-- Status note (2026-11-04): implemented in the rune-export rank-bucket work (migration 011 `rune_ctx.rank_bucket`, B-038 fix); awaiting owner acceptance.
+### D-049 — Preserve rank buckets in rune exports — ACCEPTED
+
+- Status note (2026-11-04): implemented in the rune-export rank-bucket work (migration 011 `rune_ctx.rank_bucket`, B-038 fix); accepted by the owner 2026-11-04.
 
 - Context: `rune_ctx` stores rank-specific aggregates because expert weighting depends on the user's rank bucket. The export grouped pages only by context key and level, which merged these distinct statistics.
 - Decision: include `rankBucket` on every exported rune context, group by it, and bump `MANIFEST_SCHEMA_VERSION` to 3.
@@ -437,9 +453,11 @@ _Note: D-037..D-042 were never assigned; numbering resumes at D-043._
   - Export separate files per bucket — rejected: adds path complexity without changing the rune-context contract.
 - Consequences: consumers must accept schema version 3 and read `rankBucket` on rune contexts.
 
-### D-050 — Reserve the user's role during ally role inference — PROPOSED
+Owner decision 2026-11-04.
 
-- Status note (2026-11-04): implemented in B-043; awaiting owner acceptance.
+### D-050 — Reserve the user's role during ally role inference — ACCEPTED
+
+- Status note (2026-11-04): implemented in B-043; accepted by the owner 2026-11-04.
 
 - Context: B-043. Ally role inference ran with all 5 roles available, so an unfixed ally could be assigned `userRole` even though the user occupies it (e.g. an unfixed Senna ally inferred as SUPPORT while the user plays support). The ally then produced no ally-pair synergy for the role it actually plays.
 - Decision:
@@ -452,14 +470,18 @@ _Note: D-037..D-042 were never assigned; numbering resumes at D-043._
   - Keep the current behavior — rejected: the ally is scored against the wrong role and its real synergy is lost (e.g. an ADC Senna ally contributes no ADC synergy).
 - Consequences: no output-shape change (`DRAFT_RESULT_SCHEMA_VERSION` unchanged). Enemy inference is untouched: every enemy role is legitimately possible.
 
-### D-051 — Latest-patch pointer for the web app — PROPOSED
+Owner decision 2026-11-04. Rationale: the user can fix the role of any champion they know; their own role is always known, so `userRole` is authoritative and no ally may take it.
+
+### D-051 — Latest-patch pointer for the web app — ACCEPTED
 
 - Context: ARCHITECTURE.md says the web loads `data/public/manifest.json` (latest), but export only writes `data/public/<patch>/manifest.json`, so nothing tells the web which patch is current.
-- Decision (assumption): export writes `data/public/latest.json` = `{ schemaVersion, patch, manifest: "<patch>/manifest.json", generatedAt }` as the last step after the patch directory is published; the web fetches it first, then the referenced manifest.
+- Decision: export writes `data/public/latest.json` = `{ schemaVersion, patch, manifest: "<patch>/manifest.json", generatedAt }` as the last step after the patch directory is published; the web fetches it first, then the referenced manifest.
 - Alternatives:
   - Copy the latest manifest to `data/public/manifest.json` — rejected: its `files` paths are relative to the patch dir, so a copy needs rewriting and can drift.
   - Hard-code the patch in the web build — rejected: needs a redeploy per patch.
 - Consequences: one extra small fetch; old patch dirs stay addressable; T-029 implements it.
+
+Owner decision 2026-11-04.
 
 ### Template
 

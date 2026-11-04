@@ -4,7 +4,7 @@
 
 - Phase: 1 (Support / Diamond)
 - Current milestone: M0 Foundations (T-002.b DONE) and M1 ETL (in progress: T-014 DONE; T-015/T-015.b DONE; T-016 DONE; T-017 DONE; T-018 DONE; T-019 DONE; T-019.b..f TODO) -> M2 Engine (T-020..T-023 DONE)
-- Last updated: 2026-11-04 by Devin (docs audit cleanup, audit batch 4)
+- Last updated: 2026-11-04 by Devin (owner decisions D-034..D-051)
 
 ## Epic status
 
@@ -12,7 +12,7 @@
 | -------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b DONE                                                                                                             |
 | E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e, T-014, T-015, T-015.b, T-016, T-017, T-018, T-019 DONE; T-019.b..f TODO |
-| E2 Engine      | IN PROGRESS | T-020 DONE; T-021 DONE; T-022 DONE; T-023 DONE                                                                                              |
+| E2 Engine      | IN PROGRESS | T-020..T-025 DONE; T-026, T-027.a/b TODO                                                                                                    |
 | E3 Web MVP     | NOT STARTED |                                                                                                                                             |
 | E4 Runes       | NOT STARTED |                                                                                                                                             |
 | E5 Items       | NOT STARTED |                                                                                                                                             |
@@ -35,21 +35,23 @@ Session entries before 2026-10-29 live in [PROGRESS_ARCHIVE.md](./PROGRESS_ARCHI
 
 ## Open questions for the owner
 
-PROPOSED decisions awaiting owner acceptance (titles only; see DECISIONS.md):
+Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-050 and D-051 ACCEPTED. Still PROPOSED (see the review notes in DECISIONS.md):
 
-- D-034 — Champion roles derived from role-prob data, `champions.json.roles` kept
-- D-035 — Decay-weighted `role_prob` evidence, superseding D-031
-- D-043 — Patch index from Data Dragon versions.json
-- D-044 — Retention and prune
-- D-045 — Weight formula
-- D-046 — Automatic change score
-- D-047 — Breakpoints
-- D-048 — No separate Bayesian smoothing
-- D-049 — Preserve rank buckets in rune exports
-- D-050 — Reserve the user's role during ally role inference
-- D-051 — Latest-patch pointer for the web app
+- D-044 — Retention and prune: keep the default `retentionPatches = 8` or raise it (e.g. 19) so pruning drops a negligible share of the recency weight?
+- D-046 — Automatic change score: Data Dragon champion files lack ability values, so most champion balance changes are invisible; choose Data Dragon as is, CommunityDragon for champions, or items/runes only.
 
 ## Session log (newest first)
+
+### 2026-11-04 — Devin — Owner decisions on PROPOSED ADRs
+
+- Done:
+  - DECISIONS.md: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-050 (with the owner rationale) and D-051 marked ACCEPTED (owner decision 2026-11-04); D-031 header simplified to SUPERSEDED by D-035; D-043 gained an implementation note (ignore legacy `lolpatch_*` entries in `versions.json`); D-047 notes that manual breakpoints do not depend on D-046.
+  - D-044 and D-046 kept PROPOSED with review notes: D-044 default retention prunes ≈ 27% of the recency weight mass; D-046 relies on Data Dragon champion files whose ability values are empty (checked on 16.22.1 `Ahri.json`).
+  - TICKETS/DATA_MODEL/ARCHITECTURE: dropped the PROPOSED tags for the accepted decisions.
+- Files touched: `docs/DECISIONS.md`, `docs/TICKETS.md`, `docs/DATA_MODEL.md`, `docs/ARCHITECTURE.md`, `docs/PROGRESS.md`.
+- Tests: `pnpm format:check`.
+- State left: DONE.
+- Next step: owner answers on D-044/D-046; then T-029 or T-019.b.
 
 ### 2026-11-04 — Devin — Docs audit cleanup (audit batch 4)
 

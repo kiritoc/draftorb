@@ -44,6 +44,15 @@ Review notes that predate the bug log live in [Review history](#review-history) 
 
 ## Fixed
 
+### B-051 — Draft flow data and validation review findings — FIXED
+
+- The web loader used incorrect paths for patch-relative manifest files and did not publish manual champion tags in all runtime/deploy paths.
+- Recommendation data was not schema-validated or fully wired; pool edits were not persisted, all role pools could affect Support, and storage/engine failures were not clearly surfaced.
+- Pagination did not reset with draft changes, and unavailable pool entries did not display their effective sample size.
+- The unvalidated-model banner could disappear based on a raw loss comparison before the D-023 paired-bootstrap gate passed.
+- The backtest baseline included holdout information and its game thresholds/counts used participant rows rather than matches.
+- Fixed in T-035 with regression coverage. Backtest reports remain `unvalidated` until the paired-bootstrap gate is implemented.
+
 ### B-050 — Reserved-role ally reappears through an unfixed duplicate slot — FIXED
 
 - Severity / Area: S3 / engine
@@ -123,7 +132,6 @@ Review notes that predate the bug log live in [Review history](#review-history) 
 - Suspected cause: `recommend` called `resolveKnownSlots(input.allies, ...)` -> `inferRoles` with all 5 roles available, so the user's occupied role was assignable to allies.
 - Fix (commit/ticket): `inferRoles`/`resolveViableSubset`/`resolveKnownSlots` accept excluded/reserved roles; `recommend` passes `[userRole]` for the ally team (D-050). An ally fixed to `userRole` is dropped from role-dependent layers but still counts for comp and stays excluded from candidates.
 - Verification: new unit tests in `roles.test.ts` and `recommend-slots.test.ts`, a recommend-level regression in `recommend-pairs.test.ts`, and golden fixture `support_ally_flex_reserved_role.json`; all failed before the fix and pass after.
-
 ### B-042 — Explicit patch exports can mislabel aggregates — FIXED
 
 - Severity / Area: S3 / etl

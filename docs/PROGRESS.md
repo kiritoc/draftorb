@@ -3,8 +3,8 @@
 ## Current status
 
 - Phase: 1 (Support / Diamond)
-- Current milestone: M0 Foundations (T-002.b DONE) and M1 ETL (in progress: T-014 DONE; T-015/T-015.b DONE; T-016 DONE; T-017 DONE; T-018 DONE; T-019 DONE; T-019.b..f TODO) -> M2 Engine (T-020..T-023 DONE)
-- Last updated: 2026-11-04 by Devin (T-019.d verification step)
+- Current milestone: M3 Web MVP implementation complete (T-030..T-035 DONE); the backtest harness (T-027.a) remains under review because D-023 paired-bootstrap validation is not implemented. M1 ETL tickets T-019.b..f remain TODO.
+- Last updated: 2026-11-04 by Copilot (T-035 review fixes)
 
 ## Epic status
 
@@ -12,8 +12,8 @@
 | -------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b DONE                                                                                                             |
 | E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e, T-014, T-015, T-015.b, T-016, T-017, T-018, T-019 DONE; T-019.b..f TODO |
-| E2 Engine      | IN PROGRESS | T-020..T-025 DONE; T-026, T-027.a/b TODO                                                                                                    |
-| E3 Web MVP     | NOT STARTED |                                                                                                                                             |
+| E2 Engine      | IN PROGRESS | T-020..T-025 DONE; T-026, T-027.b TODO; T-027.a REVIEW                                                                                     |
+| E3 Web MVP     | DONE        | T-030..T-035 complete; recommendation flow, Support pool, regression coverage, deploy assets and visible unvalidated-model state            |
 | E4 Runes       | NOT STARTED |                                                                                                                                             |
 | E5 Items       | NOT STARTED |                                                                                                                                             |
 | E6 Live        | NOT STARTED |                                                                                                                                             |
@@ -27,9 +27,8 @@
 
 ## Next recommended ticket
 
-T-023 is **DONE** (Role-generic recommendation engine with explanations, layered shrinkage scoring, pool contract D-024, composition needs, golden test runner and golden fixtures including non-support TOP 1v1 lane group). T-024 (blind pick) and T-025 (comp needs) are also **DONE**.
-Next engine tickets: **T-026** (Golden test suite: complete the remaining scenarios) or **T-027.a** (Draft backtest harness).
-Next ETL tickets: **T-019.b** (Patches table, label mapping, patch_index switch, --since-patch) or the small **T-029** (export latest-patch pointer, D-051).
+T-023 is **DONE** (Role-generic recommendation engine with explanations, layered shrinkage scoring, pool contract D-024, composition needs, golden test runner and golden fixtures including non-support TOP 1v1 lane group). The Web MVP implementation is complete; its model remains visibly unvalidated until D-023's paired-bootstrap gate is implemented and passed.
+Next ETL ticket: **T-019.b** (Patches table, label mapping, patch_index switch, --since-patch). Next validation work: complete D-023 and revisit T-027.a before claiming model validation.
 
 Session entries before 2026-10-29 live in [PROGRESS_ARCHIVE.md](./PROGRESS_ARCHIVE.md).
 
@@ -137,6 +136,16 @@ Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-0
 - Tests: new B-043 tests failed before the fix (8 failures) and pass after; engine suite green.
 - State left: DONE pending review/commit (branch `fix/b-043-ally-role-reservation`).
 - Next step: T-019.b (retention model migration).
+
+### 2026-11-04 — Copilot — T-035 review fixes
+
+- Done:
+  - Fixed manifest/patched export URLs, validated and connected recommendation data, and published manual champion tags in dev/build/deploy.
+  - Persisted and restricted the Phase 1 Support pool, surfaced storage and engine failures, reset pagination on draft changes, and centralized UI text.
+  - Corrected backtest baseline leakage and match counts; reports now remain explicitly unvalidated until the D-023 paired-bootstrap gate exists.
+  - Added regression tests for data loading, recommendation inputs, pool storage, draft rendering, pagination reset, report gating and backtest behavior.
+  - Updated T-035 and related status/decision/bug documentation.
+- Validation: `pnpm check` passed (65 test files, 754 tests); lint has existing non-null assertion warnings. Production build and public-data asset verification also passed.
 
 ### 2026-11-03 — Copilot — T-019 review follow-up rebase
 

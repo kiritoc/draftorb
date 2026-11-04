@@ -1,9 +1,9 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import { createReadStream, existsSync, statSync } from 'node:fs';
+import { createReadStream, existsSync, realpathSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { resolveDataPath } from './src/dev/data-path';
+import { isRealPathInside, resolveDataPath } from './src/dev/data-path';
 
 /** In development, mirror the exported data tree (`data/public`) at the root
  *  so the loader can fetch `latest.json` and manifest/role files just like the
@@ -24,6 +24,15 @@ function serveExportedData(req: IncomingMessage, res: ServerResponse, next: () =
       return;
     }
     if (!existsSync(filePath) || statSync(filePath).isDirectory()) {
+      next();
+      return;
+    }
+    // Block symlinks that escape the served tree (CWE-22). The manual tags
+    // file lives outside data/public by design and is a fixed, known path.
+    if (
+      filePath !== CHAMPION_TAGS_PATH &&
+      !isRealPathInside(filePath, DATA_PUBLIC_DIR, realpathSync)
+    ) {
       next();
       return;
     }

@@ -32,5 +32,26 @@ export function resolveDataPath(
   }
   const root = resolve(dataRoot);
   const filePath = resolve(root, pathname.replace(/^\/+/, ''));
-  return filePath.startsWith(root + sep) ? filePath : null;
+  return isInside(filePath, root) ? filePath : null;
+}
+
+function isInside(filePath: string, root: string): boolean {
+  return filePath.startsWith(root + sep);
+}
+
+/**
+ * Symlink-safe containment check: resolves both paths to their real location
+ * (following symlinks) and requires the file to stay inside the real root.
+ * `realpath` is injectable for tests; returns false when either path is missing.
+ */
+export function isRealPathInside(
+  filePath: string,
+  root: string,
+  realpath: (path: string) => string,
+): boolean {
+  try {
+    return isInside(realpath(filePath), realpath(root));
+  } catch {
+    return false;
+  }
 }

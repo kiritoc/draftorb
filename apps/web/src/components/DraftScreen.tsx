@@ -31,6 +31,7 @@ import {
   loadManifest,
 } from '../data/loader.js';
 import { createRecommendData } from '../data/recommend-data.js';
+import { excludePick, excludedRanks } from '../data/exclude-pick.js';
 import { recommendationPageSize } from '../config.js';
 import { strings } from '../strings.js';
 import { DraftSlot, type DraftSlotState } from './DraftSlot.js';
@@ -189,12 +190,19 @@ export function DraftScreen() {
 
   const totalKnown = [user, ...allies, ...enemies].filter(isFilled).length;
   const poolSize = poolChampionIds.length;
-  // The user's own pick is already taken: never suggest it again.
-  const notUserPick = (r: Recommendation): boolean => r.championId !== user.championId;
-  const overallRecommendations = recommendations
-    .filter(notUserPick)
-    .filter((r) => !hideMyPool || !poolSet.has(r.championId));
-  const visiblePoolRecommendations = poolRecommendations.filter(notUserPick);
+  // The user's own pick is already taken: never suggest it again, and close
+  // the rank gaps it leaves in both lists.
+  const removedRanks = excludedRanks(user.championId, recommendations, poolRecommendations);
+  const overallRecommendations = excludePick(
+    recommendations,
+    user.championId,
+    removedRanks,
+  ).filter((r) => !hideMyPool || !poolSet.has(r.championId));
+  const visiblePoolRecommendations = excludePick(
+    poolRecommendations,
+    user.championId,
+    removedRanks,
+  );
 
   if (error) {
     return (

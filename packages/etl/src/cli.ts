@@ -17,6 +17,7 @@
 import { RiotAuthError } from './riot';
 import { CliError, EXIT, UsageError } from './cli-args';
 import { staticCommand } from './commands/static';
+import { backtestCommand } from './commands/backtest';
 import { validateTagsCommand } from './commands/validate-tags';
 import { checkKeyCommand } from './commands/check-key';
 import { playersCommand } from './commands/players';
@@ -30,6 +31,7 @@ import { log, type Command, findCommand, formatHelp, isHelpFlag } from './comman
 
 const COMMANDS: readonly Command[] = [
   staticCommand,
+  backtestCommand,
   validateTagsCommand,
   checkKeyCommand,
   playersCommand,

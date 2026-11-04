@@ -193,11 +193,9 @@ export function DraftScreen() {
   // The user's own pick is already taken: never suggest it again, and close
   // the rank gaps it leaves in both lists.
   const removedRanks = excludedRanks(user.championId, recommendations, poolRecommendations);
-  const overallRecommendations = excludePick(
-    recommendations,
-    user.championId,
-    removedRanks,
-  ).filter((r) => !hideMyPool || !poolSet.has(r.championId));
+  const overallRecommendations = excludePick(recommendations, user.championId, removedRanks).filter(
+    (r) => !hideMyPool || !poolSet.has(r.championId),
+  );
   const visiblePoolRecommendations = excludePick(
     poolRecommendations,
     user.championId,

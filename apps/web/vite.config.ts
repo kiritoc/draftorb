@@ -8,10 +8,14 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
  *  so the loader can fetch `latest.json` and manifest/role files just like the
  *  statically hosted production build (where `data/public` is the web root). */
 const DATA_PUBLIC_DIR = join(process.cwd(), '..', '..', 'data', 'public');
+const CHAMPION_TAGS_PATH = join(process.cwd(), '..', '..', 'data', 'manual', 'champion-tags.json');
 
 function serveExportedData(req: IncomingMessage, res: ServerResponse, next: () => void): void {
   const url = new URL(req.url ?? '', 'http://localhost');
-  const filePath = join(DATA_PUBLIC_DIR, url.pathname.replace(/^\//, ''));
+  const filePath =
+    url.pathname === '/champion-tags.json'
+      ? CHAMPION_TAGS_PATH
+      : join(DATA_PUBLIC_DIR, url.pathname.replace(/^\//, ''));
   try {
     if (!existsSync(filePath) || statSync(filePath).isDirectory()) {
       next();

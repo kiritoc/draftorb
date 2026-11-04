@@ -30,11 +30,6 @@ jobs:
       - run: pnpm --filter @draftorb/web build
         env:
           VITE_BASE: /draftorb/
-      # data/public is the static data root (D-002): copy it into the site
-      # root so latest.json, manifest.json, the role tables and the
-      # backtest report are served alongside the app.
-      - name: Copy public data into the site root
-        run: cp -r data/public/. apps/web/dist/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: apps/web/dist

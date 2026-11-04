@@ -333,26 +333,28 @@ _Note: D-037..D-042 were never assigned; numbering resumes at D-043._
 
 Owner decision 2026-11-04.
 
-### D-044 — Retention and prune — PROPOSED
+### D-044 — Retention and prune — ACCEPTED
 
 - Context: SPECS §13 requires bounded retention. D-017 leaves "pruning old patches" as a separate concern. `matches`/`participants`/`item_events` have ON DELETE CASCADE.
 - Decision:
   - No parallel stats tables. Existing aggregate tables (`baseline`, `pair_ally`, `pair_enemy`, `lane_vs`, `lane_full`, `rune_ctx`, `item_build`, `role_prob`) are the only statistics store; recomputed on every `aggregate` run with weights baked in (SPECS §14, D-045).
-  - Raw `matches`/`participants`/`item_events` kept for the last N patches only (`retentionPatches`, default 8, ETL config). The retention window must contain the frozen holdout plus the training window (D-023/T-027.a).
-  - `pnpm etl prune --keep-patches N [--dry-run]`: in ONE transaction, for matches with `patch_index <= latest - N`, write a `match_rejects` tombstone with reason `pruned` (actual `patch`, `checked_at`) and delete the match (cascade removes `participants`/`item_events`). Idempotent. `--dry-run` prints counts only.
+  - Raw `matches`/`participants`/`item_events` kept for the last N patches only (`retentionPatches`, default 20, ETL config). The retention window must contain the frozen holdout plus the training window (D-023/T-027.a). With `decay = 0.85`, data 20 patches back weighs 0.85^20 ≈ 0.04, so the default prune drops under 5% of the recency weight mass.
+  - `pnpm etl prune [--keep-patches N] [--dry-run]` (`N` defaults to `retentionPatches`): in ONE transaction, for matches with `patch_index <= latest - N`, write a `match_rejects` tombstone with reason `pruned` (actual `patch`, `checked_at`) and delete the match (cascade removes `participants`/`item_events`). Idempotent. `--dry-run` prints counts only. Manual use: after a major game rework (e.g. a season start or an item-system overhaul) the owner may run it once with a smaller `N` to delete older data for good; the tombstones keep that data from being re-ingested even though the default ingestion window is wider. A global `reset` breakpoint (D-047) is the reversible alternative: it zeroes the old data at aggregation without deleting it.
   - `match_rejects.reason` list becomes `queue|short|patch|invalid|pruned`. This extends D-017's list; do not edit D-017. `patch` keeps its D-017 meaning (re-evaluated when a run's window includes it). `pruned` is permanent: `findRejection` never deletes or re-evaluates it, whatever `--since-patch` says.
   - `--reset` (D-018) clears `queue|short|patch|invalid` rejects and keeps `pruned`. Only the explicit flag `--reset-tombstones` clears `pruned`; its help text warns that pruned matches become fetchable again.
   - Default ingestion window: `patch_index >= latest - retentionPatches + 1`, so ingestion never re-adds data the next prune would delete. An explicit `--since-patch` below this bound is a usage error unless `--reset-tombstones` is also given.
   - If `match_rejects.reason` has a CHECK or enum in the real migrations, T-019.c adds a migration (next free number) allowing `pruned`. If not, none.
   - Aggregate tables are rebuilt each run: no purge, no soft delete, no grace period. `reset` breakpoints give weight 0 at aggregation; they do not delete data. Retention and weighting are independent.
   - Invariant: rows are never deleted to express a weight; they are deleted only for retention (outside the window).
-- Size estimate (assumptions stated): assume `M` matches per patch (unknown; parameterize), ~20 stored rows per match (1 match + 10 participants + ~8 item events + 1 tombstone), ~150 bytes per row. Retained rows ≈ N × M × 20 × 150 bytes. For N=8, M=1000: ≈ 2.4 MB. Tombstones ≈ N × M × 1 row × ~60 bytes ≈ 0.5 MB. Aggregate tables bounded by key cardinality × 8 rank buckets × N patches, not by match count.
+- Size estimate (assumptions stated): assume `M` matches per patch (unknown; parameterize), ~20 stored rows per match (1 match + 10 participants + ~8 item events + 1 tombstone), ~150 bytes per row. Retained rows ≈ N × M × 20 × 150 bytes. For N=20, M=1000: ≈ 6 MB. Tombstones ≈ N × M × 1 row × ~60 bytes ≈ 1.2 MB. Aggregate tables bounded by key cardinality × 8 rank buckets × N patches, not by match count.
 - Alternatives:
   - Keep full history — rejected: unbounded growth.
   - Soft-delete + grace period — rejected: complexity without benefit since aggregates are rebuilt.
   - Parallel stats tables (`champion_stats`, `matchup_stats`, `item_stats`, `build_stats`) — rejected: no producer/consumer, cannot represent engine consumption (F2/F3).
 - Consequences: prune must run before backtest evaluation; the holdout patch must be inside the window. Pruned matches cannot return through any ingestion or reset path except `--reset-tombstones`.
-- Review note (2026-11-04, kept PROPOSED): the default `retentionPatches = 8` drops data that recency still weights heavily. With `decay = 0.85`, a patch 8 steps back keeps weight 0.85^8 ≈ 0.27, and the pruned tail is ≈ 27% of the total recency weight mass. Keeping that tail costs little (≈ 0.3 MB per 1000 matches per patch by the estimate above), while Riot API data is slow to collect. Open question for the owner: raise the default so the pruned tail is negligible (e.g. 19 patches, where 0.85^19 < 0.05), or keep 8 on purpose to forget old metas faster.
+- Review note (2026-11-04): the first draft defaulted to 8 patches, which pruned ≈ 27% of the recency weight mass (0.85^8 ≈ 0.27) to save a few MB of easily kept data; the owner raised it to 20.
+
+Owner decision 2026-11-04: keep 20 patches by default, with manual pruning still possible after a major game rework.
 
 ### D-045 — Weight formula — ACCEPTED
 

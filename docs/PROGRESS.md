@@ -35,12 +35,19 @@ Session entries before 2026-10-29 live in [PROGRESS_ARCHIVE.md](./PROGRESS_ARCHI
 
 ## Open questions for the owner
 
-Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-050 and D-051 ACCEPTED. Still PROPOSED (see the review notes in DECISIONS.md):
+Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-050 and D-051 ACCEPTED; D-044 ACCEPTED with 20 patches. Still PROPOSED (see the review notes in DECISIONS.md):
 
-- D-044 — Retention and prune: keep the default `retentionPatches = 8` or raise it (e.g. 19) so pruning drops a negligible share of the recency weight?
 - D-046 — Automatic change score: Data Dragon champion files lack ability values, so most champion balance changes are invisible; choose Data Dragon as is, CommunityDragon for champions, or items/runes only.
 
 ## Session log (newest first)
+
+### 2026-11-04 — Devin — D-044 accepted with 20-patch retention
+
+- Done: D-044 ACCEPTED (owner): `retentionPatches` default 8 -> 20, `prune --keep-patches` defaults to it, manual smaller cut documented (tombstones block re-ingestion; global reset breakpoint is the reversible alternative). Updated DECISIONS D-044, SPECS §13, T-019.c.
+- Files touched: `docs/DECISIONS.md`, `docs/SPECS.md`, `docs/TICKETS.md`, `docs/PROGRESS.md`.
+- Tests: `pnpm format:check`.
+- State left: DONE.
+- Next step: owner decision on D-046 data source.
 
 ### 2026-11-04 — Devin — Owner decisions on PROPOSED ADRs
 

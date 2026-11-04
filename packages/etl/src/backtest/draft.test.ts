@@ -46,7 +46,7 @@ function makeMatch({
         championId,
         role,
         win: blueWins === (teamId === 100) ? 1 : 0,
-        rankScore: 2500,
+        rankScore: 6.5, // persisted D-016 scale: DIAMOND
       });
       index += 1;
     }

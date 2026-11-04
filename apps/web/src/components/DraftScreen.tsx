@@ -72,6 +72,7 @@ export function DraftScreen() {
   const [poolEditorOpen, setPoolEditorOpen] = useState(false);
   const [hideMyPool, setHideMyPool] = useState(false);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [poolRecommendations, setPoolRecommendations] = useState<Recommendation[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -148,6 +149,7 @@ export function DraftScreen() {
       const result = recommend(draftInput, data);
       if (!cancelled) {
         setRecommendations(result.recommendations);
+        setPoolRecommendations(result.poolRecommendations ?? []);
         setPoolUnavailable(result.poolUnavailable ?? []);
         setInsufficientData(result.insufficientData);
         setRecommendationError(null);
@@ -155,6 +157,7 @@ export function DraftScreen() {
     } catch (err) {
       if (!cancelled) {
         setRecommendations([]);
+        setPoolRecommendations([]);
         setPoolUnavailable([]);
         setInsufficientData([]);
         setRecommendationError(err instanceof Error ? err.message : String(err));
@@ -186,9 +189,12 @@ export function DraftScreen() {
 
   const totalKnown = [user, ...allies, ...enemies].filter(isFilled).length;
   const poolSize = poolChampionIds.length;
-  const overallRecommendations = hideMyPool
-    ? recommendations.filter((r) => !poolSet.has(r.championId))
-    : recommendations;
+  // The user's own pick is already taken: never suggest it again.
+  const notUserPick = (r: Recommendation): boolean => r.championId !== user.championId;
+  const overallRecommendations = recommendations
+    .filter(notUserPick)
+    .filter((r) => !hideMyPool || !poolSet.has(r.championId));
+  const visiblePoolRecommendations = poolRecommendations.filter(notUserPick);
 
   if (error) {
     return (
@@ -316,7 +322,7 @@ export function DraftScreen() {
             <h3 className="text-sm font-bold text-indigo-300 mb-2">{strings.fromYourPool}</h3>
             <RecommendationsList
               title={strings.fromYourPool}
-              recommendations={recommendations.filter((r) => poolSet.has(r.championId))}
+              recommendations={visiblePoolRecommendations}
               champions={champions}
               pageSize={recommendationPageSize}
               resetKey={draftInput}

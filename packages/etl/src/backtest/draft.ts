@@ -10,7 +10,9 @@
  */
 
 import { comparePatches } from '../matches-store';
+import { RANK_BUCKET_ORDER } from '@draftorb/engine';
 import { type Role, type RankBucket } from '@draftorb/shared';
+import { gameBucketIndex } from '../aggregate-shared';
 
 export interface DraftRow {
   matchId: string;
@@ -54,16 +56,10 @@ const MIN_TRAINING_GAMES = 5;
 const EFFECT_THRESHOLD = 0.03;
 const N_BINS = 10;
 
-/** Map a numeric rank score to a rank bucket (approximate League scale). */
+/** Map a persisted rank_score (D-016: integer part = bucket index) to a bucket,
+ *  using the same mapping as aggregation. */
 function scoreToBucket(rankScore: number): RankBucket {
-  if (rankScore < 800) return 'IRON';
-  if (rankScore < 1200) return 'BRONZE';
-  if (rankScore < 1600) return 'SILVER';
-  if (rankScore < 2000) return 'GOLD';
-  if (rankScore < 2400) return 'PLATINUM';
-  if (rankScore < 2800) return 'EMERALD';
-  if (rankScore < 3200) return 'DIAMOND';
-  return 'MASTER_PLUS';
+  return RANK_BUCKET_ORDER[gameBucketIndex(rankScore)] as RankBucket;
 }
 
 function clamp(p: number): number {

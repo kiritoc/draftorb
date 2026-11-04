@@ -11,7 +11,12 @@ import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { cleanupStaleExportDirs, createTempDir, publishTempDir } from './io.js';
+import {
+  cleanupStaleExportDirs,
+  createTempDir,
+  publishTempDir,
+  writeFileAtomic,
+} from './io.js';
 
 describe('export IO', () => {
   let directory: string;
@@ -22,6 +27,23 @@ describe('export IO', () => {
 
   afterEach(() => {
     rmSync(directory, { recursive: true, force: true });
+  });
+
+  it('writeFileAtomic replaces the target and leaves no temp file', () => {
+    writeFileSync(join(directory, 'latest.json'), 'old', 'utf8');
+    const path = writeFileAtomic(directory, 'latest.json', 'new');
+    expect(path).toBe(join(directory, 'latest.json'));
+    expect(readFileSync(path, 'utf8')).toBe('new');
+    expect(readdirSync(directory)).toEqual(['latest.json']);
+  });
+
+  it('writeFileAtomic keeps the previous target and cleans up when the rename fails', () => {
+    // A non-empty directory at the target path makes the rename fail after the temp write.
+    mkdirSync(join(directory, 'latest.json'));
+    writeFileSync(join(directory, 'latest.json', 'keep'), 'old', 'utf8');
+    expect(() => writeFileAtomic(directory, 'latest.json', 'new')).toThrow();
+    expect(readFileSync(join(directory, 'latest.json', 'keep'), 'utf8')).toBe('old');
+    expect(readdirSync(directory)).toEqual(['latest.json']);
   });
 
   it('replaces an existing patch directory and removes its backup', () => {

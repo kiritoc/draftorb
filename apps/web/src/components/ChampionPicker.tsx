@@ -40,6 +40,7 @@ export function ChampionPicker({
   const handleSelect = useCallback(
     (id: ChampionId | null) => {
       onChange(id);
+      setQuery('');
       setOpen(false);
     },
     [onChange],

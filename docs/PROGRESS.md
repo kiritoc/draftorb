@@ -137,6 +137,17 @@ Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-0
 - State left: DONE pending review/commit (branch `fix/b-043-ally-role-reservation`).
 - Next step: T-019.b (retention model migration).
 
+### 2026-11-04 — Devin — T-035 review follow-ups
+
+- Done:
+  - Dev data server: path resolution extracted to `apps/web/src/dev/data-path.ts`; serves only `.json` files inside `data/public` (plus manual champion tags), GET/HEAD only; traversal regression tests.
+  - Export: `latest.json` is written atomically (temp file + rename, `writeFileAtomic`) so a failed write keeps the previous pointer; regression test.
+  - Backtest: rank buckets use the persisted D-016 scale via `gameBucketIndex` (was collapsing every match into IRON); fixtures use real rank scores.
+  - Web: "From your pool" renders engine `poolRecommendations` (keeps `poolRank`); the user's own pick is excluded from both lists; the champion picker clears its search after selection.
+  - T-029 marked DONE (implemented in T-035).
+- Open: B-052 (sample export below `minGames`, needs real aggregates) and B-053 (backtest does not evaluate `recommend`).
+- Validation: not run in this session; run `pnpm check`.
+
 ### 2026-11-04 — Copilot — T-035 review fixes
 
 - Done:

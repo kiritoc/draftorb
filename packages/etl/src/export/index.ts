@@ -46,6 +46,7 @@ import {
   removeTempDir,
   STATIC_CATALOG_FILES,
   writeFile,
+  writeFileAtomic,
 } from './io.js';
 
 export const EXPORT_ROLES: readonly Role[] = ['SUPPORT'];
@@ -253,8 +254,7 @@ export function exportJson(db: Database.Database, options: ExportOptions = {}): 
       manifest: `${targetPatch}/manifest.json`,
       generatedAt,
     });
-    const latestPath = join(publicDir, 'latest.json');
-    writeFile(publicDir, 'latest.json', JSON.stringify(latest, null, 2));
+    const latestPath = writeFileAtomic(publicDir, 'latest.json', JSON.stringify(latest, null, 2));
 
     return {
       patch: targetPatch,

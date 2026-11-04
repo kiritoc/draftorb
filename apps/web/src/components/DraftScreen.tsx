@@ -195,7 +195,7 @@ export function DraftScreen() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-gray-100">
+    <div className="bg-gray-900 text-gray-100">
       <header className="border-b border-gray-800 bg-gray-900/80 backdrop-blur sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">

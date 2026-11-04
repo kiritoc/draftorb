@@ -36,6 +36,7 @@ const dataServerPlugin = {
 };
 
 export default defineConfig({
+  base: process.env.VITE_BASE ?? '/',
   plugins: [react(), dataServerPlugin],
   build: {
     outDir: 'dist',

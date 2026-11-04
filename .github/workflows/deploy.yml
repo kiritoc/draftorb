@@ -1,0 +1,50 @@
+name: Deploy
+
+# Deploys the web app to GitHub Pages on pushes to main and on demand.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm --filter @draftorb/web build
+        env:
+          VITE_BASE: /draftorb/
+      # data/public is the static data root (D-002): copy it into the site
+      # root so latest.json, manifest.json, the role tables and the
+      # backtest report are served alongside the app.
+      - name: Copy public data into the site root
+        run: cp -r data/public/. apps/web/dist/
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/web/dist
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

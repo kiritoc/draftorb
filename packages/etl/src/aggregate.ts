@@ -6,7 +6,9 @@ import {
   reliabilityFactor,
   type RankWeightingConfig,
 } from '@draftorb/engine';
-import { comparePatches } from './matches-store';
+import { assertPatchFormat, loadPatchWindow } from './aggregate-shared';
+
+export { PATCH_PATTERN } from './aggregate-shared';
 
 export interface RoleProbRow {
   championId: number;
@@ -16,9 +18,6 @@ export interface RoleProbRow {
   gamesW2: number;
   prob: number;
 }
-
-/** Patches are stored as "major.minor" (RIOT_API.md). */
-export const PATCH_PATTERN = /^\d+\.\d+$/;
 
 /**
  * Highest stored patch, compared numerically on major.minor (16.10 > 16.9,
@@ -52,7 +51,7 @@ export function latestPatch(db: Database.Database): string | undefined {
  *        * reliabilityFactor(rankKnownCount, unknownRankFactor)
  *
  * Evidence from older patches is retained with decay rather than wiped
- * (D-033 design, superseding D-031's single-patch assumption).
+ * (D-035 design, superseding D-031's single-patch assumption).
  */
 function accumulateRoleProb(
   db: Database.Database,
@@ -62,19 +61,7 @@ function accumulateRoleProb(
   string,
   { championId: number; role: string; games: number; gamesW: number; gamesW2: number }
 > {
-  const storedPatches = (
-    db.prepare('SELECT DISTINCT patch FROM matches').all() as Array<{ patch: string }>
-  )
-    .map((row) => row.patch)
-    .filter((p) => snapshotPatch === undefined || comparePatches(p, snapshotPatch) <= 0);
-  const patchSet = new Set(storedPatches);
-  if (snapshotPatch !== undefined && patchSet.size > 0) patchSet.add(snapshotPatch);
-  const patches = [...patchSet].sort(comparePatches);
-  const patchIndex = new Map<string, number>();
-  patches.forEach((p, i) => {
-    patchIndex.set(p, i);
-  });
-  const currentPatchIndex = patches.length - 1;
+  const { patchIndex, currentPatchIndex } = loadPatchWindow(db, snapshotPatch);
 
   const accum = new Map<
     string,
@@ -166,15 +153,13 @@ function toRoleProbRows(
  * `role_prob` table. Used by `derive-roles`.
  */
 export function computeRoleProb(db: Database.Database, patch?: string): RoleProbRow[] {
-  if (patch !== undefined && !PATCH_PATTERN.test(patch)) {
-    throw new Error(`Invalid patch "${patch}". Expected a format like "16.21".`);
-  }
+  assertPatchFormat(patch);
   return toRoleProbRows(accumulateRoleProb(db, patch, DEFAULT_CONFIG));
 }
 
 /**
  * Aggregate role probabilities from stored participants using decay-weighted
- * evidence (D-033 design, superseding D-031's single-patch assumption).
+ * evidence (D-035 design, superseding D-031's single-patch assumption).
  *
  * Computes probabilities via `computeRoleProb` and rewrites the `role_prob`
  * table in one transaction, so re-runs are idempotent. When no participant
@@ -188,9 +173,7 @@ export function aggregateRoleProb(
   const config = options.config ?? DEFAULT_CONFIG;
   const { patch: snapshotPatch } = options;
 
-  if (snapshotPatch !== undefined && !PATCH_PATTERN.test(snapshotPatch)) {
-    throw new Error(`Invalid patch "${snapshotPatch}". Expected a format like "16.21".`);
-  }
+  assertPatchFormat(snapshotPatch);
 
   const result = toRoleProbRows(accumulateRoleProb(db, snapshotPatch, config));
 

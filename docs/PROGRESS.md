@@ -4,7 +4,7 @@
 
 - Phase: 1 (Support / Diamond)
 - Current milestone: M0 Foundations (T-002.b DONE) and M1 ETL (in progress: T-014 DONE; T-015/T-015.b DONE; T-016 DONE; T-017 DONE; T-018 DONE; T-019 DONE; T-019.b..f TODO) -> M2 Engine (T-020..T-023 DONE)
-- Last updated: 2026-11-03 by Devin (B-044..B-049 ETL review findings)
+- Last updated: 2026-11-04 by Devin (T-028 aggregation helpers refactor)
 
 ## Epic status
 
@@ -103,6 +103,18 @@ Earlier handoff (kept for history): B-017 done (engine and shared `"types": []` 
 - Next: Owner review; then schedule T-019.b or continue T-019 (export).
 
 ## Session log (newest first)
+
+### 2026-11-04 — Devin — T-028 aggregation helpers refactor (audit batch 3)
+
+- Done:
+  - New `aggregate-shared.ts` (PATCH_PATTERN home, `assertPatchFormat`, `loadPatchWindow`, `gameBucketIndex`, `accumulateWeighted`, `groupRowsByMatch`, `partitionByTeam`) used by all four aggregators; stale "D-033" references fixed to D-035.
+  - File-size splits (every touched file now at or under 300 lines): `aggregate-runes-context.ts`, `aggregate-pairs-write.ts`, `influence-config.ts` (engine), `matches-reprocess.ts`, `players-tiers.ts`, `ddragon-transform.ts`, `riot/client-options.ts`.
+  - Lint: 0 warnings — `aggregate.test.ts` non-null assertions replaced by `requireRow`/`requireAt` helpers.
+  - Package `exports["."]` gained a `default` condition in shared/engine/etl.
+- Files touched: new modules + tests above; `aggregate{,-baseline,-pairs,-runes}.ts`, `matches.ts`, `players.ts`, `ddragon.ts`, `riot/client.ts`, `config.ts`, `aggregate.test.ts`, 3 package.json; docs TICKETS/PROGRESS.
+- Tests: `pnpm check` green (see report); new `aggregate-shared.test.ts` (12 tests).
+- State left: DONE pending review/commit (branch `refactor/etl-aggregation-helpers`).
+- Next step: T-019.b (retention model migration).
 
 ### 2026-11-03 — Devin — Bugs B-044..B-049
 

@@ -36,6 +36,23 @@ export function cursorKey(platform: string, puuid: string): string {
   return `match-ingest:${platform}:${puuid}`;
 }
 
+export const newCursor = (
+  snapshot: string[],
+  lastGameCreation = 0,
+  sincePatch?: string,
+): PlayerCursor => ({
+  status: 'partial',
+  snapshot,
+  processed: 0,
+  lastGameCreation,
+  sincePatch,
+  stored: 0,
+  duplicates: 0,
+  filtered: 0,
+  invalid: 0,
+  updatedAt: 0,
+});
+
 export function readCursor(db: Database.Database, key: string): PlayerCursor | null {
   const row = db.prepare('SELECT value FROM ingest_state WHERE key = ?').get(key) as
     { value: string } | undefined;

@@ -27,8 +27,12 @@ import {
   combinedGameWeight,
   type RankWeightingConfig,
 } from '@draftorb/engine';
-import { PATCH_PATTERN } from './aggregate';
-import { comparePatches } from './matches-store';
+import {
+  accumulateWeighted,
+  assertPatchFormat,
+  gameBucketIndex,
+  loadPatchWindow,
+} from './aggregate-shared';
 
 export interface BaselineRow {
   championId: number;
@@ -51,30 +55,10 @@ export function aggregateBaseline(
   options: AggregateBaselineOptions = {},
 ): BaselineRow[] {
   const config = options.config ?? DEFAULT_CONFIG;
-  if (options.patch !== undefined && !PATCH_PATTERN.test(options.patch)) {
-    throw new Error(`Invalid patch "${options.patch}". Expected a format like "16.21".`);
-  }
+  assertPatchFormat(options.patch);
 
   const snapshotPatch = options.patch;
-
-  // Patch -> numeric index. Only distinct stored patches are indexed (dense),
-  // so a gap in collected patches counts as one step of recency decay.
-  // comparePatches is numeric, so the snapshot filter is applied in JS
-  // (SQL string comparison would misorder "16.9" and "16.10").
-  const storedPatches = (
-    db.prepare('SELECT DISTINCT patch FROM matches').all() as Array<{ patch: string }>
-  )
-    .map((row) => row.patch)
-    .filter((patch) => snapshotPatch === undefined || comparePatches(patch, snapshotPatch) <= 0);
-  const patchSet = new Set(storedPatches);
-  if (snapshotPatch !== undefined && patchSet.size > 0) patchSet.add(snapshotPatch);
-  const patches = [...patchSet].sort(comparePatches);
-  const patchIndex = new Map<string, number>();
-  patches.forEach((patch, i) => {
-    patchIndex.set(patch, i);
-  });
-  const currentPatchIndex = patches.length - 1;
-  const maxBucket = RANK_BUCKET_ORDER.length - 1;
+  const { patchIndex, currentPatchIndex } = loadPatchWindow(db, snapshotPatch);
 
   // Key: `${championId}|${myRole}|${rankBucket}`
   const accum = new Map<
@@ -118,8 +102,7 @@ export function aggregateBaseline(
     const pIdx = patchIndex.get(row.patch);
     if (pIdx === undefined) continue;
 
-    // rank_score scale: integer part = RANK_BUCKET_ORDER index (6.5 = DIAMOND).
-    const gameBucketIdx = Math.max(0, Math.min(Math.floor(row.rankScore), maxBucket));
+    const gameBucketIdx = gameBucketIndex(row.rankScore);
 
     for (const rankBucket of RANK_BUCKET_ORDER) {
       const uIdx = bucketIndex(rankBucket);
@@ -134,23 +117,15 @@ export function aggregateBaseline(
       if (w <= 0) continue;
 
       const key = `${row.championId}|${row.myRole}|${rankBucket}`;
-      const existing = accum.get(key);
-      if (existing === undefined) {
-        accum.set(key, {
-          championId: row.championId,
-          myRole: row.myRole,
-          rankBucket,
-          winsW: w * row.win,
-          gamesW: w,
-          gamesW2: w * w,
-          games: 1,
-        });
-      } else {
-        existing.winsW += w * row.win;
-        existing.gamesW += w;
-        existing.gamesW2 += w * w;
-        existing.games += 1;
-      }
+      accumulateWeighted(accum, key, w, row.win, () => ({
+        championId: row.championId,
+        myRole: row.myRole,
+        rankBucket,
+        winsW: 0,
+        gamesW: 0,
+        gamesW2: 0,
+        games: 0,
+      })).games += 1;
     }
   }
 

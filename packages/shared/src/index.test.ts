@@ -43,6 +43,7 @@ import {
   supportBaselineTableSchema,
   supportPairEntrySchema,
   supportPairTableSchema,
+  latestSchema,
 } from './index';
 
 describe('shared schemas', () => {
@@ -478,5 +479,17 @@ describe('shared schemas', () => {
       ],
     };
     expect(itemBuildExportSchema.parse(itemExport)).toEqual(itemExport);
+  });
+
+  it('latestSchema accepts a valid latest.json pointer and rejects bad input', () => {
+    const valid = {
+      schemaVersion: 1,
+      patch: '16.21',
+      manifest: '16.21/manifest.json',
+      generatedAt: '2026-11-04T16:47:00.000Z',
+    };
+    expect(latestSchema.parse(valid)).toEqual(valid);
+    expect(() => latestSchema.parse({ ...valid, schemaVersion: 2 })).toThrow();
+    expect(() => latestSchema.parse({ ...valid, patch: '' })).toThrow();
   });
 });

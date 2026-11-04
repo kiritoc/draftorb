@@ -32,3 +32,19 @@ export const manifestSchema = z
   })
   .strict();
 export type Manifest = z.infer<typeof manifestSchema>;
+
+/**
+ * Version of the `latest.json` patch pointer (D-051). Bumped when the pointer
+ * format changes.
+ */
+export const LATEST_SCHEMA_VERSION = 1;
+
+export const latestSchema = z
+  .object({
+    schemaVersion: z.literal(LATEST_SCHEMA_VERSION),
+    patch: z.string().min(1),
+    manifest: z.string().min(1),
+    generatedAt: z.string().min(1),
+  })
+  .strict();
+export type Latest = z.infer<typeof latestSchema>;

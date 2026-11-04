@@ -226,4 +226,53 @@ describe('exportCommand', () => {
     const summary = 'skipped 1 rune page(s) with unparseable or invalid perks_json';
     expect(output().split(summary)).toHaveLength(2);
   });
+
+  it('writes latest.json after a successful export (D-051)', async () => {
+    const db = openDb(dbPath);
+    migrate(db);
+    db.prepare(
+      `INSERT INTO matches (match_id, platform, patch, queue_id, duration, created_at, avg_rank_score, rank_known_count)
+       VALUES ('m1', 'euw1', '16.21', 420, 1800, 1, 6.5, 2)`,
+    ).run();
+    db.prepare(
+      `INSERT INTO role_prob (champion_id, role, games, games_w, games_w2, prob)
+       VALUES (412, 'SUPPORT', 1, 10, 10, 1)`,
+    ).run();
+    db.close();
+
+    await exportCommand.run([]);
+
+    const latest = JSON.parse(
+      readFileSync(join(process.env.DRAFTORB_PUBLIC_DIR as string, 'latest.json'), 'utf8'),
+    );
+    expect(latest.schemaVersion).toBe(1);
+    expect(latest.patch).toBe('16.21');
+    expect(latest.manifest).toBe('16.21/manifest.json');
+    expect(typeof latest.generatedAt).toBe('string');
+    expect(new Date(latest.generatedAt).getTime()).toBeGreaterThan(0);
+  });
+
+  it('leaves previous latest.json untouched when the export fails (D-051)', async () => {
+    const db = openDb(dbPath);
+    migrate(db);
+    db.prepare(
+      `INSERT INTO matches (match_id, platform, patch, queue_id, duration, created_at, avg_rank_score, rank_known_count)
+       VALUES ('m1', 'euw1', '16.21', 420, 1800, 1, 6.5, 2)`,
+    ).run();
+    db.prepare(
+      `INSERT INTO role_prob (champion_id, role, games, games_w, games_w2, prob)
+       VALUES (412, 'SUPPORT', 1, 10, 10, 1)`,
+    ).run();
+    db.close();
+
+    await exportCommand.run([]);
+    const publicDir = process.env.DRAFTORB_PUBLIC_DIR as string;
+    const latestPath = join(publicDir, 'latest.json');
+    const before = readFileSync(latestPath, 'utf8');
+
+    await expect(exportCommand.run(['not-a-patch'])).rejects.toThrow(/Invalid patch/);
+
+    const after = readFileSync(latestPath, 'utf8');
+    expect(after).toBe(before);
+  });
 });

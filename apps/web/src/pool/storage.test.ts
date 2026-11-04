@@ -13,7 +13,7 @@ import {
 function fakeStorage(): PoolStorage {
   const map = new Map<string, string>();
   return {
-    getItem: (key: string) => (map.has(key) ? map.get(key)! : null),
+    getItem: (key: string) => map.get(key) ?? null,
     setItem: (key: string, value: string) => {
       map.set(key, value);
     },

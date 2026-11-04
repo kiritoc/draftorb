@@ -132,6 +132,7 @@ Review notes that predate the bug log live in [Review history](#review-history) 
 - Suspected cause: `recommend` called `resolveKnownSlots(input.allies, ...)` -> `inferRoles` with all 5 roles available, so the user's occupied role was assignable to allies.
 - Fix (commit/ticket): `inferRoles`/`resolveViableSubset`/`resolveKnownSlots` accept excluded/reserved roles; `recommend` passes `[userRole]` for the ally team (D-050). An ally fixed to `userRole` is dropped from role-dependent layers but still counts for comp and stays excluded from candidates.
 - Verification: new unit tests in `roles.test.ts` and `recommend-slots.test.ts`, a recommend-level regression in `recommend-pairs.test.ts`, and golden fixture `support_ally_flex_reserved_role.json`; all failed before the fix and pass after.
+
 ### B-042 — Explicit patch exports can mislabel aggregates — FIXED
 
 - Severity / Area: S3 / etl

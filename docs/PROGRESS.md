@@ -22,7 +22,7 @@
 ## Data collection status
 
 - Riot key: not recorded (development keys expire every 24 h).
-- Games collected: 0 (no SQLite database exists under `data/` in this workspace) | Patch: 16.21 (static data imported: champions, items, runes).
+- Games collected: 0 (no SQLite database exists under `data/` in this workspace) | Patch: 16.21 (static data imported: champions, items, runes; a parallel `pnpm etl static` run also imported 16.22 catalogs). `data/public/latest.json` (D-051, T-029) points at patch 16.21 and is written by `pnpm etl export` after a successful publish.
 - Last aggregation: role_prob (T-015) and baselines (T-016) implemented; pairs/lane (T-017) and runes (T-018) implemented; export (T-019) implemented and tested (`packages/etl/src/export/`, `packages/etl/src/commands/export.ts`, tests); export preserves static catalogs (`champions.json`, `items.json`, `runes.json`) and lists them in the manifest (B-035).
 
 ## Next recommended ticket
@@ -172,6 +172,63 @@ Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-0
 - State left: DONE (T-019 review follow-up implemented; D-049 awaits owner decision).
 - Next step: T-019.b (patches table, label mapping, patch_index switch, --since-patch).
 - Pitfalls / notes: (merged with the 2026-11-02 Copilot "T-019 review follow-up" entry, which described the same work before the rebase; test counts above are post-rebase) manifest schema v2 is no longer accepted; rune consumers must read `rankBucket` on each context.
+
+---
+
+### 2026-11-01 — PR #42 redesign: storage/weighting/change-detection made coherent (docs only)
+
+- Done:
+  - **`docs/DECISIONS.md`** (edited): Replaced old D-043..D-049 (ACCEPTED) with new D-043..D-048 (PROPOSED): patches table (D-043), retention/prune (D-044), single weight formula (D-045), automatic change score (D-046), breakpoints (D-047), no separate smoothing (D-048). D-049 removed (content folded into Alternatives). No fabricated owner decisions or dates.
+  - **`docs/SPECS.md`** (edited): §3 recency references `patches` table (D-043); removed §14 DECAY/p0 note; replaced sections 12-18 with target-model sections 12-17 (patch index, retention/prune, weights, change score, breakpoints, edge cases) preceded by a target-model banner.
+  - **`docs/TICKETS.md`** (edited): Replaced single T-019.b with session-sized chain T-019.b..f; T-019 (export) unblocked.
+  - **`docs/DATA_MODEL.md`** (edited): Added `patches`, `entity_change_scores`, `data_breakpoints` DDL with CHECKs and unique index; aggregated tables recomputed each run with weights baked in; exports unchanged note.
+  - **`docs/TESTING.md`** (edited): Added section 6 (retention, weights, change scoring, breakpoints) with property checks and real-JSON fixture rule.
+  - **`docs/RIOT_API.md`** (edited): Expanded Data Dragon static data row; added VERIFY markers.
+- Tests: `pnpm check` green (typecheck, lint 0 errors, format 0 errors). No code changed.
+- State left: **Docs-only redesign complete**. `BUGS.md` unchanged (no bugs found).
+- Next: Owner review of PROPOSED ADRs; then schedule T-019.b.
+
+### 2026-11-01 — PR #42 docs completion: T-019.b ticket, downweight precedence, loose ends
+
+- Done:
+  - **`docs/TICKETS.md`** (edited): Replaced "Future work" paragraph with `T-019.b | Retention model migration (L)` in E1 ETL; deps `T-019, T-015..T-018, T-002.b`; acceptance mirrors `docs/TESTING.md` expected tests.
+  - **`docs/SPECS.md`** (edited): §18 documents overlapping `downweight` precedence (multiply `weight_factor`s floored at `MIN_WEIGHT`; `reset` dominates; same rule regardless of `from_patch_index`); §18 hotfix line reworded (weights never stored, nothing "kept"); §14 note confirms `DECAY` 0.7 vs `decay` 0.85 and data-driven `p0` vs fixed 0.5 prior are intentional.
+  - **`docs/DECISIONS.md`** (edited): D-047 adds overlapping `downweight` precedence line.
+  - **`docs/TESTING.md`** (edited): Added overlapping `downweight` precedence test expectation.
+  - **`docs/PROGRESS.md`** (edited): Session log corrected to §12-18 / D-043..D-049; removed open follow-ups; T-019.b added as TODO.
+- Tests: `pnpm check` green (typecheck, lint 0 errors, format 0 errors); prettier fixed `docs/PROGRESS.md` wrapping.
+- State left: **Docs-only PR complete**. No code changed. `BUGS.md` unchanged (no bugs found).
+- Next: Owner review; then schedule T-019.b or continue T-019 (export).
+
+## Session log (newest first)
+
+### 2026-11-04 — Kilo — Web draft flow + backtest + static deploy (T-029/T-030→T-034, T-027.a)
+
+- Done:
+  - T-029 / D-051: export writes `data/public/latest.json` (`{schemaVersion, patch, manifest, generatedAt}`) after a successful publish; zod `Latest` schema in `@draftorb/shared`; test that a failed export leaves the previous `latest.json` untouched.
+  - T-030: web scaffold (Vite/React/Tailwind) with a schema-validated data loader resolving the patch through `latest.json`, then the manifest and every export file it lists; sample data under `data/public/16.21`; vite dev middleware mirrors `data/public` at `/`; `apps/web/src/**/*.test.ts` added to vitest include.
+  - T-031: draft screen — 10 slots (user, 4 allies, 5 enemies), reusable searchable `ChampionPicker`, optional role per slot, blind-pick toggle, rank selector (Diamond default); engine `recommend` wired to draft input; any subset of inputs valid.
+  - T-032: "Best overall" recommendations list with `recommendationPageSize` (5) pagination, "Show N more", `aria-live="polite"` "Showing X of Y", button hidden when exhausted; `RecommendationCard` (reasons, level badges, sample sizes, low-data warnings); pure `paginate` helper unit-tested; overall list always shown.
+  - T-033: per-role champion pool in `localStorage` (`draftorb.pool.v1`, `championPoolSchema`, try/catch degradation, catalogue filtering with dropped-id notice); `PoolEditor` (add/remove/clear, `poolMaxSize`, off-role hints, JSON export/import, invalid import leaves stored pool untouched); "From your pool" list above "Best overall", `In your pool` badge, "Hide my pool" toggle, empty-pool CTA, pool-unavailable reasons; two lists paginate independently.
+  - T-027.a: `pnpm etl backtest draft` (D-023 baseline) — frozen temporal holdout vs training window, log-loss/Brier/calibration vs 0.5 and baseline-only, per-role matchup effects, JSON report at `data/public/backtest-draft.json`; holdout-exclusion and toy planted-matchup (TOP + SUPPORT) tests.
+  - T-034: GitHub Pages deploy workflow (`.github/workflows/deploy.yml`, `VITE_BASE=/draftorb/`, `data/public` copied into site root), legal footer, unvalidated model banner shown when no backtest report beats baseline-only.
+- Files touched: `packages/shared/src/schemas/manifest.ts`, `packages/shared/src/index.ts`, `packages/etl/src/export/index.ts`, `packages/etl/src/commands/export.ts`, `packages/etl/src/backtest/draft.ts`, `packages/etl/src/commands/backtest.ts`, `packages/etl/src/cli.ts`, `apps/web/src/**` (loader, config, pagination, components, App, vite config), `.github/workflows/deploy.yml`, `data/public/{latest.json,16.21/{manifest,role-prob,roles/*}}`.
+- Tests: `pnpm check` green — 60 test files, 738 tests passed; lint 0 errors (15 pre-existing warnings); format clean.
+- State left: DONE (T-027.a baseline, T-029/T-030/T-031/T-032/T-033/T-034).
+- Next step: owner review; then T-019.b (patches table) or T-024/T-025/T-026.
+
+### 2026-11-02 — Copilot — T-019 review follow-up
+
+- Done:
+  - Preserved `champions.json`, `items.json`, and `runes.json` across exports and included available catalogs in manifest hashes; missing catalogs warn. Role-derivation snapshots also survive directory replacement without being listed as public assets.
+  - Invalidated manifests before `static` and `derive-roles` modify catalog files.
+  - Corrected pair-role serialization, preserved rune rank buckets (manifest schema v3), and rounded role probabilities so the final surviving role receives the residual; validated the resulting role map against the shared schema.
+  - Added warnings for explicit patch mismatches and mixed-platform aggregates, including with an explicit region. Backup cleanup failures after publication now preserve the backup and return a warning. Builds with no gated-in context emit no file.
+- Files touched: exporter orchestration/builders/IO and tests, shared rune/manifest schemas and tests, catalog-writing commands and tests, and `DATA_MODEL.md`, `DECISIONS.md`, `TICKETS.md`, `BUGS.md`, and this log.
+- Tests: focused export/shared tests pass (12 files, 92 tests); `pnpm check` passes (55 files, 707 tests); lint reports 0 errors and 15 pre-existing warnings.
+- State left: DONE (T-019 review follow-up implemented; D-049 awaits owner decision).
+- Next step: T-019.b (patches table, label mapping, patch_index switch, --since-patch).
+- Pitfalls / notes: aggregate tables are not patch- or platform-scoped; warnings report this limitation. Rune consumers must read `rankBucket` on each context; manifest schema v2 is no longer accepted.
 
 ### 2026-11-02 — T-019 Windows test compatibility follow-up
 

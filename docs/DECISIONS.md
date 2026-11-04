@@ -376,35 +376,39 @@ Owner decision 2026-11-04: keep 20 patches by default, with manual pruning still
 
 Owner decision 2026-11-04.
 
-### D-046 — Automatic change score — PROPOSED
+### D-046 — Automatic change score from CommunityDragon game data — ACCEPTED
 
-- Context: SPECS §15 needs deterministic change scoring from Data Dragon without full snapshots. Python `difflib` is not a TypeScript dependency; deterministic char-bigram Dice specified instead.
+- Context: SPECS §15 needs deterministic change scoring per patch without full snapshots, so that data from before a balance change can be downweighted (D-045). The first draft read Data Dragon, but Data Dragon champion files do not carry ability values: on 16.22.1 `champion/Ahri.json`, Q `effect` holds only `null`/zero arrays, `vars` is empty and the tooltip uses placeholders (`{{ totaldamage }}`); only `cooldown`, `cost`, `range` and base `stats` are real. Ability damage and ratio changes, the most common balance changes, would be invisible, while tooltip rewording would be visible. CommunityDragon publishes the game's own data files per patch. Checked on 16.21: `game/data/characters/ahri/ahri.bin.json` (≈ 64 KB) has `Characters/Ahri/Spells/AhriQAbility/AhriQ` with `mSpell.DataValues` `BaseDamage = [10, 35, 60, 85, 110, 135, 160]`, `mSpellCalculations.TotalDamage` with an AP `mCoefficient` of 0.5, `cooldownTime` and `mana`, and `Characters/Ahri/CharacterRecords/Root` with base and per-level stats. `game/items.cdtb.bin.json` (≈ 16 MB) has `Items/<id>` records with `price`, `recipeItemLinks` and `mFlat*`/`mPercent*` stat mods. Patch folders exist back to `10.1`.
 - Decision:
-  - Command `pnpm etl changes <patch>` writes `entity_change_scores(entity_type, entity_id, patch_index, content_hash, change_score, details)`; `entity_type` IN (`champion`,`item`,`rune`); unique key `(entity_type, entity_id, patch_index)`; re-run overwrites. `change_score` REAL in [0,1] or NULL, rounded to 4 decimals. `content_hash` + `details` only (no snapshots). Data Dragon versions assumed immutable on CDN; previous patch's files re-downloaded when needed (VERIFY).
+  - Source: CommunityDragon `https://raw.communitydragon.org/<major.minor>/` (same label as `matches.patch`), fetched with `fetch`, no new dependency, no key. Free game data, not a third-party stats site (golden rule 1). Data Dragon stays the source of the published catalogs (`champions.json`, `items.json`, `runes.json`, T-003) and of the Summoner's Rift item filter (`item.json` `maps["11"]`); CommunityDragon is used only by `pnpm etl changes`.
+  - Files: champions — `plugins/rcp-be-lol-game-data/global/default/v1/champion-summary.json` (numeric id -> alias; ids < 0 skipped), then `game/data/characters/<alias>/<alias>.bin.json` (alias lowercased); items — `game/items.cdtb.bin.json`; runes — numeric rune values location VERIFY in the T-019.d check (the plugin `perks.json` has ids and tooltips with `@placeholders@` only).
+  - Command `pnpm etl changes <patch>` writes `entity_change_scores(entity_type, entity_id, patch_index, content_hash, change_score, details)`; `entity_type` IN (`champion`,`item`,`rune`); `entity_id` = numeric champion/item/perk id; unique key `(entity_type, entity_id, patch_index)`; re-run overwrites. `change_score` REAL in [0,1] or NULL, rounded to 4 decimals. `content_hash` + `details` only (no snapshots); the previous patch's files are re-downloaded when needed.
   - Algorithm (TypeScript terms):
-    1. Flatten entity into `Map<string, Leaf>` (key -> leaf). Leaf typed as `number | number[] | text | other`.
-    2. Ignored keys (configurable): `image`, `tags`, `blurb`, `lore`, `skins`, `allytips`, `enemytips`, `partype`, burn strings (`cooldownBurn`, `effectBurn`), other cosmetic/UI keys.
-    3. `content_hash` = sha256 of canonical JSON (sorted keys) of the filtered map (`node:crypto`, no new dependency). Equal -> `change_score = 0`.
+    1. Allowlist extraction (configurable, normative list in SPECS §15): only balance fields are read; everything else in the game files (skins, VFX, animation, icons, client/tooltip data, unresolved `{hash}` names) is ignored. Champion: numeric base and per-level stats of the character record; for every spell of the record's ability list, `DataValues` (keyed by `name`, not by position), `mSpellCalculations` formula parts (referenced data value names and `mCoefficient`s), `cooldownTime`, `mana`, `castRange`. Item: `price`, `recipeItemLinks`, numeric `mFlat*`/`mPercent*` mods and item `DataValues`. Rune: numeric values once located.
+    2. Flatten into `Map<string, Leaf>` (path -> leaf), leaf `number | number[]`. Numbers rounded to 6 decimals first (the files store float32 values such as `0.30000001192092896`).
+    3. `content_hash` = sha256 of canonical JSON (sorted keys) of the map (`node:crypto`). Equal -> `change_score = 0`.
     4. Otherwise sum contributions:
        - number: `min(1, abs(new-old) / max(abs(old), 1e-6)) * 0.5`, per-leaf cap 0.5.
        - number[] same length: `mean(relative change per index) * 0.5` (one contribution per array). Different length: 0.3.
-       - text: strip HTML, remove digits, lowercase; char-bigram Dice similarity; if < 0.9 -> 0.3; total text contribution per entity capped at 0.3.
-       - structural: ability/passive/effect added or removed -> 0.6 each, counted once (no text double count).
-       - item-only: recipe (`from[]`) changed -> 0.3; stat key added/removed -> 0.3; gold cost is a normal numeric leaf; only Summoner's Rift items (`maps["11"] == true`).
-       - runes: same rules as champion (no special casing beyond `entity_type`).
+       - structural: a spell added, removed or replaced in the ability list -> 0.6 each; a data value or calculation added or removed -> 0.3 each; item recipe changed -> 0.3; stat mod added or removed -> 0.3.
     5. `change_score = min(1, sum)`, rounded to 4 decimals.
-  - Properties (tested): pure reword alone can never reach suggested band (text capped at 0.3 < 0.6); magnitude matters beyond per-leaf cap; monotone in change size for fixed keys; key order never changes result (canonical JSON).
+  - Text is never compared, so tooltip rewording cannot change a score.
+  - Properties (tested): rewording or reordering never changes the score (allowlist + canonical JSON + name keys); magnitude matters beyond the per-leaf cap; monotone in change size for fixed keys.
   - Bands (half-open): [0, 0.1) x1.0; [0.1, 0.3) x0.9; [0.3, 0.6) x0.5; [0.6, 1] creates `suggested` breakpoint (source `auto`, mode `downweight`, `weight_factor` 0.2). While a suggestion is pending or after rejection: effective weight = [0.3, 0.6) band weight (x0.5), never 1.0 (F18).
   - Fallback: missing/unreadable/incomplete source, or no previous patch with data -> `change_score = NULL`, weight 1.0, warning logged (first patch: NULL, no warning). Stated once in SPECS §15; all other sections reference it. Never invent a score, never block the pipeline.
-  - Fixtures (arithmetic shown in SPECS §15): cooldown scalar 10->9 = 0.05 ([0,0.1) x1.0); armor 30->36 (0.1) + cooldown 10->9 (0.05) = 0.15 ([0.1,0.3) x0.9); cooldown array [10,9,8,7,6]->[9,8,7,6,5] ≈ 0.065 ([0,0.1) x1.0); ability replaced = 0.6 ([0.6,1] suggested); identical = 0; reword only = 0.3 (capped, [0.3,0.6) x0.5, not suggested); ignored key / ARAM-only item = 0.
-  - Real-JSON fixtures: two consecutive real patches under `packages/etl/test/fixtures` (VERIFY Data Dragon structure before asserting).
+  - Fixtures (arithmetic shown in SPECS §15): cooldown scalar 10->9 = 0.05 ([0,0.1) x1.0); armor 30->36 (0.1) + cooldown 10->9 (0.05) = 0.15 ([0.1,0.3) x0.9); damage array [10,9,8,7,6]->[9,8,7,6,5] ≈ 0.065 ([0,0.1) x1.0); AP ratio 0.5->0.55 = 0.05; ability replaced = 0.6 ([0.6,1] suggested); identical = 0; skin/VFX-only change = 0; ARAM-only item = 0.
+  - Sequencing: manual breakpoints (T-019.e) ship before automatic scores (T-019.d). T-019.d starts with a verification step on two real consecutive patches: every champion and item change listed in the official patch notes must get a non-zero score, unchanged entities must score 0, and the list of misses and false positives is recorded in PROGRESS.md before the allowlist is frozen. Whether change weighting is turned on at all is decided by the backtest (D-023, T-027.a); it stays off (`changeWeightEnabled = false`) otherwise.
 - Alternatives:
-  - Python `difflib.SequenceMatcher` — rejected: project is TypeScript (D-001); deterministic char-bigram Dice specified instead.
+  - Data Dragon as the source — rejected: no ability values, so most champion changes are invisible.
+  - Ignore-list over whole files — rejected: game files are dominated by skin/VFX entries (65 entries in Ahri's file), so almost every patch would look changed.
+  - Parsing official patch notes — rejected: brittle HTML, and runtime LLMs are excluded (D-006).
+  - Detecting changes only from shifts in our own win rates — rejected for now: too noisy at Phase 1 volumes; may become a second signal later, through the D-023 gate.
+  - Python `difflib.SequenceMatcher` / text similarity — rejected: text is no longer compared.
   - Full JSON snapshots — rejected: unbounded (D-006).
-  - LLM scoring — rejected: non-deterministic (D-006).
   - Pending suggestion = weight 1.0 — rejected: biggest changes get least protection.
-- Consequences: no new dependency (`node:crypto` is built-in). `content_hash`/`details` stored, not snapshots.
-- Review note (2026-11-04, kept PROPOSED): the data source does not carry most champion balance changes. Checked on Data Dragon 16.22.1 `champion/Ahri.json`: for Q, `effect` holds only `null`/zero arrays, `vars` is empty and the tooltip uses placeholders (`{{ totaldamage }}`). Only `cooldown`, `cost`, `range` and base `stats` hold real values. Ability damage and ratio changes, the most common balance changes, are therefore invisible to this algorithm, while rewording of tooltips is visible. Item stats/gold and rune descriptions were not checked in detail and must be verified in T-019.d. Options for the owner: (a) keep Data Dragon and accept that champion scores cover only base stats, cooldowns and costs (manual D-047 breakpoints cover the rest); (b) use CommunityDragon game-data files for champions (free, game data rather than a third-party stats site, but a new data source to record in a decision); (c) restrict automatic scoring to items and runes and use manual breakpoints for champions. Change weighting stays disabled (`changeWeightEnabled = false`) until this is resolved, so nothing is blocked before T-019.d.
+- Consequences: no new dependency (`fetch`, `node:crypto` are built-in). A new external host (community-run, not Riot): its format can change and some names are hashed; the fallback covers outages and unreadable files. About 11 MB of champion files plus 16 MB of item data downloaded per patch compared; only hashes and details are stored.
+
+Owner decision 2026-11-04 (after the Data Dragon review above: CommunityDragon source, allowlist, manual breakpoints first).
 
 ### D-047 — Breakpoints — ACCEPTED
 
@@ -425,7 +429,7 @@ Owner decision 2026-11-04.
   - item breakpoint cascades to champion tables — rejected: champion/global breakpoints are the tool.
   - `weight_factor = 0` as reset — rejected: reset is its own mode; require 0 < weight_factor <= 1.
 - Consequences: `status` enum has no `validated` (use `active`); `weight_factor` NOT NULL required only for downweight.
-- Note (2026-11-04): manual breakpoints do not depend on D-046. Rows with `source = 'auto'` only appear once the automatic change score (D-046, still PROPOSED) is settled.
+- Note (2026-11-04): manual breakpoints do not depend on D-046 and ship first (T-019.e before T-019.d). Rows with `source = 'auto'` appear once T-019.d lands.
 
 Owner decision 2026-11-04.
 

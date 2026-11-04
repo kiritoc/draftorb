@@ -254,29 +254,35 @@ One weight formula, stated once:
 
 ## 15. Change score (D-046)
 
-Command `pnpm etl changes <patch>` writes `entity_change_scores(entity_type, entity_id, patch_index, content_hash, change_score, details)`; `entity_type` IN (`champion`,`item`,`rune`); unique key `(entity_type, entity_id, patch_index)`; re-run overwrites. `change_score` REAL in [0,1] or NULL, rounded to 4 decimals. `content_hash` + `details` only (no snapshots). Data Dragon versions assumed immutable on CDN; previous patch's files re-downloaded when needed (VERIFY immutability).
+Source: CommunityDragon game data, `https://raw.communitydragon.org/<major.minor>/` (same label as `matches.patch`). Data Dragon is not used for scoring (its champion files carry no ability values); it stays the source of the published catalogs and of the Summoner's Rift item filter (`item.json` `maps["11"]`). Files: champions — `plugins/rcp-be-lol-game-data/global/default/v1/champion-summary.json` (numeric id -> alias; ids < 0 skipped), then `game/data/characters/<alias>/<alias>.bin.json` (alias lowercased); items — `game/items.cdtb.bin.json`; runes — location of numeric rune values VERIFY in the T-019.d check.
+
+Command `pnpm etl changes <patch>` writes `entity_change_scores(entity_type, entity_id, patch_index, content_hash, change_score, details)`; `entity_type` IN (`champion`,`item`,`rune`); `entity_id` = numeric champion/item/perk id; unique key `(entity_type, entity_id, patch_index)`; re-run overwrites. `change_score` REAL in [0,1] or NULL, rounded to 4 decimals. `content_hash` + `details` only (no snapshots). The previous patch's files are re-downloaded when needed.
 
 Algorithm (TypeScript terms):
 
-1. Flatten entity into `Map<string, Leaf>` (key -> leaf). Leaf typed as `number | number[] | text | other`.
-2. Ignored keys (configurable): `image`, `tags`, `blurb`, `lore`, `skins`, `allytips`, `enemytips`, `partype`, burn strings (`cooldownBurn`, `effectBurn`), other cosmetic/UI keys.
-3. `content_hash` = sha256 of canonical JSON (sorted keys) of the filtered map (`node:crypto`, no new dependency). Equal -> `change_score = 0`.
+1. Allowlist extraction (configurable). Only these fields are read; everything else (skins, VFX, animation, icons, client/tooltip data, unresolved `{hash}` names) is ignored:
+   - champion: numeric base and per-level stats of `Characters/<Name>/CharacterRecords/Root`; for every spell of the record's ability list, `mSpell.DataValues` (keyed by `name`), `mSpell.mSpellCalculations` formula parts (referenced data value names and `mCoefficient`s), `cooldownTime`, `mana`, `castRange`.
+   - item (`Items/<id>`, Summoner's Rift items only): `price`, `recipeItemLinks`, numeric `mFlat*`/`mPercent*` mods, item `DataValues`.
+   - rune: numeric values once located (VERIFY).
+2. Flatten into `Map<string, Leaf>` (path -> leaf), leaf `number | number[]`; numbers rounded to 6 decimals (the files store float32 values such as `0.30000001192092896`).
+3. `content_hash` = sha256 of canonical JSON (sorted keys) of the map (`node:crypto`, no new dependency). Equal -> `change_score = 0`.
 4. Otherwise sum contributions:
    - number: `min(1, abs(new-old) / max(abs(old), 1e-6)) * 0.5`, per-leaf cap 0.5.
    - number[] same length: `mean(relative change per index) * 0.5` (one contribution per array). Different length: 0.3.
-   - text: strip HTML, remove digits, lowercase; char-bigram Dice similarity; if < 0.9 -> 0.3; total text contribution per entity capped at 0.3.
-   - structural: ability/passive/effect added or removed -> 0.6 each, counted once (no text double count).
-   - item-only: recipe (`from[]`) changed -> 0.3; stat key added/removed -> 0.3; gold cost is a normal numeric leaf; only Summoner's Rift items (`maps["11"] == true`).
-   - runes: same rules as champion (no special casing beyond `entity_type`).
+   - structural: spell added, removed or replaced in the ability list -> 0.6 each; data value or calculation added or removed -> 0.3 each; item recipe changed -> 0.3; stat mod added or removed -> 0.3.
 5. `change_score = min(1, sum)`, rounded to 4 decimals.
 
-Properties (tested): pure reword alone can never reach suggested band (text capped at 0.3 < 0.6); magnitude matters beyond per-leaf cap; monotone in change size for fixed keys; key order never changes result (canonical JSON).
+Text is never compared, so tooltip rewording cannot change a score.
+
+Properties (tested): rewording or reordering never changes the score (allowlist, canonical JSON, data values keyed by name); magnitude matters beyond the per-leaf cap; monotone in change size for fixed keys.
 
 Bands (half-open): [0, 0.1) x1.0; [0.1, 0.3) x0.9; [0.3, 0.6) x0.5; [0.6, 1] creates `suggested` breakpoint (source `auto`, mode `downweight`, `weight_factor` 0.2). While a suggestion is pending or after rejection: effective weight = [0.3, 0.6) band weight (x0.5), never 1.0.
 
 Fallback (stated once here): missing/unreadable/incomplete source, or no previous patch with data -> `change_score = NULL`, weight 1.0, warning logged (first patch: NULL, no warning). Never invent a score, never block the pipeline. All other sections reference this fallback.
 
-Fixtures (arithmetic shown): cooldown scalar 10->9 = 0.05 ([0,0.1) x1.0); armor 30->36 (0.1) + cooldown 10->9 (0.05) = 0.15 ([0.1,0.3) x0.9); cooldown array [10,9,8,7,6]->[9,8,7,6,5] ≈ 0.065 ([0,0.1) x1.0); ability replaced = 0.6 ([0.6,1] suggested); identical = 0; reword only = 0.3 (capped, [0.3,0.6) x0.5, not suggested); ignored key / ARAM-only item = 0. Real-JSON fixtures: two consecutive real patches under `packages/etl/test/fixtures` (VERIFY Data Dragon structure before asserting).
+Fixtures (arithmetic shown): cooldown scalar 10->9 = 0.05 ([0,0.1) x1.0); armor 30->36 (0.1) + cooldown 10->9 (0.05) = 0.15 ([0.1,0.3) x0.9); damage array [10,9,8,7,6]->[9,8,7,6,5] ≈ 0.065 ([0,0.1) x1.0); AP ratio 0.5->0.55 = 0.05 ([0,0.1) x1.0); ability replaced = 0.6 ([0.6,1] suggested); identical = 0; skin/VFX-only change = 0; ARAM-only item = 0. Real-JSON fixtures: trimmed CommunityDragon files of two consecutive real patches under `packages/etl/test/fixtures`.
+
+Verification before the allowlist is frozen (T-019.d): on two real consecutive patches, every champion and item change listed in the official patch notes gets a non-zero score and unchanged entities score 0; misses and false positives are recorded in PROGRESS.md. Manual breakpoints (§16, T-019.e) ship first.
 
 ## 16. Breakpoints (D-047)
 
@@ -297,8 +303,7 @@ DDL with table-level constraints (exact text in DATA_MODEL.md §5.4): CHECKs for
 Only edge cases not owned by sections 12-16; all other rules reference those sections (one normative statement per rule).
 
 - Missing source data: `change_score = NULL`, weight 1.0, warning logged (first patch: NULL, no warning). Stated once in SPECS §15; referenced here.
-- Entity renamed / ID changed between patches: new `entity_id` = new row; cross-patch comparison uses `entity_id`, so renamed entities are separate rows. Champion keyed by name id (e.g. `MonkeyKing`), mapped to the numeric key via the `key` field (VERIFY against Data Dragon).
-- Burn strings (`cooldownBurn`, `effectBurn`) ignored (duplicate numeric arrays).
-- Item passives living in description HTML: VERIFY against real `item.json` before asserting structural detection.
-- Runes are scored: `rune_ctx` rows whose page contains a rune affected by a rune breakpoint are downweighted; `baseline` is identical. Per-champion Data Dragon files are needed (summary `champion.json` has no spell data; T-003 only fetches summaries).
+- Entity renamed / ID changed between patches: new `entity_id` = new row; cross-patch comparison uses `entity_id`, so renamed entities are separate rows. Champions are keyed by numeric id from CommunityDragon `champion-summary.json` (alias such as `monkeyking` only builds the file path).
+- Item passives: numeric values come from the item `DataValues` in `items.cdtb.bin.json`; description HTML is never parsed.
+- Runes are scored: `rune_ctx` rows whose page contains a rune affected by a rune breakpoint are downweighted; `baseline` is identical. Change scoring downloads CommunityDragon files itself (§15); the T-003 Data Dragon import is unchanged.
 - One normative statement per rule; cross-references (§14, §15, §16) used elsewhere.

@@ -4,7 +4,7 @@
 
 - Phase: 1 (Support / Diamond)
 - Current milestone: M0 Foundations (T-002.b DONE) and M1 ETL (in progress: T-014 DONE; T-015/T-015.b DONE; T-016 DONE; T-017 DONE; T-018 DONE; T-019 DONE; T-019.b..f TODO) -> M2 Engine (T-020..T-023 DONE)
-- Last updated: 2026-11-04 by Devin (owner decisions D-034..D-051)
+- Last updated: 2026-11-04 by Devin (D-046 rewritten and accepted)
 
 ## Epic status
 
@@ -35,11 +35,18 @@ Session entries before 2026-10-29 live in [PROGRESS_ARCHIVE.md](./PROGRESS_ARCHI
 
 ## Open questions for the owner
 
-Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-050 and D-051 ACCEPTED; D-044 ACCEPTED with 20 patches. Still PROPOSED (see the review notes in DECISIONS.md):
-
-- D-046 — Automatic change score: Data Dragon champion files lack ability values, so most champion balance changes are invisible; choose Data Dragon as is, CommunityDragon for champions, or items/runes only.
+Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-050 and D-051 ACCEPTED; D-044 ACCEPTED with 20 patches; D-046 ACCEPTED with CommunityDragon as the source. No PROPOSED decisions are open.
 
 ## Session log (newest first)
+
+### 2026-11-04 — Devin — D-046 rewritten for CommunityDragon and accepted
+
+- Done: D-046 ACCEPTED (owner). Change scoring now reads CommunityDragon game data (Data Dragon champion files have no ability values; verified on 16.22.1) with an allowlist of balance fields, float32 rounding, name-keyed data values and no text comparison. Manual breakpoints ship first: T-019.e now depends on T-019.b, T-019.d on T-019.e and starts with a patch-notes verification step; T-019.f works with manual breakpoints alone. Updated DECISIONS D-046/D-047, SPECS §15/§17, RIOT_API.md, TICKETS T-019.d/e/f.
+- Files touched: `docs/DECISIONS.md`, `docs/SPECS.md`, `docs/RIOT_API.md`, `docs/TICKETS.md`, `docs/PROGRESS.md`.
+- Tests: `pnpm format:check`.
+- State left: DONE.
+- Next step: T-029 (small) or T-019.b; for change weighting the order is T-019.b -> T-019.e -> T-019.d -> T-019.f.
+- Pitfalls / notes for next AI: CommunityDragon is community-run; numeric rune values were not located yet (VERIFY in T-019.d). `items.cdtb.bin.json` is about 16 MB.
 
 ### 2026-11-04 — Devin — D-044 accepted with 20-patch retention
 

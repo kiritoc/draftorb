@@ -198,9 +198,7 @@ Non-support roles, accounts/login, pool sync across devices or auto-import of th
 
 ## 12-17. Storage, retention, weights, change scoring, breakpoints (target model)
 
-**Target model, implemented by T-019.b..T-019.f. Until T-019.b lands, section 3 recency uses D-033's index over stored patches and aggregation stays clear-and-rewrite; until T-019.f lands and T-027.a passes the D-023 gate, change weighting is off (`changeWeightEnabled = false`).**
-
-These sections describe the **target** storage and weighting model, implemented by tickets T-019.b through T-019.f. Until those tickets are complete, SPECS §3 (recency with the dense stored-patch index from D-033) and clear-and-rewrite aggregation (DATA_MODEL.md, T-015..T-018) govern. Sections 12-17 are normative once implemented; they do not describe current code. No new tables are created and no rows are soft-deleted until T-019.b..f are done.
+**Target model, implemented by T-019.b..T-019.f.** These sections describe the target storage and weighting model; they are normative once implemented and do not describe current code. Until T-019.b lands, SPECS §3 recency uses the dense stored-patch index from D-033 and aggregation stays clear-and-rewrite (DATA_MODEL.md, T-015..T-018); until T-019.f lands and T-027.a passes the D-023 gate, change weighting is off (`changeWeightEnabled = false`). No new tables are created and no rows are soft-deleted until T-019.b..f are done.
 
 ## 12. Patch index (D-043)
 

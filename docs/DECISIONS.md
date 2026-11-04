@@ -174,14 +174,11 @@ Owner decision 2026-10-29.
 - Alternatives: (a) pool as a hard filter (old SPECS §2) — rejected, no "learn a new champion" list; (b) boost pool champions' scores — rejected, mixes preference with win probability and breaks D-023 validation and explanations; (c) one merged list with badges — rejected, pool picks get buried under the overall ranking; (d) accounts or cloud sync — rejected (D-002, D-006, golden rule 1); (e) derive the pool from match history or mastery — deferred, needs the user's puuid and extra Riot calls; (f) infinite scroll — rejected, an explicit "Show more" keeps keyboard/screen-reader use and tests simple.
 - Consequences: the engine output stays complete (about 170 entries, inside the 50 ms budget) and deterministic. T-002.b adds `poolRank`, `poolRecommendations`, `poolUnavailable` and the pool storage schema; T-023 implements the contract and its tests prove that the pool never changes scores; T-032 delivers the overall list with pagination; T-033 delivers pool storage, editor, import/export and the pool list. If rejected: SPECS §2/§2.1/§5/§7/§7.1 and tickets T-002.b/T-023/T-026/T-032/T-033 revert to the single filtered-list wording. Owner confirmed the defaults: page size 5, `poolMaxSize` 40 per role, and the overall list includes pool champions by default ("In your pool" badge, "Hide my pool" toggle off). Clarification (review of PR #6): "never changes order" does not mean `recommendations` is identical with vs without a pool. Point 3 widens the candidate set, so overall `rank` may shift when pool-only champions are inserted; scores of shared champions and their relative order stay the same. T-033 must test that, not list identity.
 
-### D-028 — Record type-only devDependencies already in use — ACCEPTED
+### D-025 — Correction: Node 22 minimum raises @types/node from ^26.x to ^22.x — ACCEPTED
 
-- Context: AGENTS.md rule 6 requires every dependency to be recorded here. The 2026-10-26 review found three type-only packages in use without an entry. Renumbered from D-025 (2026-10-29) to avoid the ID collision with the D-025 correction entry below.
-- Decision: Keep `@types/better-sqlite3` (^9.6.0, `packages/etl`), `@types/react` and `@types/react-dom` (^19.1.2, `apps/web`) as devDependencies. All are MIT-licensed DefinitelyTyped packages, free, with no runtime code.
-- Alternatives: hand-written declarations — rejected, more maintenance for no benefit.
-- Consequences: no runtime impact. `@types/better-sqlite3` ^9.6.0 is older than `better-sqlite3` 13.0.3; check the typings when upgrading either package.
-
-Owner decision 2026-10-29.
+- Context: D-028 (formerly D-025) referenced `@types/better-sqlite3`, `@types/react`, `@types/react-dom` but the root `@types/node` was `^26.6.5` (matching Node 26, not the then-declared Node 20 minimum). D-026 raised the minimum Node version to 22.
+- Decision: Correct the root `@types/node` devDependency from `^26.6.5` to `^22.18.5` to align with the Node 22 minimum. The `@types/better-sqlite3` version is unaffected.
+- Consequences: `@types/node` now matches the supported Node major version; no API surface changes for the ETL package.
 
 ### D-026 — Require Node 22 (B-015) — ACCEPTED
 
@@ -192,12 +189,6 @@ Owner decision 2026-10-29.
   - Support both Node 20 and 22 — rejected by policy [B]; not pursued.
 - Consequences: Node 20 is no longer a supported runtime. Developers and CI must use Node 22. `better-sqlite3` 13.0.3 remains pinned in `packages/etl/package.json` (it already satisfies the Node 22 requirement). The `Node version policy` open question in PROGRESS.md is resolved.
 
-### D-025 — Correction: Node 22 minimum raises @types/node from ^26.x to ^22.x — ACCEPTED
-
-- Context: D-028 (formerly D-025) referenced `@types/better-sqlite3`, `@types/react`, `@types/react-dom` but the root `@types/node` was `^26.6.5` (matching Node 26, not the then-declared Node 20 minimum). D-026 raised the minimum Node version to 22.
-- Decision: Correct the root `@types/node` devDependency from `^26.6.5` to `^22.18.5` to align with the Node 22 minimum. The `@types/better-sqlite3` version is unaffected.
-- Consequences: `@types/node` now matches the supported Node major version; no API surface changes for the ETL package.
-
 ### D-027 — B-011 resolution: n semantics, apex bucket name, role-prob sparsity — ACCEPTED (owner decision)
 
 - Context: B-011 identified that SPECS §3/§7 and the shared schemas diverged on three points that T-002.b must resolve at the spec level before implementing the schemas.
@@ -207,6 +198,15 @@ Owner decision 2026-10-29.
   3. **`role-prob.json` is sparse:** each champion entry lists only the roles with non-zero probability (roles that have games); absent roles are treated as 0. In zod 4, `z.record(roleSchema, numberSchema)` requires every key, so a sparse map must use `z.partialRecord` (or equivalent). Each champion's probabilities sum to 1 (tolerance 1e-6).
 - Alternatives considered: (1) raw games — rejected because thresholds use `n_eff`, so showing raw counts would mislead; (2) `MASTER` without suffix — rejected, ambiguous with the raw MASTER tier; (3) dense maps — rejected, bloats the file with zero entries for off-role champions.
 - Consequences: T-002.b schemas use `z.number().nonnegative()` (not `.int()`) for `Reason.n` and `reliability.games`; a `rankBucketSchema` with 8 values replaces `rankSchema` in bucket-typed fields; `championRoleProbabilitiesSchema` uses `z.partialRecord`; all export rows and `manifest.rankBuckets` carry the 8-value bucket.
+
+### D-028 — Record type-only devDependencies already in use — ACCEPTED
+
+- Context: AGENTS.md rule 6 requires every dependency to be recorded here. The 2026-10-26 review found three type-only packages in use without an entry. Renumbered from D-025 (2026-10-29) to avoid the ID collision with the D-025 correction entry below.
+- Decision: Keep `@types/better-sqlite3` (^9.6.0, `packages/etl`), `@types/react` and `@types/react-dom` (^19.1.2, `apps/web`) as devDependencies. All are MIT-licensed DefinitelyTyped packages, free, with no runtime code.
+- Alternatives: hand-written declarations — rejected, more maintenance for no benefit.
+- Consequences: no runtime impact. `@types/better-sqlite3` ^9.6.0 is older than `better-sqlite3` 13.0.3; check the typings when upgrading either package.
+
+Owner decision 2026-10-29.
 
 ### D-029 — Review resolutions: lowData required, manifest version pinned, zero-prob and pool-duplicate guards — ACCEPTED
 
@@ -250,7 +250,7 @@ Owner decision 2026-10-29.
 
 Accepted by the owner on 2026-10-31. SPECS §5/§7 text derived from this decision is normative.
 
-### D-031 — `role_prob` counts a single patch, no recency decay — SUPERSEDED by D-035
+### D-031 — `role_prob` counts a single patch, no recency decay — SUPERSEDED by D-035 (implemented in T-015.c; D-035 still PROPOSED)
 
 - Context: SPECS §3 applies recency decay `decay^(currentPatchIndex - gamePatchIndex)` at aggregation time and D-017 keeps older patches for that purpose. §3 names draft probabilities (pairs, matchups, baselines) but not `role_prob`, and DATA_MODEL.md says aggregated tables are "recomputed per patch". T-015 had to choose between single-patch counts and decay-weighted counts across patches.
 - Assumption (T-015): `aggregateRoleProb` counts only participants of one target patch (default: highest stored patch, numeric major.minor compare as in D-017). `role_prob` has no `patch` column and holds one patch at a time. A target patch with no participants leaves the table unchanged; a malformed patch is a usage error.
@@ -266,7 +266,7 @@ Accepted by the owner on 2026-10-31. SPECS §5/§7 text derived from this decisi
 
 Owner decision 2026-10-31.
 
-### D-033 — Recency `patchIndex` and game rank bucket in ETL aggregation — SUPERSEDED by T-019.b
+### D-033 — Recency `patchIndex` and game rank bucket in ETL aggregation — ACCEPTED (to be superseded by D-043 when T-019.b lands)
 
 - Context: SPECS §3 defines recency as `decay ^ (currentPatchIndex - patchIndex)` but does not define `patchIndex`. It also does not say how a match's `avg_rank_score` maps to a rank bucket. T-016 needs both.
 - Question: should a patch gap (no stored games on some patches) count as one decay step or as the real number of patches released in between?
@@ -284,6 +284,8 @@ Owner decision 2026-10-31.
 - Consequences: `transformChampions` gains an optional `roleProbabilities` parameter (tag fallback when absent, backward compatible). `champions.json.roles` now reflects observed probabilities once `pnpm etl derive-roles` runs after `pnpm etl aggregate`. Only roles with probability >= `roleProbThreshold` (default 0.05) are kept, and a champion always keeps at least its highest-probability role (B-046).
 
 ### D-035 — Decay-weighted `role_prob` evidence, superseding D-031 single-patch assumption — PROPOSED
+
+- Status note (2026-11-04): implemented in T-015.c; awaiting owner acceptance.
 
 - Context: D-031 (PROPOSED) made `aggregateRoleProb` count one target patch only, with `role_prob` having no `games_w`/`games_w2` columns and no recency decay. SPECS §3 applies recency decay at aggregation time and never drops older patches. The single-patch implementation wipes `role_prob` on every aggregate: after one newer-patch match is ingested, the next `pnpm etl aggregate` rebuilds the table from ~10 participants, dropping champions absent from that patch. The `role-prob.json` export carries no `games` signal, so D-031's mitigation ("consumers should check games") cannot work. Baselines (T-016/D-033) already use cross-patch decay with a dense patch index — the two tables followed different rules.
 - Decision: `aggregateRoleProb` stores decay-weighted evidence like the other aggregate tables: `games` (raw count), `games_w` (sum of recency weights), `games_w2` (sum of squared weights). Weight = `recencyFactor(patchIndex, currentPatchIndex, decay) * reliabilityFactor(rankKnownCount, unknownRankFactor)`, using the same dense patch index and snapshot-patch rules as D-033. `prob = games_w(champion, role) / sum_roles games_w(champion, role)`, preserving the sum-to-1 invariant. `role-prob.json` stays a bare sparse map of probabilities (no `p`, `games` wrapper), so D-027, D-029, the shared schema, parity tests, and engine consumers do NOT change. Migration 009 adds `games_w` and `games_w2` to `role_prob`. The exporter (T-019) drops champions below `exportMinGames`; aggregate.ts itself does not filter.
@@ -305,6 +307,8 @@ Owner decision 2026-10-31.
   - Drop mastery fallback entirely and rely only on `champion_games`. Rejected: D-022 specifies the fallback for participants of the user's role.
   - Drop rank-based weighting entirely and treat all experts equally. Rejected: D-022 says "rank-based expertWeight" is a future addition.
 - Consequences: T-018 stores a single expert-weighted `rune_ctx` table with no rank bucket column. Follow-up work will require a migration if rank buckets are added. Mastery points are already stored in `participants` from T-014 but are not used in T-018.
+
+_Note: D-037..D-042 were never assigned; numbering resumes at D-043._
 
 ### D-043 — Patch index from Data Dragon versions.json — PROPOSED
 
@@ -424,6 +428,8 @@ Owner decision 2026-10-31.
 
 ### D-049 — Preserve rank buckets in rune exports — PROPOSED
 
+- Status note (2026-11-04): implemented in the rune-export rank-bucket work (migration 011 `rune_ctx.rank_bucket`, B-038 fix); awaiting owner acceptance.
+
 - Context: `rune_ctx` stores rank-specific aggregates because expert weighting depends on the user's rank bucket. The export grouped pages only by context key and level, which merged these distinct statistics.
 - Decision: include `rankBucket` on every exported rune context, group by it, and bump `MANIFEST_SCHEMA_VERSION` to 3.
 - Alternatives:
@@ -432,6 +438,8 @@ Owner decision 2026-10-31.
 - Consequences: consumers must accept schema version 3 and read `rankBucket` on rune contexts.
 
 ### D-050 — Reserve the user's role during ally role inference — PROPOSED
+
+- Status note (2026-11-04): implemented in B-043; awaiting owner acceptance.
 
 - Context: B-043. Ally role inference ran with all 5 roles available, so an unfixed ally could be assigned `userRole` even though the user occupies it (e.g. an unfixed Senna ally inferred as SUPPORT while the user plays support). The ally then produced no ally-pair synergy for the role it actually plays.
 - Decision:
@@ -443,6 +451,15 @@ Owner decision 2026-10-31.
   - Treat a conflicting fixed ally as authoritative and drop the user's role — rejected: `userRole` is the input that defines the request.
   - Keep the current behavior — rejected: the ally is scored against the wrong role and its real synergy is lost (e.g. an ADC Senna ally contributes no ADC synergy).
 - Consequences: no output-shape change (`DRAFT_RESULT_SCHEMA_VERSION` unchanged). Enemy inference is untouched: every enemy role is legitimately possible.
+
+### D-051 — Latest-patch pointer for the web app — PROPOSED
+
+- Context: ARCHITECTURE.md says the web loads `data/public/manifest.json` (latest), but export only writes `data/public/<patch>/manifest.json`, so nothing tells the web which patch is current.
+- Decision (assumption): export writes `data/public/latest.json` = `{ schemaVersion, patch, manifest: "<patch>/manifest.json", generatedAt }` as the last step after the patch directory is published; the web fetches it first, then the referenced manifest.
+- Alternatives:
+  - Copy the latest manifest to `data/public/manifest.json` — rejected: its `files` paths are relative to the patch dir, so a copy needs rewriting and can drift.
+  - Hard-code the patch in the web build — rejected: needs a redeploy per patch.
+- Consequences: one extra small fetch; old patch dirs stay addressable; T-029 implements it.
 
 ### Template
 

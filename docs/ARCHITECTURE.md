@@ -1,6 +1,6 @@
 # ARCHITECTURE
 
-Status (2026-10-26): `packages/shared` and the ETL ingestion part of `packages/etl` exist; aggregation and export, `packages/engine` (placeholder only), `apps/web` (scaffold only) and `apps/desktop` (not created) are target state.
+Status (2026-11-04): `packages/shared` (types + zod schemas), `packages/engine` (role-generic recommendation engine) and `packages/etl` (Riot client, SQLite ingestion, aggregation, JSON export) exist. `apps/web` is a scaffold (stub app, T-030 not started); `apps/desktop` is not created.
 
 ## Overview
 
@@ -36,13 +36,13 @@ Node 22 (CI and minimum, enforced by `engines` and CI matrix; Node 20 unsupporte
 
 ## Data flow (draft)
 
-1. Web loads `manifest.json` (patch, files, generatedAt).
+1. Web loads `data/public/latest.json` to learn the current patch, then `<patch>/manifest.json` (patch, files, generatedAt) (D-051 PROPOSED, T-029; `latest.json` is not yet written by export).
 2. Loads static data (champions, tags) + the role tables listed in `manifest.roles` (`roles/<ROLE>/...`, DATA_MODEL.md).
 3. User input -> `engine.recommend(draftInput, dataBundle)` -> `DraftResult` (SPECS §7) -> UI lists.
 
 ## Data versioning
 
-`data/public/<patch>/` + `data/public/manifest.json` (latest). Engine functions receive data as arguments (dependency injection) — never import JSON directly.
+`data/public/<patch>/` + `data/public/latest.json` pointing at the current patch's `manifest.json` (D-051 PROPOSED, T-029; not yet written by export). Engine functions receive data as arguments (dependency injection) — never import JSON directly.
 
 ## Adapters pattern (phase 2)
 

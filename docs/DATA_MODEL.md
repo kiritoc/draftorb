@@ -21,7 +21,7 @@ CREATE TABLE participants (
   win INTEGER NOT NULL CHECK (win IN (0, 1)),
   rank_score REAL, champion_games INTEGER NOT NULL DEFAULT 0, -- pure count of games on the champion in our data (D-022)
   mastery_points INTEGER,      -- champion-mastery-v4 points for THIS champion at last fetch; NULL = never fetched (at most one call per (puuid, champion) pair)
-  is_expert INTEGER,          -- derived: recomputed each aggregation run from champion_games/mastery_points (D-022), not written at extraction
+  is_expert INTEGER,          -- column exists but is never written; expert status is computed on the fly during rune aggregation (D-022, aggregate-runes.ts)
   keystone INTEGER, primary_style INTEGER, sub_style INTEGER,
   perks_json TEXT,            -- full rune selection + shards
   items_json TEXT,            -- final items
@@ -43,12 +43,14 @@ CREATE TABLE match_rejects (  -- matches seen and rejected, deduped across playe
 );
 CREATE INDEX idx_part_champ_role ON participants(champion_id, role);
 
+-- PLANNED (T-019.b, D-043): not migrated yet.
 CREATE TABLE patches (
   patch_index INTEGER PRIMARY KEY,
   version_label TEXT NOT NULL UNIQUE,   -- major.minor, matches matches.patch
   released_at INTEGER
 );
 
+-- PLANNED (T-019.d, D-046): not migrated yet.
 CREATE TABLE entity_change_scores (
   entity_type TEXT NOT NULL CHECK (entity_type IN ('champion','item','rune')),
   entity_id INTEGER NOT NULL,
@@ -59,6 +61,7 @@ CREATE TABLE entity_change_scores (
   PRIMARY KEY (entity_type, entity_id, patch_index)
 );
 
+-- PLANNED (T-019.e, D-047): not migrated yet.
 CREATE TABLE data_breakpoints (
   id INTEGER PRIMARY KEY,
   scope_type TEXT NOT NULL CHECK (scope_type IN ('champion','item','rune','global')),
@@ -76,10 +79,11 @@ CREATE TABLE data_breakpoints (
     OR (mode = 'downweight' AND weight_factor IS NOT NULL AND weight_factor > 0 AND weight_factor <= 1)
   )
 );
+-- PLANNED (T-019.e, D-047): not migrated yet.
 CREATE UNIQUE INDEX idx_data_breakpoints_unique ON data_breakpoints(scope_type, COALESCE(scope_id, -1), from_patch_index, source);
 ```
 
-Notes: match ingestion persists the match row and its 10 participant rows in one transaction. A match is accepted only when each of two teams has exactly one participant in each role; invalid layouts are rejected and have no stored participants. `rank_score` = coarse tier/division score at collection time (approximation, documented in RIOT_API.md). Exact rank ordering uses the stored `tier`, `division`, and `lp` fields separately. The score uses the D-016 tier base and division bonus formula; it excludes LP and is distinct from the SPECS §3 weighting buckets. Store only needed fields. `match_rejects` records match ids already evaluated and rejected (wrong queue, too short, off-patch, invalid payload) so shared matches are not re-fetched per player; a `patch` reject keeps the match's actual patch so it is re-evaluated once a run's `--since-patch` window includes it (D-017). `reason` is `queue|short|patch|invalid|pruned`; `pruned` is written by `pnpm etl prune` (reason for deletion = retention, actual `patch`, `checked_at`) and is permanent: `findRejection` never deletes or re-evaluates it, whatever `--since-patch` says (D-044).
+Notes: match ingestion persists the match row and its 10 participant rows in one transaction. A match is accepted only when each of two teams has exactly one participant in each role; invalid layouts are rejected and have no stored participants. `rank_score` = coarse tier/division score at collection time (approximation, documented in RIOT_API.md). Exact rank ordering uses the stored `tier`, `division`, and `lp` fields separately. The score uses the D-016 tier base and division bonus formula; it excludes LP and is distinct from the SPECS §3 weighting buckets. Store only needed fields. `match_rejects` records match ids already evaluated and rejected (wrong queue, too short, off-patch, invalid payload) so shared matches are not re-fetched per player; a `patch` reject keeps the match's actual patch so it is re-evaluated once a run's `--since-patch` window includes it (D-017). `reason` is `queue|short|patch|invalid` today, `pruned` planned (`pnpm etl prune`, T-019.c, D-044): `pruned` is written by `pnpm etl prune` (reason for deletion = retention, actual `patch`, `checked_at`) and is permanent: `findRejection` never deletes or re-evaluates it, whatever `--since-patch` says (D-044).
 
 `champions.json.roles` is kept (D-034, PROPOSED). `pnpm etl derive-roles` rewrites it with the roles observed for that patch's participants (probability >= `roleProbThreshold` (default 0.05), canonical order). Champions with no observations keep the Data Dragon tag roles, read from an untouched `champions.bootstrap.json` snapshot. Re-run `derive-roles` after `static`, because `static` restores the tag roles.
 

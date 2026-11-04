@@ -4,31 +4,20 @@ Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATI
 
 ## Open
 
-| ID    | Sev | Area   | Title                                                                                                                                                                  | Status | Found by/date                     | Ticket  |
-| ----- | --- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | --------------------------------- | ------- |
-| B-026 | S3  | engine | `blindSafety` approximates `pickShare(e)` with roleProb (no pick-rate export)                                                                                          | OPEN   | T-023 review 2026-10-30           | –       |
-| B-027 | S3  | engine | `W_COMP`, `W_BLIND`, `BLIND_WORST_CASE_FACTOR`, `HARD_COUNTER_DELTA_PP` and `LANE_GROUPS` were module constants; now injectable via `RecommendConfig` (T-027.a tuning) | FIXED  | T-023 review 2026-10-31           | T-027.a |
-| B-021 | S3  | engine | `types: []` in engine/shared tsconfigs is circumvented by test files importing vitest, so the type-checker still resolves Node globals in production files             | OPEN   | B-017 fix verification 2026-10-28 | –       |
+| ID    | Sev | Area   | Title                                                                                                                                                      | Status | Found by/date                     | Ticket |
+| ----- | --- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | --------------------------------- | ------ |
+| B-026 | S3  | engine | `blindSafety` approximates `pickShare(e)` with roleProb (no pick-rate export)                                                                              | OPEN   | T-023 review 2026-10-30           | –      |
+| B-021 | S3  | engine | `types: []` in engine/shared tsconfigs is circumvented by test files importing vitest, so the type-checker still resolves Node globals in production files | OPEN   | B-017 fix verification 2026-10-28 | –      |
 
 ## Duplicate bug IDs (not renumbered)
 
-B-026 appears twice: OPEN (blindSafety approximates pickShare with roleProb, line 9) and FIXED under the Fixed section below (engine `shrink()` returns NaN for empty contexts, migration to `levels.ts`). B-027 appears twice: FIXED in the Open table below (injectable recommendation config, line 10) and FIXED under the Fixed section below (transient enrichment failures become permanent gaps). Neither ID is renumbered per owner instruction; both duplicates are documented here.
+Three IDs each label two distinct bugs (per owner instruction, IDs are never renumbered; the duplicates are documented here):
 
-T-023 review (2026-10-30) fixed in-PR: blind safety firing on every 1v1 role, blind safety re-scoring known enemies, unknown pool ids being scored, role-inference failure dropping a whole team, raw-winrate hard-counter warning, missing `W_comp`/`W_blind`, engine magic numbers outside `config.ts`, missing level 0 for lowData reasons (`reasonLevelSchema` now includes 0, SPECS §7), board-picked pool champions now reported as `poolUnavailable` `picked`, hard-counter warnings emitted as codes (`counteredBy:<ROLE>:<id>`), `rawGames` optional (omitted when unknown instead of a fake 0).
+- **B-026**: OPEN in the table below — "`blindSafety` approximates `pickShare(e)` with roleProb (no pick-rate export)" — and FIXED in the Fixed section — "Engine `shrink()` returns NaN for empty contexts with zero prior strength".
+- **B-027**: FIXED in the Fixed section — "Recommendation constants injectable via `RecommendConfig`" — and also FIXED in the Fixed section — "Transient enrichment failures become permanent gaps (no retry on duplicates)".
+- **B-035**: FIXED in the Fixed section — "Export removes static catalogs and role-derivation snapshots" — and also FIXED in the Fixed section — "Export review findings (role-prob rounding, empty builds, publish cleanup, static catalogs)".
 
-T-018 review (2026-11-01) fixed in-PR: lane `context_level` now depends only on the slot count (TOP 1-slot and partial-lane keys get level 3, same as 1-slot back-offs; no match-order dependence); migration 010 backfills `context_level` from `context_key` for existing rows. Mastery fallback (`minMasteryPoints`) and rank-based `expertWeight` per user rank bucket (migration 011 adds `rune_ctx.rank_bucket`) are now applied (D-036 update).
-
-T-017 review (2026-11-01) fixed in-PR: `aggregatePairTables` buffered every stored match's participants before aggregating; it now streams rows ordered by `match_id` and aggregates each match as soon as it is complete. A ten-player match test was added. No other new bugs were identified during T-017.
-
-T-015 review (2026-10-31) fixed in-PR: `role_prob` mixed participants from all stored patches; aggregation now filters by a target patch (default: the patch of the most recent match). No other new bugs were identified during T-015.
-
-No new bugs were identified during the D-016 formula confirmation; player discovery remains within the current ETL scope.
-
-No new bugs were identified during T-013 (match ingestion); rejected match ids are tracked by design in `match_rejects`, not as bug candidates.
-
-No new bugs were identified while revising T-013 patch-window and rank-known-count behavior.
-
-T-019 review follow-up found export regressions in paired-role serialization, rank-specific rune grouping, probability rounding, warnings, and post-publish backup cleanup; these are recorded as B-037 through B-042 below and fixed in this pass.
+Review notes that predate the bug log live in [Review history](#review-history) at the end of this file.
 
 ### B-021 — `types: []` does not isolate the engine type-checker from Node globals — OPEN
 
@@ -259,6 +248,12 @@ T-019 review follow-up found export regressions in paired-role serialization, ra
   - Expected: unranked players are excluded from the seed list for match listing and their NULL score is never used in `rankSummary`.
   - Actual: the seed query selected all players regardless of NULL rank_score; a NULL score flowing into `rankSummary` was treated as 0, skewing `avg_rank_score` and inflating `rank_known_count` (and listing matches for players outside the ranked pool).
 - Fix (commit/ticket): T-014 — the seed query in `matches.ts` now filters `rank_score IS NOT NULL`; `createRankLoader` (already in `matches-store.ts`) skips NULL entries when building the rank map, and `rankSummary` only counts known ranks.
+
+### B-027 — Recommendation constants injectable via `RecommendConfig` — FIXED
+
+- Severity / Area: S3 / engine
+- Expected / Actual: `W_COMP`, `W_BLIND`, `BLIND_WORST_CASE_FACTOR`, `HARD_COUNTER_DELTA_PP` and `LANE_GROUPS` were module constants; they must be injectable via `RecommendConfig` for T-027.a tuning.
+- Fix (commit/ticket): T-023 — all five moved to `RecommendConfig`/`DEFAULT_RECOMMEND_CONFIG`. (Moved here from the Open table where it was already marked FIXED; see the duplicate-ID note above.)
 
 ### B-027 — Transient enrichment failures become permanent gaps (no retry on duplicates) — FIXED
 
@@ -595,3 +590,23 @@ T-019 review follow-up found export regressions in paired-role serialization, ra
 - Logs / screenshot: not applicable
 - Suspected cause: the required validation library was not added when the schema file was created.
 - Fix (commit/ticket): T-002 — added `zod` to `packages/shared/package.json` and implemented the shared schema suite.
+
+## Review history
+
+Review notes moved verbatim from the top of this file (docs audit cleanup, 2026-11-04).
+
+T-023 review (2026-10-30) fixed in-PR: blind safety firing on every 1v1 role, blind safety re-scoring known enemies, unknown pool ids being scored, role-inference failure dropping a whole team, raw-winrate hard-counter warning, missing `W_comp`/`W_blind`, engine magic numbers outside `config.ts`, missing level 0 for lowData reasons (`reasonLevelSchema` now includes 0, SPECS §7), board-picked pool champions now reported as `poolUnavailable` `picked`, hard-counter warnings emitted as codes (`counteredBy:<ROLE>:<id>`), `rawGames` optional (omitted when unknown instead of a fake 0).
+
+T-018 review (2026-11-01) fixed in-PR: lane `context_level` now depends only on the slot count (TOP 1-slot and partial-lane keys get level 3, same as 1-slot back-offs; no match-order dependence); migration 010 backfills `context_level` from `context_key` for existing rows. Mastery fallback (`minMasteryPoints`) and rank-based `expertWeight` per user rank bucket (migration 011 adds `rune_ctx.rank_bucket`) are now applied (D-036 update).
+
+T-017 review (2026-11-01) fixed in-PR: `aggregatePairTables` buffered every stored match's participants before aggregating; it now streams rows ordered by `match_id` and aggregates each match as soon as it is complete. A ten-player match test was added. No other new bugs were identified during T-017.
+
+T-015 review (2026-10-31) fixed in-PR: `role_prob` mixed participants from all stored patches; aggregation now filters by a target patch (default: the patch of the most recent match). No other new bugs were identified during T-015.
+
+No new bugs were identified during the D-016 formula confirmation; player discovery remains within the current ETL scope.
+
+No new bugs were identified during T-013 (match ingestion); rejected match ids are tracked by design in `match_rejects`, not as bug candidates.
+
+No new bugs were identified while revising T-013 patch-window and rank-known-count behavior.
+
+T-019 review follow-up found export regressions in paired-role serialization, rank-specific rune grouping, probability rounding, warnings, and post-publish backup cleanup; these are recorded as B-037 through B-042 below and fixed in this pass.

@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 3,
+  "patch": "16.21",
+  "generatedAt": "2026-11-04T16:47:00.000Z",
+  "region": "euw1",
+  "rankBuckets": [
+    "IRON",
+    "BRONZE",
+    "SILVER",
+    "GOLD",
+    "PLATINUM",
+    "EMERALD",
+    "DIAMOND",
+    "MASTER_PLUS"
+  ],
+  "roles": [
+    "SUPPORT"
+  ],
+  "files": [
+    { "path": "role-prob.json", "sha256": "6b6de18df1391f9d2a3d516d98a24aaecfe68bc8a8b675ae3cb19c448428ce56" },
+    { "path": "roles/SUPPORT/baseline.json", "sha256": "5e609467c1a09ed122d3c469a296c11cb5e9af1099e970847266eb1203bd9175" },
+    { "path": "roles/SUPPORT/ally-pairs.json", "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570" },
+    { "path": "roles/SUPPORT/enemy-pairs.json", "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570" },
+    { "path": "roles/SUPPORT/lane-vs.json", "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570" },
+    { "path": "roles/SUPPORT/lane-full.json", "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570" }
+  ]
+}

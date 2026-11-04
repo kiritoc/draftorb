@@ -55,6 +55,22 @@ export function writeFile(dir: string, relativePath: string, content: string): E
   return { path: fullPath, relativePath, bytes, sha256 };
 }
 
+/** Atomically replaces `dir/relativePath`: writes a unique sibling temp file,
+ *  then renames it over the target. On failure the previous file is untouched. */
+export function writeFileAtomic(dir: string, relativePath: string, content: string): string {
+  const fullPath = join(dir, relativePath);
+  mkdirSync(dirname(fullPath), { recursive: true });
+  const tempPath = join(dirname(fullPath), `.${basename(fullPath)}.tmp-${randomUUID()}`);
+  try {
+    writeFileSync(tempPath, content, 'utf8');
+    renameSync(tempPath, fullPath);
+  } catch (error: unknown) {
+    rmSync(tempPath, { force: true });
+    throw error;
+  }
+  return fullPath;
+}
+
 /** Gzip size of `content` in bytes (DATA_MODEL.md calls the budget "gzip"). */
 export function gzipSize(content: string): number {
   return gzipSync(content).length;

@@ -4,10 +4,12 @@ Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATI
 
 ## Open
 
-| ID    | Sev | Area   | Title                                                                                                                                                      | Status | Found by/date                     | Ticket |
-| ----- | --- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | --------------------------------- | ------ |
-| B-026 | S3  | engine | `blindSafety` approximates `pickShare(e)` with roleProb (no pick-rate export)                                                                              | OPEN   | T-023 review 2026-10-30           | –      |
-| B-021 | S3  | engine | `types: []` in engine/shared tsconfigs is circumvented by test files importing vitest, so the type-checker still resolves Node globals in production files | OPEN   | B-017 fix verification 2026-10-28 | –      |
+| ID    | Sev | Area   | Title                                                                                                                                                      | Status | Found by/date                     | Ticket  |
+| ----- | --- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | --------------------------------- | ------- |
+| B-053 | S2  | etl    | Draft backtest scores a per-champion win-rate model, not `recommend`; its loss does not validate the deployed engine (D-023)                               | OPEN   | T-035 review 2026-11-04           | T-027.a |
+| B-052 | S2  | data   | Sample `data/public/16.21` baseline (n_eff 10, IRON only) is below `minGames` 25, so every draft shows empty lists; needs real aggregates                  | OPEN   | T-035 review 2026-11-04           | T-019   |
+| B-026 | S3  | engine | `blindSafety` approximates `pickShare(e)` with roleProb (no pick-rate export)                                                                              | OPEN   | T-023 review 2026-10-30           | –       |
+| B-021 | S3  | engine | `types: []` in engine/shared tsconfigs is circumvented by test files importing vitest, so the type-checker still resolves Node globals in production files | OPEN   | B-017 fix verification 2026-10-28 | –       |
 
 ## Duplicate bug IDs (not renumbered)
 
@@ -43,6 +45,15 @@ Review notes that predate the bug log live in [Review history](#review-history) 
 ```
 
 ## Fixed
+
+### B-051 — Draft flow data and validation review findings — FIXED
+
+- The web loader used incorrect paths for patch-relative manifest files and did not publish manual champion tags in all runtime/deploy paths.
+- Recommendation data was not schema-validated or fully wired; pool edits were not persisted, all role pools could affect Support, and storage/engine failures were not clearly surfaced.
+- Pagination did not reset with draft changes, and unavailable pool entries did not display their effective sample size.
+- The unvalidated-model banner could disappear based on a raw loss comparison before the D-023 paired-bootstrap gate passed.
+- The backtest baseline included holdout information and its game thresholds/counts used participant rows rather than matches.
+- Fixed in T-035 with regression coverage. Backtest reports remain `unvalidated` until the paired-bootstrap gate is implemented.
 
 ### B-050 — Reserved-role ally reappears through an unfixed duplicate slot — FIXED
 

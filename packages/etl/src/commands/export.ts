@@ -52,13 +52,14 @@ async function runExport(args: string[]): Promise<void> {
       patch,
       region: typeof values.region === 'string' ? values.region : undefined,
     });
-    const { manifest, files, warnings } = result;
+    const { manifest, files, warnings, latestPath } = result;
     log.info(
       `Exported patch ${manifest.patch} (schema v${manifest.schemaVersion}, roles: ${manifest.roles.join(', ')}) to ${result.files.length} file(s):`,
     );
     for (const file of files) {
       log.detail(`${file.relativePath} (${file.bytes} bytes)`);
     }
+    log.detail(`Wrote latest patch pointer: ${latestPath}`);
     for (const warning of warnings) {
       log.info(warning);
     }

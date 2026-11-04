@@ -17,7 +17,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { DEFAULT_CONFIG, type RankWeightingConfig } from '@draftorb/engine';
-import { type Manifest, type Role } from '@draftorb/shared';
+import { LATEST_SCHEMA_VERSION, type Manifest, type Role, latestSchema } from '@draftorb/shared';
 import { latestPatch, PATCH_PATTERN } from '../aggregate';
 import { defaultPublicDataDir } from '../config/paths';
 import { buildManifest } from './manifest.js';
@@ -46,6 +46,7 @@ import {
   removeTempDir,
   STATIC_CATALOG_FILES,
   writeFile,
+  writeFileAtomic,
 } from './io.js';
 
 export const EXPORT_ROLES: readonly Role[] = ['SUPPORT'];
@@ -68,6 +69,7 @@ export interface ExportResult {
   files: ExportFile[];
   warnings: string[];
   skippedRunePages: number;
+  latestPath: string;
 }
 
 /** Typed wrapper around `db.prepare(sql).all()` so query results are never
@@ -244,12 +246,23 @@ export function exportJson(db: Database.Database, options: ExportOptions = {}): 
     const cleanupWarning = publishTempDir(tempDir, targetDir);
     published = true;
     if (cleanupWarning !== null) warnings.push(cleanupWarning);
+
+    // D-051: write the latest-patch pointer last, after the patch dir is live.
+    const latest = latestSchema.parse({
+      schemaVersion: LATEST_SCHEMA_VERSION,
+      patch: targetPatch,
+      manifest: `${targetPatch}/manifest.json`,
+      generatedAt,
+    });
+    const latestPath = writeFileAtomic(publicDir, 'latest.json', JSON.stringify(latest, null, 2));
+
     return {
       patch: targetPatch,
       manifest,
       files: written.map((file) => ({ ...file, path: join(targetDir, file.relativePath) })),
       warnings,
       skippedRunePages,
+      latestPath,
     };
   } finally {
     if (!published) {

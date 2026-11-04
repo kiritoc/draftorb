@@ -1,8 +1,15 @@
-/** Root application component. */
+import { DraftScreen } from './components/DraftScreen.js';
+import { UnvalidatedModelBanner } from './components/UnvalidatedModelBanner.js';
+import { LegalFooter } from './components/LegalFooter.js';
+
 export function App() {
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <h1 className="text-4xl font-bold text-indigo-400">DraftOrb</h1>
+    <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col">
+      <UnvalidatedModelBanner />
+      <main className="flex-1">
+        <DraftScreen />
+      </main>
+      <LegalFooter />
     </div>
   );
 }

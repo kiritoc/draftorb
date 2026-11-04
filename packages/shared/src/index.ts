@@ -95,6 +95,8 @@ export type { ChampionTagsScaling, ChampionTags, ChampionTagsMap } from './schem
 
 export { manifestFileSchema, manifestSchema } from './schemas/manifest.js';
 export type { Manifest } from './schemas/manifest.js';
+export { LATEST_SCHEMA_VERSION, latestSchema } from './schemas/manifest.js';
+export type { Latest } from './schemas/manifest.js';
 
 export {
   supportBaselineEntrySchema,

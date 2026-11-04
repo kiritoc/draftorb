@@ -12,6 +12,7 @@ export default tseslint.config(
             'eslint.config.mjs',
             'vitest.config.ts',
             'apps/web/postcss.config.mjs',
+            'apps/web/scripts/copy-public-data.mjs',
           ],
         },
         tsconfigRootDir: import.meta.dirname,

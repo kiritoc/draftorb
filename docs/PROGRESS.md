@@ -158,6 +158,16 @@ Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-0
   - Updated T-035 and related status/decision/bug documentation.
 - Validation: `pnpm check` passed (65 test files, 754 tests); lint has existing non-null assertion warnings. Production build and public-data asset verification also passed.
 
+### 2026-11-04 — Copilot — T-035 review fixes
+
+- Done:
+  - Fixed manifest/patched export URLs, validated and connected recommendation data, and published manual champion tags in dev/build/deploy.
+  - Persisted and restricted the Phase 1 Support pool, surfaced storage and engine failures, reset pagination on draft changes, and centralized UI text.
+  - Corrected backtest baseline leakage and match counts; reports now remain explicitly unvalidated until the D-023 paired-bootstrap gate exists.
+  - Added regression tests for data loading, recommendation inputs, pool storage, draft rendering, pagination reset, report gating and backtest behavior.
+  - Updated T-035 and related status/decision/bug documentation.
+- Validation: `pnpm check` passed (65 test files, 754 tests); lint has existing non-null assertion warnings. Production build and public-data asset verification also passed.
+
 ### 2026-11-03 — Copilot — T-019 review follow-up rebase
 
 - Done:

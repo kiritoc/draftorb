@@ -263,6 +263,12 @@ describe('runBacktestDraft (engine evaluation, B-053)', () => {
 
     const report = runBacktestDraft(rows, ENGINE);
     expect(report.insufficientData).toBe(true);
+    expect(report.predictions).toBe(24);
+    expect(report.unscored).toBe(24);
+    expect(report.perRole.TOP.predictions).toBe(12);
+    expect(report.perRole.TOP.unscored).toBe(12);
+    expect(report.perRole.SUPPORT.predictions).toBe(12);
+    expect(report.perRole.SUPPORT.unscored).toBe(12);
     expect(report.logLoss).toBeNull();
     expect(report.baselineLogLoss).toBeNull();
     expect(report.message).toMatch(/No holdout pick was scored/);

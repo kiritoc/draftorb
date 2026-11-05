@@ -4,7 +4,7 @@
 
 - Phase: 1 (Support / Diamond)
 - Current milestone: M3 Web MVP implementation complete (T-030..T-035 DONE); the backtest harness (T-027.a) remains under review because D-023 paired-bootstrap validation is not implemented. M1 ETL tickets T-019.b..f remain TODO.
-- Last updated: 2026-11-05 by Devin (PR #47 review fixes B-057/B-058 + export JSDoc)
+- Last updated: 2026-11-05 by Devin (PR #47 review fixes B-057..B-059 + export JSDoc)
 
 ## Epic status
 
@@ -39,6 +39,16 @@ Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-0
 - T-019.d verification: please compare the champion and item lists in the 2026-11-04 "T-019.d verification step" entry below with the official 16.21 and 16.22 patch notes (misses and false positives).
 
 ## Session log (newest first)
+
+### 2026-11-05 — Devin — PR #47 follow-up review fix (unscored report counts)
+
+- Done:
+  - B-059: the all-unscored backtest branch now preserves the evaluated fallback sample size instead of reusing the early-exit `insufficient()` counts; `predictions`/`unscored` equal `points.length` and `perRole` carries the same counts while loss metrics stay null.
+- Files touched: `packages/etl/src/{backtest/draft.ts,backtest/draft.test.ts}`, `docs/{BUGS,PROGRESS}.md`.
+- Tests: `pnpm check` green (75 files, 855 tests); all-unscored regression now asserts 24 predictions / 24 unscored with TOP and SUPPORT at 12 each.
+- State left: DONE pending review/commit (branch `bugs`). T-027.a stays REVIEW; the report remains `unvalidated` until the D-023 paired-bootstrap gate and remaining validation metrics exist.
+- Next step: owner review; then T-019.b or D-023 gate work.
+- Pitfalls / notes for next AI: `unscored <= predictions` must hold even when `insufficientData` is true; early exits before evaluation still report zero counts.
 
 ### 2026-11-05 — Devin — PR #47 review fixes (backtest rank + unscored gate)
 

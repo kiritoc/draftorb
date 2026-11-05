@@ -32,6 +32,16 @@ Review notes that predate the bug log live in [Review history](#review-history) 
 
 ## Fixed
 
+### B-059 — All-unscored backtest report dropped evaluated fallback counts — FIXED
+
+- Severity / Area: S3 / etl
+- Steps to reproduce: run `pnpm etl backtest draft` when every holdout pick is an unscored baseline fallback; the insufficient-data report showed `predictions: 0` and `unscored: 0` even though fallback points were evaluated.
+- Expected / Actual: an insufficient report may keep loss metrics null, but it should preserve the evaluated sample size (`predictions`/`unscored`, and per-role counts) so the JSON still shows how many fallback evaluations happened; the shared `insufficient()` helper zeroed those counts for every early exit.
+- Environment (OS, Node version, patch): any; patch-independent.
+- Suspected cause: the all-unscored branch reused `insufficient()`, which is correct before evaluation but resets counts after `points` were collected.
+- Fix (commit/ticket): added `insufficientWithFallbackCounts()` for the all-unscored branch; it keeps metrics null and `insufficientData: true` while setting `predictions`/`unscored` to `points.length` and populating `perRole` prediction/unscored counts.
+- Verification: `backtest/draft.test.ts` all-unscored case now asserts `predictions: 24`, `unscored: 24`, and TOP/SUPPORT per-role counts of 12/12 with null loss metrics. `pnpm check` green (75 files, 855 tests).
+
 ### B-057 — Draft backtest evaluated holdout players at participant rank, not match rank — FIXED
 
 - Severity / Area: S2 / etl

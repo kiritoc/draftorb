@@ -276,6 +276,30 @@ function insufficient(
   };
 }
 
+function insufficientWithFallbackCounts(
+  partial: Pick<
+    BacktestReport,
+    'holdoutPatch' | 'trainingPatches' | 'holdoutGames' | 'trainingGames'
+  >,
+  message: string,
+  points: readonly PlayerPoint[],
+): BacktestReport {
+  const perRole = Object.fromEntries(
+    ALL_ROLES.map((role) => [role, { ...emptyRoleMetrics() }]),
+  ) as Record<Role, RoleMetrics>;
+  for (const point of points) {
+    const metrics = perRole[point.role];
+    metrics.predictions += 1;
+    metrics.unscored += 1;
+  }
+  return {
+    ...insufficient(partial, message),
+    predictions: points.length,
+    unscored: points.length,
+    perRole,
+  };
+}
+
 export function runBacktestDraft(rows: DraftRow[], engine: BacktestEngineData): BacktestReport {
   const { holdoutPatch, trainingPatches } = draftPatchSplit(rows);
   const holdoutRows = rows.filter((r) => r.patch === holdoutPatch);
@@ -320,9 +344,10 @@ export function runBacktestDraft(rows: DraftRow[], engine: BacktestEngineData): 
     );
   }
   if (points.every((point) => !point.scored)) {
-    return insufficient(
+    return insufficientWithFallbackCounts(
       counts,
       'No holdout pick was scored by the engine; only baseline fallbacks are available.',
+      points,
     );
   }
 

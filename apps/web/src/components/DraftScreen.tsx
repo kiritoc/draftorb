@@ -33,6 +33,7 @@ import {
 } from '../data/loader.js';
 import { createRecommendData } from '../data/recommend-data.js';
 import { excludePick, excludedRanks } from '../data/exclude-pick.js';
+import { championsForSlot } from '../champion-availability.js';
 import { recommendationPageSize } from '../config.js';
 import { strings } from '../strings.js';
 import { DraftSlot, type DraftSlotState } from './DraftSlot.js';
@@ -189,6 +190,15 @@ export function DraftScreen() {
     });
   }, []);
 
+  // A champion picked in one slot cannot be picked again in another.
+  const usedChampionIds = useMemo(
+    () =>
+      new Set(
+        [user, ...allies, ...enemies].filter(isFilled).map((slot) => slot.championId),
+      ),
+    [user, allies, enemies],
+  );
+
   const totalKnown = [user, ...allies, ...enemies].filter(isFilled).length;
   const poolSize = poolChampionIds.length;
   // The user's own pick is already taken: never suggest it again, and close
@@ -283,7 +293,7 @@ export function DraftScreen() {
                 label={strings.userSlot}
                 slot={user}
                 onChange={setUserSlot}
-                champions={champions}
+                champions={championsForSlot(champions, usedChampionIds, user.championId)}
               />
               {allies.map((slot, index) => (
                 <DraftSlot
@@ -291,7 +301,7 @@ export function DraftScreen() {
                   label={strings.allySlot(index + 1)}
                   slot={slot}
                   onChange={(next) => setAlly(index, next)}
-                  champions={champions}
+                  champions={championsForSlot(champions, usedChampionIds, slot.championId)}
                 />
               ))}
             </div>
@@ -308,7 +318,7 @@ export function DraftScreen() {
                   label={strings.enemySlot(index + 1)}
                   slot={slot}
                   onChange={(next) => setEnemy(index, next)}
-                  champions={champions}
+                  champions={championsForSlot(champions, usedChampionIds, slot.championId)}
                 />
               ))}
             </div>

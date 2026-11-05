@@ -46,6 +46,12 @@ Review notes that predate the bug log live in [Review history](#review-history) 
 
 ## Fixed
 
+### B-055 — PR #46 third-pass review findings — FIXED
+
+- `exportJson` guarded the `latest.json` pointer only against the database's latest patch, so after a database reset or restore an explicit older `--patch` export could overwrite a newer published pointer and move the web app backwards (S3, etl).
+- `ChampionPicker` Escape dismissal unmounted the autofocused search input without returning focus to the trigger button, so keyboard navigation restarted from the document (S4, web).
+- Fixed on `feature/t-029-to-t-034`: the exporter reads and validates the existing `latest.json` in `publicDir` and preserves it (with a warning) when it references a newer patch; the picker refocuses its button on Escape. Regression coverage in `export/atomic.test.ts`.
+
 ### B-054 — Draft flow second-pass review findings — FIXED
 
 - `pnpm etl backtest draft --out=<path>` was unreachable: strict `parseArgs` rejected the flag before the manual scan ran (S2, etl).

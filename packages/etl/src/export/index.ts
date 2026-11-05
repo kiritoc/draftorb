@@ -19,6 +19,7 @@ import { join } from 'node:path';
 import { DEFAULT_CONFIG, type RankWeightingConfig } from '@draftorb/engine';
 import { LATEST_SCHEMA_VERSION, type Manifest, type Role, latestSchema } from '@draftorb/shared';
 import { latestPatch, PATCH_PATTERN } from '../aggregate';
+import { comparePatches } from '../matches-store';
 import { defaultPublicDataDir } from '../config/paths';
 import { buildManifest } from './manifest.js';
 import { buildRuneFiles } from './runes.js';
@@ -79,6 +80,21 @@ export interface ExportResult {
 function all<T>(db: Database.Database, sql: string, params: readonly unknown[] = []): T[] {
   const statement = db.prepare(sql);
   return (params.length === 0 ? statement.all() : statement.all(...params)) as T[];
+}
+
+/** Patch referenced by an existing `latest.json` in `publicDir`, or undefined
+ *  when the file is absent or does not validate against latestSchema. */
+function readPublishedPatch(publicDir: string): string | undefined {
+  const latestPath = join(publicDir, 'latest.json');
+  if (!existsSync(latestPath)) {
+    return undefined;
+  }
+  try {
+    const parsed = latestSchema.safeParse(JSON.parse(readFileSync(latestPath, 'utf8')));
+    return parsed.success ? parsed.data.patch : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export function exportJson(db: Database.Database, options: ExportOptions = {}): ExportResult {
@@ -251,9 +267,15 @@ export function exportJson(db: Database.Database, options: ExportOptions = {}): 
     // D-051: write the latest-patch pointer last, after the patch dir is live.
     // Only when the exported patch IS the latest one: re-exporting an older
     // patch must not move the pointer backwards (the patch dir may not even
-    // exist yet for a newer dbLatestPatch).
+    // exist yet for a newer dbLatestPatch). A newer pointer already published
+    // in publicDir also wins, e.g. after a database reset or restore.
     let latestPath: string | null = null;
-    if (dbLatestPatch === undefined || targetPatch === dbLatestPatch) {
+    const publishedPatch = readPublishedPatch(publicDir);
+    if (publishedPatch !== undefined && comparePatches(publishedPatch, targetPatch) > 0) {
+      warnings.push(
+        `export: latest.json already points to newer patch ${publishedPatch}; keeping it`,
+      );
+    } else if (dbLatestPatch === undefined || targetPatch === dbLatestPatch) {
       const latest = latestSchema.parse({
         schemaVersion: LATEST_SCHEMA_VERSION,
         patch: targetPatch,

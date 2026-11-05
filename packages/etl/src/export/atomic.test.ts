@@ -195,4 +195,50 @@ describe('exportJson', () => {
     const result = suite.exportOnce();
     expect(result.warnings.some((w) => w.includes('missing static catalog'))).toBe(true);
   });
+
+  const writeLatest = (patch: string): void => {
+    mkdirSync(suite.publicDir, { recursive: true });
+    writeFileSync(
+      join(suite.publicDir, 'latest.json'),
+      JSON.stringify({
+        schemaVersion: 1,
+        patch,
+        manifest: `${patch}/manifest.json`,
+        generatedAt: FIXED_NOW.toISOString(),
+      }),
+    );
+  };
+  const readLatestPatch = (): string =>
+    (JSON.parse(readFileSync(join(suite.publicDir, 'latest.json'), 'utf8')) as { patch: string })
+      .patch;
+
+  it('keeps a newer published latest.json when the database has no matches', () => {
+    // No match seed: dbLatestPatch is undefined, but a newer pointer exists.
+    writeLatest('16.22');
+    const result = suite.exportOnce();
+
+    expect(result.latestPath).toBeNull();
+    expect(result.warnings.some((w) => w.includes('newer patch 16.22'))).toBe(true);
+    expect(readLatestPatch()).toBe('16.22');
+  });
+
+  it('keeps a newer published latest.json when the database latest patch is older', () => {
+    // match seed defaults to patch 16.21; the published pointer is ahead.
+    seed(suite.db, 'match', [{}]);
+    writeLatest('16.22');
+    const result = suite.exportOnce();
+
+    expect(result.latestPath).toBeNull();
+    expect(result.warnings.some((w) => w.includes('newer patch 16.22'))).toBe(true);
+    expect(readLatestPatch()).toBe('16.22');
+  });
+
+  it('moves latest.json forward over an older published pointer', () => {
+    seed(suite.db, 'match', [{}]);
+    writeLatest('16.20');
+    const result = suite.exportOnce();
+
+    expect(result.latestPath).not.toBeNull();
+    expect(readLatestPatch()).toBe('16.21');
+  });
 });

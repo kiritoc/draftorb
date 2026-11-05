@@ -33,6 +33,7 @@ export function ChampionPicker({
   const [open, setOpen] = useState(false);
   const listboxId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   // Close on outside pointer-down and Escape while the listbox is open.
   useEffect(() => {
@@ -49,6 +50,10 @@ export function ChampionPicker({
       if (event.key === 'Escape') {
         setOpen(false);
         setQuery('');
+        // The autofocused search input unmounts with the listbox; return
+        // focus to the trigger so keyboard navigation does not restart
+        // from the document.
+        buttonRef.current?.focus();
       }
     };
     document.addEventListener('pointerdown', onPointerDown);
@@ -76,6 +81,7 @@ export function ChampionPicker({
   return (
     <div className="relative w-full" ref={rootRef}>
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setOpen((current) => !current)}
         disabled={disabled}

@@ -39,7 +39,7 @@ async function runBacktest(args: string[]): Promise<void> {
   if (outArgs.length === 1 && (outValue === undefined || outValue === '')) {
     throw new UsageError('Missing value for --out.\nUsage: backtest draft [--out=<path>]');
   }
-  let out =
+  const out =
     outValue !== undefined && outValue !== ''
       ? outValue
       : join(process.env.DRAFTORB_PUBLIC_DIR ?? defaultPublicDataDir(), 'backtest-draft.json');

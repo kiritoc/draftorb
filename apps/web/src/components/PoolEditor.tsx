@@ -8,12 +8,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import {
-  type Champion,
-  type ChampionId,
-  type ChampionPool,
-  type Role,
-} from '@draftorb/shared';
+import { type Champion, type ChampionId, type ChampionPool, type Role } from '@draftorb/shared';
 import { poolMaxSize } from '../config.js';
 import { strings } from '../strings.js';
 import { ChampionPicker } from './ChampionPicker.js';

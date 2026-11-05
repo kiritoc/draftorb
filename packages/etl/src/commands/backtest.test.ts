@@ -112,9 +112,9 @@ describe('backtestCommand', () => {
   });
 
   it('rejects a duplicate or empty --out option', async () => {
-    await expect(
-      backtestCommand.run(['draft', '--out=a.json', '--out=b.json']),
-    ).rejects.toThrow(/Duplicate --out/);
+    await expect(backtestCommand.run(['draft', '--out=a.json', '--out=b.json'])).rejects.toThrow(
+      /Duplicate --out/,
+    );
     await expect(backtestCommand.run(['draft', '--out='])).rejects.toThrow(/Missing value/);
   });
 

@@ -192,10 +192,7 @@ export function DraftScreen() {
 
   // A champion picked in one slot cannot be picked again in another.
   const usedChampionIds = useMemo(
-    () =>
-      new Set(
-        [user, ...allies, ...enemies].filter(isFilled).map((slot) => slot.championId),
-      ),
+    () => new Set([user, ...allies, ...enemies].filter(isFilled).map((slot) => slot.championId)),
     [user, allies, enemies],
   );
 

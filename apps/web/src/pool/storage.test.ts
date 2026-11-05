@@ -121,17 +121,15 @@ describe('pool storage', () => {
     expect(() => parsePoolImport('{ bad')).toThrow();
     expect(() => parsePoolImport(JSON.stringify({ version: 2, pools: {} }))).toThrow();
     expect(() =>
-      parsePoolImport(
-        JSON.stringify({ version: 1, pools: { SUPPORT: [412, 412] } }),
-      ),
+      parsePoolImport(JSON.stringify({ version: 1, pools: { SUPPORT: [412, 412] } })),
     ).toThrow(/duplicate/);
   });
 
   it('parsePoolImport rejects a role pool over the maximum size', () => {
     const ids = Array.from({ length: 41 }, (_, i) => i + 1);
-    expect(() =>
-      parsePoolImport(JSON.stringify({ version: 1, pools: { SUPPORT: ids } })),
-    ).toThrow(/exceeds the maximum/);
+    expect(() => parsePoolImport(JSON.stringify({ version: 1, pools: { SUPPORT: ids } }))).toThrow(
+      /exceeds the maximum/,
+    );
   });
 
   it('filterPoolByCatalogue drops ids absent from the catalogue', () => {

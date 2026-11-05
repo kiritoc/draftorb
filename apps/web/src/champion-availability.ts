@@ -13,7 +13,5 @@ export function championsForSlot(
   usedIds: ReadonlySet<ChampionId>,
   ownChampionId: ChampionId | null,
 ): Champion[] {
-  return champions.filter(
-    (champion) => champion.id === ownChampionId || !usedIds.has(champion.id),
-  );
+  return champions.filter((champion) => champion.id === ownChampionId || !usedIds.has(champion.id));
 }

@@ -44,7 +44,7 @@ import {
   supportPairEntrySchema,
   supportPairTableSchema,
   latestSchema,
-} from './index';
+} from '../src/index.js';
 
 describe('shared schemas', () => {
   it('accepts valid rank and role values', () => {

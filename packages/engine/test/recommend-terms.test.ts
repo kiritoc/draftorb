@@ -4,19 +4,19 @@
 
 import { describe, it, expect } from 'vitest';
 import type { ChampionRoleProbabilities, EnemyPairTable } from '@draftorb/shared';
-import { DEFAULT_CONFIG, DEFAULT_RECOMMEND_CONFIG, getInfluence } from './config.js';
-import { indexPairs, makePairKey } from './recommend-indexes.js';
-import { scorePair } from './levels.js';
-import type { KnownSlot } from './recommend-types.js';
+import { DEFAULT_CONFIG, DEFAULT_RECOMMEND_CONFIG, getInfluence } from '../src/config.js';
+import { indexPairs, makePairKey } from '../src/recommend-indexes.js';
+import { scorePair } from '../src/levels.js';
+import type { KnownSlot } from '../src/recommend-types.js';
 import {
   blindOpponents,
   blindSafetyFromOpponents,
   computeBlindSafety,
   hardCounterWarnings,
   scorePairs,
-} from './recommend-terms.js';
-import type { PairDelta } from './recommend-terms.js';
-import { roundDeltaPp } from './recommend-reasons.js';
+} from '../src/recommend-terms.js';
+import type { PairDelta } from '../src/recommend-terms.js';
+import { roundDeltaPp } from '../src/recommend-reasons.js';
 
 function deltaAt(deltaPp: number): PairDelta {
   return {

@@ -4,7 +4,7 @@
 
 import { describe, it, expect } from 'vitest';
 import type { BaselineTable, EnemyPairTable, LaneFullTable, LaneVsTable } from '@draftorb/shared';
-import { MISSING_LANE_ID } from './config.js';
+import { MISSING_LANE_ID } from '../src/config.js';
 import {
   indexBaselines,
   indexLaneFull,
@@ -13,7 +13,7 @@ import {
   makeLaneFullKey,
   makeLaneVsKey,
   makePairKey,
-} from './recommend-indexes.js';
+} from '../src/recommend-indexes.js';
 
 describe('lookup keys', () => {
   it('encodes every component in order', () => {

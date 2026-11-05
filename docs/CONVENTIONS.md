@@ -20,8 +20,8 @@ All code, comments, docs, commit messages, tickets, bug reports, logs, error mes
 
 ## Tests
 
-- Vitest, file `*.test.ts` next to source. See TESTING.md.
-- Exception: tests that need Node APIs (file I/O, e.g. the engine golden runner) live in `packages/<pkg>/test/` so they never sit next to pure engine sources (golden rule 3). They have their own `tsconfig.json` and are type-checked by `pnpm typecheck`.
+- Vitest, file `*.test.ts`. Engine and shared tests live in `packages/<pkg>/test/` (never in `src/`): importing vitest transitively pulls `@types/node` into the type-check program, which would break the `types: []` isolation of the production tsconfigs (B-021). ETL and web tests stay next to source. See TESTING.md.
+- Tests that need Node APIs directly (file I/O, e.g. the engine golden runner) also live in `packages/<pkg>/test/`. They have their own `tsconfig.json` and are type-checked by `pnpm typecheck`.
 
 ## React/Web
 

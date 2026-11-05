@@ -4,9 +4,9 @@
 
 import { describe, it, expect } from 'vitest';
 import type { ChampionRoleProbabilities } from '@draftorb/shared';
-import type { KnownSlot } from './recommend-types.js';
-import { DEFAULT_LANE_GROUPS as LANE_GROUPS } from './config.js';
-import { computeLaneGroup, resolveKnownSlots } from './recommend-slots.js';
+import type { KnownSlot } from '../src/recommend-types.js';
+import { DEFAULT_LANE_GROUPS as LANE_GROUPS } from '../src/config.js';
+import { computeLaneGroup, resolveKnownSlots } from '../src/recommend-slots.js';
 
 const roleProb = {
   '50': { MID: 0.8, SUPPORT: 0.2 },

@@ -4,10 +4,10 @@
 
 import { describe, it, expect } from 'vitest';
 import type { BaselineTable, ChampionId, ChampionTagsMap, Role } from '@draftorb/shared';
-import { recommend } from './recommend.js';
-import { DEFAULT_CONFIG, DEFAULT_RECOMMEND_CONFIG } from './config.js';
-import { indexBaselines, indexPairs, makePairKey } from './recommend-indexes.js';
-import { baselineLogOdds, baselinePrior, deltaPp, scorePair } from './levels.js';
+import { recommend } from '../src/recommend.js';
+import { DEFAULT_CONFIG, DEFAULT_RECOMMEND_CONFIG } from '../src/config.js';
+import { indexBaselines, indexPairs, makePairKey } from '../src/recommend-indexes.js';
+import { baselineLogOdds, baselinePrior, deltaPp, scorePair } from '../src/levels.js';
 import {
   BOT_ROLE_PROB,
   HIGH_GAMES,
@@ -19,7 +19,7 @@ import {
   makeInput,
   makeLaneVs,
   makeTag,
-} from './recommend-test-utils.js';
+} from '../src/recommend-test-utils.js';
 
 describe('recommend: pair terms', () => {
   it('adds synergy from ally pairs', () => {

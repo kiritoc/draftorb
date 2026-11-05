@@ -11,8 +11,8 @@ import {
   influenceConfigSchema,
   rankToBucket,
   rankWeightingConfigSchema,
-} from './config.js';
-import type { InfluenceMatrix } from './config.js';
+} from '../src/config.js';
+import type { InfluenceMatrix } from '../src/config.js';
 
 // JSON round-trip produces a fully mutable copy (avoids TypeScript's
 // "delete on required property" error when building invalid test fixtures).

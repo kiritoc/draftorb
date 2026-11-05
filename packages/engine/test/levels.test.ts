@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
-import { DEFAULT_CONFIG } from './config.js';
-import { sigmoid, toEquivalentCounts } from './weighting.js';
+import { DEFAULT_CONFIG } from '../src/config.js';
+import { sigmoid, toEquivalentCounts } from '../src/weighting.js';
 import {
   baselineGate,
   baselineLogOdds,
@@ -15,7 +15,7 @@ import {
   pairTerm,
   scoreLane,
   scorePair,
-} from './levels.js';
+} from '../src/levels.js';
 
 describe('isLowData', () => {
   it('treats NaN n_eff as lowData', () => {

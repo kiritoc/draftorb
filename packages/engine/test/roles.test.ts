@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { inferRoles, assignmentConfidence } from './roles.js';
+import { inferRoles, assignmentConfidence } from '../src/roles.js';
 import type { ChampionRoleProbabilities, Role, Slot } from '@draftorb/shared';
 
 /**
@@ -40,7 +40,7 @@ function expectAssignment(result: ReturnType<typeof inferRoles>): RoleAssignment
   return result as RoleAssignment;
 }
 
-import type { RoleAssignment } from './roles.js';
+import type { RoleAssignment } from '../src/roles.js';
 
 describe('inferRoles — fixed roles', () => {
   it('returns all-fixed teams with confidence 1', () => {

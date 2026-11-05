@@ -4,12 +4,11 @@ Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATI
 
 ## Open
 
-| ID    | Sev | Area   | Title                                                                                                                                                      | Status | Found by/date                     | Ticket  |
-| ----- | --- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | --------------------------------- | ------- |
-| B-053 | S2  | etl    | Draft backtest scores a per-champion win-rate model, not `recommend`; its loss does not validate the deployed engine (D-023)                               | OPEN   | T-035 review 2026-11-04           | T-027.a |
-| B-052 | S2  | data   | Sample `data/public/16.21` baseline (n_eff 10, IRON only) is below `minGames` 25, so every draft shows empty lists; needs real aggregates                  | OPEN   | T-035 review 2026-11-04           | T-019   |
-| B-026 | S3  | engine | `blindSafety` approximates `pickShare(e)` with roleProb (no pick-rate export)                                                                              | OPEN   | T-023 review 2026-10-30           | –       |
-| B-021 | S3  | engine | `types: []` in engine/shared tsconfigs is circumvented by test files importing vitest, so the type-checker still resolves Node globals in production files | OPEN   | B-017 fix verification 2026-10-28 | –       |
+| ID    | Sev | Area   | Title                                                                                                                                     | Status | Found by/date           | Ticket  |
+| ----- | --- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------- | ------ | ----------------------- | ------- |
+| B-053 | S2  | etl    | Draft backtest scores a per-champion win-rate model, not `recommend`; its loss does not validate the deployed engine (D-023)              | OPEN   | T-035 review 2026-11-04 | T-027.a |
+| B-052 | S2  | data   | Sample `data/public/16.21` baseline (n_eff 10, IRON only) is below `minGames` 25, so every draft shows empty lists; needs real aggregates | OPEN   | T-035 review 2026-11-04 | T-019   |
+| B-026 | S3  | engine | `blindSafety` approximates `pickShare(e)` with roleProb (no pick-rate export)                                                             | OPEN   | T-023 review 2026-10-30 | –       |
 
 ## Duplicate bug IDs (not renumbered)
 
@@ -20,16 +19,6 @@ Three IDs each label two distinct bugs (per owner instruction, IDs are never ren
 - **B-035**: FIXED in the Fixed section — "Export removes static catalogs and role-derivation snapshots" — and also FIXED in the Fixed section — "Export review findings (role-prob rounding, empty builds, publish cleanup, static catalogs)".
 
 Review notes that predate the bug log live in [Review history](#review-history) at the end of this file.
-
-### B-021 — `types: []` does not isolate the engine type-checker from Node globals — OPEN
-
-- Severity / Area: S3 / engine
-- Steps to reproduce: add `export const probe = process.cwd();` to `packages/engine/src/hello.ts` (production code, no vitest import), then run `pnpm typecheck`.
-- Expected / Actual: with `"types": []` in `packages/engine/tsconfig.json`, `@types/node` is no longer auto-included by the `types` mechanism, so the type-checker is expected to reject `process` / Node globals in production files / `pnpm typecheck` still passes (exit 0): `@types/node` is loaded into the engine program because `packages/engine/src/hello.test.ts` imports `vitest`, and `vitest`'s type declarations import `node:vm`, which pulls in the whole `@types/node` package including the ambient `process`/`Buffer` globals. `types: []` only disables `@types` auto-inclusion, not type inclusion that arrives via a module-import chain. ESLint's `no-restricted-globals` does reject `process`, so `pnpm lint` fails as intended.
-- Environment (OS, Node version, patch): any.
-- Logs / screenshot: `pnpm exec tsc --noEmit -p packages/engine/tsconfig.json --listFiles` lists `node_modules/.../@types/node/globals.d.ts` (which declares `process`) and `vitest/dist/...` files; `pnpm typecheck` exits 0 with the probe; `pnpm lint` reports `no-restricted-globals` on `process`.
-- Suspected cause: test files live in the same `tsc` program as production code and import the vitest framework, whose types depend on `node:*` modules.
-- Fix (commit/ticket): not fixed in this session (out of B-017 scope per AGENTS rule 6). Candidate future fix: exclude `**/*.test.ts` from the engine and shared `tsconfig.json` `include` (or add a dedicated test type-check), so production source is type-checked without the framework's Node dependency. Not applied because it would remove type-checking coverage of test files from `pnpm check` and is a behavioral change outside B-017's prescribed fix.
 
 ## Template (copy below the table when detailed)
 
@@ -45,6 +34,12 @@ Review notes that predate the bug log live in [Review history](#review-history) 
 ```
 
 ## Fixed
+
+### B-021 — `types: []` does not isolate the engine type-checker from Node globals — FIXED
+
+- `types: []` in `packages/engine/tsconfig.json` and `packages/shared/tsconfig.json` only disables `@types` auto-inclusion; it does not stop type inclusion that arrives via a module-import chain. Test files living in `src/` imported `vitest`, whose declarations import `node:*` modules, pulling all of `@types/node` (including the ambient `process`/`Buffer` globals) into the production program — so `process.cwd()` in engine sources passed `pnpm typecheck` (S3, engine).
+- Fixed: every engine/shared unit test moved from `src/` to `packages/engine/test/` and `packages/shared/test/` (vitest types transitively require Node types, so all of them are "Node-dependent" per CONVENTIONS.md), relative imports rewritten to `../src/...`, a new `packages/shared/test/tsconfig.json` added, and `pnpm typecheck` now runs `tsc -p packages/shared/test` next to `tsc -p packages/engine/test`. Both production tsconfigs keep `"exclude": ["src/**/*.test.ts"]` as a guard so a stray test file cannot silently reintroduce the leak (the ESLint project service would also reject it as not belonging to any project).
+- Verification: reproduced with `export const probe = process.cwd();` in `packages/engine/src/` — `pnpm typecheck` exited 0 before the fix and fails with TS2591 after. New regression test `packages/engine/test/typecheck-isolation.test.ts` builds both production programs through the TypeScript API and asserts no `@types/node` file is loaded; it failed before the move and passes now.
 
 ### B-055 — PR #46 third-pass review findings — FIXED
 

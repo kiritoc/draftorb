@@ -10,8 +10,8 @@ import type {
   RecommendData,
   Role,
 } from '@draftorb/shared';
-import { recommend } from './recommend.js';
-import { DEFAULT_COMP_CONFIG, DEFAULT_CONFIG, DEFAULT_RECOMMEND_CONFIG } from './config.js';
+import { recommend } from '../src/recommend.js';
+import { DEFAULT_COMP_CONFIG, DEFAULT_CONFIG, DEFAULT_RECOMMEND_CONFIG } from '../src/config.js';
 import {
   BOT_ROLE_PROB,
   FIXED_BOT,
@@ -24,7 +24,7 @@ import {
   makeInput,
   makeTag,
   noUtilityTag,
-} from './recommend-test-utils.js';
+} from '../src/recommend-test-utils.js';
 
 type Rec = ReturnType<typeof recommend>['recommendations'][number];
 

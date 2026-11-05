@@ -11,7 +11,7 @@
 
 import { describe, it, expect } from 'vitest';
 
-import * as shared from '../index.js';
+import * as shared from '../src/index.js';
 
 describe('shared schema parity (D-011)', () => {
   it('exports core schemas: role, rank, rankBucket, championId, itemId', () => {

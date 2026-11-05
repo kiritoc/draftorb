@@ -4,7 +4,7 @@
 
 - Phase: 1 (Support / Diamond)
 - Current milestone: M3 Web MVP implementation complete (T-030..T-035 DONE); the backtest harness (T-027.a) remains under review because D-023 paired-bootstrap validation is not implemented. M1 ETL tickets T-019.b..f remain TODO.
-- Last updated: 2026-11-05 by Devin (PR #46 review fixes, third pass)
+- Last updated: 2026-11-05 by Devin (bug fix B-021)
 
 ## Epic status
 
@@ -39,6 +39,20 @@ Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-0
 - T-019.d verification: please compare the champion and item lists in the 2026-11-04 "T-019.d verification step" entry below with the official 16.21 and 16.22 patch notes (misses and false positives).
 
 ## Session log (newest first)
+
+### 2026-11-05 — Devin — Bug fix B-021 (engine/shared type-check isolation)
+
+- Done:
+  - Reproduced B-021: `export const probe = process.cwd()` in `packages/engine/src/` passed `pnpm typecheck` because test files in `src/` import vitest, whose types pull `@types/node` globals into the production program.
+  - Moved all engine/shared unit tests out of `src/` into `packages/engine/test/` and `packages/shared/test/` (vitest types transitively require Node types, so every vitest test is "Node-dependent" per CONVENTIONS.md); rewrote relative imports to `../src/...`; added `packages/shared/test/tsconfig.json`; `pnpm typecheck` now also runs `tsc -p packages/shared/test`.
+  - Kept `"exclude": ["src/**/*.test.ts"]` in both production tsconfigs as a guard; `process` in engine sources now fails with TS2591.
+  - New regression test `packages/engine/test/typecheck-isolation.test.ts` builds both production programs via the TypeScript API and asserts no `@types/node` file is loaded (failed before the move, passes now).
+  - Updated CONVENTIONS.md test-location rule and BUGS.md (B-021 FIXED).
+- Files touched: `packages/engine/test/*.test.ts` (moved from `src/`, imports rewritten), `packages/shared/test/*` (moved + new `tsconfig.json`), `packages/{engine,shared}/tsconfig.json`, `package.json`, `packages/engine/test/typecheck-isolation.test.ts` (new), `docs/{BUGS,CONVENTIONS,PROGRESS}.md`.
+- Tests: `pnpm check` green (71 files, 828 tests).
+- State left: DONE pending review/commit.
+- Next step: owner review; then T-019.b.
+- Pitfalls / notes for next AI: engine/shared tests must never live in `src/` again — vitest's type declarations import `node:*` and reintroduce `@types/node` globals; the `typecheck-isolation` test and the tsconfig `exclude` guard both catch it. ETL and web tests still live next to source (their tsconfigs allow Node/DOM types).
 
 ### 2026-11-05 — Devin — PR #46 review fixes (third pass)
 

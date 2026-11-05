@@ -8,7 +8,7 @@ import {
   dedupeTeamSlots,
   resolveViableSubset,
   uniqueFixedSlots,
-} from './recommend-role-conflicts.js';
+} from '../src/recommend-role-conflicts.js';
 
 const roleProb = {
   '201': { ADC: 1 },

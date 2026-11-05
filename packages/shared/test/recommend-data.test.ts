@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { recommendDataSchema } from './recommend-data.js';
-import { baselineEntrySchema } from './tables.js';
+import { recommendDataSchema } from '../src/schemas/recommend-data.js';
+import { baselineEntrySchema } from '../src/schemas/tables.js';
 
 const valid = {
   baselines: [[1, 'DIAMOND', 30, 50, 0.1, 50]],

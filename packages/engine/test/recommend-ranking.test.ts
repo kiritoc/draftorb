@@ -5,8 +5,8 @@
 import { describe, it, expect } from 'vitest';
 import type { BaselineTable } from '@draftorb/shared';
 import { draftResultSchema } from '@draftorb/shared';
-import { recommend } from './recommend.js';
-import { DEFAULT_CONFIG, DEFAULT_RECOMMEND_CONFIG } from './config.js';
+import { recommend } from '../src/recommend.js';
+import { DEFAULT_CONFIG, DEFAULT_RECOMMEND_CONFIG } from '../src/config.js';
 import {
   BOT_ROLE_PROB,
   asRoleProb,
@@ -14,7 +14,7 @@ import {
   makeBaselines,
   makeData,
   makeInput,
-} from './recommend-test-utils.js';
+} from '../src/recommend-test-utils.js';
 
 describe('recommend: candidate set and baseline gate', () => {
   it('includes all champions passing the baseline gate', () => {

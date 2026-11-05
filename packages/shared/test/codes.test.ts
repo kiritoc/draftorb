@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { compNeedCategorySchema, warningCodeSchema } from './codes.js';
+import { compNeedCategorySchema, warningCodeSchema } from '../src/schemas/codes.js';
 
 describe('warningCodeSchema', () => {
   it('accepts offRole and well-formed counteredBy codes', () => {

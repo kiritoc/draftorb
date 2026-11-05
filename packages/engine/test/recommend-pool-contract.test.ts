@@ -5,7 +5,7 @@
 
 import { describe, it, expect } from 'vitest';
 import type { BaselineTable, ChampionId, Role } from '@draftorb/shared';
-import { recommend } from './recommend.js';
+import { recommend } from '../src/recommend.js';
 import {
   BOT_ROLE_PROB,
   HIGH_GAMES,
@@ -14,7 +14,7 @@ import {
   makeData,
   makeEnemyPairs,
   makeInput,
-} from './recommend-test-utils.js';
+} from '../src/recommend-test-utils.js';
 
 const ids = (recs: Array<{ championId: ChampionId }>): ChampionId[] =>
   recs.map((r) => r.championId);

@@ -5,7 +5,7 @@
 
 import { describe, it, expect } from 'vitest';
 import type { LaneFullTable, LaneVsTable, Role } from '@draftorb/shared';
-import { recommend } from './recommend.js';
+import { recommend } from '../src/recommend.js';
 import {
   BOT_ROLE_PROB,
   FIXED_BOT,
@@ -15,7 +15,7 @@ import {
   makeInput,
   makeLaneFull,
   makeLaneVs,
-} from './recommend-test-utils.js';
+} from '../src/recommend-test-utils.js';
 
 type Rec = ReturnType<typeof recommend>['recommendations'][number];
 

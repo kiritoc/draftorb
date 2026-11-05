@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { DEFAULT_CONFIG } from './config.js';
+import { DEFAULT_CONFIG } from '../src/config.js';
 import {
   combinedGameWeight,
   expertWeight,
@@ -12,7 +12,7 @@ import {
   shrink,
   sigmoid,
   toEquivalentCounts,
-} from './weighting.js';
+} from '../src/weighting.js';
 
 describe('rankDistanceWeight', () => {
   const tau = DEFAULT_CONFIG.tau; // 1.25

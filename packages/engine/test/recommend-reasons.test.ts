@@ -3,12 +3,12 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { DEFAULT_CONFIG } from './config.js';
-import type { LaneGroupInfo } from './recommend-types.js';
-import type { PairDelta } from './recommend-terms.js';
-import type { ReasonInputs, ScoredCandidate } from './recommend-reasons.js';
-import { buildReasons, toReasonLevel, toRecommendation } from './recommend-reasons.js';
-import { baselineGate, isLowData } from './levels.js';
+import { DEFAULT_CONFIG } from '../src/config.js';
+import type { LaneGroupInfo } from '../src/recommend-types.js';
+import type { PairDelta } from '../src/recommend-terms.js';
+import type { ReasonInputs, ScoredCandidate } from '../src/recommend-reasons.js';
+import { buildReasons, toReasonLevel, toRecommendation } from '../src/recommend-reasons.js';
+import { baselineGate, isLowData } from '../src/levels.js';
 
 describe('toReasonLevel', () => {
   it('accepts -3..3 and throws on out-of-range or non-integer levels', () => {

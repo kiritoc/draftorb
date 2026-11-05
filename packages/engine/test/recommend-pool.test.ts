@@ -9,9 +9,9 @@ import type {
   DraftInput,
   InsufficientDataEntry,
 } from '@draftorb/shared';
-import { DEFAULT_CONFIG } from './config.js';
-import type { ScoredCandidate } from './recommend-reasons.js';
-import { buildCandidateSet, buildPoolOutput, isBelowRoleThreshold } from './recommend-pool.js';
+import { DEFAULT_CONFIG } from '../src/config.js';
+import type { ScoredCandidate } from '../src/recommend-reasons.js';
+import { buildCandidateSet, buildPoolOutput, isBelowRoleThreshold } from '../src/recommend-pool.js';
 
 const roleProb = {
   '1': { SUPPORT: 1 },

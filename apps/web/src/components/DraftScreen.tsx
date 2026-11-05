@@ -344,10 +344,7 @@ export function DraftScreen() {
                     const sample = insufficientData.find(
                       (item) => item.championId === entry.championId,
                     );
-                    const reason =
-                      entry.reason === 'insufficientData' && sample !== undefined
-                        ? strings.insufficientData(sample.nEff)
-                        : entry.reason;
+                    const reason = poolUnavailableReason(entry, sample);
                     return strings.dataReason(championName(champions, entry.championId), reason);
                   })
                   .join(', ')}
@@ -404,6 +401,7 @@ export function DraftScreen() {
           champions={champions}
           pageSize={recommendationPageSize}
           resetKey={draftInput}
+          poolIds={poolSet}
         />
         {recommendationError !== null && (
           <p role="alert" className="mt-3 text-sm text-red-400">
@@ -432,6 +430,22 @@ export function DraftScreen() {
       />
     </div>
   );
+}
+
+function poolUnavailableReason(
+  entry: PoolUnavailableEntry,
+  sample: InsufficientDataEntry | undefined,
+): string {
+  if (entry.reason === 'insufficientData' && sample !== undefined) {
+    return strings.insufficientData(sample.nEff);
+  }
+  if (entry.reason === 'picked') {
+    return strings.poolReasonPicked;
+  }
+  if (entry.reason === 'unknownChampion') {
+    return strings.poolReasonUnknownChampion;
+  }
+  return entry.reason;
 }
 
 function championName(champions: Champion[], id: number): string {

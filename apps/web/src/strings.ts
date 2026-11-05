@@ -27,6 +27,8 @@ export const strings = {
   editPoolCta: 'Edit your pool',
   personalizedPool: 'to get personalized "From your pool" recommendations.',
   poolUnavailable: 'Pool champions not recommended:',
+  poolReasonPicked: 'already picked',
+  poolReasonUnknownChampion: 'not in the champion catalogue',
   poolDropped: 'Dropped from pool (no longer in catalogue):',
   corruptPool: 'Saved champion pool is invalid. The pool is empty until you save a replacement.',
   unavailableStorage:
@@ -44,6 +46,7 @@ export const strings = {
   close: 'Close',
   win: 'win',
   inPool: (rank: number): string => `In your pool · #${rank}`,
+  inPoolTag: 'In your pool',
   counter: 'Counter',
   strongCounter: 'Strong counter',
   weakCounter: 'Weak counter',

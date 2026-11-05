@@ -4,7 +4,7 @@
 
 - Phase: 1 (Support / Diamond)
 - Current milestone: M3 Web MVP implementation complete (T-030..T-035 DONE); the backtest harness (T-027.a) remains under review because D-023 paired-bootstrap validation is not implemented. M1 ETL tickets T-019.b..f remain TODO.
-- Last updated: 2026-11-05 by Devin (bug fix B-021)
+- Last updated: 2026-11-05 by Devin (bug fix B-056 / T-036)
 
 ## Epic status
 
@@ -39,6 +39,20 @@ Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-0
 - T-019.d verification: please compare the champion and item lists in the 2026-11-04 "T-019.d verification step" entry below with the official 16.21 and 16.22 patch notes (misses and false positives).
 
 ## Session log (newest first)
+
+### 2026-11-05 — Devin — Bug fix B-056 / T-036 (web production build ordering + CI gate)
+
+- Done:
+  - Reproduced B-056 from a clean state (all `dist/` and `*.tsbuildinfo` removed): `pnpm --filter @draftorb/web build` failed with TS6305 (`packages/{shared,engine}/dist/index.d.ts has not been built from source`) plus cascading type errors, while PR CI stayed green because it never ran the production build.
+  - Root cause: `apps/web/tsconfig.json` project-references the composite `packages/shared`/`packages/engine`, so `tsc` redirects their `src/index.ts` entry points to `dist/*.d.ts`; `tsc --noEmit` (non-build mode) requires those outputs. Root `pnpm typecheck` (`tsc --build`) builds them, masking the gap locally.
+  - Fix: `apps/web` `build` and `typecheck` scripts now run `tsc -b .` — build mode emits the referenced projects' declarations, then type-checks the app (`noEmit` preserved, `composite: false` untouched). No type-safety weakening, no stale-file reliance.
+  - CI gate: `.github/workflows/ci.yml` lint job now runs `pnpm --filter @draftorb/web build` on PRs and pushes to main.
+  - Regression test `apps/web/src/build-script.test.ts` pins the build-mode ordering in the package scripts.
+- Files touched: `apps/web/package.json`, `apps/web/src/build-script.test.ts` (new), `.github/workflows/ci.yml`, `docs/{TICKETS,BUGS,PROGRESS}.md`.
+- Tests: `pnpm check` green (72 files, 830 tests); `pnpm --filter @draftorb/web build` verified green from a clean state.
+- State left: DONE pending review/commit (branch `bugs`).
+- Next step: owner review; then T-019.b.
+- Pitfalls / notes for next AI: any `tsc` invocation inside `apps/web` must use build mode (`tsc -b .`) or the referenced `dist/*.d.ts` must already exist — plain `tsc --noEmit`/`tsc -p` fails on a clean checkout. `tsc -b` writes `dist/` + `*.tsbuildinfo` for shared/engine (both gitignored). The deploy workflow still runs on push to main in parallel with CI; it is not gated on the CI build job.
 
 ### 2026-11-05 — Devin — Bug fix B-021 (engine/shared type-check isolation)
 

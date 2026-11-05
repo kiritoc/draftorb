@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build && node scripts/copy-public-data.mjs",
+    "build": "tsc -b . && vite build && node scripts/copy-public-data.mjs",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc -b ."
   },
   "dependencies": {
     "@draftorb/shared": "workspace:*",

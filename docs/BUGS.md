@@ -35,6 +35,16 @@ Review notes that predate the bug log live in [Review history](#review-history) 
 
 ## Fixed
 
+### B-056 — Web production build fails on clean checkout (TS6305) and PR CI never ran it — FIXED
+
+- Severity / Area: S2 / web+ci
+- Steps to reproduce: from a clean checkout (no `packages/*/dist`, no `*.tsbuildinfo`), run `pnpm --filter @draftorb/web build`.
+- Expected / Actual: the production build should succeed; instead `tsc --noEmit` failed with TS6305 ("Output file '.../packages/{shared,engine}/dist/index.d.ts' has not been built from source file") plus cascading type errors, so the deploy workflow failed after merge even though PR checks were green.
+- Environment (OS, Node version, patch): any; Node.js 22, pnpm workspace.
+- Suspected cause: `apps/web/tsconfig.json` references the composite `packages/shared` and `packages/engine` projects, so module resolution redirects their `src/index.ts` entry points to `dist/*.d.ts`; `tsc --noEmit` (non-build mode) requires those outputs to exist. Root `pnpm typecheck` (`tsc --build`) builds them, which is why local checks passed, and CI never ran the web build command.
+- Fix (commit/ticket): `apps/web` `build` and `typecheck` scripts now run `tsc -b .` (build mode builds the referenced projects' declarations, then type-checks the app with `noEmit` preserved); `.github/workflows/ci.yml` runs `pnpm --filter @draftorb/web build` so the production build is gated on PRs (T-036).
+- Verification: reproduced the TS6305 cascade on a clean state before the fix; `pnpm --filter @draftorb/web build` succeeds after; regression test `apps/web/src/build-script.test.ts` pins the build-mode ordering.
+
 ### B-021 — `types: []` does not isolate the engine type-checker from Node globals — FIXED
 
 - `types: []` in `packages/engine/tsconfig.json` and `packages/shared/tsconfig.json` only disables `@types` auto-inclusion; it does not stop type inclusion that arrives via a module-import chain. Test files living in `src/` imported `vitest`, whose declarations import `node:*` modules, pulling all of `@types/node` (including the ambient `process`/`Buffer` globals) into the production program — so `process.cwd()` in engine sources passed `pnpm typecheck` (S3, engine).

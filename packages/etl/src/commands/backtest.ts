@@ -1,8 +1,12 @@
 /**
- * @draftorb/etl — `backtest draft` command (D-023, T-027.a).
+ * @draftorb/etl — `backtest draft` command (D-023, T-027.a, B-053).
  *
  * Splits stored matches into a frozen temporal holdout (latest patch) and a
- * training window, runs the draft backtest, and writes a JSON report.
+ * training window, rebuilds the deployed engine's inputs (`RecommendData`)
+ * from aggregates restricted to the training window — in an in-memory
+ * database, so the real aggregate tables are never touched — evaluates every
+ * holdout player through `recommend` on the full draft, and writes a JSON
+ * report.
  */
 
 import Database from 'better-sqlite3';
@@ -10,14 +14,86 @@ import { existsSync } from 'node:fs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 
-import { resolveRepoRoot, defaultPublicDataDir } from '../config/paths';
-import { runBacktestDraft, type DraftRow } from '../backtest/draft';
+import { DEFAULT_CONFIG } from '@draftorb/engine';
+
+import { aggregateRoleProb } from '../aggregate';
+import { aggregateBaseline } from '../aggregate-baseline';
+import { aggregatePairTables } from '../aggregate-pairs';
+import {
+  draftPatchSplit,
+  runBacktestDraft,
+  type BacktestEngineData,
+  type DraftRow,
+} from '../backtest/draft';
+import { buildRoleRecommendData, loadChampionTagsMap } from '../backtest/recommend-data';
 import { UsageError } from '../cli-args';
+import { defaultManualDataDir, resolveRepoRoot, defaultPublicDataDir } from '../config/paths';
+import { migrate } from '../db';
 import { log, parsePositionals, type Command } from './shared';
 
 function resolveDbPathReadOnly(): string {
   const chosen = process.env.DRAFTORB_DB_PATH ?? join(resolveRepoRoot(), 'data', 'DraftOrb.sqlite');
   return resolve(chosen);
+}
+
+/**
+ * Rebuild the engine's per-role inputs from the training window only. The
+ * source database is attached read-only into a throwaway in-memory database
+ * that holds every match except the holdout patch, then aggregated with the
+ * snapshot set to the last training patch — the same code path as
+ * `pnpm etl aggregate`, so recency is relative to the patch before the
+ * holdout (D-023).
+ */
+function buildEngineData(dbPath: string, rows: readonly DraftRow[]): BacktestEngineData {
+  const { holdoutPatch, trainingPatches } = draftPatchSplit(rows);
+  const snapshotPatch = trainingPatches[trainingPatches.length - 1];
+  if (holdoutPatch === null || snapshotPatch === undefined) {
+    return { dataByRole: {} };
+  }
+
+  const memory = new Database(':memory:');
+  try {
+    migrate(memory);
+    memory.exec(`ATTACH DATABASE '${dbPath.replaceAll("'", "''")}' AS src`);
+    try {
+      memory
+        .prepare('INSERT INTO matches SELECT * FROM src.matches WHERE patch <> ?')
+        .run(holdoutPatch);
+      memory
+        .prepare(
+          `INSERT INTO participants SELECT * FROM src.participants
+           WHERE match_id IN (SELECT match_id FROM matches)`,
+        )
+        .run();
+    } finally {
+      memory.exec('DETACH DATABASE src');
+    }
+
+    aggregateRoleProb(memory, { patch: snapshotPatch });
+    aggregateBaseline(memory, { patch: snapshotPatch });
+    aggregatePairTables(memory, { patch: snapshotPatch });
+
+    const championIds = [
+      ...new Set<number>([
+        ...(
+          memory.prepare('SELECT DISTINCT champion_id AS id FROM participants').all() as Array<{
+            id: number;
+          }>
+        ).map((r) => r.id),
+        ...rows.map((r) => r.championId),
+      ]),
+    ].sort((a, b) => a - b);
+
+    const tags = loadChampionTagsMap(join(defaultManualDataDir(), 'champion-tags.json'));
+    const dataByRole = buildRoleRecommendData(memory, {
+      exportMinGames: DEFAULT_CONFIG.exportMinGames,
+      tags,
+      championIds,
+    });
+    return { dataByRole };
+  } finally {
+    memory.close();
+  }
 }
 
 async function runBacktest(args: string[]): Promise<void> {
@@ -62,7 +138,8 @@ async function runBacktest(args: string[]): Promise<void> {
       )
       .all() as DraftRow[];
 
-    const report = runBacktestDraft(rows);
+    const engine = buildEngineData(dbPath, rows);
+    const report = runBacktestDraft(rows, engine);
 
     mkdirSync(dirname(out), { recursive: true });
     writeFileSync(out, JSON.stringify(report, null, 2), 'utf8');
@@ -72,11 +149,12 @@ async function runBacktest(args: string[]): Promise<void> {
     log.detail(`training games: ${report.trainingGames}, holdout games: ${report.holdoutGames}`);
     if (report.logLoss !== null) {
       log.detail(
-        `log-loss: ${report.logLoss.toFixed(4)} (baseline-only ${(report.baselineLogLoss ?? 0).toFixed(4)})`,
+        `log-loss: ${report.logLoss.toFixed(4)} (champion baseline-only ${(report.baselineLogLoss ?? 0).toFixed(4)})`,
       );
       log.detail(
         `Brier: ${(report.brier ?? 0).toFixed(4)} (baseline-only ${(report.baselineBrier ?? 0).toFixed(4)})`,
       );
+      log.detail(`predictions: ${report.predictions} (${report.unscored} unscored)`);
     } else {
       log.detail(`insufficient data: ${report.message}`);
     }

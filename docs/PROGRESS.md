@@ -4,7 +4,7 @@
 
 - Phase: 1 (Support / Diamond)
 - Current milestone: M3 Web MVP implementation complete (T-030..T-035 DONE); the backtest harness (T-027.a) remains under review because D-023 paired-bootstrap validation is not implemented. M1 ETL tickets T-019.b..f remain TODO.
-- Last updated: 2026-11-05 by Devin (bug fix B-056 / T-036)
+- Last updated: 2026-11-05 by Devin (bug fix B-053 / T-027.a engine evaluation)
 
 ## Epic status
 
@@ -39,6 +39,18 @@ Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-0
 - T-019.d verification: please compare the champion and item lists in the 2026-11-04 "T-019.d verification step" entry below with the official 16.21 and 16.22 patch notes (misses and false positives).
 
 ## Session log (newest first)
+
+### 2026-11-05 — Devin — Bug fix B-053 (draft backtest evaluates the deployed engine)
+
+- Done:
+  - Reproduced B-053: `runBacktestDraft` trained a private per-champion win-rate model on raw `DraftRow`s and predicted blue-team win probability — its log-loss never touched `recommend`.
+  - `runBacktestDraft(rows, engine)` now runs `recommend` once per holdout participant on the full draft (nine known picks with fixed roles, `blindPick: false`) and scores the champion actually picked; unscored picks fall back to the champion's baseline-only prior so the comparison stays paired. Metrics are per-player log-loss/Brier/calibration vs the champion baseline; report gains `predictions`/`unscored` and per-role metrics (old `perRole` matchup effects were win-rate-model specific).
+  - New `backtest/recommend-data.ts` rebuilds per-role `RecommendData` from aggregates computed in a throwaway in-memory DB holding only pre-holdout matches (same aggregators, `exportMinGames` gate, role-prob renormalization as the JSON export); `commands/backtest.ts` wires it via ATTACH + migrate + aggregate, so the real aggregate tables are never touched.
+- Files touched: `packages/etl/src/backtest/{draft,draft.test,recommend-data,recommend-data.test}.ts`, `packages/etl/src/commands/backtest.ts`, `packages/etl/src/export/role-tables.ts` (exported `WeightedRow`), `docs/{BUGS,TICKETS,PROGRESS}.md`.
+- Tests: `pnpm check` green (73 files, 836 tests); new regression coverage fails on the old win-rate model.
+- State left: DONE pending review/commit (branch `bugs`). T-027.a stays REVIEW: masked drafts, rolling validation, fixed-Diamond report, layer/slot ablation and the D-023 paired-bootstrap gate remain outstanding; report stays `unvalidated`.
+- Next step: owner review; then T-019.b or D-023 gate work.
+- Pitfalls / notes for next AI: the backtest command needs `data/manual/champion-tags.json` (fails loudly without it) and never writes to the source DB — aggregates run on an in-memory copy minus the holdout patch. `runBacktestDraft` requires the second `BacktestEngineData` argument; holdout = latest patch, training snapshot = last training patch.
 
 ### 2026-11-05 — Devin — Bug fix B-056 / T-036 (web production build ordering + CI gate)
 

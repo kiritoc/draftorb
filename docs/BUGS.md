@@ -4,11 +4,10 @@ Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATI
 
 ## Open
 
-| ID    | Sev | Area   | Title                                                                                                                                     | Status | Found by/date           | Ticket  |
-| ----- | --- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------- | ------ | ----------------------- | ------- |
-| B-053 | S2  | etl    | Draft backtest scores a per-champion win-rate model, not `recommend`; its loss does not validate the deployed engine (D-023)              | OPEN   | T-035 review 2026-11-04 | T-027.a |
-| B-052 | S2  | data   | Sample `data/public/16.21` baseline (n_eff 10, IRON only) is below `minGames` 25, so every draft shows empty lists; needs real aggregates | OPEN   | T-035 review 2026-11-04 | T-019   |
-| B-026 | S3  | engine | `blindSafety` approximates `pickShare(e)` with roleProb (no pick-rate export)                                                             | OPEN   | T-023 review 2026-10-30 | –       |
+| ID    | Sev | Area   | Title                                                                                                                                     | Status | Found by/date           | Ticket |
+| ----- | --- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------- | ------ | ----------------------- | ------ |
+| B-052 | S2  | data   | Sample `data/public/16.21` baseline (n_eff 10, IRON only) is below `minGames` 25, so every draft shows empty lists; needs real aggregates | OPEN   | T-035 review 2026-11-04 | T-019  |
+| B-026 | S3  | engine | `blindSafety` approximates `pickShare(e)` with roleProb (no pick-rate export)                                                             | OPEN   | T-023 review 2026-10-30 | –      |
 
 ## Duplicate bug IDs (not renumbered)
 
@@ -34,6 +33,16 @@ Review notes that predate the bug log live in [Review history](#review-history) 
 ```
 
 ## Fixed
+
+### B-053 — Draft backtest scored a per-champion win-rate model, not `recommend` — FIXED
+
+- Severity / Area: S2 / etl
+- Steps to reproduce: `pnpm etl backtest draft` on a database with at least 5 training matches and a holdout patch; inspect the written `backtest-draft.json`.
+- Expected / Actual: per D-023 the report must measure the deployed engine (`recommend` from `@draftorb/engine`); instead T-027.a trained a private per-champion win-rate model on raw participant rows and predicted blue-team win probability, so its log-loss said nothing about the shipped scorer.
+- Environment (OS, Node version, patch): any; patch-independent.
+- Suspected cause: the baseline harness implemented a standalone win-rate model instead of wiring the pure engine.
+- Fix (commit/ticket): `runBacktestDraft(rows, engine)` now runs `recommend` once per holdout participant on the full draft (all nine other picks known with fixed roles, `blindPick: false`) and reads the score of the champion actually picked; picks the engine cannot score fall back to the champion's baseline-only prior so the comparison stays paired. New `backtest/recommend-data.ts` rebuilds per-role `RecommendData` from aggregates computed in a throwaway in-memory database holding only matches before the holdout patch (same aggregators, `exportMinGames` gate and role-prob renormalization as the JSON export), wired by `commands/backtest.ts`. The report gains `predictions`/`unscored` and per-role log-loss/Brier/mean-prediction metrics; the old `perRole` matchup effects were specific to the win-rate model and are replaced. Masked drafts, rolling validation, fixed-Diamond report, layer/slot ablation and the paired-bootstrap gate remain outstanding — the report stays `unvalidated` (T-027.a).
+- Verification: `backtest/draft.test.ts` rewritten — engine evaluation, matchup-layer regression (an enemy-pair term beats the champion baseline, impossible for a win-rate model), unscored fallback and insufficient-data cases; `backtest/recommend-data.test.ts` covers gating, role-prob renormalization and loud tags failure; `commands/backtest.test.ts` covers the seeded-DB report path.
 
 ### B-056 — Web production build fails on clean checkout (TS6305) and PR CI never ran it — FIXED
 

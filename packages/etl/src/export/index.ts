@@ -17,7 +17,14 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { DEFAULT_CONFIG, type RankWeightingConfig } from '@draftorb/engine';
-import { LATEST_SCHEMA_VERSION, type Manifest, type Role, latestSchema } from '@draftorb/shared';
+import {
+  LATEST_SCHEMA_VERSION,
+  manifestSchema,
+  type Latest,
+  type Manifest,
+  type Role,
+  latestSchema,
+} from '@draftorb/shared';
 import { latestPatch, PATCH_PATTERN } from '../aggregate';
 import { comparePatches } from '../matches-store';
 import { defaultPublicDataDir } from '../config/paths';
@@ -82,19 +89,37 @@ function all<T>(db: Database.Database, sql: string, params: readonly unknown[] =
   return (params.length === 0 ? statement.all() : statement.all(...params)) as T[];
 }
 
-/** Patch referenced by an existing `latest.json` in `publicDir`, or undefined
- *  when the file is absent or does not validate against latestSchema. */
-function readPublishedPatch(publicDir: string): string | undefined {
+/** Latest-patch pointer already published in `publicDir`, or undefined when
+ *  `latest.json` is absent or does not validate against latestSchema.
+ *  `intact` is true only when the manifest the pointer references exists,
+ *  validates against manifestSchema, and names the same patch: a dangling
+ *  pointer (e.g. after a partial restore) must not block recovery exports. */
+function readPublishedPointer(publicDir: string): { patch: string; intact: boolean } | undefined {
   const latestPath = join(publicDir, 'latest.json');
   if (!existsSync(latestPath)) {
     return undefined;
   }
+  let latest: Latest;
   try {
     const parsed = latestSchema.safeParse(JSON.parse(readFileSync(latestPath, 'utf8')));
-    return parsed.success ? parsed.data.patch : undefined;
+    if (!parsed.success) {
+      return undefined;
+    }
+    latest = parsed.data;
   } catch {
     return undefined;
   }
+  const manifestPath = join(publicDir, latest.manifest);
+  let intact = false;
+  try {
+    if (existsSync(manifestPath)) {
+      const manifest = manifestSchema.safeParse(JSON.parse(readFileSync(manifestPath, 'utf8')));
+      intact = manifest.success && manifest.data.patch === latest.patch;
+    }
+  } catch {
+    intact = false;
+  }
+  return { patch: latest.patch, intact };
 }
 
 export function exportJson(db: Database.Database, options: ExportOptions = {}): ExportResult {
@@ -268,21 +293,34 @@ export function exportJson(db: Database.Database, options: ExportOptions = {}): 
     // Only when the exported patch IS the latest one: re-exporting an older
     // patch must not move the pointer backwards (the patch dir may not even
     // exist yet for a newer dbLatestPatch). A newer pointer already published
-    // in publicDir also wins, e.g. after a database reset or restore.
+    // in publicDir also wins, e.g. after a database reset or restore — but
+    // only while it is intact: a dangling pointer (missing or mismatched
+    // manifest) does not block an eligible export from replacing it.
     let latestPath: string | null = null;
-    const publishedPatch = readPublishedPatch(publicDir);
-    if (publishedPatch !== undefined && comparePatches(publishedPatch, targetPatch) > 0) {
+    const publishedPointer = readPublishedPointer(publicDir);
+    const keepNewerPointer =
+      publishedPointer !== undefined &&
+      publishedPointer.intact &&
+      comparePatches(publishedPointer.patch, targetPatch) > 0;
+    if (keepNewerPointer) {
       warnings.push(
-        `export: latest.json already points to newer patch ${publishedPatch}; keeping it`,
+        `export: latest.json already points to newer patch ${publishedPointer.patch}; keeping it`,
       );
-    } else if (dbLatestPatch === undefined || targetPatch === dbLatestPatch) {
-      const latest = latestSchema.parse({
-        schemaVersion: LATEST_SCHEMA_VERSION,
-        patch: targetPatch,
-        manifest: `${targetPatch}/manifest.json`,
-        generatedAt,
-      });
-      latestPath = writeFileAtomic(publicDir, 'latest.json', JSON.stringify(latest, null, 2));
+    } else {
+      if (publishedPointer !== undefined && !publishedPointer.intact) {
+        warnings.push(
+          `export: latest.json points to ${publishedPointer.patch} but its manifest is missing or invalid`,
+        );
+      }
+      if (dbLatestPatch === undefined || targetPatch === dbLatestPatch) {
+        const latest = latestSchema.parse({
+          schemaVersion: LATEST_SCHEMA_VERSION,
+          patch: targetPatch,
+          manifest: `${targetPatch}/manifest.json`,
+          generatedAt,
+        });
+        latestPath = writeFileAtomic(publicDir, 'latest.json', JSON.stringify(latest, null, 2));
+      }
     }
 
     return {

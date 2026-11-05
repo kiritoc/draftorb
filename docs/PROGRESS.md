@@ -43,7 +43,7 @@ Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-0
 ### 2026-11-05 — Devin — PR #46 review fixes (third pass)
 
 - Done:
-  - `exportJson` `latest.json` guard now also reads the published pointer in `publicDir`: a newer existing `latest.json` is preserved (with a warning) even when the database is empty or its latest match patch is older than the pointer (B-055, S3).
+  - `exportJson` `latest.json` guard now also reads the published pointer in `publicDir`: a newer existing `latest.json` is preserved (with a warning) even when the database is empty or its latest match patch is older than the pointer — but only while the pointer is intact (its manifest exists, validates, and names the same patch); a dangling pointer does not block an eligible export (B-055, S3).
   - `ChampionPicker` returns focus to its trigger button on Escape so keyboard navigation does not restart from the document (B-055, S4).
 - Files touched: `packages/etl/src/export/index.ts`, `packages/etl/src/export/atomic.test.ts`, `apps/web/src/components/ChampionPicker.tsx`, `docs/BUGS.md`, `docs/PROGRESS.md`.
 - Tests: `pnpm check` green (70 files, 824 tests); three new export pointer tests in `atomic.test.ts`.

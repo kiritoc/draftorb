@@ -4,7 +4,7 @@
 
 - Phase: 1 (Support / Diamond)
 - Current milestone: M3 Web MVP implementation complete (T-030..T-035 DONE); the backtest harness (T-027.a) remains under review because D-023 paired-bootstrap validation is not implemented. M1 ETL tickets T-019.b..f remain TODO.
-- Last updated: 2026-11-04 by Copilot (T-035 review fixes)
+- Last updated: 2026-11-05 by Devin (draft flow review fixes, second pass)
 
 ## Epic status
 
@@ -158,16 +158,6 @@ Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-0
   - Updated T-035 and related status/decision/bug documentation.
 - Validation: `pnpm check` passed (65 test files, 754 tests); lint has existing non-null assertion warnings. Production build and public-data asset verification also passed.
 
-### 2026-11-04 — Copilot — T-035 review fixes
-
-- Done:
-  - Fixed manifest/patched export URLs, validated and connected recommendation data, and published manual champion tags in dev/build/deploy.
-  - Persisted and restricted the Phase 1 Support pool, surfaced storage and engine failures, reset pagination on draft changes, and centralized UI text.
-  - Corrected backtest baseline leakage and match counts; reports now remain explicitly unvalidated until the D-023 paired-bootstrap gate exists.
-  - Added regression tests for data loading, recommendation inputs, pool storage, draft rendering, pagination reset, report gating and backtest behavior.
-  - Updated T-035 and related status/decision/bug documentation.
-- Validation: `pnpm check` passed (65 test files, 754 tests); lint has existing non-null assertion warnings. Production build and public-data asset verification also passed.
-
 ### 2026-11-03 — Copilot — T-019 review follow-up rebase
 
 - Done:
@@ -211,6 +201,18 @@ Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-0
 - Next: Owner review; then schedule T-019.b or continue T-019 (export).
 
 ## Session log (newest first)
+
+### 2026-11-05 — Devin — Draft flow review fixes (second pass)
+
+- Done:
+  - `pnpm etl backtest draft --out=<path>` was unreachable: strict `parseArgs` rejected the flag before the manual scan ran. `--out=` args are now stripped before positional parsing; duplicates and empty values are rejected; regression tests added.
+  - `exportJson` wrote `latest.json` for whatever patch was exported, so re-exporting an older patch moved the web pointer backwards. The pointer is now written only when the exported patch is the latest patch in the database (`latestPath` is `null` otherwise).
+  - Web draft fixes: rank selector now lists the 10 real `Rank` values from `rankSchema.options` (was emitting the invalid `MASTER_PLUS` bucket); duplicate champion picks across slots are prevented via `championsForSlot`; the dead role select on the user slot is hidden; pool champions in "Best overall" are tagged "In your pool" via a `poolIds` prop (SPECS §7.1); `poolUnavailable` reasons render readable strings; `ChampionPicker` listbox id is unique per instance (`useId`) with Escape/outside-click dismissal; duplicated list titles removed; pool JSON import validation extracted to `parsePoolImport` with unit tests.
+  - Removed a duplicated "Copilot — T-035 review fixes" session entry from this file.
+- Files touched: `packages/etl/src/commands/backtest.ts`, `packages/etl/src/commands/export.ts`, `packages/etl/src/export/index.ts`, `apps/web/src/**`, `docs/BUGS.md`, `docs/PROGRESS.md`.
+- Tests: `pnpm check` green.
+- State left: DONE (review fixes committed on `feature/t-029-to-t-034`).
+- Next step: owner review; then T-019.b or D-023 gate work (T-027.a stays REVIEW).
 
 ### 2026-11-04 — Kilo — Web draft flow + backtest + static deploy (T-029/T-030→T-034, T-027.a)
 

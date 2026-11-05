@@ -46,6 +46,13 @@ Review notes that predate the bug log live in [Review history](#review-history) 
 
 ## Fixed
 
+### B-054 — Draft flow second-pass review findings — FIXED
+
+- `pnpm etl backtest draft --out=<path>` was unreachable: strict `parseArgs` rejected the flag before the manual scan ran (S2, etl).
+- `exportJson` wrote `latest.json` for any exported patch, so re-exporting an older patch moved the web pointer backwards (S2, etl).
+- Web: rank selector emitted the invalid `MASTER_PLUS` bucket as a `Rank`; duplicate champion picks across slots were allowed; the user slot showed a dead role select; pool champions in "Best overall" lacked the "In your pool" tag (SPECS §7.1); `poolUnavailable` reasons rendered as raw codes; `ChampionPicker` had a dangling `aria-controls` id and no dismiss handling; list titles were duplicated; pool import validation was untested.
+- Fixed on `feature/t-029-to-t-034` with regression coverage (`parsePoolImport`, `championsForSlot`, `--out` and `latest.json` guard tests, card pool-tag render tests).
+
 ### B-051 — Draft flow data and validation review findings — FIXED
 
 - The web loader used incorrect paths for patch-relative manifest files and did not publish manual champion tags in all runtime/deploy paths.

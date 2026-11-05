@@ -22,8 +22,9 @@
 ## Data collection status
 
 - Riot key: present in `.env` (development keys expire every 24 h).
-- Games collected: 883 matches, 8830 participants (euw1, patches 16.19–16.22; ingestion may still be running — counts grew during the B-052 session). Patch catalogs imported for 16.21 and 16.22. `data/public/latest.json` (D-051, T-029) points at patch 16.22, written by `pnpm etl export` after a successful publish.
-- Last aggregation: 2026-11-05 — role_prob (430 rows/173 champions), baseline (3440 rows), pair tables, rune_ctx (42816 rows) aggregated from the real database; `pnpm etl export` published patch 16.22 and re-exported 16.21 (B-052). Both dirs now include `pick-rate.json` and rune files.
+- Games collected: 3,311 matches, ~33k participants (euw1, patches 16.19–16.22; top-250 players by rank_score — Challenger/Grandmaster/Master — via `matches --limit=250`, ~3 h on a dev key). Patch catalogs imported for 16.21 and 16.22. `data/public/latest.json` (D-051, T-029) points at patch 16.22, written by `pnpm etl export` after a successful publish.
+- Last aggregation: 2026-11-05 — role_prob (553 rows/173 champions), baseline (4424 rows), pair tables (~912k rows), rune_ctx (159,918 rows) aggregated from the full 3,311-match database; `pnpm etl export` published patch 16.22 and re-exported 16.21. Both dirs include `pick-rate.json` and rune files. Champion roles re-derived (`derive-roles`) for 16.22.
+- Weekly refresh estimate: ~1.5–3 h incremental for the same 250 players (cursors fetch only new matches); first run on a fresh DB ~4–6 h. A scheduled GitHub Action is feasible but blocked on key strategy (dev keys expire in 24 h; production key needs Riot approval).
 
 ## Next recommended ticket
 
@@ -39,6 +40,19 @@ Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-0
 - T-019.d verification: please compare the champion and item lists in the 2026-11-04 "T-019.d verification step" entry below with the official 16.21 and 16.22 patch notes (misses and false positives).
 
 ## Session log (newest first)
+
+### 2026-11-05 — Devin — First real match-data collection (ops, no ticket)
+
+- Done:
+  - Verified the refreshed Riot dev key (`check-key euw1`), ran `migrate` (11 migrations), `players euw1` (850 players: 250 Emerald / 250 Diamond / 150 Master / 100 Grandmaster / 100 Challenger).
+  - `matches euw1 --limit=250` (top rank_score first: Challenger + Grandmaster + top Master), ~3 h: 250/250 players, 3,311 matches stored, 1,597 duplicates, 91 filtered, 1 invalid, 0 failures.
+  - `aggregate` + `derive-roles` + `export` (16.22 published, `latest.json` moved forward; 16.21 re-exported). Exports now carry real aggregates, `pick-rate.json` and SUPPORT rune files.
+  - OTP prototype (owner idea, not ticketed): champion+role concentration query over `participants` confirmed many true one-tricks (e.g. Senna/Sona SUPPORT at 100%, Thresh 97%, Bard 91%); all are Master+ rank, so an OTP weighting feature would need an ADR against the rank kernel. Possible follow-up: `pnpm etl otp` report, then optional aggregation weight.
+- Files touched: `data/DraftOrb.sqlite` (gitignored), `data/public/{latest.json,16.21/*,16.22/*}`, `docs/PROGRESS.md`.
+- Tests: none (ops run; export/aggregate paths already covered).
+- State left: DONE. `data/public` exports reflect the full match set; remaining 600 discovered players not yet ingested.
+- Next step: owner review; then T-019.b. Re-run `matches` (no `--limit`) later to ingest Emerald/Diamond players if wanted.
+- Pitfalls / notes for next AI: `matches` has no tier filter — `--limit` slices by `rank_score` DESC after done-cursor sorting, so it picks the highest ranks, not a chosen tier. Dev-key pace ≈ 45 s/player for 20 matches + enrichment.
 
 ### 2026-11-05 — Devin — Pool editor champion browser with avatars (owner request, D-053)
 

@@ -490,6 +490,30 @@ Owner decision 2026-11-04. Rationale: the user can fix the role of any champion 
 
 Owner decision 2026-11-04.
 
+### D-052 — Pick-rate export semantics for `blindSafety` — PROPOSED
+
+- Context: B-026. `blindSafety` needs `pickShare(e)` = the share of picks of champion `e` in an unseen enemy role, but no pick-rate export existed, so the engine approximated it with `roleProb[e][role]` (the share of `e`'s own games played in that role — a different quantity).
+- Decision:
+  1. **Source.** `pick-rate.json` is computed from the `role_prob` table's `games_w` per (champion, role): `share(e, role) = games_w(e, role) / sum_e games_w(e, role)`. Each (champion, role) cell is gated by `n_eff >= exportMinGames` like every other export, then shares are renormalized per role to sum 1 (round6, largest share absorbs the residual, same rule as B-049).
+  2. **Scope.** Global like `role-prob.json`, independent of `manifest.roles`: `role_prob` has no rank-bucket or platform split, so pick shares are global across buckets and platforms (same aggregation scope as role probabilities).
+  3. **Threshold.** `blindOpponentMinShare` now applies to the pick-share value. With real shares (a handful of picks above a few percent) the 0.05 default keeps only reasonably popular opponents; the value may need retuning once real data exists (T-027.a).
+  4. **Fallback.** `RecommendData.pickRate` is optional: exports published before `pick-rate.json` existed keep the roleProb approximation until re-exported. The backtest's `RecommendData` always carries real pick rates.
+- Alternatives:
+  - Per-rank-bucket pick shares — rejected for now: `role_prob` carries no bucket dimension; would need a new aggregation.
+  - Required `pickRate` field — rejected: already-published patch exports have no `pick-rate.json` and cannot be regenerated while the database is locked.
+- Consequences: `pnpm etl export` writes `pick-rate.json` (manifest `files`, no schemaVersion bump — additive file, loader treats it as optional). Engine behavior is unchanged until an export containing the file is loaded.
+
+### D-053 — Champion avatars from the Data Dragon CDN — ACCEPTED
+
+- Context: the pool editor needed a browsable champion set with avatars, but `champions.json` stores only the icon file name (`Annie.png`) and no images are shipped with the export.
+- Decision: resolve avatar URLs at runtime against the Data Dragon CDN (`https://ddragon.leagueoflegends.com/cdn/<version>/img/champion/<icon>`). The export patch is a `major.minor` label, so `apps/web/src/data/champion-icons.ts` maps it to the newest matching full version from `api/versions.json` (fetched once per session). Every failure path (CDN down, unknown patch, missing version) degrades to `null` and the grid renders a letter placeholder — avatars never block the app.
+- Alternatives:
+  - Bundle icons into `data/public/<patch>/` at export time — rejected by the owner: adds ETL work and per-patch image weight for no functional gain while the app already requires network access for its data.
+  - CommunityDragon icons — rejected: Data Dragon is the documented static-data source (RIOT_API.md) and its `img/champion/` path is stable and key-free.
+- Consequences: one extra small fetch (`versions.json`) per session; avatar availability depends on Riot's CDN, mitigated by the placeholder fallback. `square/` portraits return AccessDenied on this CDN, so the 128x128 `img/champion/` portrait is used.
+
+Owner decision 2026-11-05 (avatar source chosen in session).
+
 ### Template
 
 ```

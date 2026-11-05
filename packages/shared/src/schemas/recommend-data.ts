@@ -9,7 +9,7 @@
 import { z } from 'zod';
 
 import { championIdSchema } from './core.js';
-import { championRoleProbabilitiesSchema } from './champions.js';
+import { championRoleProbabilitiesSchema, pickRateSchema } from './champions.js';
 import { championTagsMapSchema } from './tags.js';
 import {
   allyPairTableSchema,
@@ -33,6 +33,11 @@ export const recommendDataSchema = z
     laneFull: laneFullTableSchema,
     /** championId -> { role: prob }. */
     roleProb: championRoleProbabilitiesSchema,
+    /**
+     * role -> championId -> pick share (`pick-rate.json`, B-026). Optional:
+     * exports predating it fall back to the roleProb approximation.
+     */
+    pickRate: pickRateSchema.optional(),
     /** Champion tags for comp needs. */
     tags: championTagsMapSchema,
     /** Every known champion id (candidate enumeration and unknown-id checks). */

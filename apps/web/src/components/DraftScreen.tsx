@@ -31,6 +31,7 @@ import {
   loadLatest,
   loadManifest,
 } from '../data/loader.js';
+import { loadChampionIconVersion } from '../data/champion-icons.js';
 import { createRecommendData } from '../data/recommend-data.js';
 import { excludePick, excludedRanks } from '../data/exclude-pick.js';
 import { championsForSlot } from '../champion-availability.js';
@@ -57,6 +58,7 @@ function isFilled(slot: DraftSlotState): slot is { championId: number; role?: Ro
 export function DraftScreen() {
   const [patch, setPatch] = useState<string | null>(null);
   const [champions, setChampions] = useState<Champion[]>([]);
+  const [iconVersion, setIconVersion] = useState<string | null>(null);
   const [data, setData] = useState<RecommendData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [recommendationError, setRecommendationError] = useState<string | null>(null);
@@ -82,6 +84,13 @@ export function DraftScreen() {
     void (async () => {
       try {
         const latest = await loadLatest();
+        void loadChampionIconVersion(latest.patch)
+          .then((version) => {
+            if (!cancelled) {
+              setIconVersion(version);
+            }
+          })
+          .catch(() => {});
         const manifest = await loadManifest(latest.manifest);
         if (manifest.patch !== latest.patch) {
           throw new Error(
@@ -412,6 +421,7 @@ export function DraftScreen() {
         onClose={() => setPoolEditorOpen(false)}
         pool={pool}
         champions={champions}
+        iconVersion={iconVersion}
         onSave={(nextPool) => {
           const { pool: filteredPool, dropped } = filterPoolByCatalogue(
             nextPool,

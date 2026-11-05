@@ -112,6 +112,7 @@ champions.json         // id, name, icon, roles
 items.json             // item catalog (from Data Dragon)
 runes.json             // rune tree catalog (from Data Dragon)
 role-prob.json         // Global across roles, independent of manifest.roles: { [championId]: { SUPPORT: 0.92, ... } }. Sparse roles with games only; absent roles are 0. Probabilities sum to 1 (tolerance 1e-6). Gated-in rows use stored `role_prob.prob` and are renormalized per champion; an unknown exported role fails the export with a role-prob.json error.
+pick-rate.json         // Global across roles, independent of manifest.roles (B-026, D-052): { [role]: { [championId]: share } }, share of that role's picks. Computed from `role_prob.games_w` per (champion, role), gated per cell by `n_eff >= exportMinGames`, renormalized per role to sum 1 (tolerance 1e-6, largest share absorbs the residual). Optional for consumers: exports without it keep the roleProb approximation in `blindSafety`.
 roles/<ROLE>/baseline.json    // [championId, bucket, wins_w, games_w, games_w2, games] (games = raw match count)
 roles/<ROLE>/ally-pairs.json  // [championId, allyId, otherRole, bucket, wins_w, games_w, games_w2]
 roles/<ROLE>/enemy-pairs.json // [championId, enemyId, otherRole, bucket, wins_w, games_w, games_w2]

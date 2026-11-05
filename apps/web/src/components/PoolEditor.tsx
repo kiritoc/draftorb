@@ -1,9 +1,11 @@
 /**
  * @draftorb/web — Champion pool editor (T-033, D-024).
  *
- * Per-role pool editor reusing the searchable ChampionPicker (T-031). Edits
- * live in a working copy and are only persisted when the user saves. Supports
- * JSON export and import; an invalid import leaves the stored pool untouched.
+ * Per-role pool editor backed by the searchable ChampionGrid avatar browser:
+ * the whole catalogue is visible and filterable by name, and clicking a
+ * champion toggles its membership. Edits live in a working copy and are only
+ * persisted when the user saves. Supports JSON export and import; an invalid
+ * import leaves the stored pool untouched.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -11,7 +13,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { type Champion, type ChampionId, type ChampionPool, type Role } from '@draftorb/shared';
 import { poolMaxSize } from '../config.js';
 import { strings } from '../strings.js';
-import { ChampionPicker } from './ChampionPicker.js';
+import { ChampionGrid } from './ChampionGrid.js';
 import { parsePoolImport } from '../pool/storage.js';
 
 const USER_ROLE: Role = 'SUPPORT';
@@ -26,10 +28,19 @@ export interface PoolEditorProps {
   onClose: () => void;
   pool: ChampionPool | null;
   champions: Champion[];
+  /** Resolved Data Dragon version for champion avatars, or null. */
+  iconVersion: string | null;
   onSave: (pool: ChampionPool) => void;
 }
 
-export function PoolEditor({ open, onClose, pool, champions, onSave }: PoolEditorProps) {
+export function PoolEditor({
+  open,
+  onClose,
+  pool,
+  champions,
+  iconVersion,
+  onSave,
+}: PoolEditorProps) {
   const [working, setWorking] = useState<Record<Role, number[]>>(emptyPools());
   const [message, setMessage] = useState({ text: '', kind: 'info' as 'info' | 'error' });
   const [importError, setImportError] = useState<string | null>(null);
@@ -45,34 +56,22 @@ export function PoolEditor({ open, onClose, pool, champions, onSave }: PoolEdito
     setMessage({ text: '', kind: 'info' });
   }, [open, pool]);
 
-  const championById = useMemo(() => new Map(champions.map((c) => [c.id, c])), [champions]);
+  const selectedIds = useMemo(() => new Set(working[USER_ROLE]), [working]);
 
-  const isOffRole = (role: Role, championId: ChampionId): boolean => {
-    const champion = championById.get(championId);
-    return champion !== undefined && !champion.roles.includes(role);
-  };
-
-  const countFor = (role: Role): number => working[role].length;
-
-  const addChampion = useCallback(
-    (role: Role, championId: ChampionId | null) => {
-      if (championId === null) return;
-      if (working[role].includes(championId)) return;
-      if (countFor(role) >= poolMaxSize) {
-        setMessage({ text: strings.poolFull(role, poolMaxSize), kind: 'error' });
-        return;
+  const toggleChampion = useCallback((championId: ChampionId) => {
+    setWorking((current) => {
+      const ids = current[USER_ROLE];
+      if (ids.includes(championId)) {
+        setMessage({ text: '', kind: 'info' });
+        return { ...current, [USER_ROLE]: ids.filter((id) => id !== championId) };
       }
-      setWorking((current) => ({ ...current, [role]: [...current[role], championId] }));
+      if (ids.length >= poolMaxSize) {
+        setMessage({ text: strings.poolFull(USER_ROLE, poolMaxSize), kind: 'error' });
+        return current;
+      }
       setMessage({ text: '', kind: 'info' });
-    },
-    [working],
-  );
-
-  const removeChampion = useCallback((role: Role, championId: ChampionId) => {
-    setWorking((current) => ({
-      ...current,
-      [role]: current[role].filter((id) => id !== championId),
-    }));
+      return { ...current, [USER_ROLE]: [...ids, championId] };
+    });
   }, []);
 
   const handleSave = () => {
@@ -135,7 +134,7 @@ export function PoolEditor({ open, onClose, pool, champions, onSave }: PoolEdito
         onClick={onClose}
         aria-hidden="true"
       />
-      <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold text-indigo-300">{strings.poolEditorTitle}</h2>
           <button
@@ -161,77 +160,30 @@ export function PoolEditor({ open, onClose, pool, champions, onSave }: PoolEdito
           </div>
         )}
 
-        <div className="space-y-4">
-          {[USER_ROLE].map((role) => {
-            const ids = working[role];
-            return (
-              <div key={role} className="border border-gray-800 rounded p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                    {role}
-                  </label>
-                  <span className="text-xs text-gray-500">
-                    {strings.poolCount(countFor(role), poolMaxSize)}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 mb-2">
-                  <ChampionPicker
-                    value={null}
-                    onChange={(championId) => addChampion(role, championId)}
-                    champions={champions}
-                    placeholder={strings.addRole(role)}
-                    disabled={countFor(role) >= poolMaxSize}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setWorking((current) => ({ ...current, [USER_ROLE]: [] }))}
-                    disabled={total === 0}
-                    className="px-2 py-1 text-xs text-gray-400 hover:text-red-400 disabled:opacity-50"
-                  >
-                    {strings.clearAll}
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  {ids.length === 0 && (
-                    <span className="text-xs text-gray-500 italic">{strings.empty}</span>
-                  )}
-                  {ids.map((championId) => {
-                    const champion = championById.get(championId);
-                    const offRole = isOffRole(role, championId);
-                    return (
-                      <span
-                        key={championId}
-                        className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs border ${
-                          offRole
-                            ? 'bg-amber-900/30 text-amber-300 border-amber-600/30'
-                            : 'bg-gray-800 text-gray-300 border-gray-600/30'
-                        }`}
-                        title={offRole ? strings.offRole(role) : undefined}
-                      >
-                        {champion?.name ?? strings.championFallback(championId)}
-                        <button
-                          type="button"
-                          onClick={() => removeChampion(role, championId)}
-                          className="ml-1.5 text-gray-500 hover:text-white"
-                          aria-label={strings.removeFromRole(
-                            champion?.name ?? String(championId),
-                            role,
-                          )}
-                        >
-                          ✕
-                        </button>
-                        {offRole && (
-                          <span className="text-[10px] text-amber-400" aria-hidden="true">
-                            {strings.offRoleLabel}
-                          </span>
-                        )}
-                      </span>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
+        <div className="border border-gray-800 rounded p-3">
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+              {USER_ROLE}
+            </label>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-gray-500">{strings.poolCount(total, poolMaxSize)}</span>
+              <button
+                type="button"
+                onClick={() => setWorking((current) => ({ ...current, [USER_ROLE]: [] }))}
+                disabled={total === 0}
+                className="px-2 py-1 text-xs text-gray-400 hover:text-red-400 disabled:opacity-50"
+              >
+                {strings.clearAll}
+              </button>
+            </div>
+          </div>
+          <ChampionGrid
+            champions={champions}
+            role={USER_ROLE}
+            selectedIds={selectedIds}
+            iconVersion={iconVersion}
+            onToggle={toggleChampion}
+          />
         </div>
 
         <div className="mt-6 flex items-center justify-between">

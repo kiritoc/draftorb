@@ -36,3 +36,21 @@ const roleProbInnerSchema = z.partialRecord(roleSchema, z.number().finite().gt(0
 
 export const championRoleProbabilitiesSchema = z.record(z.string(), roleProbInnerSchema);
 export type ChampionRoleProbabilities = z.infer<typeof championRoleProbabilitiesSchema>;
+
+const PICK_RATE_TOLERANCE = 1e-6;
+
+const pickRateRoleSchema = z.record(z.string(), z.number().finite().gt(0).max(1)).refine(
+  (shares) => {
+    const sum = Object.values(shares).reduce((acc, s) => acc + s, 0);
+    return Math.abs(sum - 1) <= PICK_RATE_TOLERANCE;
+  },
+  { message: 'Pick shares per role must sum to 1 (tolerance 1e-6)' },
+);
+
+/**
+ * Per-role pick shares (`pick-rate.json`, B-026): role -> championId -> share
+ * of that role's picks. Sparse like roleProb: absent champions have share 0,
+ * and shares within each role sum to 1 (tolerance 1e-6).
+ */
+export const pickRateSchema = z.partialRecord(roleSchema, pickRateRoleSchema);
+export type PickRate = z.infer<typeof pickRateSchema>;

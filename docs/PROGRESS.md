@@ -4,7 +4,7 @@
 
 - Phase: 1 (Support / Diamond)
 - Current milestone: M3 Web MVP implementation complete (T-030..T-035 DONE); the backtest harness (T-027.a) remains under review because D-023 paired-bootstrap validation is not implemented. M1 ETL tickets T-019.b..f remain TODO.
-- Last updated: 2026-11-05 by Devin (PR #46 review fixes, third pass)
+- Last updated: 2026-11-05 by Devin (PR #47 review fixes B-057..B-059 + export JSDoc)
 
 ## Epic status
 
@@ -21,9 +21,9 @@
 
 ## Data collection status
 
-- Riot key: not recorded (development keys expire every 24 h).
-- Games collected: 0 (no SQLite database exists under `data/` in this workspace) | Patch: 16.21 (static data imported: champions, items, runes; a parallel `pnpm etl static` run also imported 16.22 catalogs). `data/public/latest.json` (D-051, T-029) points at patch 16.21 and is written by `pnpm etl export` after a successful publish.
-- Last aggregation: role_prob (T-015) and baselines (T-016) implemented; pairs/lane (T-017) and runes (T-018) implemented; export (T-019) implemented and tested (`packages/etl/src/export/`, `packages/etl/src/commands/export.ts`, tests); export preserves static catalogs (`champions.json`, `items.json`, `runes.json`) and lists them in the manifest (B-035).
+- Riot key: present in `.env` (development keys expire every 24 h).
+- Games collected: 883 matches, 8830 participants (euw1, patches 16.19–16.22; ingestion may still be running — counts grew during the B-052 session). Patch catalogs imported for 16.21 and 16.22. `data/public/latest.json` (D-051, T-029) points at patch 16.22, written by `pnpm etl export` after a successful publish.
+- Last aggregation: 2026-11-05 — role_prob (430 rows/173 champions), baseline (3440 rows), pair tables, rune_ctx (42816 rows) aggregated from the real database; `pnpm etl export` published patch 16.22 and re-exported 16.21 (B-052). Both dirs now include `pick-rate.json` and rune files.
 
 ## Next recommended ticket
 
@@ -34,11 +34,111 @@ Session entries before 2026-10-29 live in [PROGRESS_ARCHIVE.md](./PROGRESS_ARCHI
 
 ## Open questions for the owner
 
-Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-050 and D-051 ACCEPTED; D-044 ACCEPTED with 20 patches; D-046 ACCEPTED with CommunityDragon as the source. No PROPOSED decisions are open.
+Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-050 and D-051 ACCEPTED; D-044 ACCEPTED with 20 patches; D-046 ACCEPTED with CommunityDragon as the source. PROPOSED and awaiting owner review: D-052 (pick-rate export semantics for `blindSafety`, added with the B-026 fix).
 
 - T-019.d verification: please compare the champion and item lists in the 2026-11-04 "T-019.d verification step" entry below with the official 16.21 and 16.22 patch notes (misses and false positives).
 
 ## Session log (newest first)
+
+### 2026-11-05 — Devin — Pool editor champion browser with avatars (owner request, D-053)
+
+- Done:
+  - Replaced the pool editor's ChampionPicker dropdown + chip list with `ChampionGrid`: the whole champion catalogue as an avatar grid, filterable by name, click-to-toggle membership, selected champions pinned first and highlighted, off-role picks marked amber. Pool stays Support-only (Phase 1, D-024); max size and working-copy/save semantics unchanged.
+  - Avatars come from the Data Dragon CDN (D-053): `data/champion-icons.ts` maps the export patch label to the newest full version via `api/versions.json` (cached per session) and builds `cdn/<version>/img/champion/<icon>` URLs; all failures degrade to a letter placeholder.
+  - `DraftScreen` resolves the icon version alongside the data load and passes it to `PoolEditor`; unused picker strings removed; modal widened to `max-w-3xl`.
+- Files touched: `apps/web/src/data/{champion-icons.ts,champion-icons.test.ts}` (new), `apps/web/src/components/{ChampionGrid.tsx,champion-grid.test.ts}` (new), `apps/web/src/components/{PoolEditor,DraftScreen}.tsx`, `apps/web/src/strings.ts`, `docs/{DECISIONS,PROGRESS}.md`.
+- Tests: `pnpm check` green (77 files, 864 tests); new coverage for version resolution, icon URLs and grid rendering/order/placeholder fallback.
+- State left: DONE pending owner review. Dev server verified serving; visual check of the grid in the browser preview is on the owner.
+- Next step: owner review; then T-019.b.
+- Pitfalls / notes for next AI: `api/versions.json` is newest-first, so `resolveIconVersion` takes the first `major.minor.*` match; Data Dragon `img/champion/square/` returns AccessDenied — only `img/champion/<Icon>.png` (128x128) works.
+
+### 2026-11-05 — Devin — PR #47 follow-up review fix (unscored report counts)
+
+- Done:
+  - B-059: the all-unscored backtest branch now preserves the evaluated fallback sample size instead of reusing the early-exit `insufficient()` counts; `predictions`/`unscored` equal `points.length` and `perRole` carries the same counts while loss metrics stay null.
+- Files touched: `packages/etl/src/{backtest/draft.ts,backtest/draft.test.ts}`, `docs/{BUGS,PROGRESS}.md`.
+- Tests: `pnpm check` green (75 files, 855 tests); all-unscored regression now asserts 24 predictions / 24 unscored with TOP and SUPPORT at 12 each.
+- State left: DONE pending review/commit (branch `bugs`). T-027.a stays REVIEW; the report remains `unvalidated` until the D-023 paired-bootstrap gate and remaining validation metrics exist.
+- Next step: owner review; then T-019.b or D-023 gate work.
+- Pitfalls / notes for next AI: `unscored <= predictions` must hold even when `insufficientData` is true; early exits before evaluation still report zero counts.
+
+### 2026-11-05 — Devin — PR #47 review fixes (backtest rank + unscored gate)
+
+- Done:
+  - B-057: the draft backtest now evaluates holdout players at `matches.avg_rank_score` (`DraftRow.matchRankScore`) for both `userRank` and the champion-baseline lookup, matching the rank context used by every aggregate table; NULL `participants.rank_score` no longer becomes IRON through `gameBucketIndex`.
+  - B-058: `runBacktestDraft` returns the insufficient-data report when every holdout point is an unscored baseline fallback, instead of publishing metrics equal to the fallback baseline; mixed scored/unscored reports keep the paired fallback points and `unscored` count.
+  - Added the missing public-function JSDoc to `pickRateFile` and aligned `roleProbFile` (CONVENTIONS.md).
+- Files touched: `packages/etl/src/{commands/backtest.ts,commands/backtest.test.ts,backtest/draft.ts,backtest/draft.test.ts,export/pick-rate.ts,export/role-prob.ts}`, `docs/{BUGS,PROGRESS}.md`.
+- Tests: `pnpm check` green (75 files, 855 tests). New regressions: all-unscored holdout report, match-rank evaluation with NULL participant ranks, and a 30-match command seed (the old 5-match seed was itself all-unscored under `minGames = 25`).
+- State left: DONE pending review/commit (branch `bugs`). T-027.a stays REVIEW: masked drafts, rolling validation, fixed-Diamond report, layer/slot ablation and the D-023 paired-bootstrap gate remain outstanding; report stays `unvalidated`.
+- Next step: owner review; then T-019.b or D-023 gate work.
+- Pitfalls / notes for next AI: scored backtest recommendations need `n_eff >= minGames` (25), stricter than `exportMinGames` (10); tiny training windows now correctly report insufficient data. `data/public/16.21` and `16.22` intentionally share aggregate evidence because aggregate tables are not patch-scoped, and `lane-full.json` is empty because no SUPPORT lane_full row reaches `exportMinGames` in the current sample.
+
+### 2026-11-05 — Devin — Bug fix B-052 (real aggregate sample export)
+
+- Done:
+  - Reproduced B-052: the committed `data/public/16.21` export held a single baseline row (`[412,"IRON",6,10,10,3]`, n_eff 10 < `minGames` 25) and a one-champion `role-prob.json`; `recommend` returned 0 recommendations for every draft.
+  - Wrote failing regression test `packages/etl/src/export/sample-export.test.ts`: loads the published export (`latest.json` -> manifest -> listed files) through the web loader's schemas and asserts `recommend` returns a non-empty "Best overall" list per exported role at Diamond. Failed before the fix (0 recommendations), passes after.
+  - Fix is data, not code: ran `pnpm etl aggregate` on `data/DraftOrb.sqlite` (now populated: 883 matches, euw1, patches 16.19–16.22) then `pnpm etl export` -> patch 16.22 (latest.json moved 16.21 -> 16.22 via the D-051 pointer rule) and `pnpm etl export 16.21` so the previously degenerate committed dir also carries real aggregates. Both exports now include `pick-rate.json` and SUPPORT rune files.
+- Files touched: `packages/etl/src/export/sample-export.test.ts` (new), `data/public/{latest.json,16.21/*,16.22/*}`, `docs/{BUGS,PROGRESS}.md`.
+- Tests: `pnpm check` green (75 files, 853 tests).
+- State left: DONE pending review/commit (branch `bugs`). `data/public/backtest-draft.json` and `data/public/16.22/` were already untracked before this session; the backtest report is still the empty placeholder (T-027.a stays REVIEW) — left untracked, regenerate with `pnpm etl backtest draft` when needed.
+- Next step: owner review; then T-019.b. Re-run `pnpm etl aggregate && pnpm etl export` after ingestion finishes to refresh the sample with the final match set.
+- Pitfalls / notes for next AI: aggregate tables are not patch-scoped — exporting an older patch (`pnpm etl export 16.21`) warns and labels current aggregates with that patch; `latest.json` only moves forward. The DB was being written during this session (match counts grew between queries), so exported numbers are a snapshot.
+
+### 2026-11-05 — Devin — Bug fix B-026 (pick-rate export for `blindSafety`)
+
+- Done:
+  - Reproduced B-026: `blindSafety` approximated `pickShare(e)` with `roleProb[e][role]` (share of the champion's own games in that role), so real popular picks with low role share were filtered out by `blindOpponentMinShare`.
+  - New global `pick-rate.json` export (`packages/etl/src/export/pick-rate.ts`): per-role shares from `role_prob.games_w`, gated per cell by `n_eff >= exportMinGames`, renormalized per role to sum 1; written by `exportJson` next to `role-prob.json` and listed in the manifest (no schemaVersion bump — additive file).
+  - Shared: `pickRateSchema`/`PickRate` (role -> championId -> share, per-role sum 1); `RecommendData.pickRate` optional so pre-existing exports keep the roleProb fallback.
+  - Engine: `blindOpponents`/`computeBlindSafety` accept an optional `pickRate` (trailing param); `recommend` passes `data.pickRate`. Web `createRecommendData` loads `pick-rate.json` when present; the backtest's `RecommendData` always carries real pick rates.
+  - Docs: SPECS §5, DATA_MODEL export layout, DECISIONS D-052 (PROPOSED: pick-share source/scope/threshold/fallback assumptions), BUGS B-026 FIXED.
+- Files touched: `packages/shared/src/schemas/{champions,recommend-data}.ts`, `packages/shared/src/index.ts`, `packages/shared/test/recommend-data.test.ts`, `packages/engine/src/{recommend-terms,recommend,config,recommend-test-utils}.ts`, `packages/engine/test/{recommend-terms,recommend-blind-comp}.test.ts`, `packages/etl/src/export/{pick-rate,pick-rate.test,index,manifest.test,atomic.test}.ts`, `packages/etl/src/backtest/recommend-data.ts`, `apps/web/src/data/{recommend-data,recommend-data.test}.ts`, `docs/{SPECS,DATA_MODEL,DECISIONS,BUGS,PROGRESS}.md`.
+- Tests: `pnpm check` green (74 files, 851 tests); new regression tests failed before the fix.
+- State left: DONE pending review/commit (branch `bugs`). Note: `data/DraftOrb.sqlite` was not touched (parallel work); published `data/public/<patch>/` exports gain `pick-rate.json` on the next `pnpm etl export` — until then the web keeps the roleProb fallback.
+- Next step: owner review; then T-019.b. Re-run `pnpm etl aggregate && pnpm etl export` once the DB is free to populate pick-rate.json; D-052 needs owner acceptance.
+- Pitfalls / notes for next AI: pick shares are global across rank buckets/platforms (role_prob has no split); `blindOpponentMinShare` (0.05) now applies to pick-share values, which are much smaller than roleProb values — retune via T-027.a if needed. `pickRate: {}` (export with no gated rows) disables blind safety rather than falling back — deliberate, the export is authoritative when present.
+
+### 2026-11-05 — Devin — Bug fix B-053 (draft backtest evaluates the deployed engine)
+
+- Done:
+  - Reproduced B-053: `runBacktestDraft` trained a private per-champion win-rate model on raw `DraftRow`s and predicted blue-team win probability — its log-loss never touched `recommend`.
+  - `runBacktestDraft(rows, engine)` now runs `recommend` once per holdout participant on the full draft (nine known picks with fixed roles, `blindPick: false`) and scores the champion actually picked; unscored picks fall back to the champion's baseline-only prior so the comparison stays paired. Metrics are per-player log-loss/Brier/calibration vs the champion baseline; report gains `predictions`/`unscored` and per-role metrics (old `perRole` matchup effects were win-rate-model specific).
+  - New `backtest/recommend-data.ts` rebuilds per-role `RecommendData` from aggregates computed in a throwaway in-memory DB holding only pre-holdout matches (same aggregators, `exportMinGames` gate, role-prob renormalization as the JSON export); `commands/backtest.ts` wires it via ATTACH + migrate + aggregate, so the real aggregate tables are never touched.
+- Files touched: `packages/etl/src/backtest/{draft,draft.test,recommend-data,recommend-data.test}.ts`, `packages/etl/src/commands/backtest.ts`, `packages/etl/src/export/role-tables.ts` (exported `WeightedRow`), `docs/{BUGS,TICKETS,PROGRESS}.md`.
+- Tests: `pnpm check` green (73 files, 836 tests); new regression coverage fails on the old win-rate model.
+- State left: DONE pending review/commit (branch `bugs`). T-027.a stays REVIEW: masked drafts, rolling validation, fixed-Diamond report, layer/slot ablation and the D-023 paired-bootstrap gate remain outstanding; report stays `unvalidated`.
+- Next step: owner review; then T-019.b or D-023 gate work.
+- Pitfalls / notes for next AI: the backtest command needs `data/manual/champion-tags.json` (fails loudly without it) and never writes to the source DB — aggregates run on an in-memory copy minus the holdout patch. `runBacktestDraft` requires the second `BacktestEngineData` argument; holdout = latest patch, training snapshot = last training patch.
+
+### 2026-11-05 — Devin — Bug fix B-056 / T-036 (web production build ordering + CI gate)
+
+- Done:
+  - Reproduced B-056 from a clean state (all `dist/` and `*.tsbuildinfo` removed): `pnpm --filter @draftorb/web build` failed with TS6305 (`packages/{shared,engine}/dist/index.d.ts has not been built from source`) plus cascading type errors, while PR CI stayed green because it never ran the production build.
+  - Root cause: `apps/web/tsconfig.json` project-references the composite `packages/shared`/`packages/engine`, so `tsc` redirects their `src/index.ts` entry points to `dist/*.d.ts`; `tsc --noEmit` (non-build mode) requires those outputs. Root `pnpm typecheck` (`tsc --build`) builds them, masking the gap locally.
+  - Fix: `apps/web` `build` and `typecheck` scripts now run `tsc -b .` — build mode emits the referenced projects' declarations, then type-checks the app (`noEmit` preserved, `composite: false` untouched). No type-safety weakening, no stale-file reliance.
+  - CI gate: `.github/workflows/ci.yml` lint job now runs `pnpm --filter @draftorb/web build` on PRs and pushes to main.
+  - Regression test `apps/web/src/build-script.test.ts` pins the build-mode ordering in the package scripts.
+- Files touched: `apps/web/package.json`, `apps/web/src/build-script.test.ts` (new), `.github/workflows/ci.yml`, `docs/{TICKETS,BUGS,PROGRESS}.md`.
+- Tests: `pnpm check` green (72 files, 830 tests); `pnpm --filter @draftorb/web build` verified green from a clean state.
+- State left: DONE pending review/commit (branch `bugs`).
+- Next step: owner review; then T-019.b.
+- Pitfalls / notes for next AI: any `tsc` invocation inside `apps/web` must use build mode (`tsc -b .`) or the referenced `dist/*.d.ts` must already exist — plain `tsc --noEmit`/`tsc -p` fails on a clean checkout. `tsc -b` writes `dist/` + `*.tsbuildinfo` for shared/engine (both gitignored). The deploy workflow still runs on push to main in parallel with CI; it is not gated on the CI build job.
+
+### 2026-11-05 — Devin — Bug fix B-021 (engine/shared type-check isolation)
+
+- Done:
+  - Reproduced B-021: `export const probe = process.cwd()` in `packages/engine/src/` passed `pnpm typecheck` because test files in `src/` import vitest, whose types pull `@types/node` globals into the production program.
+  - Moved all engine/shared unit tests out of `src/` into `packages/engine/test/` and `packages/shared/test/` (vitest types transitively require Node types, so every vitest test is "Node-dependent" per CONVENTIONS.md); rewrote relative imports to `../src/...`; added `packages/shared/test/tsconfig.json`; `pnpm typecheck` now also runs `tsc -p packages/shared/test`.
+  - Kept `"exclude": ["src/**/*.test.ts"]` in both production tsconfigs as a guard; `process` in engine sources now fails with TS2591.
+  - New regression test `packages/engine/test/typecheck-isolation.test.ts` builds both production programs via the TypeScript API and asserts no `@types/node` file is loaded (failed before the move, passes now).
+  - Updated CONVENTIONS.md test-location rule and BUGS.md (B-021 FIXED).
+- Files touched: `packages/engine/test/*.test.ts` (moved from `src/`, imports rewritten), `packages/shared/test/*` (moved + new `tsconfig.json`), `packages/{engine,shared}/tsconfig.json`, `package.json`, `packages/engine/test/typecheck-isolation.test.ts` (new), `docs/{BUGS,CONVENTIONS,PROGRESS}.md`.
+- Tests: `pnpm check` green (71 files, 828 tests).
+- State left: DONE pending review/commit.
+- Next step: owner review; then T-019.b.
+- Pitfalls / notes for next AI: engine/shared tests must never live in `src/` again — vitest's type declarations import `node:*` and reintroduce `@types/node` globals; the `typecheck-isolation` test and the tsconfig `exclude` guard both catch it. ETL and web tests still live next to source (their tsconfigs allow Node/DOM types).
 
 ### 2026-11-05 — Devin — PR #46 review fixes (third pass)
 

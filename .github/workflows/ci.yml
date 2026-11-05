@@ -160,6 +160,11 @@ jobs:
         if: ${{ !cancelled() }}
       - run: pnpm typecheck
         if: ${{ !cancelled() }}
+      # Production build gate (B-056): PR checks must catch build failures
+      # that only appear on a clean checkout (e.g. missing project-reference
+      # declarations), before the deploy workflow runs them post-merge.
+      - run: pnpm --filter @draftorb/web build
+        if: ${{ !cancelled() }}
 
   test:
     needs: [format, commit-format]

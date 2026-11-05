@@ -20,7 +20,7 @@ import {
 } from '@draftorb/shared';
 import { passesGate, round6 } from './io.js';
 
-interface WeightedRow {
+export interface WeightedRow {
   championId: number;
   myRole: Role;
   winsW: number;

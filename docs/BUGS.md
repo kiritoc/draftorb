@@ -4,32 +4,18 @@ Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATI
 
 ## Open
 
-| ID    | Sev | Area   | Title                                                                                                                                                      | Status | Found by/date                     | Ticket  |
-| ----- | --- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | --------------------------------- | ------- |
-| B-053 | S2  | etl    | Draft backtest scores a per-champion win-rate model, not `recommend`; its loss does not validate the deployed engine (D-023)                               | OPEN   | T-035 review 2026-11-04           | T-027.a |
-| B-052 | S2  | data   | Sample `data/public/16.21` baseline (n_eff 10, IRON only) is below `minGames` 25, so every draft shows empty lists; needs real aggregates                  | OPEN   | T-035 review 2026-11-04           | T-019   |
-| B-026 | S3  | engine | `blindSafety` approximates `pickShare(e)` with roleProb (no pick-rate export)                                                                              | OPEN   | T-023 review 2026-10-30           | –       |
-| B-021 | S3  | engine | `types: []` in engine/shared tsconfigs is circumvented by test files importing vitest, so the type-checker still resolves Node globals in production files | OPEN   | B-017 fix verification 2026-10-28 | –       |
+| ID  | Sev | Area | Title | Status | Found by/date | Ticket |
+| --- | --- | ---- | ----- | ------ | ------------- | ------ |
 
 ## Duplicate bug IDs (not renumbered)
 
 Three IDs each label two distinct bugs (per owner instruction, IDs are never renumbered; the duplicates are documented here):
 
-- **B-026**: OPEN in the table below — "`blindSafety` approximates `pickShare(e)` with roleProb (no pick-rate export)" — and FIXED in the Fixed section — "Engine `shrink()` returns NaN for empty contexts with zero prior strength".
+- **B-026**: two FIXED entries in the Fixed section — "`blindSafety` approximates `pickShare(e)` with roleProb (no pick-rate export)" and "Engine `shrink()` returns NaN for empty contexts with zero prior strength".
 - **B-027**: FIXED in the Fixed section — "Recommendation constants injectable via `RecommendConfig`" — and also FIXED in the Fixed section — "Transient enrichment failures become permanent gaps (no retry on duplicates)".
 - **B-035**: FIXED in the Fixed section — "Export removes static catalogs and role-derivation snapshots" — and also FIXED in the Fixed section — "Export review findings (role-prob rounding, empty builds, publish cleanup, static catalogs)".
 
 Review notes that predate the bug log live in [Review history](#review-history) at the end of this file.
-
-### B-021 — `types: []` does not isolate the engine type-checker from Node globals — OPEN
-
-- Severity / Area: S3 / engine
-- Steps to reproduce: add `export const probe = process.cwd();` to `packages/engine/src/hello.ts` (production code, no vitest import), then run `pnpm typecheck`.
-- Expected / Actual: with `"types": []` in `packages/engine/tsconfig.json`, `@types/node` is no longer auto-included by the `types` mechanism, so the type-checker is expected to reject `process` / Node globals in production files / `pnpm typecheck` still passes (exit 0): `@types/node` is loaded into the engine program because `packages/engine/src/hello.test.ts` imports `vitest`, and `vitest`'s type declarations import `node:vm`, which pulls in the whole `@types/node` package including the ambient `process`/`Buffer` globals. `types: []` only disables `@types` auto-inclusion, not type inclusion that arrives via a module-import chain. ESLint's `no-restricted-globals` does reject `process`, so `pnpm lint` fails as intended.
-- Environment (OS, Node version, patch): any.
-- Logs / screenshot: `pnpm exec tsc --noEmit -p packages/engine/tsconfig.json --listFiles` lists `node_modules/.../@types/node/globals.d.ts` (which declares `process`) and `vitest/dist/...` files; `pnpm typecheck` exits 0 with the probe; `pnpm lint` reports `no-restricted-globals` on `process`.
-- Suspected cause: test files live in the same `tsc` program as production code and import the vitest framework, whose types depend on `node:*` modules.
-- Fix (commit/ticket): not fixed in this session (out of B-017 scope per AGENTS rule 6). Candidate future fix: exclude `**/*.test.ts` from the engine and shared `tsconfig.json` `include` (or add a dedicated test type-check), so production source is type-checked without the framework's Node dependency. Not applied because it would remove type-checking coverage of test files from `pnpm check` and is a behavioral change outside B-017's prescribed fix.
 
 ## Template (copy below the table when detailed)
 
@@ -45,6 +31,82 @@ Review notes that predate the bug log live in [Review history](#review-history) 
 ```
 
 ## Fixed
+
+### B-059 — All-unscored backtest report dropped evaluated fallback counts — FIXED
+
+- Severity / Area: S3 / etl
+- Steps to reproduce: run `pnpm etl backtest draft` when every holdout pick is an unscored baseline fallback; the insufficient-data report showed `predictions: 0` and `unscored: 0` even though fallback points were evaluated.
+- Expected / Actual: an insufficient report may keep loss metrics null, but it should preserve the evaluated sample size (`predictions`/`unscored`, and per-role counts) so the JSON still shows how many fallback evaluations happened; the shared `insufficient()` helper zeroed those counts for every early exit.
+- Environment (OS, Node version, patch): any; patch-independent.
+- Suspected cause: the all-unscored branch reused `insufficient()`, which is correct before evaluation but resets counts after `points` were collected.
+- Fix (commit/ticket): added `insufficientWithFallbackCounts()` for the all-unscored branch; it keeps metrics null and `insufficientData: true` while setting `predictions`/`unscored` to `points.length` and populating `perRole` prediction/unscored counts.
+- Verification: `backtest/draft.test.ts` all-unscored case now asserts `predictions: 24`, `unscored: 24`, and TOP/SUPPORT per-role counts of 12/12 with null loss metrics. `pnpm check` green (75 files, 855 tests).
+
+### B-057 — Draft backtest evaluated holdout players at participant rank, not match rank — FIXED
+
+- Severity / Area: S2 / etl
+- Steps to reproduce: run `pnpm etl backtest draft` on matches whose participants have `rank_score NULL` while `matches.avg_rank_score` is known; the holdout evaluation bucketed those players as IRON.
+- Expected / Actual: per D-023 the holdout `userRank` is the game's rank bucket, and every aggregate table is keyed by `matches.avg_rank_score`; the backtest selected `participants.rank_score`, so NULL became bucket index 0 through `gameBucketIndex` and the engine/baseline lookup used the wrong rank context.
+- Environment (OS, Node version, patch): any; patch-independent.
+- Suspected cause: the holdout query selected `p.rank_score` while `DraftRow.rankScore` was typed as non-nullable `number`.
+- Fix (commit/ticket): the query now selects `m.avg_rank_score AS matchRankScore` for every participant row, and `DraftRow.rankScore` was renamed to `matchRankScore` to match the aggregate rank context.
+- Verification: new `commands/backtest.test.ts` case seeds low-rank training matches plus Diamond holdout matches with NULL participant ranks; before the fix the NULL ranks evaluated as IRON and scored, after the fix the Diamond bucket has no training evidence and the report is insufficient. `pnpm check` green (75 files, 855 tests).
+
+### B-058 — Draft backtest published metrics when every pick was an unscored fallback — FIXED
+
+- Severity / Area: S3 / etl
+- Steps to reproduce: run `pnpm etl backtest draft` with enough matches to pass the training-count gate but too little evidence for any champion to be engine-scored; every holdout point used the champion-baseline fallback while `insufficientData` stayed false.
+- Expected / Actual: a report with zero engine-scored picks is not a completed backtest; it should return the insufficient-data report. Paired fallback points remain valid when at least one pick is scored.
+- Environment (OS, Node version, patch): any; patch-independent.
+- Suspected cause: `runBacktestDraft` only checked `points.length === 0` and never counted `point.scored` before publishing metrics.
+- Fix (commit/ticket): `runBacktestDraft` returns an insufficient-data report when every holdout point is unscored; the existing `predictions`/`unscored` paired-fallback behavior is unchanged for mixed reports.
+- Verification: new `backtest/draft.test.ts` case covers the all-unscored report; the command seed was expanded to 30 training matches because the old 5-match seed was itself an all-unscored scenario. `pnpm check` green (75 files, 855 tests).
+
+### B-052 — Sample `data/public` export below `minGames`, every draft empty — FIXED
+
+- Severity / Area: S2 / data
+- Steps to reproduce: run `recommend` (or open the app) against the committed `data/public/16.21` export: `roles/SUPPORT/baseline.json` held a single row `[412,"IRON",6,10,10,3]` (n_eff 10 < `minGames` 25) and `role-prob.json` a single champion, so every candidate failed the baseline gate and `recommendations` was empty for every draft.
+- Expected / Actual: the published sample must be exported from real aggregates so drafts return recommendations; it had been produced from a nearly empty database.
+- Environment (OS, Node version, patch): any; data bug, patch-independent.
+- Suspected cause: `pnpm etl export` ran before real match ingestion/aggregation, publishing the degenerate tables.
+- Fix (commit/ticket): ran `pnpm etl aggregate` on `data/DraftOrb.sqlite` (883 matches, euw1, patches 16.19–16.22; role_prob 430 rows/173 champions, baseline 3440 rows, pair tables, rune_ctx 42816 rows) then `pnpm etl export` (patch 16.22) and `pnpm etl export 16.21`. `latest.json` now points to 16.22 (the D-051 newer-pointer guard kept it); both committed patch dirs carry real aggregates plus `pick-rate.json` and rune files.
+- Verification: new `packages/etl/src/export/sample-export.test.ts` loads the published export through the same schemas as the web loader and asserts `recommend` returns a non-empty "Best overall" list per exported role at Diamond — failed before the re-export (0 recommendations), passes now. `pnpm check` green (75 files, 853 tests).
+
+### B-026 — `blindSafety` approximates `pickShare(e)` with roleProb — FIXED
+
+- Severity / Area: S3 / engine (+ etl, shared, web)
+- Steps to reproduce: pick-rate export absent, so `blindSafety` used `roleProb[e][role]` — the share of champion `e`'s own games played in `role` — as the opponent distribution instead of the share of `role`'s picks won by `e`.
+- Expected / Actual: `pickShare(e)` must be the per-role pick share; until now it was approximated by normalized roleProb, which ranks dedicated one-trick picks differently from real pick rates (e.g. a 0.04-roleProb flex picked in 90% of ADC games was filtered out by `blindOpponentMinShare`).
+- Environment (OS, Node version, patch): any; engine-level bug, patch-independent.
+- Suspected cause: no pick-rate export existed (D-030 item 1 recorded the approximation).
+- Fix (commit/ticket): new global `pick-rate.json` export (`export/pick-rate.ts`): per-role shares computed from `role_prob.games_w`, gated per cell by `n_eff >= exportMinGames`, renormalized per role to sum 1 (round6, largest share absorbs residual — B-049 rule). New `pickRateSchema`/`PickRate` in `@draftorb/shared`; `RecommendData.pickRate` is optional so pre-existing exports keep working. `blindOpponents`/`computeBlindSafety` take an optional `pickRate` and use `pickRate[role][e]` when present, falling back to `roleProb[e][role]` otherwise; `recommend` passes `data.pickRate`. The web loader reads `pick-rate.json` when the manifest lists it; the draft backtest's `RecommendData` always carries real pick rates. Semantics recorded as D-052 (PROPOSED).
+- Verification: `recommend-terms.test.ts` "blind opponent pick share (B-026)" (pickRate precedence, roleProb fallback, changed blindSafety value — failed before the fix), `recommend-blind-comp.test.ts` recommend-level regression, `export/pick-rate.test.ts` (gate, renormalization, residual, unknown role, manifest listing), `apps/web` loader tests, `shared` schema tests.
+
+### B-053 — Draft backtest scored a per-champion win-rate model, not `recommend` — FIXED
+
+- Severity / Area: S2 / etl
+- Steps to reproduce: `pnpm etl backtest draft` on a database with at least 5 training matches and a holdout patch; inspect the written `backtest-draft.json`.
+- Expected / Actual: per D-023 the report must measure the deployed engine (`recommend` from `@draftorb/engine`); instead T-027.a trained a private per-champion win-rate model on raw participant rows and predicted blue-team win probability, so its log-loss said nothing about the shipped scorer.
+- Environment (OS, Node version, patch): any; patch-independent.
+- Suspected cause: the baseline harness implemented a standalone win-rate model instead of wiring the pure engine.
+- Fix (commit/ticket): `runBacktestDraft(rows, engine)` now runs `recommend` once per holdout participant on the full draft (all nine other picks known with fixed roles, `blindPick: false`) and reads the score of the champion actually picked; picks the engine cannot score fall back to the champion's baseline-only prior so the comparison stays paired. New `backtest/recommend-data.ts` rebuilds per-role `RecommendData` from aggregates computed in a throwaway in-memory database holding only matches before the holdout patch (same aggregators, `exportMinGames` gate and role-prob renormalization as the JSON export), wired by `commands/backtest.ts`. The report gains `predictions`/`unscored` and per-role log-loss/Brier/mean-prediction metrics; the old `perRole` matchup effects were specific to the win-rate model and are replaced. Masked drafts, rolling validation, fixed-Diamond report, layer/slot ablation and the paired-bootstrap gate remain outstanding — the report stays `unvalidated` (T-027.a).
+- Verification: `backtest/draft.test.ts` rewritten — engine evaluation, matchup-layer regression (an enemy-pair term beats the champion baseline, impossible for a win-rate model), unscored fallback and insufficient-data cases; `backtest/recommend-data.test.ts` covers gating, role-prob renormalization and loud tags failure; `commands/backtest.test.ts` covers the seeded-DB report path.
+
+### B-056 — Web production build fails on clean checkout (TS6305) and PR CI never ran it — FIXED
+
+- Severity / Area: S2 / web+ci
+- Steps to reproduce: from a clean checkout (no `packages/*/dist`, no `*.tsbuildinfo`), run `pnpm --filter @draftorb/web build`.
+- Expected / Actual: the production build should succeed; instead `tsc --noEmit` failed with TS6305 ("Output file '.../packages/{shared,engine}/dist/index.d.ts' has not been built from source file") plus cascading type errors, so the deploy workflow failed after merge even though PR checks were green.
+- Environment (OS, Node version, patch): any; Node.js 22, pnpm workspace.
+- Suspected cause: `apps/web/tsconfig.json` references the composite `packages/shared` and `packages/engine` projects, so module resolution redirects their `src/index.ts` entry points to `dist/*.d.ts`; `tsc --noEmit` (non-build mode) requires those outputs to exist. Root `pnpm typecheck` (`tsc --build`) builds them, which is why local checks passed, and CI never ran the web build command.
+- Fix (commit/ticket): `apps/web` `build` and `typecheck` scripts now run `tsc -b .` (build mode builds the referenced projects' declarations, then type-checks the app with `noEmit` preserved); `.github/workflows/ci.yml` runs `pnpm --filter @draftorb/web build` so the production build is gated on PRs (T-036).
+- Verification: reproduced the TS6305 cascade on a clean state before the fix; `pnpm --filter @draftorb/web build` succeeds after; regression test `apps/web/src/build-script.test.ts` pins the build-mode ordering.
+
+### B-021 — `types: []` does not isolate the engine type-checker from Node globals — FIXED
+
+- `types: []` in `packages/engine/tsconfig.json` and `packages/shared/tsconfig.json` only disables `@types` auto-inclusion; it does not stop type inclusion that arrives via a module-import chain. Test files living in `src/` imported `vitest`, whose declarations import `node:*` modules, pulling all of `@types/node` (including the ambient `process`/`Buffer` globals) into the production program — so `process.cwd()` in engine sources passed `pnpm typecheck` (S3, engine).
+- Fixed: every engine/shared unit test moved from `src/` to `packages/engine/test/` and `packages/shared/test/` (vitest types transitively require Node types, so all of them are "Node-dependent" per CONVENTIONS.md), relative imports rewritten to `../src/...`, a new `packages/shared/test/tsconfig.json` added, and `pnpm typecheck` now runs `tsc -p packages/shared/test` next to `tsc -p packages/engine/test`. Both production tsconfigs keep `"exclude": ["src/**/*.test.ts"]` as a guard so a stray test file cannot silently reintroduce the leak (the ESLint project service would also reject it as not belonging to any project).
+- Verification: reproduced with `export const probe = process.cwd();` in `packages/engine/src/` — `pnpm typecheck` exited 0 before the fix and fails with TS2591 after. New regression test `packages/engine/test/typecheck-isolation.test.ts` builds both production programs through the TypeScript API and asserts no `@types/node` file is loaded; it failed before the move and passes now.
 
 ### B-055 — PR #46 third-pass review findings — FIXED
 

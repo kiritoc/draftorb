@@ -68,6 +68,7 @@ describe('exportJson', () => {
       .sort();
     expect(remaining).toEqual([
       'manifest.json',
+      'pick-rate.json',
       'role-prob.json',
       'roles/SUPPORT/ally-pairs.json',
       'roles/SUPPORT/baseline.json',

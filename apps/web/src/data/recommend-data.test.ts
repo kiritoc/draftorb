@@ -39,8 +39,44 @@ describe('createRecommendData', () => {
     expect(data.laneVs).toHaveLength(1);
     expect(data.laneFull).toHaveLength(1);
     expect(data.roleProb['412']?.SUPPORT).toBe(1);
+    expect(data.pickRate).toBeUndefined();
     expect(data.tags['412']?.peel).toBe(true);
     expect(data.championIds).toEqual([412]);
+  });
+
+  it('loads and validates pick-rate.json when the export provides it (B-026)', () => {
+    const data = createRecommendData(
+      {
+        'roles/SUPPORT/baseline.json': [],
+        'roles/SUPPORT/ally-pairs.json': [],
+        'roles/SUPPORT/enemy-pairs.json': [],
+        'roles/SUPPORT/lane-vs.json': [],
+        'roles/SUPPORT/lane-full.json': [],
+        'role-prob.json': {},
+        'pick-rate.json': { ADC: { '22': 1 } },
+      },
+      champions,
+      tags,
+    );
+    expect(data.pickRate).toEqual({ ADC: { '22': 1 } });
+  });
+
+  it('rejects a malformed pick-rate.json', () => {
+    expect(() =>
+      createRecommendData(
+        {
+          'roles/SUPPORT/baseline.json': [],
+          'roles/SUPPORT/ally-pairs.json': [],
+          'roles/SUPPORT/enemy-pairs.json': [],
+          'roles/SUPPORT/lane-vs.json': [],
+          'roles/SUPPORT/lane-full.json': [],
+          'role-prob.json': {},
+          'pick-rate.json': { ADC: { '22': 0 } },
+        },
+        champions,
+        tags,
+      ),
+    ).toThrow();
   });
 
   it('fails explicitly when a required recommendation file is missing', () => {

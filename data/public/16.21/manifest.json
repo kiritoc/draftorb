@@ -1,7 +1,6 @@
 {
-  "schemaVersion": 3,
   "patch": "16.21",
-  "generatedAt": "2026-11-04T16:47:00.000Z",
+  "generatedAt": "2026-11-05T14:04:03.895Z",
   "region": "euw1",
   "rankBuckets": [
     "IRON",
@@ -17,11 +16,58 @@
     "SUPPORT"
   ],
   "files": [
-    { "path": "role-prob.json", "sha256": "6b6de18df1391f9d2a3d516d98a24aaecfe68bc8a8b675ae3cb19c448428ce56" },
-    { "path": "roles/SUPPORT/baseline.json", "sha256": "5e609467c1a09ed122d3c469a296c11cb5e9af1099e970847266eb1203bd9175" },
-    { "path": "roles/SUPPORT/ally-pairs.json", "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570" },
-    { "path": "roles/SUPPORT/enemy-pairs.json", "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570" },
-    { "path": "roles/SUPPORT/lane-vs.json", "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570" },
-    { "path": "roles/SUPPORT/lane-full.json", "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570" }
-  ]
+    {
+      "path": "champions.json",
+      "sha256": "bd9d0f007b22ee12dec35362422481da43555278ee75b2f1a3d6958f8d6ae04f"
+    },
+    {
+      "path": "items.json",
+      "sha256": "ed47ce96a462a8c400ec13b622ef66b161b970ee1f940e1c9519c1b80d1ae168"
+    },
+    {
+      "path": "pick-rate.json",
+      "sha256": "516baa5d7331408204311feea0d3b73a9d43454b2381bf2f989f7f93cb2f96b5"
+    },
+    {
+      "path": "role-prob.json",
+      "sha256": "464140fa579b8c093fd97f7108527c1a7887a7b3496ec0474f0ebad673c7372a"
+    },
+    {
+      "path": "roles/SUPPORT/ally-pairs.json",
+      "sha256": "03770c53e6e85319fd06c9c030e08928af1d96c67a88462ea811b7e6021cdae0"
+    },
+    {
+      "path": "roles/SUPPORT/baseline.json",
+      "sha256": "3e39eec62f4dd97d4f349315a8f2d556313a6d21f4e3dc44d5a7a84fef4b0595"
+    },
+    {
+      "path": "roles/SUPPORT/enemy-pairs.json",
+      "sha256": "4856dc0b35e69a916e8d03024e335019a41f9dc5f3e72266e5ccefd944cf9399"
+    },
+    {
+      "path": "roles/SUPPORT/lane-full.json",
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "path": "roles/SUPPORT/lane-vs.json",
+      "sha256": "edc4ac8494b52a59bf2b88706aa75e95a6f5a37ef61da92a145446848507afa2"
+    },
+    {
+      "path": "roles/SUPPORT/runes/12.json",
+      "sha256": "bc2c8193b90d3895e463a98ee99d3183ddc648a96c2e89c1da3c5126fde345ef"
+    },
+    {
+      "path": "roles/SUPPORT/runes/412.json",
+      "sha256": "b6d57bd14f4ac0f7c384e40f9f6007f58a594ccb4603ea866eb7cd1a0213b4e4"
+    },
+    {
+      "path": "roles/SUPPORT/runes/432.json",
+      "sha256": "f88c92dd1c153ac684a8bf0d60b40eb670eb9bbe86972d9fdc0a558d0fb74705"
+    },
+    {
+      "path": "runes.json",
+      "sha256": "f342ea824f6c0ee9f2c0765f2e6bd3d846e987aa186fb9e57027545bd7551a64"
+    }
+  ],
+  "schemaVersion": 3
 }

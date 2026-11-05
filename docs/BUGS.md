@@ -4,9 +4,8 @@ Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATI
 
 ## Open
 
-| ID    | Sev | Area | Title                                                                                                                                     | Status | Found by/date           | Ticket |
-| ----- | --- | ---- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------ | ----------------------- | ------ |
-| B-052 | S2  | data | Sample `data/public/16.21` baseline (n_eff 10, IRON only) is below `minGames` 25, so every draft shows empty lists; needs real aggregates | OPEN   | T-035 review 2026-11-04 | T-019  |
+| ID  | Sev | Area | Title | Status | Found by/date | Ticket |
+| --- | --- | ---- | ----- | ------ | ------------- | ------ |
 
 ## Duplicate bug IDs (not renumbered)
 
@@ -32,6 +31,16 @@ Review notes that predate the bug log live in [Review history](#review-history) 
 ```
 
 ## Fixed
+
+### B-052 — Sample `data/public` export below `minGames`, every draft empty — FIXED
+
+- Severity / Area: S2 / data
+- Steps to reproduce: run `recommend` (or open the app) against the committed `data/public/16.21` export: `roles/SUPPORT/baseline.json` held a single row `[412,"IRON",6,10,10,3]` (n_eff 10 < `minGames` 25) and `role-prob.json` a single champion, so every candidate failed the baseline gate and `recommendations` was empty for every draft.
+- Expected / Actual: the published sample must be exported from real aggregates so drafts return recommendations; it had been produced from a nearly empty database.
+- Environment (OS, Node version, patch): any; data bug, patch-independent.
+- Suspected cause: `pnpm etl export` ran before real match ingestion/aggregation, publishing the degenerate tables.
+- Fix (commit/ticket): ran `pnpm etl aggregate` on `data/DraftOrb.sqlite` (883 matches, euw1, patches 16.19–16.22; role_prob 430 rows/173 champions, baseline 3440 rows, pair tables, rune_ctx 42816 rows) then `pnpm etl export` (patch 16.22) and `pnpm etl export 16.21`. `latest.json` now points to 16.22 (the D-051 newer-pointer guard kept it); both committed patch dirs carry real aggregates plus `pick-rate.json` and rune files.
+- Verification: new `packages/etl/src/export/sample-export.test.ts` loads the published export through the same schemas as the web loader and asserts `recommend` returns a non-empty "Best overall" list per exported role at Diamond — failed before the re-export (0 recommendations), passes now. `pnpm check` green (75 files, 853 tests).
 
 ### B-026 — `blindSafety` approximates `pickShare(e)` with roleProb — FIXED
 

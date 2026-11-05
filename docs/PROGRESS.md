@@ -4,7 +4,7 @@
 
 - Phase: 1 (Support / Diamond)
 - Current milestone: M3 Web MVP implementation complete (T-030..T-035 DONE); the backtest harness (T-027.a) remains under review because D-023 paired-bootstrap validation is not implemented. M1 ETL tickets T-019.b..f remain TODO.
-- Last updated: 2026-11-05 by Devin (bug fix B-026 / pick-rate export for blindSafety)
+- Last updated: 2026-11-05 by Devin (bug fix B-052 / real aggregate sample export)
 
 ## Epic status
 
@@ -21,9 +21,9 @@
 
 ## Data collection status
 
-- Riot key: not recorded (development keys expire every 24 h).
-- Games collected: 0 (no SQLite database exists under `data/` in this workspace) | Patch: 16.21 (static data imported: champions, items, runes; a parallel `pnpm etl static` run also imported 16.22 catalogs). `data/public/latest.json` (D-051, T-029) points at patch 16.21 and is written by `pnpm etl export` after a successful publish.
-- Last aggregation: role_prob (T-015) and baselines (T-016) implemented; pairs/lane (T-017) and runes (T-018) implemented; export (T-019) implemented and tested (`packages/etl/src/export/`, `packages/etl/src/commands/export.ts`, tests); export preserves static catalogs (`champions.json`, `items.json`, `runes.json`) and lists them in the manifest (B-035).
+- Riot key: present in `.env` (development keys expire every 24 h).
+- Games collected: 883 matches, 8830 participants (euw1, patches 16.19–16.22; ingestion may still be running — counts grew during the B-052 session). Patch catalogs imported for 16.21 and 16.22. `data/public/latest.json` (D-051, T-029) points at patch 16.22, written by `pnpm etl export` after a successful publish.
+- Last aggregation: 2026-11-05 — role_prob (430 rows/173 champions), baseline (3440 rows), pair tables, rune_ctx (42816 rows) aggregated from the real database; `pnpm etl export` published patch 16.22 and re-exported 16.21 (B-052). Both dirs now include `pick-rate.json` and rune files.
 
 ## Next recommended ticket
 
@@ -39,6 +39,18 @@ Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-0
 - T-019.d verification: please compare the champion and item lists in the 2026-11-04 "T-019.d verification step" entry below with the official 16.21 and 16.22 patch notes (misses and false positives).
 
 ## Session log (newest first)
+
+### 2026-11-05 — Devin — Bug fix B-052 (real aggregate sample export)
+
+- Done:
+  - Reproduced B-052: the committed `data/public/16.21` export held a single baseline row (`[412,"IRON",6,10,10,3]`, n_eff 10 < `minGames` 25) and a one-champion `role-prob.json`; `recommend` returned 0 recommendations for every draft.
+  - Wrote failing regression test `packages/etl/src/export/sample-export.test.ts`: loads the published export (`latest.json` -> manifest -> listed files) through the web loader's schemas and asserts `recommend` returns a non-empty "Best overall" list per exported role at Diamond. Failed before the fix (0 recommendations), passes after.
+  - Fix is data, not code: ran `pnpm etl aggregate` on `data/DraftOrb.sqlite` (now populated: 883 matches, euw1, patches 16.19–16.22) then `pnpm etl export` -> patch 16.22 (latest.json moved 16.21 -> 16.22 via the D-051 pointer rule) and `pnpm etl export 16.21` so the previously degenerate committed dir also carries real aggregates. Both exports now include `pick-rate.json` and SUPPORT rune files.
+- Files touched: `packages/etl/src/export/sample-export.test.ts` (new), `data/public/{latest.json,16.21/*,16.22/*}`, `docs/{BUGS,PROGRESS}.md`.
+- Tests: `pnpm check` green (75 files, 853 tests).
+- State left: DONE pending review/commit (branch `bugs`). `data/public/backtest-draft.json` and `data/public/16.22/` were already untracked before this session; the backtest report is still the empty placeholder (T-027.a stays REVIEW) — left untracked, regenerate with `pnpm etl backtest draft` when needed.
+- Next step: owner review; then T-019.b. Re-run `pnpm etl aggregate && pnpm etl export` after ingestion finishes to refresh the sample with the final match set.
+- Pitfalls / notes for next AI: aggregate tables are not patch-scoped — exporting an older patch (`pnpm etl export 16.21`) warns and labels current aggregates with that patch; `latest.json` only moves forward. The DB was being written during this session (match counts grew between queries), so exported numbers are a snapshot.
 
 ### 2026-11-05 — Devin — Bug fix B-026 (pick-rate export for `blindSafety`)
 

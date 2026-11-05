@@ -63,7 +63,7 @@ export function DraftScreen() {
   const [pool, setPool] = useState<ChampionPool | null>(null);
   const [poolStorageIssue, setPoolStorageIssue] = useState<'corrupt' | 'unavailable' | null>(null);
   const [poolDropped, setPoolDropped] = useState<number[]>([]);
-  const [user, setUser] = useState<DraftSlotState>(emptySlot(USER_ROLE));
+  const [user, setUser] = useState<DraftSlotState>({ championId: null });
   const [allies, setAllies] = useState<DraftSlotState[]>(
     Array.from({ length: ALLY_COUNT }, () => emptySlot()),
   );
@@ -294,6 +294,7 @@ export function DraftScreen() {
                 slot={user}
                 onChange={setUserSlot}
                 champions={championsForSlot(champions, usedChampionIds, user.championId)}
+                showRole={false}
               />
               {allies.map((slot, index) => (
                 <DraftSlot

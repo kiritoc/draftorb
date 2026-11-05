@@ -84,6 +84,13 @@ export function DraftScreen() {
     void (async () => {
       try {
         const latest = await loadLatest();
+        void loadChampionIconVersion(latest.patch)
+          .then((version) => {
+            if (!cancelled) {
+              setIconVersion(version);
+            }
+          })
+          .catch(() => {});
         const manifest = await loadManifest(latest.manifest);
         if (manifest.patch !== latest.patch) {
           throw new Error(
@@ -91,10 +98,9 @@ export function DraftScreen() {
           );
         }
         const loadedChampions = await loadChampions(latest.patch);
-        const [loadedFiles, tags, resolvedIconVersion] = await Promise.all([
+        const [loadedFiles, tags] = await Promise.all([
           loadExportFiles(manifest),
           loadChampionTags(),
-          loadChampionIconVersion(latest.patch),
         ]);
         const loadedPool = readPool();
         if (cancelled) {
@@ -102,7 +108,6 @@ export function DraftScreen() {
         }
         setPatch(latest.patch);
         setChampions(loadedChampions);
-        setIconVersion(resolvedIconVersion);
         setData(createRecommendData(loadedFiles.files, loadedChampions, tags));
         const { pool: filteredPool, dropped } = filterPoolByCatalogue(
           loadedPool.pool ?? { version: 1, pools: {} },

@@ -62,6 +62,7 @@ describe('exportJson', () => {
     const paths = manifest.files.map((f) => f.path).sort();
     // The manifest is not listed in its own `files`.
     expect(paths).toEqual([
+      'pick-rate.json',
       'role-prob.json',
       'roles/SUPPORT/ally-pairs.json',
       'roles/SUPPORT/baseline.json',

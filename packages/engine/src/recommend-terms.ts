@@ -2,7 +2,13 @@
  * @draftorb/engine — Pair, blind-safety and hard-counter terms (SPECS §5).
  */
 
-import type { ChampionId, ChampionRoleProbabilities, Role, WarningCode } from '@draftorb/shared';
+import type {
+  ChampionId,
+  ChampionRoleProbabilities,
+  PickRate,
+  Role,
+  WarningCode,
+} from '@draftorb/shared';
 import type { RankWeightingConfig } from './config.js';
 import type { DataRow, KnownSlot } from './recommend-types.js';
 import {
@@ -88,10 +94,25 @@ export function scorePairs(
 }
 
 /**
+ * Share of likely unseen opponents for (role, champion): the exported pick
+ * rate when `pick-rate.json` was loaded, otherwise the normalized roleProb
+ * approximation kept for legacy exports (B-026).
+ */
+function blindOpponentShare(
+  pickRate: PickRate | undefined,
+  roleProb: ChampionRoleProbabilities,
+  championId: ChampionId,
+  role: Role,
+): number | undefined {
+  if (pickRate !== undefined) return pickRate[role]?.[championId];
+  return roleProb[championId]?.[role];
+}
+
+/**
  * blindSafety(c) (SPECS §5): expected pair term against the likely *unseen*
  * lane opponents, plus a worst-case penalty. Known enemies are excluded — the
- * pair layer already scores them. `pickShare(e)` is approximated by the
- * normalized roleProb of remaining champions (no pick-rate export yet, B-026).
+ * pair layer already scores them. `pickShare(e)` comes from the pick-rate
+ * export; without it, roleProb is the fallback approximation (B-026).
  */
 export function computeBlindSafety(
   c: ChampionId,
@@ -104,8 +125,16 @@ export function computeBlindSafety(
   config: RankWeightingConfig,
   minShare: number = DEFAULT_RECOMMEND_CONFIG.blindOpponentMinShare,
   worstCaseFactor: number = DEFAULT_RECOMMEND_CONFIG.blindWorstCaseFactor,
+  pickRate?: PickRate,
 ): number {
-  const opponents = blindOpponents(unknownRoles, excluded, championIds, roleProb, minShare);
+  const opponents = blindOpponents(
+    unknownRoles,
+    excluded,
+    championIds,
+    roleProb,
+    minShare,
+    pickRate,
+  );
   return blindSafetyFromOpponents(c, opponents, enemyIdx, p0, config, worstCaseFactor);
 }
 
@@ -125,6 +154,7 @@ export function blindOpponents(
   championIds: readonly ChampionId[],
   roleProb: ChampionRoleProbabilities,
   minShare: number = DEFAULT_RECOMMEND_CONFIG.blindOpponentMinShare,
+  pickRate?: PickRate,
 ): ReadonlyMap<Role, readonly BlindOpponent[]> {
   const unique = [...new Set(championIds)];
   const out = new Map<Role, BlindOpponent[]>();
@@ -132,7 +162,7 @@ export function blindOpponents(
     const list: BlindOpponent[] = [];
     for (const e of unique) {
       if (excluded.has(e)) continue;
-      const share = roleProb[e]?.[role];
+      const share = blindOpponentShare(pickRate, roleProb, e, role);
       if (typeof share !== 'number' || share < minShare) continue;
       list.push({ championId: e, share });
     }

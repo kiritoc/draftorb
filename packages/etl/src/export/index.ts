@@ -41,6 +41,7 @@ import {
   type LaneVsRow,
 } from './role-tables.js';
 import { roleProbFile, type RoleProbRow } from './role-prob.js';
+import { pickRateFile } from './pick-rate.js';
 import type { ItemBuildRow } from './builds.js';
 import type { RuneCtxRow } from './runes.js';
 import {
@@ -222,6 +223,7 @@ export function exportJson(db: Database.Database, options: ExportOptions = {}): 
   const filesToWrite: Array<{ relativePath: string; content: string }> = [];
 
   filesToWrite.push(roleProbFile(roleProbRows, exportMinGames));
+  filesToWrite.push(pickRateFile(roleProbRows, exportMinGames));
 
   for (const role of roles) {
     filesToWrite.push(

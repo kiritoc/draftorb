@@ -31,6 +31,7 @@ import {
   type WeightedRow,
 } from '../export/role-tables';
 import { exportRoleProbabilities, type RoleProbRow } from '../export/role-prob';
+import { exportPickRates } from '../export/pick-rate';
 
 const ALL_ROLES: readonly Role[] = ['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT'];
 
@@ -82,14 +83,13 @@ export function buildRoleRecommendData(
   db: Database.Database,
   options: BacktestRecommendDataOptions,
 ): Record<Role, RecommendData> {
-  const roleProb = exportRoleProbabilities(
-    all<RoleProbRow>(
-      db,
-      `SELECT champion_id AS championId, role AS role, games_w AS gamesW, games_w2 AS gamesW2, prob AS prob
-       FROM role_prob ORDER BY champion_id, role`,
-    ),
-    options.exportMinGames,
+  const roleProbRows = all<RoleProbRow>(
+    db,
+    `SELECT champion_id AS championId, role AS role, games_w AS gamesW, games_w2 AS gamesW2, prob AS prob
+     FROM role_prob ORDER BY champion_id, role`,
   );
+  const roleProb = exportRoleProbabilities(roleProbRows, options.exportMinGames);
+  const pickRate = exportPickRates(roleProbRows, options.exportMinGames);
 
   const baselineRows = all<BaselineRow>(db, TABLE_SPECS[0].sql);
   const allyPairRows = all<AllyPairRow>(db, TABLE_SPECS[1].sql);
@@ -107,6 +107,7 @@ export function buildRoleRecommendData(
       laneVs: tuplesForRole(TABLE_SPECS[3], laneVsRows, role, options.exportMinGames),
       laneFull: tuplesForRole(TABLE_SPECS[4], laneFullRows, role, options.exportMinGames),
       roleProb,
+      pickRate,
       tags: options.tags,
       championIds,
     };

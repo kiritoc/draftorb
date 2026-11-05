@@ -28,6 +28,23 @@ describe('recommendDataSchema', () => {
     expect(recommendDataSchema.safeParse(missing).success).toBe(false);
     expect(recommendDataSchema.safeParse({ ...valid, championIds: [0] }).success).toBe(false);
   });
+
+  it('accepts an optional pickRate and rejects malformed shares (B-026)', () => {
+    expect(recommendDataSchema.safeParse({ ...valid, pickRate: { ADC: { '2': 1 } } }).success).toBe(
+      true,
+    );
+    // Shares per role must sum to 1 and each share must be positive.
+    expect(
+      recommendDataSchema.safeParse({ ...valid, pickRate: { ADC: { '2': 0.4, '3': 0.4 } } })
+        .success,
+    ).toBe(false);
+    expect(recommendDataSchema.safeParse({ ...valid, pickRate: { ADC: { '2': 0 } } }).success).toBe(
+      false,
+    );
+    expect(
+      recommendDataSchema.safeParse({ ...valid, pickRate: { ADC: { '2': 1.5 } } }).success,
+    ).toBe(false);
+  });
 });
 
 describe('baselineEntrySchema games column (B-025)', () => {

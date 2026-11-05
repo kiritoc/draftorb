@@ -132,6 +132,7 @@ export function recommend(
     data.championIds,
     data.roleProb,
     rc.blindOpponentMinShare,
+    data.pickRate,
   );
 
   // --- Score each candidate ---

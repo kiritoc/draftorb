@@ -6,6 +6,7 @@ import {
   enemyPairTableSchema,
   laneFullTableSchema,
   laneVsTableSchema,
+  pickRateSchema,
   type Champion,
   type ChampionTagsMap,
   type RecommendData,
@@ -23,6 +24,10 @@ export function createRecommendData(
     laneVs: laneVsTableSchema.parse(requiredFile(files, 'roles/SUPPORT/lane-vs.json')),
     laneFull: laneFullTableSchema.parse(requiredFile(files, 'roles/SUPPORT/lane-full.json')),
     roleProb: championRoleProbabilitiesSchema.parse(requiredFile(files, 'role-prob.json')),
+    // Optional: exports predating pick-rate.json keep the roleProb fallback (B-026).
+    ...(files['pick-rate.json'] !== undefined
+      ? { pickRate: pickRateSchema.parse(files['pick-rate.json']) }
+      : {}),
     tags: championTagsMapSchema.parse(tags),
     championIds: champions.map((champion) => champion.id),
   };

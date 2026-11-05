@@ -217,8 +217,9 @@ export interface RecommendConfig {
   /** Role probability threshold to enter the candidate set. */
   readonly roleProbThreshold: number;
   /**
-   * Minimum roleProb share for a champion to count as a likely unseen blind
-   * opponent. Separate from `roleProbThreshold` so tuning one never moves the other.
+   * Minimum opponent share for a champion to count as a likely unseen blind
+   * opponent (pick share from `pick-rate.json`, roleProb fallback, B-026).
+   * Separate from `roleProbThreshold` so tuning one never moves the other.
    */
   readonly blindOpponentMinShare: number;
   /** W_comp: scale applied to the comp-need bonus. Prior. */

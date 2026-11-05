@@ -4,16 +4,15 @@ Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATI
 
 ## Open
 
-| ID    | Sev | Area   | Title                                                                                                                                     | Status | Found by/date           | Ticket |
-| ----- | --- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------- | ------ | ----------------------- | ------ |
-| B-052 | S2  | data   | Sample `data/public/16.21` baseline (n_eff 10, IRON only) is below `minGames` 25, so every draft shows empty lists; needs real aggregates | OPEN   | T-035 review 2026-11-04 | T-019  |
-| B-026 | S3  | engine | `blindSafety` approximates `pickShare(e)` with roleProb (no pick-rate export)                                                             | OPEN   | T-023 review 2026-10-30 | –      |
+| ID    | Sev | Area | Title                                                                                                                                     | Status | Found by/date           | Ticket |
+| ----- | --- | ---- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------ | ----------------------- | ------ |
+| B-052 | S2  | data | Sample `data/public/16.21` baseline (n_eff 10, IRON only) is below `minGames` 25, so every draft shows empty lists; needs real aggregates | OPEN   | T-035 review 2026-11-04 | T-019  |
 
 ## Duplicate bug IDs (not renumbered)
 
 Three IDs each label two distinct bugs (per owner instruction, IDs are never renumbered; the duplicates are documented here):
 
-- **B-026**: OPEN in the table below — "`blindSafety` approximates `pickShare(e)` with roleProb (no pick-rate export)" — and FIXED in the Fixed section — "Engine `shrink()` returns NaN for empty contexts with zero prior strength".
+- **B-026**: two FIXED entries in the Fixed section — "`blindSafety` approximates `pickShare(e)` with roleProb (no pick-rate export)" and "Engine `shrink()` returns NaN for empty contexts with zero prior strength".
 - **B-027**: FIXED in the Fixed section — "Recommendation constants injectable via `RecommendConfig`" — and also FIXED in the Fixed section — "Transient enrichment failures become permanent gaps (no retry on duplicates)".
 - **B-035**: FIXED in the Fixed section — "Export removes static catalogs and role-derivation snapshots" — and also FIXED in the Fixed section — "Export review findings (role-prob rounding, empty builds, publish cleanup, static catalogs)".
 
@@ -33,6 +32,16 @@ Review notes that predate the bug log live in [Review history](#review-history) 
 ```
 
 ## Fixed
+
+### B-026 — `blindSafety` approximates `pickShare(e)` with roleProb — FIXED
+
+- Severity / Area: S3 / engine (+ etl, shared, web)
+- Steps to reproduce: pick-rate export absent, so `blindSafety` used `roleProb[e][role]` — the share of champion `e`'s own games played in `role` — as the opponent distribution instead of the share of `role`'s picks won by `e`.
+- Expected / Actual: `pickShare(e)` must be the per-role pick share; until now it was approximated by normalized roleProb, which ranks dedicated one-trick picks differently from real pick rates (e.g. a 0.04-roleProb flex picked in 90% of ADC games was filtered out by `blindOpponentMinShare`).
+- Environment (OS, Node version, patch): any; engine-level bug, patch-independent.
+- Suspected cause: no pick-rate export existed (D-030 item 1 recorded the approximation).
+- Fix (commit/ticket): new global `pick-rate.json` export (`export/pick-rate.ts`): per-role shares computed from `role_prob.games_w`, gated per cell by `n_eff >= exportMinGames`, renormalized per role to sum 1 (round6, largest share absorbs residual — B-049 rule). New `pickRateSchema`/`PickRate` in `@draftorb/shared`; `RecommendData.pickRate` is optional so pre-existing exports keep working. `blindOpponents`/`computeBlindSafety` take an optional `pickRate` and use `pickRate[role][e]` when present, falling back to `roleProb[e][role]` otherwise; `recommend` passes `data.pickRate`. The web loader reads `pick-rate.json` when the manifest lists it; the draft backtest's `RecommendData` always carries real pick rates. Semantics recorded as D-052 (PROPOSED).
+- Verification: `recommend-terms.test.ts` "blind opponent pick share (B-026)" (pickRate precedence, roleProb fallback, changed blindSafety value — failed before the fix), `recommend-blind-comp.test.ts` recommend-level regression, `export/pick-rate.test.ts` (gate, renormalization, residual, unknown role, manifest listing), `apps/web` loader tests, `shared` schema tests.
 
 ### B-053 — Draft backtest scored a per-champion win-rate model, not `recommend` — FIXED
 

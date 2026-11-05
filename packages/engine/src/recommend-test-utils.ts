@@ -18,6 +18,7 @@ import type {
   LaneFullTable,
   LaneVsEntry,
   LaneVsTable,
+  PickRate,
   Rank,
   RankBucket,
   RecommendData,
@@ -187,6 +188,7 @@ export function makeData(opts: {
   laneVs?: LaneVsTable;
   laneFull?: LaneFullTable;
   roleProb?: ChampionRoleProbabilities;
+  pickRate?: PickRate;
   tags?: ChampionTagsMap;
 }): RecommendData {
   return {
@@ -196,6 +198,7 @@ export function makeData(opts: {
     laneVs: opts.laneVs ?? [],
     laneFull: opts.laneFull ?? [],
     roleProb: opts.roleProb ?? makeRoleProb(opts.champions),
+    ...(opts.pickRate !== undefined ? { pickRate: opts.pickRate } : {}),
     tags: opts.tags ?? makeChampionTags(opts.champions),
     championIds: opts.champions,
   };

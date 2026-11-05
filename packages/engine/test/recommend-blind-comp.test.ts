@@ -162,6 +162,36 @@ describe('recommend: blind safety values and levels', () => {
       .recommendations[0];
     expect(blindOf(rec)).toBeUndefined();
   });
+
+  it('weights unseen opponents by exported pick rates, not roleProb (B-026)', () => {
+    // roleProb marks 201 as the only ADC and 202 as a 0.04 flex; the pick-rate
+    // export says 202 is picked in 90% of ADC games and has a terrible matchup.
+    const roleProb = asRoleProb({
+      '1': { SUPPORT: 1 },
+      '201': { ADC: 1 },
+      '202': { ADC: 0.04, TOP: 0.96 },
+    });
+    const enemyPairs = makeEnemyPairs([
+      { championId: 1, enemyId: 202, role: 'ADC', ...HIGH_GAMES, winsW: 10 },
+    ]);
+    const champions = [1, 201, 202];
+    const input = makeInput({ blindPick: true });
+    const fallback = recommend(input, makeData({ champions, roleProb, enemyPairs }))
+      .recommendations[0];
+    const withRate = recommend(
+      input,
+      makeData({
+        champions,
+        roleProb,
+        enemyPairs,
+        pickRate: { ADC: { '201': 0.1, '202': 0.9 } },
+      }),
+    ).recommendations[0];
+    // Under the roleProb approximation 202 is filtered out and 201 has no
+    // matchup row, so blind safety stays neutral; real pick rates expose it.
+    expect(blindOf(fallback)).toBeUndefined();
+    expect(blindOf(withRate)?.deltaPp).toBeLessThan(0);
+  });
 });
 
 describe('recommend: comp need', () => {

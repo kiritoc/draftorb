@@ -490,6 +490,19 @@ Owner decision 2026-11-04. Rationale: the user can fix the role of any champion 
 
 Owner decision 2026-11-04.
 
+### D-052 — Pick-rate export semantics for `blindSafety` — PROPOSED
+
+- Context: B-026. `blindSafety` needs `pickShare(e)` = the share of picks of champion `e` in an unseen enemy role, but no pick-rate export existed, so the engine approximated it with `roleProb[e][role]` (the share of `e`'s own games played in that role — a different quantity).
+- Decision:
+  1. **Source.** `pick-rate.json` is computed from the `role_prob` table's `games_w` per (champion, role): `share(e, role) = games_w(e, role) / sum_e games_w(e, role)`. Each (champion, role) cell is gated by `n_eff >= exportMinGames` like every other export, then shares are renormalized per role to sum 1 (round6, largest share absorbs the residual, same rule as B-049).
+  2. **Scope.** Global like `role-prob.json`, independent of `manifest.roles`: `role_prob` has no rank-bucket or platform split, so pick shares are global across buckets and platforms (same aggregation scope as role probabilities).
+  3. **Threshold.** `blindOpponentMinShare` now applies to the pick-share value. With real shares (a handful of picks above a few percent) the 0.05 default keeps only reasonably popular opponents; the value may need retuning once real data exists (T-027.a).
+  4. **Fallback.** `RecommendData.pickRate` is optional: exports published before `pick-rate.json` existed keep the roleProb approximation until re-exported. The backtest's `RecommendData` always carries real pick rates.
+- Alternatives:
+  - Per-rank-bucket pick shares — rejected for now: `role_prob` carries no bucket dimension; would need a new aggregation.
+  - Required `pickRate` field — rejected: already-published patch exports have no `pick-rate.json` and cannot be regenerated while the database is locked.
+- Consequences: `pnpm etl export` writes `pick-rate.json` (manifest `files`, no schemaVersion bump — additive file, loader treats it as optional). Engine behavior is unchanged until an export containing the file is loaded.
+
 ### Template
 
 ```

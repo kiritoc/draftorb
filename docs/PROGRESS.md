@@ -4,7 +4,7 @@
 
 - Phase: 1 (Support / Diamond)
 - Current milestone: M3 Web MVP implementation complete (T-030..T-035 DONE); the backtest harness (T-027.a) remains under review because D-023 paired-bootstrap validation is not implemented. M1 ETL tickets T-019.b..f remain TODO.
-- Last updated: 2026-11-05 by Devin (bug fix B-053 / T-027.a engine evaluation)
+- Last updated: 2026-11-05 by Devin (bug fix B-026 / pick-rate export for blindSafety)
 
 ## Epic status
 
@@ -34,11 +34,25 @@ Session entries before 2026-10-29 live in [PROGRESS_ARCHIVE.md](./PROGRESS_ARCHI
 
 ## Open questions for the owner
 
-Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-050 and D-051 ACCEPTED; D-044 ACCEPTED with 20 patches; D-046 ACCEPTED with CommunityDragon as the source. No PROPOSED decisions are open.
+Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-050 and D-051 ACCEPTED; D-044 ACCEPTED with 20 patches; D-046 ACCEPTED with CommunityDragon as the source. PROPOSED and awaiting owner review: D-052 (pick-rate export semantics for `blindSafety`, added with the B-026 fix).
 
 - T-019.d verification: please compare the champion and item lists in the 2026-11-04 "T-019.d verification step" entry below with the official 16.21 and 16.22 patch notes (misses and false positives).
 
 ## Session log (newest first)
+
+### 2026-11-05 — Devin — Bug fix B-026 (pick-rate export for `blindSafety`)
+
+- Done:
+  - Reproduced B-026: `blindSafety` approximated `pickShare(e)` with `roleProb[e][role]` (share of the champion's own games in that role), so real popular picks with low role share were filtered out by `blindOpponentMinShare`.
+  - New global `pick-rate.json` export (`packages/etl/src/export/pick-rate.ts`): per-role shares from `role_prob.games_w`, gated per cell by `n_eff >= exportMinGames`, renormalized per role to sum 1; written by `exportJson` next to `role-prob.json` and listed in the manifest (no schemaVersion bump — additive file).
+  - Shared: `pickRateSchema`/`PickRate` (role -> championId -> share, per-role sum 1); `RecommendData.pickRate` optional so pre-existing exports keep the roleProb fallback.
+  - Engine: `blindOpponents`/`computeBlindSafety` accept an optional `pickRate` (trailing param); `recommend` passes `data.pickRate`. Web `createRecommendData` loads `pick-rate.json` when present; the backtest's `RecommendData` always carries real pick rates.
+  - Docs: SPECS §5, DATA_MODEL export layout, DECISIONS D-052 (PROPOSED: pick-share source/scope/threshold/fallback assumptions), BUGS B-026 FIXED.
+- Files touched: `packages/shared/src/schemas/{champions,recommend-data}.ts`, `packages/shared/src/index.ts`, `packages/shared/test/recommend-data.test.ts`, `packages/engine/src/{recommend-terms,recommend,config,recommend-test-utils}.ts`, `packages/engine/test/{recommend-terms,recommend-blind-comp}.test.ts`, `packages/etl/src/export/{pick-rate,pick-rate.test,index,manifest.test,atomic.test}.ts`, `packages/etl/src/backtest/recommend-data.ts`, `apps/web/src/data/{recommend-data,recommend-data.test}.ts`, `docs/{SPECS,DATA_MODEL,DECISIONS,BUGS,PROGRESS}.md`.
+- Tests: `pnpm check` green (74 files, 851 tests); new regression tests failed before the fix.
+- State left: DONE pending review/commit (branch `bugs`). Note: `data/DraftOrb.sqlite` was not touched (parallel work); published `data/public/<patch>/` exports gain `pick-rate.json` on the next `pnpm etl export` — until then the web keeps the roleProb fallback.
+- Next step: owner review; then T-019.b. Re-run `pnpm etl aggregate && pnpm etl export` once the DB is free to populate pick-rate.json; D-052 needs owner acceptance.
+- Pitfalls / notes for next AI: pick shares are global across rank buckets/platforms (role_prob has no split); `blindOpponentMinShare` (0.05) now applies to pick-share values, which are much smaller than roleProb values — retune via T-027.a if needed. `pickRate: {}` (export with no gated rows) disables blind safety rather than falling back — deliberate, the export is authoritative when present.
 
 ### 2026-11-05 — Devin — Bug fix B-053 (draft backtest evaluates the deployed engine)
 

@@ -83,8 +83,14 @@ export {
   championSchema,
   championsMapSchema,
   championRoleProbabilitiesSchema,
+  pickRateSchema,
 } from './schemas/champions.js';
-export type { Champion, ChampionsMap, ChampionRoleProbabilities } from './schemas/champions.js';
+export type {
+  Champion,
+  ChampionsMap,
+  ChampionRoleProbabilities,
+  PickRate,
+} from './schemas/champions.js';
 
 export {
   championTagsScalingSchema,

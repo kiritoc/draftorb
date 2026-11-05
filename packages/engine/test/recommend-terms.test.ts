@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import type { ChampionRoleProbabilities, EnemyPairTable } from '@draftorb/shared';
+import type { ChampionRoleProbabilities, EnemyPairTable, PickRate } from '@draftorb/shared';
 import { DEFAULT_CONFIG, DEFAULT_RECOMMEND_CONFIG, getInfluence } from '../src/config.js';
 import { indexPairs, makePairKey } from '../src/recommend-indexes.js';
 import { scorePair } from '../src/levels.js';
@@ -161,6 +161,60 @@ describe('computeBlindSafety', () => {
     expect(computeBlindSafety(1, ['TOP'], new Set(), ids, roleProb, idx, P0, DEFAULT_CONFIG)).toBe(
       0,
     );
+  });
+});
+
+describe('blind opponent pick share (B-026)', () => {
+  // roleProb marks 201 as the only ADC (1.0) and 202 as a 0.04 flex — below
+  // blindOpponentMinShare. The exported pick rates rank 202 first instead.
+  const roleProb = {
+    '201': { ADC: 1.0 },
+    '202': { ADC: 0.04, TOP: 0.96 },
+  } as ChampionRoleProbabilities;
+  const pickRate: PickRate = { ADC: { '201': 0.2, '202': 0.8 } };
+
+  it('weights unseen opponents by pickRate when the export is loaded', () => {
+    const opponents = blindOpponents(['ADC'], new Set(), [201, 202], roleProb, undefined, pickRate);
+    expect(opponents.get('ADC')).toEqual([
+      { championId: 201, share: 0.2 },
+      { championId: 202, share: 0.8 },
+    ]);
+  });
+
+  it('falls back to roleProb shares when no pickRate export is loaded', () => {
+    const opponents = blindOpponents(['ADC'], new Set(), [201, 202], roleProb);
+    expect(opponents.get('ADC')).toEqual([{ championId: 201, share: 1 }]);
+  });
+
+  it('changes blindSafety when pick rates disagree with roleProb', () => {
+    // A terrible matchup into the real popular pick (202) must count even
+    // though the roleProb approximation would have filtered it out.
+    const idx = indexPairs([[1, 202, 'ADC', 'DIAMOND', 0, 50, 0.1]], 'DIAMOND');
+    const fallback = computeBlindSafety(
+      1,
+      ['ADC'],
+      new Set(),
+      [201, 202],
+      roleProb,
+      idx,
+      P0,
+      DEFAULT_CONFIG,
+    );
+    const withPickRate = computeBlindSafety(
+      1,
+      ['ADC'],
+      new Set(),
+      [201, 202],
+      roleProb,
+      idx,
+      P0,
+      DEFAULT_CONFIG,
+      undefined,
+      undefined,
+      pickRate,
+    );
+    expect(fallback).toBe(0);
+    expect(withPickRate).toBeLessThan(0);
   });
 });
 

@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Database from 'better-sqlite3';
 
 import { openDb, migrate } from '../db';
+import { seedGames } from '../aggregate-baseline-helpers';
 import { backtestCommand } from './backtest';
 
 describe('backtestCommand', () => {
@@ -39,40 +40,48 @@ describe('backtestCommand', () => {
   });
 
   const seed = (db: Database.Database) => {
-    db.prepare(
+    const insertMatch = db.prepare(
       `INSERT INTO matches (match_id, platform, patch, queue_id, duration, created_at, avg_rank_score, rank_known_count)
-       VALUES ('m1', 'euw1', '16.20', 420, 1800, 1, 2500, 10),
-              ('m2', 'euw1', '16.20', 420, 1800, 2, 2500, 10),
-              ('m3', 'euw1', '16.21', 420, 1800, 3, 2500, 10),
-              ('m4', 'euw1', '16.21', 420, 1800, 4, 2500, 10),
-              ('m5', 'euw1', '16.20', 420, 1800, 5, 2500, 10),
-              ('m6', 'euw1', '16.20', 420, 1800, 6, 2500, 10),
-              ('m7', 'euw1', '16.20', 420, 1800, 7, 2500, 10),
-              ('m8', 'euw1', '16.21', 420, 1800, 8, 2500, 10)`,
-    ).run();
-    // Every match: 5 blue (team 100), 5 red (team 200), TOP is champion 100 on both sides.
-    // Blue wins m1, m3; red wins m2, m4 -> planted TOP effect.
-    for (const [matchId, blueWins] of [
-      ['m1', true],
-      ['m2', false],
-      ['m3', true],
-      ['m4', false],
-      ['m5', true],
-      ['m6', false],
-      ['m7', true],
-      ['m8', true],
-    ]) {
-      for (let i = 0; i < 5; i += 1) {
-        const puuidBlue = `puuid-${matchId}-${100 + i}`;
-        const puuidRed = `puuid-${matchId}-${200 + i}`;
-        db.prepare(
-          `INSERT INTO participants (match_id, puuid, team_id, champion_id, role, win, rank_score, champion_games, keystone, primary_style, sub_style, perks_json, items_json, kills, deaths, assists)
-           VALUES (?, '${puuidBlue}', ${100 + i}, ${i === 0 ? 100 : 1000 + i}, '${['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT'][i]}', ${blueWins ? 1 : 0}, 2500, 0, 8000, 8000, 8400, '[]', '[]', 0, 0, 0)`,
-        ).run(matchId);
-        db.prepare(
-          `INSERT INTO participants (match_id, puuid, team_id, champion_id, role, win, rank_score, champion_games, keystone, primary_style, sub_style, perks_json, items_json, kills, deaths, assists)
-           VALUES (?, '${puuidRed}', ${200 + i}, ${i === 0 ? 100 : 2000 + i}, '${['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT'][i]}', ${blueWins ? 0 : 1}, 2500, 0, 8000, 8000, 8400, '[]', '[]', 0, 0, 0)`,
-        ).run(matchId);
+       VALUES (?, 'euw1', ?, 420, 1800, ?, 6.5, 10)`,
+    );
+    const insertParticipant = db.prepare(
+      `INSERT INTO participants (match_id, puuid, team_id, champion_id, role, win, rank_score, champion_games, keystone, primary_style, sub_style, perks_json, items_json, kills, deaths, assists)
+       VALUES (?, ?, ?, ?, ?, ?, 6.5, 0, 8000, 8000, 8400, '[]', '[]', 0, 0, 0)`,
+    );
+    const roles = ['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT'] as const;
+    const matches = [
+      ...Array.from({ length: 30 }, (_, i) => ({
+        matchId: `train-${i}`,
+        patch: '16.20',
+        createdAt: i + 1,
+        blueWins: i % 2 === 0,
+      })),
+      ...Array.from({ length: 5 }, (_, i) => ({
+        matchId: `holdout-${i}`,
+        patch: '16.21',
+        createdAt: 100 + i,
+        blueWins: i % 2 === 0,
+      })),
+    ];
+
+    for (const match of matches) {
+      insertMatch.run(match.matchId, match.patch, match.createdAt);
+      // TOP is champion 100 on both teams; other roles use one consistent champion per side.
+      for (const [teamId, teamWins] of [
+        [100, match.blueWins],
+        [200, !match.blueWins],
+      ] as const) {
+        for (const [i, role] of roles.entries()) {
+          const championId = i === 0 ? 100 : teamId * 10 + i;
+          insertParticipant.run(
+            match.matchId,
+            `puuid-${match.matchId}-${teamId}-${i}`,
+            teamId,
+            championId,
+            role,
+            teamWins ? 1 : 0,
+          );
+        }
       }
     }
   };
@@ -90,8 +99,8 @@ describe('backtestCommand', () => {
     );
     expect(report.holdoutPatch).toBe('16.21');
     expect(report.trainingPatches).toEqual(['16.20']);
-    expect(report.trainingGames).toBe(5);
-    expect(report.holdoutGames).toBe(3);
+    expect(report.trainingGames).toBe(30);
+    expect(report.holdoutGames).toBe(5);
     expect(report.insufficientData).toBe(false);
     expect(report.validationStatus).toBe('unvalidated');
     expect(report.logLoss).toBeTypeOf('number');
@@ -109,6 +118,34 @@ describe('backtestCommand', () => {
     const report = JSON.parse(readFileSync(customOut, 'utf8'));
     expect(report.holdoutPatch).toBe('16.21');
     expect(report.insufficientData).toBe(false);
+  });
+
+  it('evaluates holdout players at the match rank when participant rank is unknown', async () => {
+    const db = openDb(dbPath);
+    migrate(db);
+    seedGames(db, [
+      ...Array.from({ length: 30 }, (_, i) => ({
+        patch: '16.20',
+        rankScore: 0.5,
+        win: i % 2,
+        participantRankScore: null,
+      })),
+      ...Array.from({ length: 5 }, (_, i) => ({
+        patch: '16.21',
+        rankScore: 6.5,
+        win: i % 2,
+        participantRankScore: null,
+      })),
+    ]);
+    db.close();
+
+    const customOut = join(directory, 'reports', 'match-rank-backtest.json');
+    await backtestCommand.run(['draft', `--out=${customOut}`]);
+
+    const report = JSON.parse(readFileSync(customOut, 'utf8'));
+    expect(report.holdoutPatch).toBe('16.21');
+    expect(report.insufficientData).toBe(true);
+    expect(report.message).toMatch(/No holdout pick was scored/);
   });
 
   it('rejects a duplicate or empty --out option', async () => {

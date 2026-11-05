@@ -32,6 +32,26 @@ Review notes that predate the bug log live in [Review history](#review-history) 
 
 ## Fixed
 
+### B-057 — Draft backtest evaluated holdout players at participant rank, not match rank — FIXED
+
+- Severity / Area: S2 / etl
+- Steps to reproduce: run `pnpm etl backtest draft` on matches whose participants have `rank_score NULL` while `matches.avg_rank_score` is known; the holdout evaluation bucketed those players as IRON.
+- Expected / Actual: per D-023 the holdout `userRank` is the game's rank bucket, and every aggregate table is keyed by `matches.avg_rank_score`; the backtest selected `participants.rank_score`, so NULL became bucket index 0 through `gameBucketIndex` and the engine/baseline lookup used the wrong rank context.
+- Environment (OS, Node version, patch): any; patch-independent.
+- Suspected cause: the holdout query selected `p.rank_score` while `DraftRow.rankScore` was typed as non-nullable `number`.
+- Fix (commit/ticket): the query now selects `m.avg_rank_score AS matchRankScore` for every participant row, and `DraftRow.rankScore` was renamed to `matchRankScore` to match the aggregate rank context.
+- Verification: new `commands/backtest.test.ts` case seeds low-rank training matches plus Diamond holdout matches with NULL participant ranks; before the fix the NULL ranks evaluated as IRON and scored, after the fix the Diamond bucket has no training evidence and the report is insufficient. `pnpm check` green (75 files, 855 tests).
+
+### B-058 — Draft backtest published metrics when every pick was an unscored fallback — FIXED
+
+- Severity / Area: S3 / etl
+- Steps to reproduce: run `pnpm etl backtest draft` with enough matches to pass the training-count gate but too little evidence for any champion to be engine-scored; every holdout point used the champion-baseline fallback while `insufficientData` stayed false.
+- Expected / Actual: a report with zero engine-scored picks is not a completed backtest; it should return the insufficient-data report. Paired fallback points remain valid when at least one pick is scored.
+- Environment (OS, Node version, patch): any; patch-independent.
+- Suspected cause: `runBacktestDraft` only checked `points.length === 0` and never counted `point.scored` before publishing metrics.
+- Fix (commit/ticket): `runBacktestDraft` returns an insufficient-data report when every holdout point is unscored; the existing `predictions`/`unscored` paired-fallback behavior is unchanged for mixed reports.
+- Verification: new `backtest/draft.test.ts` case covers the all-unscored report; the command seed was expanded to 30 training matches because the old 5-match seed was itself an all-unscored scenario. `pnpm check` green (75 files, 855 tests).
+
 ### B-052 — Sample `data/public` export below `minGames`, every draft empty — FIXED
 
 - Severity / Area: S2 / data

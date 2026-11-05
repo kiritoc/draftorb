@@ -4,7 +4,7 @@
 
 - Phase: 1 (Support / Diamond)
 - Current milestone: M3 Web MVP implementation complete (T-030..T-035 DONE); the backtest harness (T-027.a) remains under review because D-023 paired-bootstrap validation is not implemented. M1 ETL tickets T-019.b..f remain TODO.
-- Last updated: 2026-11-05 by Devin (bug fix B-052 / real aggregate sample export)
+- Last updated: 2026-11-05 by Devin (PR #47 review fixes B-057/B-058 + export JSDoc)
 
 ## Epic status
 
@@ -39,6 +39,18 @@ Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-0
 - T-019.d verification: please compare the champion and item lists in the 2026-11-04 "T-019.d verification step" entry below with the official 16.21 and 16.22 patch notes (misses and false positives).
 
 ## Session log (newest first)
+
+### 2026-11-05 — Devin — PR #47 review fixes (backtest rank + unscored gate)
+
+- Done:
+  - B-057: the draft backtest now evaluates holdout players at `matches.avg_rank_score` (`DraftRow.matchRankScore`) for both `userRank` and the champion-baseline lookup, matching the rank context used by every aggregate table; NULL `participants.rank_score` no longer becomes IRON through `gameBucketIndex`.
+  - B-058: `runBacktestDraft` returns the insufficient-data report when every holdout point is an unscored baseline fallback, instead of publishing metrics equal to the fallback baseline; mixed scored/unscored reports keep the paired fallback points and `unscored` count.
+  - Added the missing public-function JSDoc to `pickRateFile` and aligned `roleProbFile` (CONVENTIONS.md).
+- Files touched: `packages/etl/src/{commands/backtest.ts,commands/backtest.test.ts,backtest/draft.ts,backtest/draft.test.ts,export/pick-rate.ts,export/role-prob.ts}`, `docs/{BUGS,PROGRESS}.md`.
+- Tests: `pnpm check` green (75 files, 855 tests). New regressions: all-unscored holdout report, match-rank evaluation with NULL participant ranks, and a 30-match command seed (the old 5-match seed was itself all-unscored under `minGames = 25`).
+- State left: DONE pending review/commit (branch `bugs`). T-027.a stays REVIEW: masked drafts, rolling validation, fixed-Diamond report, layer/slot ablation and the D-023 paired-bootstrap gate remain outstanding; report stays `unvalidated`.
+- Next step: owner review; then T-019.b or D-023 gate work.
+- Pitfalls / notes for next AI: scored backtest recommendations need `n_eff >= minGames` (25), stricter than `exportMinGames` (10); tiny training windows now correctly report insufficient data. `data/public/16.21` and `16.22` intentionally share aggregate evidence because aggregate tables are not patch-scoped, and `lane-full.json` is empty because no SUPPORT lane_full row reaches `exportMinGames` in the current sample.
 
 ### 2026-11-05 — Devin — Bug fix B-052 (real aggregate sample export)
 

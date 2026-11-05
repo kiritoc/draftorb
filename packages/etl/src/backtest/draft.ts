@@ -38,7 +38,8 @@ export interface DraftRow {
   championId: number;
   role: Role;
   win: number; // 1 when this participant's team won the match
-  rankScore: number;
+  /** Match average rank score (D-019), the same rank context used by aggregates. */
+  matchRankScore: number;
 }
 
 /** Per-role engine inputs built from the training window (never the holdout). */
@@ -191,7 +192,7 @@ function evaluatePlayer(
   const data = engine.dataByRole[row.role];
   if (data === undefined) return null;
 
-  const bucket = scoreToBucket(row.rankScore);
+  const bucket = scoreToBucket(row.matchRankScore);
   const input: DraftInput = {
     userRank: BUCKET_TO_RANK[bucket],
     userRole: row.role,
@@ -316,6 +317,12 @@ export function runBacktestDraft(rows: DraftRow[], engine: BacktestEngineData): 
     return insufficient(
       counts,
       'No holdout player has engine data for their role; nothing to evaluate.',
+    );
+  }
+  if (points.every((point) => !point.scored)) {
+    return insufficient(
+      counts,
+      'No holdout pick was scored by the engine; only baseline fallbacks are available.',
     );
   }
 

@@ -70,6 +70,7 @@ export function exportPickRates(rows: readonly RoleProbRow[], exportMinGames: nu
   }
 }
 
+/** File descriptor for the compact `pick-rate.json` export. */
 export function pickRateFile(
   rows: readonly RoleProbRow[],
   exportMinGames: number,

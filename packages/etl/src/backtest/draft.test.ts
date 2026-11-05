@@ -13,10 +13,14 @@ const CHAMP_ROLE: Record<number, Role> = {
   100: 'TOP',
   101: 'TOP',
   300: 'TOP',
+  500: 'TOP',
+  501: 'TOP',
   1100: 'TOP',
   1200: 'TOP',
   200: 'SUPPORT',
   201: 'SUPPORT',
+  400: 'SUPPORT',
+  401: 'SUPPORT',
   1104: 'SUPPORT',
   1204: 'SUPPORT',
   1101: 'JUNGLE',
@@ -30,7 +34,7 @@ const CHAMP_ROLE: Record<number, Role> = {
 const ALL_CHAMPIONS = Object.keys(CHAMP_ROLE).map(Number);
 
 /** Champions with a strong DIAMOND baseline per role (30/50 -> n_eff 25000).
- *  Champion 300 deliberately has no baseline row. */
+ *  Champions 300, 400, 401, 500 and 501 deliberately have no baseline row. */
 const BASELINE_CHAMPS: Record<Role, number[]> = {
   TOP: [100, 101, 1100, 1200],
   JUNGLE: [],
@@ -68,7 +72,7 @@ function makeMatch({
         championId: override ?? 1000 + teamId + ROLES.indexOf(role),
         role,
         win: wins ? 1 : 0,
-        rankScore: 6.5, // persisted D-016 scale: DIAMOND
+        matchRankScore: 6.5, // persisted D-016 scale: DIAMOND
       });
     }
   }
@@ -240,5 +244,27 @@ describe('runBacktestDraft (engine evaluation, B-053)', () => {
     expect(report.unscored).toBe(6);
     expect(report.predictions).toBe(24);
     expect(report.perRole.TOP.unscored).toBe(6);
+  });
+
+  it('returns insufficient data when every holdout pick is an unscored fallback', () => {
+    const rows: DraftRow[] = [];
+    for (let i = 0; i < 6; i += 1) {
+      rows.push(...makeMatch({ matchId: `t${i}`, patch: '16.20', blueWins: i % 2 === 0 }));
+      rows.push(
+        ...makeMatch({
+          matchId: `h${i}`,
+          patch: '16.21',
+          blueWins: true,
+          blue: { TOP: 500, SUPPORT: 400 },
+          red: { TOP: 501, SUPPORT: 401 },
+        }),
+      );
+    }
+
+    const report = runBacktestDraft(rows, ENGINE);
+    expect(report.insufficientData).toBe(true);
+    expect(report.logLoss).toBeNull();
+    expect(report.baselineLogLoss).toBeNull();
+    expect(report.message).toMatch(/No holdout pick was scored/);
   });
 });

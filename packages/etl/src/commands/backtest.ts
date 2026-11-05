@@ -132,7 +132,8 @@ async function runBacktest(args: string[]): Promise<void> {
       .prepare(
         `SELECT
            m.match_id AS matchId, m.patch AS patch, p.team_id AS teamId,
-           p.champion_id AS championId, p.role AS role, p.win AS win, p.rank_score AS rankScore
+           p.champion_id AS championId, p.role AS role, p.win AS win,
+           m.avg_rank_score AS matchRankScore
          FROM participants p
          JOIN matches m ON m.match_id = p.match_id`,
       )

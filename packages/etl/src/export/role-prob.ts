@@ -75,6 +75,7 @@ export function exportRoleProbabilities(
   }
 }
 
+/** File descriptor for the compact `role-prob.json` export. */
 export function roleProbFile(
   rows: readonly RoleProbRow[],
   exportMinGames: number,

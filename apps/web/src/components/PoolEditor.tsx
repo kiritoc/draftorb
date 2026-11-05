@@ -134,7 +134,7 @@ export function PoolEditor({
         onClick={onClose}
         aria-hidden="true"
       />
-      <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+      <div className="relative bg-gray-900 border border-gray-700 rounded-lg p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold text-indigo-300">{strings.poolEditorTitle}</h2>
           <button

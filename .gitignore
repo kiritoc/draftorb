@@ -17,3 +17,6 @@ dist/
 **/data/*.sqlite*
 **/data/**/*.sqlite*
 data/raw/
+
+# Backtest reports are regenerated locally (T-027.a)
+data/public/backtest-*.json

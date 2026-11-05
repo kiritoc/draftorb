@@ -4,6 +4,7 @@
     "name": "Annie",
     "icon": "Annie.png",
     "roles": [
+      "TOP",
       "MID",
       "SUPPORT"
     ]
@@ -13,7 +14,8 @@
     "name": "Olaf",
     "icon": "Olaf.png",
     "roles": [
-      "TOP"
+      "TOP",
+      "JUNGLE"
     ]
   },
   "3": {
@@ -22,7 +24,8 @@
     "icon": "Galio.png",
     "roles": [
       "TOP",
-      "MID"
+      "MID",
+      "SUPPORT"
     ]
   },
   "4": {
@@ -30,6 +33,7 @@
     "name": "Twisted Fate",
     "icon": "TwistedFate.png",
     "roles": [
+      "TOP",
       "MID",
       "ADC"
     ]
@@ -39,7 +43,8 @@
     "name": "Xin Zhao",
     "icon": "XinZhao.png",
     "roles": [
-      "TOP"
+      "TOP",
+      "JUNGLE"
     ]
   },
   "6": {
@@ -47,7 +52,8 @@
     "name": "Urgot",
     "icon": "Urgot.png",
     "roles": [
-      "TOP"
+      "TOP",
+      "MID"
     ]
   },
   "7": {
@@ -55,7 +61,9 @@
     "name": "LeBlanc",
     "icon": "Leblanc.png",
     "roles": [
-      "MID"
+      "TOP",
+      "MID",
+      "SUPPORT"
     ]
   },
   "8": {
@@ -63,8 +71,9 @@
     "name": "Vladimir",
     "icon": "Vladimir.png",
     "roles": [
+      "TOP",
       "MID",
-      "TOP"
+      "ADC"
     ]
   },
   "9": {
@@ -72,7 +81,8 @@
     "name": "Fiddlesticks",
     "icon": "Fiddlesticks.png",
     "roles": [
-      "MID",
+      "TOP",
+      "JUNGLE",
       "SUPPORT"
     ]
   },
@@ -81,7 +91,7 @@
     "name": "Kayle",
     "icon": "Kayle.png",
     "roles": [
-      "ADC",
+      "TOP",
       "MID"
     ]
   },
@@ -90,8 +100,7 @@
     "name": "Master Yi",
     "icon": "MasterYi.png",
     "roles": [
-      "TOP",
-      "MID"
+      "JUNGLE"
     ]
   },
   "12": {
@@ -99,7 +108,6 @@
     "name": "Alistar",
     "icon": "Alistar.png",
     "roles": [
-      "TOP",
       "SUPPORT"
     ]
   },
@@ -108,6 +116,7 @@
     "name": "Ryze",
     "icon": "Ryze.png",
     "roles": [
+      "TOP",
       "MID"
     ]
   },
@@ -116,7 +125,9 @@
     "name": "Sion",
     "icon": "Sion.png",
     "roles": [
-      "TOP"
+      "TOP",
+      "JUNGLE",
+      "MID"
     ]
   },
   "15": {
@@ -132,8 +143,7 @@
     "name": "Soraka",
     "icon": "Soraka.png",
     "roles": [
-      "SUPPORT",
-      "MID"
+      "SUPPORT"
     ]
   },
   "17": {
@@ -141,8 +151,8 @@
     "name": "Teemo",
     "icon": "Teemo.png",
     "roles": [
-      "ADC",
-      "MID"
+      "TOP",
+      "JUNGLE"
     ]
   },
   "18": {
@@ -150,8 +160,8 @@
     "name": "Tristana",
     "icon": "Tristana.png",
     "roles": [
-      "ADC",
-      "MID"
+      "MID",
+      "ADC"
     ]
   },
   "19": {
@@ -167,8 +177,7 @@
     "name": "Nunu & Willump",
     "icon": "Nunu.png",
     "roles": [
-      "TOP",
-      "MID"
+      "JUNGLE"
     ]
   },
   "21": {
@@ -176,8 +185,7 @@
     "name": "Miss Fortune",
     "icon": "MissFortune.png",
     "roles": [
-      "ADC",
-      "MID"
+      "ADC"
     ]
   },
   "22": {
@@ -185,8 +193,7 @@
     "name": "Ashe",
     "icon": "Ashe.png",
     "roles": [
-      "ADC",
-      "SUPPORT"
+      "ADC"
     ]
   },
   "23": {
@@ -203,7 +210,8 @@
     "name": "Jax",
     "icon": "Jax.png",
     "roles": [
-      "TOP"
+      "TOP",
+      "MID"
     ]
   },
   "25": {
@@ -211,8 +219,9 @@
     "name": "Morgana",
     "icon": "Morgana.png",
     "roles": [
-      "SUPPORT",
-      "MID"
+      "JUNGLE",
+      "MID",
+      "SUPPORT"
     ]
   },
   "26": {
@@ -220,8 +229,9 @@
     "name": "Zilean",
     "icon": "Zilean.png",
     "roles": [
-      "SUPPORT",
-      "MID"
+      "TOP",
+      "MID",
+      "SUPPORT"
     ]
   },
   "27": {
@@ -238,7 +248,7 @@
     "name": "Evelynn",
     "icon": "Evelynn.png",
     "roles": [
-      "MID"
+      "JUNGLE"
     ]
   },
   "29": {
@@ -246,8 +256,9 @@
     "name": "Twitch",
     "icon": "Twitch.png",
     "roles": [
-      "ADC",
-      "MID"
+      "TOP",
+      "MID",
+      "ADC"
     ]
   },
   "30": {
@@ -255,7 +266,10 @@
     "name": "Karthus",
     "icon": "Karthus.png",
     "roles": [
-      "MID"
+      "TOP",
+      "JUNGLE",
+      "MID",
+      "ADC"
     ]
   },
   "31": {
@@ -264,6 +278,7 @@
     "icon": "Chogath.png",
     "roles": [
       "TOP",
+      "JUNGLE",
       "MID"
     ]
   },
@@ -272,7 +287,7 @@
     "name": "Amumu",
     "icon": "Amumu.png",
     "roles": [
-      "TOP",
+      "JUNGLE",
       "SUPPORT"
     ]
   },
@@ -281,7 +296,9 @@
     "name": "Rammus",
     "icon": "Rammus.png",
     "roles": [
-      "TOP"
+      "TOP",
+      "JUNGLE",
+      "SUPPORT"
     ]
   },
   "34": {
@@ -289,7 +306,10 @@
     "name": "Anivia",
     "icon": "Anivia.png",
     "roles": [
-      "MID"
+      "TOP",
+      "MID",
+      "ADC",
+      "SUPPORT"
     ]
   },
   "35": {
@@ -297,7 +317,8 @@
     "name": "Shaco",
     "icon": "Shaco.png",
     "roles": [
-      "MID"
+      "JUNGLE",
+      "SUPPORT"
     ]
   },
   "36": {
@@ -305,7 +326,8 @@
     "name": "Dr. Mundo",
     "icon": "DrMundo.png",
     "roles": [
-      "TOP"
+      "TOP",
+      "JUNGLE"
     ]
   },
   "37": {
@@ -313,8 +335,7 @@
     "name": "Sona",
     "icon": "Sona.png",
     "roles": [
-      "SUPPORT",
-      "MID"
+      "SUPPORT"
     ]
   },
   "38": {
@@ -322,6 +343,7 @@
     "name": "Kassadin",
     "icon": "Kassadin.png",
     "roles": [
+      "TOP",
       "MID"
     ]
   },
@@ -339,8 +361,8 @@
     "name": "Janna",
     "icon": "Janna.png",
     "roles": [
-      "SUPPORT",
-      "MID"
+      "TOP",
+      "SUPPORT"
     ]
   },
   "41": {
@@ -348,7 +370,8 @@
     "name": "Gangplank",
     "icon": "Gangplank.png",
     "roles": [
-      "TOP"
+      "TOP",
+      "MID"
     ]
   },
   "42": {
@@ -356,8 +379,9 @@
     "name": "Corki",
     "icon": "Corki.png",
     "roles": [
-      "ADC",
-      "MID"
+      "TOP",
+      "MID",
+      "ADC"
     ]
   },
   "43": {
@@ -365,7 +389,7 @@
     "name": "Karma",
     "icon": "Karma.png",
     "roles": [
-      "MID",
+      "TOP",
       "SUPPORT"
     ]
   },
@@ -374,8 +398,7 @@
     "name": "Taric",
     "icon": "Taric.png",
     "roles": [
-      "SUPPORT",
-      "TOP"
+      "SUPPORT"
     ]
   },
   "45": {
@@ -383,7 +406,9 @@
     "name": "Veigar",
     "icon": "Veigar.png",
     "roles": [
-      "MID"
+      "MID",
+      "ADC",
+      "SUPPORT"
     ]
   },
   "48": {
@@ -391,7 +416,9 @@
     "name": "Trundle",
     "icon": "Trundle.png",
     "roles": [
-      "TOP"
+      "TOP",
+      "JUNGLE",
+      "SUPPORT"
     ]
   },
   "50": {
@@ -399,7 +426,9 @@
     "name": "Swain",
     "icon": "Swain.png",
     "roles": [
+      "TOP",
       "MID",
+      "ADC",
       "SUPPORT"
     ]
   },
@@ -416,7 +445,6 @@
     "name": "Blitzcrank",
     "icon": "Blitzcrank.png",
     "roles": [
-      "TOP",
       "SUPPORT"
     ]
   },
@@ -425,8 +453,7 @@
     "name": "Malphite",
     "icon": "Malphite.png",
     "roles": [
-      "TOP",
-      "MID"
+      "TOP"
     ]
   },
   "55": {
@@ -434,7 +461,9 @@
     "name": "Katarina",
     "icon": "Katarina.png",
     "roles": [
-      "MID"
+      "TOP",
+      "MID",
+      "ADC"
     ]
   },
   "56": {
@@ -442,8 +471,7 @@
     "name": "Nocturne",
     "icon": "Nocturne.png",
     "roles": [
-      "TOP",
-      "MID"
+      "JUNGLE"
     ]
   },
   "57": {
@@ -452,6 +480,7 @@
     "icon": "Maokai.png",
     "roles": [
       "TOP",
+      "JUNGLE",
       "SUPPORT"
     ]
   },
@@ -460,7 +489,8 @@
     "name": "Renekton",
     "icon": "Renekton.png",
     "roles": [
-      "TOP"
+      "TOP",
+      "MID"
     ]
   },
   "59": {
@@ -468,7 +498,7 @@
     "name": "Jarvan IV",
     "icon": "JarvanIV.png",
     "roles": [
-      "TOP"
+      "JUNGLE"
     ]
   },
   "60": {
@@ -476,7 +506,9 @@
     "name": "Elise",
     "icon": "Elise.png",
     "roles": [
-      "MID"
+      "TOP",
+      "JUNGLE",
+      "SUPPORT"
     ]
   },
   "61": {
@@ -484,8 +516,7 @@
     "name": "Orianna",
     "icon": "Orianna.png",
     "roles": [
-      "MID",
-      "SUPPORT"
+      "MID"
     ]
   },
   "62": {
@@ -493,7 +524,7 @@
     "name": "Wukong",
     "icon": "MonkeyKing.png",
     "roles": [
-      "TOP"
+      "JUNGLE"
     ]
   },
   "63": {
@@ -501,7 +532,9 @@
     "name": "Brand",
     "icon": "Brand.png",
     "roles": [
+      "JUNGLE",
       "MID",
+      "ADC",
       "SUPPORT"
     ]
   },
@@ -510,8 +543,7 @@
     "name": "Lee Sin",
     "icon": "LeeSin.png",
     "roles": [
-      "TOP",
-      "MID"
+      "JUNGLE"
     ]
   },
   "67": {
@@ -519,8 +551,9 @@
     "name": "Vayne",
     "icon": "Vayne.png",
     "roles": [
-      "ADC",
-      "MID"
+      "TOP",
+      "MID",
+      "ADC"
     ]
   },
   "68": {
@@ -528,8 +561,7 @@
     "name": "Rumble",
     "icon": "Rumble.png",
     "roles": [
-      "TOP",
-      "MID"
+      "TOP"
     ]
   },
   "69": {
@@ -537,7 +569,9 @@
     "name": "Cassiopeia",
     "icon": "Cassiopeia.png",
     "roles": [
-      "MID"
+      "TOP",
+      "MID",
+      "ADC"
     ]
   },
   "72": {
@@ -545,7 +579,7 @@
     "name": "Skarner",
     "icon": "Skarner.png",
     "roles": [
-      "TOP"
+      "JUNGLE"
     ]
   },
   "74": {
@@ -553,8 +587,8 @@
     "name": "Heimerdinger",
     "icon": "Heimerdinger.png",
     "roles": [
-      "MID",
-      "SUPPORT"
+      "TOP",
+      "ADC"
     ]
   },
   "75": {
@@ -562,7 +596,8 @@
     "name": "Nasus",
     "icon": "Nasus.png",
     "roles": [
-      "TOP"
+      "TOP",
+      "MID"
     ]
   },
   "76": {
@@ -570,7 +605,7 @@
     "name": "Nidalee",
     "icon": "Nidalee.png",
     "roles": [
-      "MID"
+      "JUNGLE"
     ]
   },
   "77": {
@@ -578,7 +613,9 @@
     "name": "Udyr",
     "icon": "Udyr.png",
     "roles": [
-      "TOP"
+      "TOP",
+      "JUNGLE",
+      "MID"
     ]
   },
   "78": {
@@ -586,7 +623,9 @@
     "name": "Poppy",
     "icon": "Poppy.png",
     "roles": [
-      "TOP"
+      "TOP",
+      "JUNGLE",
+      "SUPPORT"
     ]
   },
   "79": {
@@ -595,6 +634,7 @@
     "icon": "Gragas.png",
     "roles": [
       "TOP",
+      "JUNGLE",
       "MID"
     ]
   },
@@ -604,7 +644,9 @@
     "icon": "Pantheon.png",
     "roles": [
       "TOP",
-      "MID"
+      "JUNGLE",
+      "MID",
+      "SUPPORT"
     ]
   },
   "81": {
@@ -612,8 +654,7 @@
     "name": "Ezreal",
     "icon": "Ezreal.png",
     "roles": [
-      "ADC",
-      "MID"
+      "ADC"
     ]
   },
   "82": {
@@ -622,7 +663,7 @@
     "icon": "Mordekaiser.png",
     "roles": [
       "TOP",
-      "MID"
+      "JUNGLE"
     ]
   },
   "83": {
@@ -638,6 +679,7 @@
     "name": "Akali",
     "icon": "Akali.png",
     "roles": [
+      "TOP",
       "MID"
     ]
   },
@@ -646,7 +688,9 @@
     "name": "Kennen",
     "icon": "Kennen.png",
     "roles": [
-      "MID"
+      "TOP",
+      "MID",
+      "ADC"
     ]
   },
   "86": {
@@ -654,7 +698,8 @@
     "name": "Garen",
     "icon": "Garen.png",
     "roles": [
-      "TOP"
+      "TOP",
+      "MID"
     ]
   },
   "89": {
@@ -662,7 +707,6 @@
     "name": "Leona",
     "icon": "Leona.png",
     "roles": [
-      "TOP",
       "SUPPORT"
     ]
   },
@@ -671,6 +715,7 @@
     "name": "Malzahar",
     "icon": "Malzahar.png",
     "roles": [
+      "TOP",
       "MID"
     ]
   },
@@ -679,7 +724,7 @@
     "name": "Talon",
     "icon": "Talon.png",
     "roles": [
-      "MID"
+      "JUNGLE"
     ]
   },
   "92": {
@@ -688,7 +733,9 @@
     "icon": "Riven.png",
     "roles": [
       "TOP",
-      "MID"
+      "JUNGLE",
+      "MID",
+      "ADC"
     ]
   },
   "96": {
@@ -696,8 +743,10 @@
     "name": "Kog'Maw",
     "icon": "KogMaw.png",
     "roles": [
-      "ADC",
-      "MID"
+      "TOP",
+      "JUNGLE",
+      "MID",
+      "ADC"
     ]
   },
   "98": {
@@ -705,7 +754,10 @@
     "name": "Shen",
     "icon": "Shen.png",
     "roles": [
-      "TOP"
+      "TOP",
+      "JUNGLE",
+      "MID",
+      "SUPPORT"
     ]
   },
   "99": {
@@ -714,6 +766,7 @@
     "icon": "Lux.png",
     "roles": [
       "MID",
+      "ADC",
       "SUPPORT"
     ]
   },
@@ -723,7 +776,7 @@
     "icon": "Xerath.png",
     "roles": [
       "MID",
-      "SUPPORT"
+      "ADC"
     ]
   },
   "102": {
@@ -731,7 +784,8 @@
     "name": "Shyvana",
     "icon": "Shyvana.png",
     "roles": [
-      "TOP"
+      "TOP",
+      "JUNGLE"
     ]
   },
   "103": {
@@ -739,6 +793,7 @@
     "name": "Ahri",
     "icon": "Ahri.png",
     "roles": [
+      "TOP",
       "MID"
     ]
   },
@@ -747,7 +802,7 @@
     "name": "Graves",
     "icon": "Graves.png",
     "roles": [
-      "ADC"
+      "JUNGLE"
     ]
   },
   "105": {
@@ -755,8 +810,9 @@
     "name": "Fizz",
     "icon": "Fizz.png",
     "roles": [
-      "MID",
-      "TOP"
+      "TOP",
+      "JUNGLE",
+      "MID"
     ]
   },
   "106": {
@@ -764,7 +820,8 @@
     "name": "Volibear",
     "icon": "Volibear.png",
     "roles": [
-      "TOP"
+      "TOP",
+      "MID"
     ]
   },
   "107": {
@@ -772,8 +829,7 @@
     "name": "Rengar",
     "icon": "Rengar.png",
     "roles": [
-      "MID",
-      "TOP"
+      "JUNGLE"
     ]
   },
   "110": {
@@ -781,8 +837,8 @@
     "name": "Varus",
     "icon": "Varus.png",
     "roles": [
-      "ADC",
-      "MID"
+      "TOP",
+      "ADC"
     ]
   },
   "111": {
@@ -790,7 +846,6 @@
     "name": "Nautilus",
     "icon": "Nautilus.png",
     "roles": [
-      "TOP",
       "SUPPORT"
     ]
   },
@@ -799,7 +854,8 @@
     "name": "Viktor",
     "icon": "Viktor.png",
     "roles": [
-      "MID"
+      "MID",
+      "ADC"
     ]
   },
   "113": {
@@ -807,7 +863,8 @@
     "name": "Sejuani",
     "icon": "Sejuani.png",
     "roles": [
-      "TOP"
+      "TOP",
+      "JUNGLE"
     ]
   },
   "114": {
@@ -815,8 +872,7 @@
     "name": "Fiora",
     "icon": "Fiora.png",
     "roles": [
-      "TOP",
-      "MID"
+      "TOP"
     ]
   },
   "115": {
@@ -824,7 +880,8 @@
     "name": "Ziggs",
     "icon": "Ziggs.png",
     "roles": [
-      "MID"
+      "MID",
+      "ADC"
     ]
   },
   "117": {
@@ -832,8 +889,7 @@
     "name": "Lulu",
     "icon": "Lulu.png",
     "roles": [
-      "SUPPORT",
-      "MID"
+      "SUPPORT"
     ]
   },
   "119": {
@@ -849,7 +905,7 @@
     "name": "Hecarim",
     "icon": "Hecarim.png",
     "roles": [
-      "TOP"
+      "JUNGLE"
     ]
   },
   "121": {
@@ -857,7 +913,7 @@
     "name": "Kha'Zix",
     "icon": "Khazix.png",
     "roles": [
-      "MID"
+      "JUNGLE"
     ]
   },
   "122": {
@@ -865,7 +921,8 @@
     "name": "Darius",
     "icon": "Darius.png",
     "roles": [
-      "TOP"
+      "TOP",
+      "JUNGLE"
     ]
   },
   "126": {
@@ -874,7 +931,8 @@
     "icon": "Jayce.png",
     "roles": [
       "TOP",
-      "ADC"
+      "JUNGLE",
+      "MID"
     ]
   },
   "127": {
@@ -890,7 +948,7 @@
     "name": "Diana",
     "icon": "Diana.png",
     "roles": [
-      "TOP",
+      "JUNGLE",
       "MID"
     ]
   },
@@ -899,7 +957,8 @@
     "name": "Quinn",
     "icon": "Quinn.png",
     "roles": [
-      "ADC",
+      "TOP",
+      "JUNGLE",
       "MID"
     ]
   },
@@ -908,7 +967,8 @@
     "name": "Syndra",
     "icon": "Syndra.png",
     "roles": [
-      "MID"
+      "MID",
+      "ADC"
     ]
   },
   "136": {
@@ -916,7 +976,9 @@
     "name": "Aurelion Sol",
     "icon": "AurelionSol.png",
     "roles": [
-      "MID"
+      "TOP",
+      "MID",
+      "ADC"
     ]
   },
   "141": {
@@ -924,8 +986,7 @@
     "name": "Kayn",
     "icon": "Kayn.png",
     "roles": [
-      "TOP",
-      "MID"
+      "JUNGLE"
     ]
   },
   "142": {
@@ -933,7 +994,10 @@
     "name": "Zoe",
     "icon": "Zoe.png",
     "roles": [
-      "MID"
+      "TOP",
+      "MID",
+      "ADC",
+      "SUPPORT"
     ]
   },
   "143": {
@@ -941,7 +1005,8 @@
     "name": "Zyra",
     "icon": "Zyra.png",
     "roles": [
-      "MID",
+      "JUNGLE",
+      "ADC",
       "SUPPORT"
     ]
   },
@@ -950,8 +1015,7 @@
     "name": "Kai'Sa",
     "icon": "Kaisa.png",
     "roles": [
-      "ADC",
-      "MID"
+      "ADC"
     ]
   },
   "147": {
@@ -959,8 +1023,8 @@
     "name": "Seraphine",
     "icon": "Seraphine.png",
     "roles": [
-      "SUPPORT",
-      "MID"
+      "ADC",
+      "SUPPORT"
     ]
   },
   "150": {
@@ -976,7 +1040,8 @@
     "name": "Zac",
     "icon": "Zac.png",
     "roles": [
-      "TOP"
+      "TOP",
+      "JUNGLE"
     ]
   },
   "157": {
@@ -985,7 +1050,8 @@
     "icon": "Yasuo.png",
     "roles": [
       "TOP",
-      "MID"
+      "MID",
+      "ADC"
     ]
   },
   "161": {
@@ -994,6 +1060,7 @@
     "icon": "Velkoz.png",
     "roles": [
       "MID",
+      "ADC",
       "SUPPORT"
     ]
   },
@@ -1002,8 +1069,8 @@
     "name": "Taliyah",
     "icon": "Taliyah.png",
     "roles": [
-      "MID",
-      "SUPPORT"
+      "JUNGLE",
+      "MID"
     ]
   },
   "164": {
@@ -1012,7 +1079,7 @@
     "icon": "Camille.png",
     "roles": [
       "TOP",
-      "MID"
+      "SUPPORT"
     ]
   },
   "166": {
@@ -1020,7 +1087,7 @@
     "name": "Akshan",
     "icon": "Akshan.png",
     "roles": [
-      "ADC",
+      "TOP",
       "MID"
     ]
   },
@@ -1029,7 +1096,7 @@
     "name": "Bel'Veth",
     "icon": "Belveth.png",
     "roles": [
-      "TOP"
+      "JUNGLE"
     ]
   },
   "201": {
@@ -1037,7 +1104,6 @@
     "name": "Braum",
     "icon": "Braum.png",
     "roles": [
-      "TOP",
       "SUPPORT"
     ]
   },
@@ -1046,8 +1112,7 @@
     "name": "Jhin",
     "icon": "Jhin.png",
     "roles": [
-      "ADC",
-      "MID"
+      "ADC"
     ]
   },
   "203": {
@@ -1055,7 +1120,7 @@
     "name": "Kindred",
     "icon": "Kindred.png",
     "roles": [
-      "ADC"
+      "JUNGLE"
     ]
   },
   "221": {
@@ -1080,6 +1145,7 @@
     "icon": "TahmKench.png",
     "roles": [
       "TOP",
+      "ADC",
       "SUPPORT"
     ]
   },
@@ -1088,8 +1154,7 @@
     "name": "Briar",
     "icon": "Briar.png",
     "roles": [
-      "TOP",
-      "MID"
+      "JUNGLE"
     ]
   },
   "234": {
@@ -1097,8 +1162,7 @@
     "name": "Viego",
     "icon": "Viego.png",
     "roles": [
-      "TOP",
-      "MID"
+      "JUNGLE"
     ]
   },
   "235": {
@@ -1106,8 +1170,7 @@
     "name": "Senna",
     "icon": "Senna.png",
     "roles": [
-      "SUPPORT",
-      "ADC"
+      "SUPPORT"
     ]
   },
   "236": {
@@ -1115,8 +1178,8 @@
     "name": "Lucian",
     "icon": "Lucian.png",
     "roles": [
-      "ADC",
-      "MID"
+      "MID",
+      "ADC"
     ]
   },
   "238": {
@@ -1124,6 +1187,8 @@
     "name": "Zed",
     "icon": "Zed.png",
     "roles": [
+      "TOP",
+      "JUNGLE",
       "MID"
     ]
   },
@@ -1132,7 +1197,8 @@
     "name": "Kled",
     "icon": "Kled.png",
     "roles": [
-      "TOP"
+      "TOP",
+      "MID"
     ]
   },
   "245": {
@@ -1140,7 +1206,11 @@
     "name": "Ekko",
     "icon": "Ekko.png",
     "roles": [
-      "MID"
+      "TOP",
+      "JUNGLE",
+      "MID",
+      "ADC",
+      "SUPPORT"
     ]
   },
   "246": {
@@ -1148,6 +1218,7 @@
     "name": "Qiyana",
     "icon": "Qiyana.png",
     "roles": [
+      "JUNGLE",
       "MID"
     ]
   },
@@ -1156,8 +1227,7 @@
     "name": "Vi",
     "icon": "Vi.png",
     "roles": [
-      "TOP",
-      "MID"
+      "JUNGLE"
     ]
   },
   "266": {
@@ -1165,7 +1235,8 @@
     "name": "Aatrox",
     "icon": "Aatrox.png",
     "roles": [
-      "TOP"
+      "TOP",
+      "JUNGLE"
     ]
   },
   "267": {
@@ -1173,8 +1244,7 @@
     "name": "Nami",
     "icon": "Nami.png",
     "roles": [
-      "SUPPORT",
-      "MID"
+      "SUPPORT"
     ]
   },
   "268": {
@@ -1182,8 +1252,8 @@
     "name": "Azir",
     "icon": "Azir.png",
     "roles": [
-      "MID",
-      "ADC"
+      "TOP",
+      "MID"
     ]
   },
   "350": {
@@ -1191,8 +1261,7 @@
     "name": "Yuumi",
     "icon": "Yuumi.png",
     "roles": [
-      "SUPPORT",
-      "MID"
+      "SUPPORT"
     ]
   },
   "360": {
@@ -1200,8 +1269,7 @@
     "name": "Samira",
     "icon": "Samira.png",
     "roles": [
-      "ADC",
-      "MID"
+      "ADC"
     ]
   },
   "412": {
@@ -1209,8 +1277,7 @@
     "name": "Thresh",
     "icon": "Thresh.png",
     "roles": [
-      "SUPPORT",
-      "TOP"
+      "SUPPORT"
     ]
   },
   "420": {
@@ -1218,7 +1285,9 @@
     "name": "Illaoi",
     "icon": "Illaoi.png",
     "roles": [
-      "TOP"
+      "TOP",
+      "JUNGLE",
+      "MID"
     ]
   },
   "421": {
@@ -1226,7 +1295,8 @@
     "name": "Rek'Sai",
     "icon": "RekSai.png",
     "roles": [
-      "TOP"
+      "TOP",
+      "JUNGLE"
     ]
   },
   "427": {
@@ -1234,8 +1304,7 @@
     "name": "Ivern",
     "icon": "Ivern.png",
     "roles": [
-      "SUPPORT",
-      "MID"
+      "JUNGLE"
     ]
   },
   "429": {
@@ -1243,6 +1312,7 @@
     "name": "Kalista",
     "icon": "Kalista.png",
     "roles": [
+      "TOP",
       "ADC"
     ]
   },
@@ -1251,8 +1321,7 @@
     "name": "Bard",
     "icon": "Bard.png",
     "roles": [
-      "SUPPORT",
-      "MID"
+      "SUPPORT"
     ]
   },
   "497": {
@@ -1284,7 +1353,10 @@
     "name": "Sylas",
     "icon": "Sylas.png",
     "roles": [
-      "MID"
+      "TOP",
+      "JUNGLE",
+      "MID",
+      "SUPPORT"
     ]
   },
   "518": {
@@ -1309,7 +1381,6 @@
     "name": "Rell",
     "icon": "Rell.png",
     "roles": [
-      "TOP",
       "SUPPORT"
     ]
   },
@@ -1318,8 +1389,7 @@
     "name": "Pyke",
     "icon": "Pyke.png",
     "roles": [
-      "SUPPORT",
-      "MID"
+      "SUPPORT"
     ]
   },
   "711": {
@@ -1345,6 +1415,7 @@
     "icon": "Ambessa.png",
     "roles": [
       "TOP",
+      "JUNGLE",
       "MID"
     ]
   },
@@ -1354,7 +1425,7 @@
     "icon": "Mel.png",
     "roles": [
       "MID",
-      "SUPPORT"
+      "ADC"
     ]
   },
   "804": {
@@ -1370,6 +1441,7 @@
     "name": "Locke",
     "icon": "Locke.png",
     "roles": [
+      "JUNGLE",
       "MID"
     ]
   },
@@ -1378,7 +1450,9 @@
     "name": "Sett",
     "icon": "Sett.png",
     "roles": [
-      "TOP"
+      "TOP",
+      "MID",
+      "SUPPORT"
     ]
   },
   "876": {
@@ -1386,8 +1460,7 @@
     "name": "Lillia",
     "icon": "Lillia.png",
     "roles": [
-      "TOP",
-      "MID"
+      "JUNGLE"
     ]
   },
   "887": {
@@ -1395,7 +1468,9 @@
     "name": "Gwen",
     "icon": "Gwen.png",
     "roles": [
-      "TOP"
+      "TOP",
+      "JUNGLE",
+      "MID"
     ]
   },
   "888": {
@@ -1403,8 +1478,7 @@
     "name": "Renata Glasc",
     "icon": "Renata.png",
     "roles": [
-      "SUPPORT",
-      "MID"
+      "SUPPORT"
     ]
   },
   "893": {
@@ -1412,6 +1486,7 @@
     "name": "Aurora",
     "icon": "Aurora.png",
     "roles": [
+      "TOP",
       "MID"
     ]
   },
@@ -1420,8 +1495,7 @@
     "name": "Nilah",
     "icon": "Nilah.png",
     "roles": [
-      "TOP",
-      "MID"
+      "ADC"
     ]
   },
   "897": {
@@ -1437,8 +1511,8 @@
     "name": "Smolder",
     "icon": "Smolder.png",
     "roles": [
-      "ADC",
-      "MID"
+      "MID",
+      "ADC"
     ]
   },
   "902": {
@@ -1446,8 +1520,7 @@
     "name": "Milio",
     "icon": "Milio.png",
     "roles": [
-      "SUPPORT",
-      "MID"
+      "SUPPORT"
     ]
   },
   "904": {
@@ -1455,7 +1528,8 @@
     "name": "Zaahen",
     "icon": "Zaahen.png",
     "roles": [
-      "TOP"
+      "TOP",
+      "JUNGLE"
     ]
   },
   "910": {
@@ -1463,7 +1537,9 @@
     "name": "Hwei",
     "icon": "Hwei.png",
     "roles": [
+      "TOP",
       "MID",
+      "ADC",
       "SUPPORT"
     ]
   },
@@ -1472,8 +1548,9 @@
     "name": "Naafiri",
     "icon": "Naafiri.png",
     "roles": [
-      "MID",
-      "TOP"
+      "TOP",
+      "JUNGLE",
+      "MID"
     ]
   }
 }

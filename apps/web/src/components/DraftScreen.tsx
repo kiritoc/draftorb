@@ -328,7 +328,6 @@ export function DraftScreen() {
 
         {poolSize > 0 && (
           <div className="mb-4">
-            <h3 className="text-sm font-bold text-indigo-300 mb-2">{strings.fromYourPool}</h3>
             <RecommendationsList
               title={strings.fromYourPool}
               recommendations={visiblePoolRecommendations}
@@ -384,8 +383,7 @@ export function DraftScreen() {
           </div>
         )}
 
-        <div className="flex items-center gap-3 mb-2">
-          <h3 className="text-sm font-bold text-indigo-300">{strings.bestOverall}</h3>
+        <div className="flex items-center justify-end gap-3 mb-2">
           <label className="flex items-center gap-1.5 text-xs text-gray-400 cursor-pointer select-none">
             <input
               type="checkbox"

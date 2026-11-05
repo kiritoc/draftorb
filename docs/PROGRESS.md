@@ -40,6 +40,18 @@ Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-0
 
 ## Session log (newest first)
 
+### 2026-11-05 — Devin — Pool editor champion browser with avatars (owner request, D-053)
+
+- Done:
+  - Replaced the pool editor's ChampionPicker dropdown + chip list with `ChampionGrid`: the whole champion catalogue as an avatar grid, filterable by name, click-to-toggle membership, selected champions pinned first and highlighted, off-role picks marked amber. Pool stays Support-only (Phase 1, D-024); max size and working-copy/save semantics unchanged.
+  - Avatars come from the Data Dragon CDN (D-053): `data/champion-icons.ts` maps the export patch label to the newest full version via `api/versions.json` (cached per session) and builds `cdn/<version>/img/champion/<icon>` URLs; all failures degrade to a letter placeholder.
+  - `DraftScreen` resolves the icon version alongside the data load and passes it to `PoolEditor`; unused picker strings removed; modal widened to `max-w-3xl`.
+- Files touched: `apps/web/src/data/{champion-icons.ts,champion-icons.test.ts}` (new), `apps/web/src/components/{ChampionGrid.tsx,champion-grid.test.ts}` (new), `apps/web/src/components/{PoolEditor,DraftScreen}.tsx`, `apps/web/src/strings.ts`, `docs/{DECISIONS,PROGRESS}.md`.
+- Tests: `pnpm check` green (77 files, 864 tests); new coverage for version resolution, icon URLs and grid rendering/order/placeholder fallback.
+- State left: DONE pending owner review. Dev server verified serving; visual check of the grid in the browser preview is on the owner.
+- Next step: owner review; then T-019.b.
+- Pitfalls / notes for next AI: `api/versions.json` is newest-first, so `resolveIconVersion` takes the first `major.minor.*` match; Data Dragon `img/champion/square/` returns AccessDenied — only `img/champion/<Icon>.png` (128x128) works.
+
 ### 2026-11-05 — Devin — PR #47 follow-up review fix (unscored report counts)
 
 - Done:

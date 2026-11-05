@@ -503,6 +503,17 @@ Owner decision 2026-11-04.
   - Required `pickRate` field — rejected: already-published patch exports have no `pick-rate.json` and cannot be regenerated while the database is locked.
 - Consequences: `pnpm etl export` writes `pick-rate.json` (manifest `files`, no schemaVersion bump — additive file, loader treats it as optional). Engine behavior is unchanged until an export containing the file is loaded.
 
+### D-053 — Champion avatars from the Data Dragon CDN — ACCEPTED
+
+- Context: the pool editor needed a browsable champion set with avatars, but `champions.json` stores only the icon file name (`Annie.png`) and no images are shipped with the export.
+- Decision: resolve avatar URLs at runtime against the Data Dragon CDN (`https://ddragon.leagueoflegends.com/cdn/<version>/img/champion/<icon>`). The export patch is a `major.minor` label, so `apps/web/src/data/champion-icons.ts` maps it to the newest matching full version from `api/versions.json` (fetched once per session). Every failure path (CDN down, unknown patch, missing version) degrades to `null` and the grid renders a letter placeholder — avatars never block the app.
+- Alternatives:
+  - Bundle icons into `data/public/<patch>/` at export time — rejected by the owner: adds ETL work and per-patch image weight for no functional gain while the app already requires network access for its data.
+  - CommunityDragon icons — rejected: Data Dragon is the documented static-data source (RIOT_API.md) and its `img/champion/` path is stable and key-free.
+- Consequences: one extra small fetch (`versions.json`) per session; avatar availability depends on Riot's CDN, mitigated by the placeholder fallback. `square/` portraits return AccessDenied on this CDN, so the 128x128 `img/champion/` portrait is used.
+
+Owner decision 2026-11-05 (avatar source chosen in session).
+
 ### Template
 
 ```

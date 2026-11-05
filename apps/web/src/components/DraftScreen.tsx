@@ -18,6 +18,7 @@ import {
   type InsufficientDataEntry,
   type PoolUnavailableEntry,
   type Rank,
+  rankSchema,
   type RecommendData,
   type Recommendation,
   type Role,
@@ -252,16 +253,7 @@ export function DraftScreen() {
                   onChange={(event) => setUserRank(event.target.value as Rank)}
                   className="px-2 py-1 bg-gray-800 border border-gray-600 rounded text-gray-200 focus:outline-none focus:border-indigo-400"
                 >
-                  {[
-                    'IRON',
-                    'BRONZE',
-                    'SILVER',
-                    'GOLD',
-                    'PLATINUM',
-                    'EMERALD',
-                    'DIAMOND',
-                    'MASTER_PLUS',
-                  ].map((rank) => (
+                  {rankSchema.options.map((rank) => (
                     <option key={rank} value={rank}>
                       {rank.replace('_', '+')}
                     </option>

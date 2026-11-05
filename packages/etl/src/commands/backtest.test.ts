@@ -97,6 +97,27 @@ describe('backtestCommand', () => {
     expect(report.logLoss).toBeTypeOf('number');
   });
 
+  it('writes the report to a custom --out path', async () => {
+    const db = openDb(dbPath);
+    migrate(db);
+    seed(db);
+    db.close();
+
+    const customOut = join(directory, 'reports', 'custom-backtest.json');
+    await backtestCommand.run(['draft', `--out=${customOut}`]);
+
+    const report = JSON.parse(readFileSync(customOut, 'utf8'));
+    expect(report.holdoutPatch).toBe('16.21');
+    expect(report.insufficientData).toBe(false);
+  });
+
+  it('rejects a duplicate or empty --out option', async () => {
+    await expect(
+      backtestCommand.run(['draft', '--out=a.json', '--out=b.json']),
+    ).rejects.toThrow(/Duplicate --out/);
+    await expect(backtestCommand.run(['draft', '--out='])).rejects.toThrow(/Missing value/);
+  });
+
   it('reports insufficient data when there are no matches', async () => {
     const db = openDb(dbPath);
     migrate(db);

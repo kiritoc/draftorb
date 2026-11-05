@@ -21,19 +21,28 @@ function resolveDbPathReadOnly(): string {
 }
 
 async function runBacktest(args: string[]): Promise<void> {
-  const [subcommand] = parsePositionals(args, 1, 'backtest draft [--out=<path>]');
+  // `--out=<path>` is handled here, not by parsePositionals: the shared helper
+  // uses strict parseArgs with no options, which would reject the flag.
+  const outArgs = args.filter((arg) => arg.startsWith('--out='));
+  if (outArgs.length > 1) {
+    throw new UsageError('Duplicate --out option.\nUsage: backtest draft [--out=<path>]');
+  }
+  const positionalArgs = args.filter((arg) => !arg.startsWith('--out='));
+  const [subcommand] = parsePositionals(positionalArgs, 1, 'backtest draft [--out=<path>]');
   if (subcommand !== 'draft') {
     throw new UsageError(
       `Unknown backtest subcommand "${subcommand ?? ''}". Usage: backtest draft [--out=<path>]`,
     );
   }
 
-  let out = join(process.env.DRAFTORB_PUBLIC_DIR ?? defaultPublicDataDir(), 'backtest-draft.json');
-  for (const arg of args) {
-    if (arg.startsWith('--out=')) {
-      out = arg.slice('--out='.length);
-    }
+  const outValue = outArgs[0]?.slice('--out='.length);
+  if (outArgs.length === 1 && (outValue === undefined || outValue === '')) {
+    throw new UsageError('Missing value for --out.\nUsage: backtest draft [--out=<path>]');
   }
+  let out =
+    outValue !== undefined && outValue !== ''
+      ? outValue
+      : join(process.env.DRAFTORB_PUBLIC_DIR ?? defaultPublicDataDir(), 'backtest-draft.json');
 
   const dbPath = resolveDbPathReadOnly();
   if (!existsSync(dbPath)) {

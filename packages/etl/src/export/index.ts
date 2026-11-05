@@ -69,7 +69,8 @@ export interface ExportResult {
   files: ExportFile[];
   warnings: string[];
   skippedRunePages: number;
-  latestPath: string;
+  /** Path of the written `latest.json`, or null when the pointer was left untouched. */
+  latestPath: string | null;
 }
 
 /** Typed wrapper around `db.prepare(sql).all()` so query results are never
@@ -248,13 +249,19 @@ export function exportJson(db: Database.Database, options: ExportOptions = {}): 
     if (cleanupWarning !== null) warnings.push(cleanupWarning);
 
     // D-051: write the latest-patch pointer last, after the patch dir is live.
-    const latest = latestSchema.parse({
-      schemaVersion: LATEST_SCHEMA_VERSION,
-      patch: targetPatch,
-      manifest: `${targetPatch}/manifest.json`,
-      generatedAt,
-    });
-    const latestPath = writeFileAtomic(publicDir, 'latest.json', JSON.stringify(latest, null, 2));
+    // Only when the exported patch IS the latest one: re-exporting an older
+    // patch must not move the pointer backwards (the patch dir may not even
+    // exist yet for a newer dbLatestPatch).
+    let latestPath: string | null = null;
+    if (dbLatestPatch === undefined || targetPatch === dbLatestPatch) {
+      const latest = latestSchema.parse({
+        schemaVersion: LATEST_SCHEMA_VERSION,
+        patch: targetPatch,
+        manifest: `${targetPatch}/manifest.json`,
+        generatedAt,
+      });
+      latestPath = writeFileAtomic(publicDir, 'latest.json', JSON.stringify(latest, null, 2));
+    }
 
     return {
       patch: targetPatch,

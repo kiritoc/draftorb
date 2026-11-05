@@ -275,4 +275,30 @@ describe('exportCommand', () => {
     const after = readFileSync(latestPath, 'utf8');
     expect(after).toBe(before);
   });
+
+  it('does not move latest.json backwards when exporting an older patch', async () => {
+    const db = openDb(dbPath);
+    migrate(db);
+    db.prepare(
+      `INSERT INTO matches (match_id, platform, patch, queue_id, duration, created_at, avg_rank_score, rank_known_count)
+       VALUES ('m1', 'euw1', '16.21', 420, 1800, 1, 6.5, 2)`,
+    ).run();
+    db.prepare(
+      `INSERT INTO role_prob (champion_id, role, games, games_w, games_w2, prob)
+       VALUES (412, 'SUPPORT', 1, 10, 10, 1)`,
+    ).run();
+    db.close();
+
+    await exportCommand.run([]);
+    const publicDir = process.env.DRAFTORB_PUBLIC_DIR as string;
+    const latestPath = join(publicDir, 'latest.json');
+    const before = readFileSync(latestPath, 'utf8');
+
+    // Re-export an older patch: the pointer must stay on the latest patch.
+    await exportCommand.run(['16.20']);
+
+    const after = readFileSync(latestPath, 'utf8');
+    expect(after).toBe(before);
+    expect(JSON.parse(after).patch).toBe('16.21');
+  });
 });

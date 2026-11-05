@@ -9,7 +9,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
-  championPoolSchema,
   type Champion,
   type ChampionId,
   type ChampionPool,
@@ -18,6 +17,7 @@ import {
 import { poolMaxSize } from '../config.js';
 import { strings } from '../strings.js';
 import { ChampionPicker } from './ChampionPicker.js';
+import { parsePoolImport } from '../pool/storage.js';
 
 const USER_ROLE: Role = 'SUPPORT';
 const STORED_ROLES: readonly Role[] = ['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT'];
@@ -96,13 +96,7 @@ export function PoolEditor({ open, onClose, pool, champions, onSave }: PoolEdito
     if (!file) return;
     setImportError(null);
     try {
-      const text = await file.text();
-      const parsed = championPoolSchema.parse(JSON.parse(text));
-      for (const role of STORED_ROLES) {
-        if ((parsed.pools[role]?.length ?? 0) > poolMaxSize) {
-          throw new Error(strings.poolTooLarge(role, poolMaxSize));
-        }
-      }
+      const parsed = parsePoolImport(await file.text());
       onSave(parsed);
       setMessage({ text: strings.poolImported, kind: 'info' });
       onClose();

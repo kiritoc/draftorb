@@ -6,6 +6,7 @@ import {
   clearPool,
   filterPoolByCatalogue,
   loadPool,
+  parsePoolImport,
   readPool,
   savePool,
 } from './storage';
@@ -109,6 +110,28 @@ describe('pool storage', () => {
     expect(readPool(storage).issue).toBe('unavailable');
     expect(savePool({ version: 1, pools: {} }, storage)).toBe(false);
     expect(clearPool(storage)).toBe(false);
+  });
+
+  it('parsePoolImport accepts a valid pool file', () => {
+    const pool = parsePoolImport(JSON.stringify({ version: 1, pools: { SUPPORT: [412, 1] } }));
+    expect(pool.pools.SUPPORT).toEqual([412, 1]);
+  });
+
+  it('parsePoolImport rejects malformed JSON and schema violations', () => {
+    expect(() => parsePoolImport('{ bad')).toThrow();
+    expect(() => parsePoolImport(JSON.stringify({ version: 2, pools: {} }))).toThrow();
+    expect(() =>
+      parsePoolImport(
+        JSON.stringify({ version: 1, pools: { SUPPORT: [412, 412] } }),
+      ),
+    ).toThrow(/duplicate/);
+  });
+
+  it('parsePoolImport rejects a role pool over the maximum size', () => {
+    const ids = Array.from({ length: 41 }, (_, i) => i + 1);
+    expect(() =>
+      parsePoolImport(JSON.stringify({ version: 1, pools: { SUPPORT: ids } })),
+    ).toThrow(/exceeds the maximum/);
   });
 
   it('filterPoolByCatalogue drops ids absent from the catalogue', () => {

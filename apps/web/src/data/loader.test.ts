@@ -106,6 +106,21 @@ describe('data loader', () => {
     ]);
   });
 
+  it('rejects when an export file fails to load', async () => {
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockImplementation(
+      async (input: RequestInfo | URL): Promise<Response> => {
+        const url = String(input);
+        if (url === '16.21/roles/SUPPORT/baseline.json') {
+          return new Response('not found', { status: 404 });
+        }
+        return new Response(JSON.stringify([[412, 'IRON', 6, 10, 10, 3]]), { status: 200 });
+      },
+    );
+
+    const manifest = manifestSchema.parse(manifestJson);
+    await expect(loadExportFiles(manifest)).rejects.toThrow(/Failed to load/);
+  });
+
   it('propagates a failed fetch as an error', async () => {
     (globalThis.fetch as ReturnType<typeof vi.fn>).mockRejectedValue(
       new Error('network down'),

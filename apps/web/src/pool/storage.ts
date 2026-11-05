@@ -9,6 +9,7 @@
 
 import { championPoolSchema, type ChampionPool, type Role } from '@draftorb/shared';
 import { poolMaxSize } from '../config.js';
+import { strings } from '../strings.js';
 
 export const POOL_STORAGE_KEY = 'draftorb.pool.v1';
 
@@ -89,6 +90,19 @@ export function clearPool(storage?: PoolStorage): boolean {
   } catch {
     return false;
   }
+}
+
+/** Parse and validate a pool JSON import (schema + per-role size limit).
+ *  Throws on any violation; callers must not touch the stored pool on
+ *  failure, which keeps invalid imports from replacing good data. */
+export function parsePoolImport(text: string): ChampionPool {
+  const parsed = championPoolSchema.parse(JSON.parse(text));
+  for (const [role, ids] of Object.entries(parsed.pools)) {
+    if (ids.length > poolMaxSize) {
+      throw new Error(strings.poolTooLarge(role, poolMaxSize));
+    }
+  }
+  return parsed;
 }
 
 /** Drop pool champion ids that are absent from the champion catalogue, and

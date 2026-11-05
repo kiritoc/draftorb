@@ -20,11 +20,21 @@ export interface DraftSlotProps {
   onChange: (slot: DraftSlotState) => void;
   champions: import('@draftorb/shared').Champion[];
   disabled?: boolean;
+  /** Show the optional role select. Hidden for the user slot: the user's
+   *  role comes from `DraftInput.userRole`, not the slot. */
+  showRole?: boolean;
 }
 
 const ROLES: readonly Role[] = ['SUPPORT', 'ADC', 'MID', 'JUNGLE', 'TOP'];
 
-export function DraftSlot({ label, slot, onChange, champions, disabled = false }: DraftSlotProps) {
+export function DraftSlot({
+  label,
+  slot,
+  onChange,
+  champions,
+  disabled = false,
+  showRole = true,
+}: DraftSlotProps) {
   const handleChampion = (championId: ChampionId | null) => {
     onChange({
       ...slot,
@@ -51,19 +61,21 @@ export function DraftSlot({ label, slot, onChange, champions, disabled = false }
         champions={champions}
         disabled={disabled}
       />
-      <select
-        value={slot.role ?? ''}
-        onChange={handleRole}
-        disabled={disabled || !hasChampion}
-        className="w-full px-2 py-1.5 bg-gray-800 border border-gray-600 rounded text-gray-200 focus:outline-none focus:border-indigo-400"
-      >
-        <option value="">{strings.roleOptional}</option>
-        {ROLES.map((role) => (
-          <option key={role} value={role}>
-            {role}
-          </option>
-        ))}
-      </select>
+      {showRole && (
+        <select
+          value={slot.role ?? ''}
+          onChange={handleRole}
+          disabled={disabled || !hasChampion}
+          className="w-full px-2 py-1.5 bg-gray-800 border border-gray-600 rounded text-gray-200 focus:outline-none focus:border-indigo-400"
+        >
+          <option value="">{strings.roleOptional}</option>
+          {ROLES.map((role) => (
+            <option key={role} value={role}>
+              {role}
+            </option>
+          ))}
+        </select>
+      )}
     </div>
   );
 }

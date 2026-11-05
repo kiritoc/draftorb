@@ -2,6 +2,8 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSy
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
+import { MANIFEST_SCHEMA_VERSION } from '@draftorb/shared';
+
 import { seed, validPerksJson } from './export.fixtures.js';
 import { createExportTestSuite, FIXED_NOW, PATCH } from './export.test-utils.js';
 import { exportJson } from './index.js';
@@ -194,5 +196,88 @@ describe('exportJson', () => {
     seed(suite.db, 'match', [{}]);
     const result = suite.exportOnce();
     expect(result.warnings.some((w) => w.includes('missing static catalog'))).toBe(true);
+  });
+
+  const writeLatestJson = (patch: string, withManifest: boolean): void => {
+    mkdirSync(suite.publicDir, { recursive: true });
+    writeFileSync(
+      join(suite.publicDir, 'latest.json'),
+      JSON.stringify({
+        schemaVersion: 1,
+        patch,
+        manifest: `${patch}/manifest.json`,
+        generatedAt: FIXED_NOW.toISOString(),
+      }),
+    );
+    if (withManifest) {
+      mkdirSync(join(suite.publicDir, patch), { recursive: true });
+      writeFileSync(
+        join(suite.publicDir, patch, 'manifest.json'),
+        JSON.stringify({
+          schemaVersion: MANIFEST_SCHEMA_VERSION,
+          patch,
+          generatedAt: FIXED_NOW.toISOString(),
+          region: 'euw1',
+          rankBuckets: [],
+          roles: [],
+          files: [],
+        }),
+      );
+    }
+  };
+  const writeLatest = (patch: string): void => writeLatestJson(patch, true);
+  const readLatestPatch = (): string =>
+    (JSON.parse(readFileSync(join(suite.publicDir, 'latest.json'), 'utf8')) as { patch: string })
+      .patch;
+
+  it('keeps a newer published latest.json when the database has no matches', () => {
+    // No match seed: dbLatestPatch is undefined, but a newer pointer exists.
+    writeLatest('16.22');
+    const result = suite.exportOnce();
+
+    expect(result.latestPath).toBeNull();
+    expect(result.warnings.some((w) => w.includes('newer patch 16.22'))).toBe(true);
+    expect(readLatestPatch()).toBe('16.22');
+  });
+
+  it('keeps a newer published latest.json when the database latest patch is older', () => {
+    // match seed defaults to patch 16.21; the published pointer is ahead.
+    seed(suite.db, 'match', [{}]);
+    writeLatest('16.22');
+    const result = suite.exportOnce();
+
+    expect(result.latestPath).toBeNull();
+    expect(result.warnings.some((w) => w.includes('newer patch 16.22'))).toBe(true);
+    expect(readLatestPatch()).toBe('16.22');
+  });
+
+  it('moves latest.json forward over an older published pointer', () => {
+    seed(suite.db, 'match', [{}]);
+    writeLatest('16.20');
+    const result = suite.exportOnce();
+
+    expect(result.latestPath).not.toBeNull();
+    expect(readLatestPatch()).toBe('16.21');
+  });
+
+  it('replaces a dangling newer latest.json when the export is eligible', () => {
+    // latest.json points at 16.22 but its patch directory is gone (partial
+    // restore); the db latest patch 16.21 must be able to take over.
+    seed(suite.db, 'match', [{}]);
+    writeLatestJson('16.22', false);
+    const result = suite.exportOnce();
+
+    expect(result.latestPath).not.toBeNull();
+    expect(result.warnings.some((w) => w.includes('manifest is missing or invalid'))).toBe(true);
+    expect(readLatestPatch()).toBe('16.21');
+  });
+
+  it('keeps a dangling newer latest.json when the export is not eligible', () => {
+    seed(suite.db, 'match', [{}]);
+    writeLatestJson('16.22', false);
+    const result = suite.exportOnce({ patch: '16.20' });
+
+    expect(result.latestPath).toBeNull();
+    expect(readLatestPatch()).toBe('16.22');
   });
 });

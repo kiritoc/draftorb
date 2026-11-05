@@ -5,7 +5,7 @@
  * the pool editor (T-033). Controlled by `value`/`onChange`.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useId, useRef } from 'react';
 
 import { type Champion, type ChampionId } from '@draftorb/shared';
 import { strings } from '../strings.js';
@@ -31,6 +31,38 @@ export function ChampionPicker({
 }: ChampionPickerProps) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
+  const listboxId = useId();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  // Close on outside pointer-down and Escape while the listbox is open.
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const onPointerDown = (event: PointerEvent) => {
+      if (rootRef.current !== null && !rootRef.current.contains(event.target as Node)) {
+        setOpen(false);
+        setQuery('');
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpen(false);
+        setQuery('');
+        // The autofocused search input unmounts with the listbox; return
+        // focus to the trigger so keyboard navigation does not restart
+        // from the document.
+        buttonRef.current?.focus();
+      }
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [open]);
 
   const selected = champions.find((champion) => champion.id === value);
   const filtered = champions
@@ -47,8 +79,9 @@ export function ChampionPicker({
   );
 
   return (
-    <div className="relative w-full">
+    <div className="relative w-full" ref={rootRef}>
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setOpen((current) => !current)}
         disabled={disabled}
@@ -64,13 +97,15 @@ export function ChampionPicker({
       {open && (
         <div
           role="listbox"
+          id={listboxId}
           aria-label={placeholder}
           className="absolute z-10 w-full mt-1 max-h-60 overflow-auto bg-gray-800 border border-gray-600 rounded shadow-lg"
         >
           <input
             autoFocus
             role="combobox"
-            aria-controls="champion-picker-options"
+            aria-expanded={open}
+            aria-controls={listboxId}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder={strings.search}

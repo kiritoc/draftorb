@@ -59,7 +59,9 @@ async function runExport(args: string[]): Promise<void> {
     for (const file of files) {
       log.detail(`${file.relativePath} (${file.bytes} bytes)`);
     }
-    log.detail(`Wrote latest patch pointer: ${latestPath}`);
+    if (latestPath !== null) {
+      log.detail(`Wrote latest patch pointer: ${latestPath}`);
+    }
     for (const warning of warnings) {
       log.info(warning);
     }

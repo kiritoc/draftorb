@@ -29,6 +29,9 @@ export interface RecommendationsListProps {
   champions: Champion[];
   pageSize?: number;
   resetKey: unknown;
+  /** Champion ids belonging to the user's pool, used to tag cards "In your
+   *  pool" in lists whose entries do not carry `poolRank` (SPECS §7.1). */
+  poolIds?: ReadonlySet<number>;
 }
 
 export function RecommendationsList({
@@ -37,6 +40,7 @@ export function RecommendationsList({
   champions,
   pageSize = recommendationPageSize,
   resetKey,
+  poolIds,
 }: RecommendationsListProps) {
   const pages = useMemo(() => paginate(recommendations, pageSize), [recommendations, pageSize]);
   const [pageCount, dispatch] = useReducer(pageCountReducer, 1);
@@ -65,6 +69,7 @@ export function RecommendationsList({
                 key={recommendation.championId}
                 recommendation={recommendation}
                 champions={champions}
+                inPool={poolIds?.has(recommendation.championId) ?? false}
               />
             ))}
         </div>

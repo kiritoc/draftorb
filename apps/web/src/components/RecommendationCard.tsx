@@ -17,6 +17,10 @@ import { strings } from '../strings.js';
 export interface RecommendationCardProps {
   recommendation: Recommendation;
   champions: Champion[];
+  /** True when the champion is in the user's pool. `poolRank` is only set on
+   *  pool-list entries, so the overall list passes membership explicitly to
+   *  get the "In your pool" tag (SPECS §7.1). */
+  inPool?: boolean;
 }
 
 const LEVEL_LABEL: Record<number, string> = {
@@ -72,7 +76,11 @@ export function warningText(warning: string, champions: Champion[]): string {
   return warning;
 }
 
-export function RecommendationCard({ recommendation, champions }: RecommendationCardProps) {
+export function RecommendationCard({
+  recommendation,
+  champions,
+  inPool = false,
+}: RecommendationCardProps) {
   const { score, poolRank, reasons, reliability, warnings } = recommendation;
   const name = championName(champions, recommendation.championId);
   const winProb = (score * 100).toFixed(1);
@@ -83,9 +91,9 @@ export function RecommendationCard({ recommendation, champions }: Recommendation
         <div className="flex items-baseline gap-2">
           <span className="text-xs font-mono text-gray-500">#{recommendation.rank}</span>
           <h3 className="text-base font-bold text-gray-100">{name}</h3>
-          {poolRank !== undefined && (
+          {(poolRank !== undefined || inPool) && (
             <span className="ml-2 px-1.5 py-0.5 rounded text-xs font-bold bg-indigo-900/50 text-indigo-300 border border-indigo-600/30">
-              {strings.inPool(poolRank)}
+              {poolRank !== undefined ? strings.inPool(poolRank) : strings.inPoolTag}
             </span>
           )}
         </div>

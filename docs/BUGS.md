@@ -46,6 +46,19 @@ Review notes that predate the bug log live in [Review history](#review-history) 
 
 ## Fixed
 
+### B-055 — PR #46 third-pass review findings — FIXED
+
+- `exportJson` guarded the `latest.json` pointer only against the database's latest patch, so after a database reset or restore an explicit older `--patch` export could overwrite a newer published pointer and move the web app backwards (S3, etl). Follow-up: the published pointer is protected only while intact — a dangling pointer (missing or mismatched manifest, e.g. after a partial restore) does not block an eligible export from replacing it.
+- `ChampionPicker` Escape dismissal unmounted the autofocused search input without returning focus to the trigger button, so keyboard navigation restarted from the document (S4, web).
+- Fixed on `feature/t-029-to-t-034`: the exporter reads and validates the existing `latest.json` in `publicDir` (pointer plus referenced manifest) and preserves it (with a warning) when it references a newer intact patch; the picker refocuses its button on Escape. Regression coverage in `export/atomic.test.ts`.
+
+### B-054 — Draft flow second-pass review findings — FIXED
+
+- `pnpm etl backtest draft --out=<path>` was unreachable: strict `parseArgs` rejected the flag before the manual scan ran (S2, etl).
+- `exportJson` wrote `latest.json` for any exported patch, so re-exporting an older patch moved the web pointer backwards (S2, etl).
+- Web: rank selector emitted the invalid `MASTER_PLUS` bucket as a `Rank`; duplicate champion picks across slots were allowed; the user slot showed a dead role select; pool champions in "Best overall" lacked the "In your pool" tag (SPECS §7.1); `poolUnavailable` reasons rendered as raw codes; `ChampionPicker` had a dangling `aria-controls` id and no dismiss handling; list titles were duplicated; pool import validation was untested.
+- Fixed on `feature/t-029-to-t-034` with regression coverage (`parsePoolImport`, `championsForSlot`, `--out` and `latest.json` guard tests, card pool-tag render tests).
+
 ### B-051 — Draft flow data and validation review findings — FIXED
 
 - The web loader used incorrect paths for patch-relative manifest files and did not publish manual champion tags in all runtime/deploy paths.

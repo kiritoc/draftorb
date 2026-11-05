@@ -18,6 +18,7 @@ import {
   type InsufficientDataEntry,
   type PoolUnavailableEntry,
   type Rank,
+  rankSchema,
   type RecommendData,
   type Recommendation,
   type Role,
@@ -32,6 +33,7 @@ import {
 } from '../data/loader.js';
 import { createRecommendData } from '../data/recommend-data.js';
 import { excludePick, excludedRanks } from '../data/exclude-pick.js';
+import { championsForSlot } from '../champion-availability.js';
 import { recommendationPageSize } from '../config.js';
 import { strings } from '../strings.js';
 import { DraftSlot, type DraftSlotState } from './DraftSlot.js';
@@ -61,7 +63,7 @@ export function DraftScreen() {
   const [pool, setPool] = useState<ChampionPool | null>(null);
   const [poolStorageIssue, setPoolStorageIssue] = useState<'corrupt' | 'unavailable' | null>(null);
   const [poolDropped, setPoolDropped] = useState<number[]>([]);
-  const [user, setUser] = useState<DraftSlotState>(emptySlot(USER_ROLE));
+  const [user, setUser] = useState<DraftSlotState>({ championId: null });
   const [allies, setAllies] = useState<DraftSlotState[]>(
     Array.from({ length: ALLY_COUNT }, () => emptySlot()),
   );
@@ -188,6 +190,12 @@ export function DraftScreen() {
     });
   }, []);
 
+  // A champion picked in one slot cannot be picked again in another.
+  const usedChampionIds = useMemo(
+    () => new Set([user, ...allies, ...enemies].filter(isFilled).map((slot) => slot.championId)),
+    [user, allies, enemies],
+  );
+
   const totalKnown = [user, ...allies, ...enemies].filter(isFilled).length;
   const poolSize = poolChampionIds.length;
   // The user's own pick is already taken: never suggest it again, and close
@@ -252,16 +260,7 @@ export function DraftScreen() {
                   onChange={(event) => setUserRank(event.target.value as Rank)}
                   className="px-2 py-1 bg-gray-800 border border-gray-600 rounded text-gray-200 focus:outline-none focus:border-indigo-400"
                 >
-                  {[
-                    'IRON',
-                    'BRONZE',
-                    'SILVER',
-                    'GOLD',
-                    'PLATINUM',
-                    'EMERALD',
-                    'DIAMOND',
-                    'MASTER_PLUS',
-                  ].map((rank) => (
+                  {rankSchema.options.map((rank) => (
                     <option key={rank} value={rank}>
                       {rank.replace('_', '+')}
                     </option>
@@ -291,7 +290,8 @@ export function DraftScreen() {
                 label={strings.userSlot}
                 slot={user}
                 onChange={setUserSlot}
-                champions={champions}
+                champions={championsForSlot(champions, usedChampionIds, user.championId)}
+                showRole={false}
               />
               {allies.map((slot, index) => (
                 <DraftSlot
@@ -299,7 +299,7 @@ export function DraftScreen() {
                   label={strings.allySlot(index + 1)}
                   slot={slot}
                   onChange={(next) => setAlly(index, next)}
-                  champions={champions}
+                  champions={championsForSlot(champions, usedChampionIds, slot.championId)}
                 />
               ))}
             </div>
@@ -316,7 +316,7 @@ export function DraftScreen() {
                   label={strings.enemySlot(index + 1)}
                   slot={slot}
                   onChange={(next) => setEnemy(index, next)}
-                  champions={champions}
+                  champions={championsForSlot(champions, usedChampionIds, slot.championId)}
                 />
               ))}
             </div>
@@ -325,7 +325,6 @@ export function DraftScreen() {
 
         {poolSize > 0 && (
           <div className="mb-4">
-            <h3 className="text-sm font-bold text-indigo-300 mb-2">{strings.fromYourPool}</h3>
             <RecommendationsList
               title={strings.fromYourPool}
               recommendations={visiblePoolRecommendations}
@@ -341,10 +340,7 @@ export function DraftScreen() {
                     const sample = insufficientData.find(
                       (item) => item.championId === entry.championId,
                     );
-                    const reason =
-                      entry.reason === 'insufficientData' && sample !== undefined
-                        ? strings.insufficientData(sample.nEff)
-                        : entry.reason;
+                    const reason = poolUnavailableReason(entry, sample);
                     return strings.dataReason(championName(champions, entry.championId), reason);
                   })
                   .join(', ')}
@@ -384,8 +380,7 @@ export function DraftScreen() {
           </div>
         )}
 
-        <div className="flex items-center gap-3 mb-2">
-          <h3 className="text-sm font-bold text-indigo-300">{strings.bestOverall}</h3>
+        <div className="flex items-center justify-end gap-3 mb-2">
           <label className="flex items-center gap-1.5 text-xs text-gray-400 cursor-pointer select-none">
             <input
               type="checkbox"
@@ -401,6 +396,7 @@ export function DraftScreen() {
           champions={champions}
           pageSize={recommendationPageSize}
           resetKey={draftInput}
+          poolIds={poolSet}
         />
         {recommendationError !== null && (
           <p role="alert" className="mt-3 text-sm text-red-400">
@@ -429,6 +425,22 @@ export function DraftScreen() {
       />
     </div>
   );
+}
+
+function poolUnavailableReason(
+  entry: PoolUnavailableEntry,
+  sample: InsufficientDataEntry | undefined,
+): string {
+  if (entry.reason === 'insufficientData' && sample !== undefined) {
+    return strings.insufficientData(sample.nEff);
+  }
+  if (entry.reason === 'picked') {
+    return strings.poolReasonPicked;
+  }
+  if (entry.reason === 'unknownChampion') {
+    return strings.poolReasonUnknownChampion;
+  }
+  return entry.reason;
 }
 
 function championName(champions: Champion[], id: number): string {

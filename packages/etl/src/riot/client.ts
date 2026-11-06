@@ -2,15 +2,21 @@ import { z } from '@draftorb/shared';
 import { loadEnv } from './env';
 import { RiotRateLimiter } from './rate-limiter';
 import {
+  RiotAccount,
   RiotChampionMastery,
+  RiotChampionMasteryList,
   RiotLeagueEntries,
   RiotLeagueList,
   RiotMatchDto,
+  RiotMatchTimeline,
+  riotAccountSchema,
+  riotChampionMasteryListSchema,
   riotChampionMasterySchema,
   riotLeagueEntriesSchema,
   riotLeagueListSchema,
   riotMatchDtoSchema,
   riotMatchIdsSchema,
+  riotMatchTimelineSchema,
 } from './schemas';
 import {
   Platform,
@@ -229,6 +235,26 @@ export class RiotClient {
     return this.request(url, riotLeagueEntriesSchema, 'league-v4.entriesByPuuid');
   }
 
+  /** account-v1: resolve a Riot ID (`gameName#tagLine`) to a puuid (T-091). */
+  async getAccountByRiotId(
+    region: RegionalRouting,
+    gameName: string,
+    tagLine: string,
+  ): Promise<RiotAccount> {
+    const url = `https://${region}.api.riotgames.com/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`;
+    return this.request(url, riotAccountSchema, 'account-v1.byRiotId');
+  }
+
+  /** champion-mastery-v4: top champion masteries for a puuid (T-091). */
+  async getChampionMasteryTop(
+    platform: Platform,
+    puuid: string,
+    count = 200,
+  ): Promise<RiotChampionMasteryList> {
+    const url = `https://${platform}.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/${puuid}/top?count=${count}`;
+    return this.request(url, riotChampionMasteryListSchema, 'champion-mastery-v4.top');
+  }
+
   async getChampionMastery(
     platform: Platform,
     puuid: string,
@@ -279,10 +305,10 @@ export class RiotClient {
   async getMatchTimeline(
     regionOrPlatform: RegionalRouting | Platform,
     matchId: string,
-  ): Promise<unknown> {
+  ): Promise<RiotMatchTimeline> {
     const region = this.resolveRegion(regionOrPlatform);
     const url = `https://${region}.api.riotgames.com/lol/match/v5/matches/${matchId}/timeline`;
-    return this.request(url, undefined, 'match-v5.timeline');
+    return this.request(url, riotMatchTimelineSchema, 'match-v5.timeline');
   }
 
   private resolveRegion(regionOrPlatform: RegionalRouting | Platform): RegionalRouting {

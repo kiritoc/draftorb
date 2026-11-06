@@ -12,4 +12,21 @@ export const ETL_CONFIG = Object.freeze({
    * default ingestion window is `patch_index >= latest - retentionPatches + 1`.
    */
   retentionPatches: 20,
+
+  /**
+   * Configured-profile sync/export knobs (T-091, D-069/D-074, SPECS §18).
+   * All priors until real profile volumes are known.
+   */
+  /** Recency half-life in days for profile win-rate weights (SPECS §18.2). */
+  profileHalfLifeDays: 60,
+  /** Export keeps at most the last N days of profile games (D-069). */
+  profileMaxAgeDays: 180,
+  /** Default per-profile export cap when `options.profileMaxGames` is unset. */
+  profileDefaultMaxGames: 500,
+  /** Favorites: recency-weighted Support games window (D-074). */
+  profileFavRecencyDays: 90,
+  profileFavRecencyCount: 15,
+  profileFavMasteryCount: 5,
+  /** Max new profile games fetched per profile per sync run (resumable). */
+  profileSyncMaxGames: 200,
 });

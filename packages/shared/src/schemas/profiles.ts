@@ -86,15 +86,16 @@ export const profileGameSchema = z
     championId: championIdSchema,
     role: roleSchema,
     win: z.boolean(),
-    /** Ally ADC champion id (bot-lane roles only, null otherwise). */
+    /** Ally ADC champion id (null when the ally team has no ADC). */
     allyAdcId: championIdSchema.nullable(),
-    /** Enemy support champion id (bot-lane roles only, null otherwise). */
+    /** Enemy support champion id (null when the enemy team has no SUPPORT). */
     enemySupportId: championIdSchema.nullable(),
-    /** Enemy ADC champion id (bot-lane roles only, null otherwise). */
+    /** Enemy ADC champion id (null when the enemy team has no ADC). */
     enemyAdcId: championIdSchema.nullable(),
     /** All five enemy team champion ids (composition context). */
     enemyChampionIds: z.array(championIdSchema),
-    runes: profileGameRunesSchema,
+    /** Rune page ids; null when the match carried no rune data. */
+    runes: profileGameRunesSchema.nullable(),
     /** Final items (item0..item5, non-zero ids). */
     items: z.array(itemIdSchema),
     /** Build order from the match timeline; null when not fetched. */

@@ -254,6 +254,7 @@ describe('migration runner', () => {
       '012_patches',
       '013_match_rejects_pruned',
       '014_patches_drop_released_at',
+      '015_profiles',
     ]);
     expect(migrate(db)).toEqual([]);
 
@@ -330,7 +331,7 @@ describe('migration runner', () => {
       ) VALUES (1, 'TOP', NULL, 10, 5, 'DIAMOND', 1, 1, 1)`,
     ).run();
     expect(db.prepare('SELECT COUNT(*) AS count FROM _migrations').get()).toMatchObject({
-      count: 14,
+      count: 15,
     });
     db.close();
   });
@@ -352,7 +353,7 @@ describe('migration runner', () => {
       'INSERT INTO patches (patch_index, version_label, released_at) VALUES (?, ?, ?)',
     ).run(1, '16.21', null);
 
-    expect(migrate(db)).toEqual(['014_patches_drop_released_at']);
+    expect(migrate(db)).toEqual(['014_patches_drop_released_at', '015_profiles']);
 
     const columns = db.prepare('PRAGMA table_info(patches)').all() as { name: string }[];
     expect(columns.map((c) => c.name)).toEqual(['patch_index', 'version_label']);
@@ -434,6 +435,7 @@ describe('migration runner', () => {
       '012_patches',
       '013_match_rejects_pruned',
       '014_patches_drop_released_at',
+      '015_profiles',
     ]);
     expect(migrate(db)).toEqual([]);
 

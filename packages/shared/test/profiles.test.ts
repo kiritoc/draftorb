@@ -9,7 +9,6 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import {
-  PROFILE_CONFIG_SCHEMA_VERSION,
   PROFILE_EXPORT_SCHEMA_VERSION,
   profileConfigSchema,
   profileExportSchema,
@@ -124,9 +123,9 @@ describe('profileExportSchema', () => {
 
   it('requires every whitelisted field and rejects a wrong schema version', () => {
     const { allyAdcId: _omit, ...withoutAlly } = validGame;
-    expect(
-      profileExportSchema.safeParse({ ...validExport, games: [withoutAlly] }).success,
-    ).toBe(false);
+    expect(profileExportSchema.safeParse({ ...validExport, games: [withoutAlly] }).success).toBe(
+      false,
+    );
     expect(profileExportSchema.safeParse({ ...validExport, schemaVersion: 2 }).success).toBe(false);
     expect(profileExportSchema.safeParse({ ...validExport, gameCount: -1 }).success).toBe(false);
   });

@@ -28,6 +28,7 @@ import { aggregateCommand } from './commands/aggregate';
 import { deriveRolesCommand } from './commands/derive-roles';
 import { exportCommand } from './commands/export';
 import { statusCommand } from './commands/status';
+import { rekeyCommand } from './commands/rekey';
 import { log, type Command, findCommand, formatHelp, isHelpFlag } from './commands/shared';
 
 const COMMANDS: readonly Command[] = [
@@ -43,6 +44,7 @@ const COMMANDS: readonly Command[] = [
   exportCommand,
   deriveRolesCommand,
   statusCommand,
+  rekeyCommand,
 ];
 
 async function main(argv: string[]): Promise<void> {

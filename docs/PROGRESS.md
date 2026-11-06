@@ -8,16 +8,16 @@
 
 ## Epic status
 
-| Epic               | Status      | Notes                                                                                                                                                                |
-| ------------------ | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| E0 Foundations     | IN PROGRESS | T-001..T-005 DONE; T-002.b DONE                                                                                                                                      |
-| E1 ETL             | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e, T-014, T-015, T-015.b, T-016, T-017, T-018, T-019 DONE; T-019.b, T-019.c REVIEW; T-019.d..f TODO |
-| E2 Engine          | IN PROGRESS | T-020..T-025 DONE; T-026 REVIEW; T-027.b TODO; T-027.a REVIEW                                                                                                        |
-| E3 Web MVP         | DONE        | T-030..T-035 complete; recommendation flow, Support pool, regression coverage, deploy assets and visible unvalidated-model state                                     |
-| E4 Runes           | IN PROGRESS | T-040 REVIEW; T-041, T-042 TODO                                                                                                                                      |
-| E5 Items           | NOT STARTED |                                                                                                                                                                      |
-| E6 Live            | NOT STARTED |                                                                                                                                                                      |
-| E7 Vision          | NOT STARTED |                                                                                                                                                                      |
+| Epic               | Status      | Notes                                                                                                                                                                   |
+| ------------------ | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| E0 Foundations     | IN PROGRESS | T-001..T-005 DONE; T-002.b DONE                                                                                                                                         |
+| E1 ETL             | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e, T-014, T-015, T-015.b, T-016, T-017, T-018, T-019 DONE; T-019.b, T-019.c REVIEW; T-019.d..f TODO    |
+| E2 Engine          | IN PROGRESS | T-020..T-025 DONE; T-026 REVIEW; T-027.b TODO; T-027.a REVIEW                                                                                                           |
+| E3 Web MVP         | DONE        | T-030..T-035 complete; recommendation flow, Support pool, regression coverage, deploy assets and visible unvalidated-model state                                        |
+| E4 Runes           | IN PROGRESS | T-040 REVIEW; T-041, T-042 TODO                                                                                                                                         |
+| E5 Items           | NOT STARTED |                                                                                                                                                                         |
+| E6 Live            | NOT STARTED |                                                                                                                                                                         |
+| E7 Vision          | NOT STARTED |                                                                                                                                                                         |
 | E8 Personalization | IN PROGRESS | Replanned 2026-11-06: pipeline-fed configured profile, static-only (D-067..D-077 PROPOSED); T-090..T-096 DONE, T-097 engine-only, T-098 blocked, T-080..T-086 CANCELLED |
 
 ## Data collection status

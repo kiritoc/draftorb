@@ -4,8 +4,8 @@ Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATI
 
 ## Open
 
-| ID    | Sev | Area | Title                                                     | Status | Found by/date    | Ticket |
-| ----- | --- | ---- | --------------------------------------------------------- | ------ | ---------------- | ------ |
+| ID  | Sev | Area | Title | Status | Found by/date | Ticket |
+| --- | --- | ---- | ----- | ------ | ------------- | ------ |
 
 ## Duplicate bug IDs (not renumbered)
 

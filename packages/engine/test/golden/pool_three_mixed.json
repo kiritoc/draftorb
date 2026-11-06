@@ -1,0 +1,93 @@
+{
+  "name": "pool_three_mixed",
+  "input": {
+    "userRank": "DIAMOND",
+    "userRole": "SUPPORT",
+    "allies": [],
+    "enemies": [],
+    "blindPick": false,
+    "pool": [1, 3, 4]
+  },
+  "data": {
+    "championIds": [1, 2, 3, 4],
+    "roleProb": {
+      "1": { "SUPPORT": 1.0 },
+      "2": { "SUPPORT": 1.0 },
+      "3": { "SUPPORT": 1.0 },
+      "4": { "TOP": 1.0 }
+    },
+    "baselines": [
+      [1, "DIAMOND", 30, 50, 0.1, 50],
+      [2, "DIAMOND", 35, 50, 0.1, 50],
+      [3, "DIAMOND", 5, 10, 10, 10],
+      [4, "DIAMOND", 25, 50, 0.1, 50]
+    ],
+    "allyPairs": [],
+    "enemyPairs": [],
+    "laneVs": [],
+    "laneFull": [],
+    "tags": {
+      "1": {
+        "championId": 1,
+        "damageType": "AP",
+        "archetype": "enchanter",
+        "hardEngage": false,
+        "peel": true,
+        "poke": true,
+        "waveclear": false,
+        "scaling": { "early": false, "mid": true, "late": true },
+        "range": "RANGED",
+        "ccCount": 1
+      },
+      "2": {
+        "championId": 2,
+        "damageType": "AP",
+        "archetype": "enchanter",
+        "hardEngage": false,
+        "peel": true,
+        "poke": true,
+        "waveclear": false,
+        "scaling": { "early": false, "mid": true, "late": true },
+        "range": "RANGED",
+        "ccCount": 1
+      },
+      "3": {
+        "championId": 3,
+        "damageType": "AP",
+        "archetype": "tank",
+        "hardEngage": true,
+        "peel": true,
+        "poke": false,
+        "waveclear": false,
+        "scaling": { "early": false, "mid": true, "late": true },
+        "range": "MELEE",
+        "ccCount": 2
+      },
+      "4": {
+        "championId": 4,
+        "damageType": "AD",
+        "archetype": "fighter",
+        "hardEngage": true,
+        "peel": false,
+        "poke": false,
+        "waveclear": true,
+        "scaling": { "early": false, "mid": true, "late": true },
+        "range": "MELEE",
+        "ccCount": 2
+      }
+    }
+  },
+  "expected": {
+    "recommendations": [
+      { "championId": 2, "rank": 1 },
+      { "championId": 1, "rank": 2 },
+      { "championId": 4, "rank": 3, "warnings": ["offRole"] }
+    ],
+    "poolRecommendations": [
+      { "championId": 1, "rank": 2, "poolRank": 1 },
+      { "championId": 4, "rank": 3, "poolRank": 2 }
+    ],
+    "poolUnavailable": [{ "championId": 3, "reason": "insufficientData" }],
+    "insufficientData": [{ "championId": 3 }]
+  }
+}

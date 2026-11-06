@@ -179,41 +179,74 @@ export interface ScoredContext {
  * Merge one exported context's rows into per-page equivalent counts.
  * Rows describing the same displayed page (same exported fields) are
  * merged; pick shares share one denominator, so they add up.
+ *
+ * `n_eff = (Σw)² / Σw²` is computed on the merged weights, not as a sum of
+ * the rows' individual `n_eff` (B-063): rows with different perk hashes but
+ * identical exported fields share one displayed page, and their effective
+ * sample size must be recomputed from the combined `gamesW`/`gamesW2`.
  */
 export function aggregateContextPages(entry: RuneContextEntry): ScoredContext | null {
-  const pages = new Map<string, PageAgg>();
-  let totalWinsE = 0;
-  let totalGamesE = 0;
+  interface Accum {
+    primaryStyleId: number;
+    subStyleId: number;
+    keystoneId: number;
+    selectedPerkIds: number[];
+    statShardIds?: number[];
+    winsW: number;
+    gamesW: number;
+    gamesW2: number;
+    players?: number;
+    pickShare: number;
+  }
+  const accums = new Map<string, Accum>();
   for (const row of entry.pages) {
     const key = pageKey(row);
-    const eq = toEquivalentCounts(row.winsW, row.gamesW, row.gamesW2);
-    const existing = pages.get(key);
+    const existing = accums.get(key);
     if (existing === undefined) {
-      pages.set(key, {
+      accums.set(key, {
         primaryStyleId: row.primaryStyleId,
         subStyleId: row.subStyleId,
         keystoneId: row.keystoneId,
         selectedPerkIds: row.selectedPerkIds,
         ...(row.statShardIds !== undefined ? { statShardIds: row.statShardIds } : {}),
+        winsW: row.winsW,
         gamesW: row.gamesW,
-        winsE: eq.winsE,
-        gamesE: eq.gamesE,
+        gamesW2: row.gamesW2,
         ...(row.players !== undefined ? { players: row.players } : {}),
         pickShare: row.pickShare,
       });
     } else {
+      existing.winsW += row.winsW;
       existing.gamesW += row.gamesW;
-      existing.winsE += eq.winsE;
-      existing.gamesE += eq.gamesE;
+      existing.gamesW2 += row.gamesW2;
       existing.pickShare = Math.min(1, existing.pickShare + row.pickShare);
       if (row.players !== undefined) {
         existing.players = Math.max(existing.players ?? 0, row.players);
       }
     }
+  }
+  if (accums.size === 0) return null;
+
+  const pages = new Map<string, PageAgg>();
+  let totalWinsE = 0;
+  let totalGamesE = 0;
+  for (const [key, acc] of accums) {
+    const eq = toEquivalentCounts(acc.winsW, acc.gamesW, acc.gamesW2);
+    pages.set(key, {
+      primaryStyleId: acc.primaryStyleId,
+      subStyleId: acc.subStyleId,
+      keystoneId: acc.keystoneId,
+      selectedPerkIds: acc.selectedPerkIds,
+      ...(acc.statShardIds !== undefined ? { statShardIds: acc.statShardIds } : {}),
+      gamesW: acc.gamesW,
+      winsE: eq.winsE,
+      gamesE: eq.gamesE,
+      ...(acc.players !== undefined ? { players: acc.players } : {}),
+      pickShare: acc.pickShare,
+    });
     totalWinsE += eq.winsE;
     totalGamesE += eq.gamesE;
   }
-  if (pages.size === 0) return null;
   return {
     contextKey: entry.contextKey,
     contextLevel: entry.contextLevel,

@@ -348,6 +348,27 @@ describe('recommendRunes', () => {
     expect(result.pages[0]?.nEff).toBeCloseTo(20, 6);
   });
 
+  it('recomputes n_eff from merged weights, not summed row n_effs', () => {
+    // Same displayed page split across two perk-hash rows with different
+    // game weights: ten weight-1 games (n_eff 10) + ten weight-0.1 games
+    // (n_eff 10). Summing row n_effs would report 20; the merged
+    // n_eff = (10+1)^2 / (10+0.1) = 121/10.1 ≈ 11.98.
+    const heavy = mkPage(8902, 6, 10, 10, { pickShare: 0.9 });
+    const light = mkPage(8902, 0.5, 1, 0.1, { pickShare: 0.1 });
+    const exportData = runeExp([ctx(LANE3_KEY, 1, [heavy, light])]);
+
+    const result = recommendRunes(draft(), CHAMP, exportData, runeData());
+
+    expect(result.pages).toHaveLength(1);
+    const page = result.pages[0];
+    expect(page?.nEff).toBeCloseTo(121 / 10.1, 6);
+    expect(page?.lowData).toBe(true); // ~11.98 < minGames, not the inflated 20
+    // Merged winsE = winsW * n_eff / gamesW = 6.5 * (121/10.1) / 11.
+    // Shrunk toward 0.5 with k=40: (winsE + 20) / (gamesE + 40).
+    const winsE = (6.5 * (121 / 10.1)) / 11;
+    expect(page?.winRate).toBeCloseTo((winsE + 40 * 0.5) / (121 / 10.1 + 40), 6);
+  });
+
   it('is deterministic', () => {
     const pages = [9001, 9002, 9003].map((id) => mkPage(id, 30, 40, 40));
     const exportData = runeExp([ctx(LANE3_KEY, 1, pages), ctx('global', 5, pages)]);

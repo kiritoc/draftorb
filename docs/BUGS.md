@@ -32,6 +32,15 @@ Review notes that predate the bug log live in [Review history](#review-history) 
 
 ## Fixed
 
+### B-063 — Merged rune pages overstated sample sizes (`n_eff` summed per row instead of recomputed) — FIXED
+
+- Severity / Area: S2 / engine (runes, T-040)
+- Steps to reproduce: an exported rune context contains two rows with identical exported page fields (same primary/sub style, keystone, perks, shards) but different perk hashes and different game weights — e.g. ten weight-1 games plus ten weight-0.1 games for the same displayed page.
+- Expected / Actual: expected the merged page's `n_eff` to be recomputed from combined weights, `(Σw)² / Σw² = 11² / 10.1 ≈ 11.98`; actual `aggregateContextPages` summed each row's individual equivalent counts (`toEquivalentCounts` per row), reporting `n_eff` 20 — enough to clear the 15/25-game low-data threshold and shift page rankings. The same inflation fed `totalGamesE`/`totalWinsE`, the context prior in `recommendRunes`.
+- Environment (OS, Node version, patch): reported 2026-11-06 against `packages/engine/src/runes-context.ts`.
+- Suspected cause: `aggregateContextPages` called `toEquivalentCounts` per row and added the results, but `n_eff` is nonlinear in the weights — it must be computed once on the merged `winsW`/`gamesW`/`gamesW2`.
+- Fix (commit/ticket): `aggregateContextPages` now accumulates `winsW`, `gamesW`, `gamesW2` per page key first, then calls `toEquivalentCounts` once per merged page; context totals are summed from those merged counts. Regression test: duplicate pages with unequal game weights assert `n_eff ≈ 11.98` and `lowData` true.
+
 ### B-061 — `docs/PROMPTS.md` fails `pnpm format:check` on a clean checkout — FIXED
 
 - Severity / Area: S4 / docs

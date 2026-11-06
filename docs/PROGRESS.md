@@ -4,7 +4,7 @@
 
 - Phase: 1 (Support / Diamond)
 - Current milestone: M3 Web MVP implementation complete (T-030..T-035 DONE); the backtest harness (T-027.a) remains under review because D-023 paired-bootstrap validation is not implemented. T-019.b (patch index, now incl. D-055), T-019.c (retention prune) and T-026 (golden suite, 23 scenarios) are in REVIEW; T-019.d..f and T-027.b remain TODO. T-040 (engine rune recommender, SPECS §8.1) is in REVIEW with D-059 PROPOSED.
-- Last updated: 2026-11-06 by Devin (T-040 rune recommender: `recommendRunes` + `RuneRecommendationResult` contract, 15 tests; D-059 PROPOSED)
+- Last updated: 2026-11-06 by Devin (B-063: merged rune pages recompute `n_eff` from combined weights instead of summing row effective counts)
 
 ## Epic status
 
@@ -42,6 +42,17 @@ Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-0
 - T-019.d verification: please compare the champion and item lists in the 2026-11-04 "T-019.d verification step" entry below with the official 16.21 and 16.22 patch notes (misses and false positives).
 
 ## Session log (newest first)
+
+### 2026-11-06 — Devin — B-063 merged rune pages overstated `n_eff` (FIXED)
+
+- Done:
+  - `aggregateContextPages` (`packages/engine/src/runes-context.ts`) merged duplicate displayed pages by summing each row's `toEquivalentCounts` output, inflating `n_eff`/`gamesE`/`winsE` and the context totals (`totalGamesE`/`totalWinsE`, the prior in `recommendRunes`) whenever duplicate rows had different game weights. Now accumulates `winsW`/`gamesW`/`gamesW2` per page key and converts once per merged page.
+  - Regression test in `runes.test.ts`: duplicate page rows with unequal weights (ten weight-1 + ten weight-0.1 games) assert merged `n_eff ≈ 11.98` (not 20) and `lowData` true.
+- Files touched: `packages/engine/src/runes-context.ts`, `packages/engine/test/runes.test.ts`, `docs/{BUGS,PROGRESS}.md`.
+- Tests: `pnpm check` green (83 files, 1001 tests).
+- State left: DONE.
+- Next step: none — feeds T-041 (runes UI) once T-040 is accepted.
+- Pitfalls / notes for next AI: `n_eff` is nonlinear — never sum per-row equivalent counts across a merge; accumulate raw `winsW`/`gamesW`/`gamesW2` and call `toEquivalentCounts` once.
 
 ### 2026-11-06 — Devin — T-040 rune recommender in engine (REVIEW, D-059 PROPOSED)
 

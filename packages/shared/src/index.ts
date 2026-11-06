@@ -12,6 +12,9 @@ export {
   MANIFEST_SCHEMA_VERSION,
   DRAFT_RESULT_SCHEMA_VERSION,
   RUNE_RESULT_SCHEMA_VERSION,
+  PROFILE_CONFIG_SCHEMA_VERSION,
+  PROFILE_EXPORT_SCHEMA_VERSION,
+  PERSONAL_RESULT_SCHEMA_VERSION,
 } from './schemas/core.js';
 export { RUNE_CONTEXT_LEVELS } from './rune-context.js';
 
@@ -189,3 +192,31 @@ export type {
   RuneAdaptationHint,
   RuneRecommendationResult,
 } from './schemas/runes.js';
+
+export {
+  profileIdSchema,
+  profileOptionsSchema,
+  profileConfigEntrySchema,
+  profileConfigSchema,
+  profileGameRunesSchema,
+  profileGameSchema,
+  profileMasteryEntrySchema,
+  profileFavoritesSchema,
+  profileExportSchema,
+  profileIndexEntrySchema,
+  profileIndexSchema,
+} from './schemas/profiles.js';
+export type {
+  ProfileId,
+  ProfileRiotId,
+  ProfileOptions,
+  ProfileConfigEntry,
+  ProfileConfig,
+  ProfileGameRunes,
+  ProfileGame,
+  ProfileMasteryEntry,
+  ProfileFavorites,
+  ProfileExport,
+  ProfileIndexEntry,
+  ProfileIndex,
+} from './schemas/profiles.js';

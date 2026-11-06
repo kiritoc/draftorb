@@ -3,8 +3,8 @@
 ## Current status
 
 - Phase: 1 (Support / Diamond)
-- Current milestone: M3 Web MVP implementation complete (T-030..T-035 DONE); the backtest harness (T-027.a) remains under review because D-023 paired-bootstrap validation is not implemented. T-019.b (patch index, now incl. D-055) and T-019.c (retention prune) are in REVIEW; T-019.d..f remain TODO.
-- Last updated: 2026-11-06 by Devin (`matches --refresh` added (D-056 PROPOSED); existing 250 players refreshed: +286 matches -> 3,597 total; aggregate + export re-published 16.22)
+- Current milestone: M3 Web MVP implementation complete (T-030..T-035 DONE); the backtest harness (T-027.a) remains under review because D-023 paired-bootstrap validation is not implemented. T-019.b (patch index, now incl. D-055), T-019.c (retention prune) and T-026 (golden suite, 23 scenarios) are in REVIEW; T-019.d..f and T-027.b remain TODO.
+- Last updated: 2026-11-06 by Devin (T-026 golden test suite completed: 23 scenarios, reason-order/lane-correction pinning; `pnpm check` green, 973 tests)
 
 ## Epic status
 
@@ -12,7 +12,7 @@
 | -------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b DONE                                                                                                                                      |
 | E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e, T-014, T-015, T-015.b, T-016, T-017, T-018, T-019 DONE; T-019.b, T-019.c REVIEW; T-019.d..f TODO |
-| E2 Engine      | IN PROGRESS | T-020..T-025 DONE; T-026, T-027.b TODO; T-027.a REVIEW                                                                                                               |
+| E2 Engine      | IN PROGRESS | T-020..T-025 DONE; T-026 REVIEW; T-027.b TODO; T-027.a REVIEW                                                                                                        |
 | E3 Web MVP     | DONE        | T-030..T-035 complete; recommendation flow, Support pool, regression coverage, deploy assets and visible unvalidated-model state                                     |
 | E4 Runes       | NOT STARTED |                                                                                                                                                                      |
 | E5 Items       | NOT STARTED |                                                                                                                                                                      |
@@ -41,6 +41,18 @@ Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-0
 - T-019.d verification: please compare the champion and item lists in the 2026-11-04 "T-019.d verification step" entry below with the official 16.21 and 16.22 patch notes (misses and false positives).
 
 ## Session log (newest first)
+
+### 2026-11-06 — Devin — T-026 golden test suite completed (REVIEW)
+
+- Done:
+  - Golden runner (`packages/engine/test/golden.test.ts`) extended: expected reasons accept `with` (exact champion-id list, distinguishes pair slots and `lane_vs` vs `lane_full`) and `deltaPp`; new `allReasons: true` pins the complete reason list index-by-index; `poolRecommendations`/`poolUnavailable: null` asserts the fields are absent (empty pool); a new per-fixture invariant asserts canonical layer order (pairs -> lane -> comp -> blind) on every recommendation of every fixture.
+  - 5 new fixtures (23 total, was 18): `pool_empty` (explicit empty pool emits no pool fields), `pool_three_mixed` (pool of 3: one scored, one low-data -> `poolUnavailable`/`insufficientData`, one off-role -> `offRole` warning), `pool_contains_top_pick` (pool holds the overall #1: `poolRank` 1 / `rank` 1), `full_draft_support` (all 10 slots known; pins the full reason order — pairs by descending influence/ties by championId, then `lane_vs` `with` [200,201], `lane_full` `with` [10,200,201], comp — plus three `counteredBy` warnings), `lane_reason_correction` (lane `deltaPp` pinned as corrections to the pair estimate: a +35.95pp synergy is corrected by -35.89pp `lane_vs` and -49.98pp `lane_full`).
+  - Fixed pre-existing `pnpm format:check` failure: `docs/PROMPTS.md` (committed unformatted in 7c592c9 on this branch) reformatted with prettier, separate `style` commit.
+- Files touched: `packages/engine/test/golden.test.ts`, `packages/engine/test/golden/{pool_empty,pool_three_mixed,pool_contains_top_pick,full_draft_support,lane_reason_correction}.json` (new), `docs/{TICKETS,PROGRESS,BUGS}.md`, `docs/PROMPTS.md` (format only).
+- Tests: `pnpm check` green (81 files, 973 tests; golden suite now 139 tests across 23 fixtures).
+- State left: REVIEW. Interpretation note: the acceptance's "lane reason phrasing" was pinned engine-side as the correction semantics (lane `deltaPp` measured against the pair-running prediction, SPECS §5); the web card has no lane-specific UI string — the literal "in this exact lane..." phrasing would be a web ticket if the owner wants it.
+- Next step: owner review; then T-027.b or the D-023 paired-bootstrap gate work for T-027.a.
+- Pitfalls / notes for next AI: expected `reasons` remain an ordered subsequence unless `allReasons: true`; `with` is matched exactly when specified. `poolRecommendations: null`/`poolUnavailable: null` assert field absence — an empty array asserts a defined-but-empty list. `deltaPp` pins the rounded (2-decimal) reported value.
 
 ### 2026-11-06 — Devin — `matches --refresh` flag (D-056 PROPOSED) + existing-set refresh run (ops)
 

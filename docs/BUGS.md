@@ -32,6 +32,14 @@ Review notes that predate the bug log live in [Review history](#review-history) 
 
 ## Fixed
 
+### B-061 — `docs/PROMPTS.md` fails `pnpm format:check` on a clean checkout — FIXED
+
+- Severity / Area: S4 / docs
+- Steps to reproduce: run `pnpm check` on `improvements-bugs` after commit 7c592c9.
+- Expected / Actual: expected the format check to pass; actual `prettier --check` flagged `docs/PROMPTS.md`, failing `pnpm check` before tests ran.
+- Environment (OS, Node version, patch): macOS, Node >=22, branch `improvements-bugs`.
+- Fix: `prettier --write docs/PROMPTS.md` (formatting only, no content change).
+
 ### B-060 — `champion-tags.json` missing Ekko/Sylas SUPPORT after role re-derivation — FIXED
 
 - Severity / Area: S2 / etl (data)

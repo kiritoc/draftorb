@@ -165,6 +165,7 @@ Read-only audit. Output ONLY the report above (sections 0–11), in English, gro
 ```
 
 ## I. Implement Ticket (Autonomous, with Review)
+
 Implements a ticket following AGENTS.md, runs two review passes with test-first bug fixes, and ends with clean commit(s). Only asks questions when truly blocked.
 
 ```

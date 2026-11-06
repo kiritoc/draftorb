@@ -29,7 +29,7 @@ pnpm dev
 `.github/workflows/etl.yml` runs the pipeline every 12h (and on demand via _Actions → ETL refresh → Run workflow_):
 
 1. Restores `data/DraftOrb.sqlite` from the orphan branch `etl-db` (single gzipped file `DraftOrb.sqlite.gz`, ~58 MB, force-pushed/amended each run — the job refuses to run if the branch is missing, so an empty DB can never overwrite good state).
-2. `migrate` → `check-key` → `static` → `matches euw1 --refresh` → `matches euw1 --limit 100` (bounded pending-player ingest) → `prune` → `aggregate` → `derive-roles` → `export` → `status`.
+2. `migrate` → `check-key` → `static` → `matches euw1 --refresh` → `matches euw1 --limit 100` (bounded pending-player ingest) → `profile-sync --publish` (configured profiles only, non-fatal) → `prune` → `aggregate` → `derive-roles` → `export` → `status`.
 3. Checkpoints WAL + VACUUMs the DB, pushes the new state to `etl-db`, and commits changed `data/public/**` to `main`. Because `GITHUB_TOKEN` pushes do not trigger `push`-event workflows, the job then dispatches `deploy.yml` explicitly (`gh workflow run`).
 
 Setup: add the **personal** Riot key as repo secret `RIOT_API_KEY` (Settings → Secrets and variables → Actions). `GITHUB_TOKEN` needs `contents: write` + `actions: write` (already granted by the workflow's `permissions` block).
@@ -53,6 +53,7 @@ Personalization is fed by configured profiles declared in `data/profiles.config.
 - Exports land in `data/public/profiles/` (`<id>.json` + `index.json`), anonymized per D-069; without `--publish` a local run keeps them out of the deployed tree.
 - GitHub Pages: the site is already deployed by `deploy.yml`; no extra Pages configuration is needed for profiles — they are plain static JSON under `data/public/`.
 - Key rotation: if `RIOT_API_KEY` ever changes, stored profile puuids are encrypted per key like match puuids (B-062/D-060) — re-resolve/re-key before the next sync (procedure in D-071, implementation detail in T-091).
+- Secret-leak check (T-092): `node scripts/check-secrets.mjs` scans committed files (`git ls-files`) and `apps/web/dist` for `RGAPI-` tokens and the literal `RIOT_API_KEY` value (when set). It runs in CI (`ci.yml` lint job) and as a gate in `deploy.yml` before the Pages artifact is uploaded; it reports file + needle name only, never the secret. Run it locally any time with `node scripts/check-secrets.mjs`.
 
 ## ETL commands
 

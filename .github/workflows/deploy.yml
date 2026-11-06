@@ -30,6 +30,13 @@ jobs:
       - run: pnpm --filter @draftorb/web build
         env:
           VITE_BASE: /draftorb/
+      # T-092: last gate before Pages — fail the deploy if the Riot key (or
+      # any RGAPI- token) leaked into committed files or the built site.
+      # The check reports file + needle name only, never the secret.
+      - name: Secret leak check
+        env:
+          RIOT_API_KEY: ${{ secrets.RIOT_API_KEY }}
+        run: node scripts/check-secrets.mjs
       - uses: actions/upload-pages-artifact@v3
         with:
           path: apps/web/dist

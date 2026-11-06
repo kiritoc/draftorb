@@ -165,6 +165,10 @@ jobs:
       # declarations), before the deploy workflow runs them post-merge.
       - run: pnpm --filter @draftorb/web build
         if: ${{ !cancelled() }}
+      # T-092: fail if a Riot key reached committed files or the built site.
+      # The literal key value is only scanned when the secret is available.
+      - run: node scripts/check-secrets.mjs
+        if: ${{ !cancelled() }}
 
   test:
     needs: [format, commit-format]

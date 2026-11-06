@@ -93,6 +93,14 @@ jobs:
           RIOT_API_KEY: ${{ secrets.RIOT_API_KEY }}
         run: pnpm etl matches euw1 --limit 100
 
+      # Non-fatal like `status`: a failed profile must not block the match
+      # pipeline, and writeProfileExports only runs on the success path so
+      # data/public/profiles keeps the previous export (D-070).
+      - name: Sync configured profiles
+        env:
+          RIOT_API_KEY: ${{ secrets.RIOT_API_KEY }}
+        run: pnpm etl profile-sync --publish || echo "::warning::profile-sync failed; previous exports are kept"
+
       - name: Prune matches beyond retention window
         run: pnpm etl prune
 

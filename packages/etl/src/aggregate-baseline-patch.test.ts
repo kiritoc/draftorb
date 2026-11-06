@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_CONFIG } from '@draftorb/engine';
 
 import { openDb } from './db';
+import { seedPatches } from './patches.test-helpers';
 import { aggregateBaseline } from './aggregate-baseline';
 import { requireRow, seedBasic, withFreshDb, withSeededDb } from './aggregate-baseline-helpers';
 
@@ -44,6 +45,7 @@ describe('aggregateBaseline — patch filtering / snapshot', () => {
 
   it('uses a snapshot patch with no stored games as the current patch', () => {
     withSeededDb([{ patch: '16.20', rankScore: 6.5, win: 1 }], (db) => {
+      seedPatches(db, ['16.21']);
       const rows = aggregateBaseline(db, { patch: '16.21' });
       const diamond = requireRow(rows, 412, 'SUPPORT', 'DIAMOND');
       expect(diamond.gamesW).toBeCloseTo(DEFAULT_CONFIG.decay);

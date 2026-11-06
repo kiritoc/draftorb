@@ -115,6 +115,20 @@ export { exportJson, type ExportResult } from './export';
 
 export { aggregateRoleProb, type RoleProbRow } from './aggregate';
 
+export {
+  createPatchIndexLookup,
+  createPatchResolver,
+  ensurePatchesFresh,
+  fetchPatchVersions,
+  lookupPatchIndex,
+  parsePatchLabel,
+  parsePatchLabels,
+  refreshPatches,
+  type EnsurePatchesResult,
+  type PatchRefreshResult,
+  type PatchResolver,
+} from './patches';
+
 export { applyDerivedRoles, deriveChampionRoles } from './derive-roles';
 
 export { aggregateBaseline, type BaselineRow } from './aggregate-baseline';

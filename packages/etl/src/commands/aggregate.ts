@@ -6,6 +6,7 @@ import { aggregateBaseline } from '../aggregate-baseline';
 import { aggregatePairTables } from '../aggregate-pairs';
 import { aggregateRunesByContext } from '../aggregate-runes';
 import { aggregateRoleProb, PATCH_PATTERN } from '../aggregate';
+import { ensurePatchesFresh, lookupPatchIndex } from '../patches';
 import { CliError, UsageError } from '../cli-args';
 import { parsePositionals, type Command } from './shared';
 
@@ -27,6 +28,21 @@ async function runAggregate(args: string[]): Promise<void> {
     if (pending > 0) {
       throw new CliError(
         `Database schema is out of date (${pending} pending migration(s)); run \`pnpm etl migrate\` first.`,
+      );
+    }
+
+    // Aggregation resolves every stored match label through `patches`
+    // (D-043): refresh the catalog once when a label is missing, and reject an
+    // explicit snapshot that Data Dragon does not know.
+    const coverage = await ensurePatchesFresh(db, {
+      extraLabels: patch === undefined ? [] : [patch],
+      onWarn: (message) => console.log(`[ETL] Warning: ${message}`),
+    });
+    if (patch !== undefined && lookupPatchIndex(db, patch) === undefined) {
+      throw new UsageError(
+        coverage.status === 'failed'
+          ? `Could not refresh patches from Data Dragon; unknown patch "${patch}".`
+          : `Unknown patch "${patch}": not present in Data Dragon versions.`,
       );
     }
 

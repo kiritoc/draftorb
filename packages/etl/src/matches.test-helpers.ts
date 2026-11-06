@@ -3,9 +3,15 @@ import { readFileSync } from 'node:fs';
 import { vi } from 'vitest';
 
 import { openDb } from './db';
+import { seedPatches } from './patches.test-helpers';
 import { riotMatchDtoSchema, type Platform, type RiotClient, type RiotMatchDto } from './riot';
 
 export const PLATFORM: Platform = 'euw1';
+
+/** Fixture patch labels every ingestion test resolves through `patches` (D-043). */
+export function seedMatchPatches(db: ReturnType<typeof openDb>): void {
+  seedPatches(db, ['16.19', '16.20', '16.21', '16.22']);
+}
 
 const matchFixture = riotMatchDtoSchema.parse(
   JSON.parse(

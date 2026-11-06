@@ -9,7 +9,6 @@
 import type Database from 'better-sqlite3';
 
 import { RANK_BUCKET_ORDER } from '@draftorb/engine';
-import { comparePatches } from './matches-store';
 
 /** Patches are stored as "major.minor" (RIOT_API.md). Re-exported by ./aggregate. */
 export const PATCH_PATTERN = /^\d+\.\d+$/;
@@ -22,34 +21,63 @@ export function assertPatchFormat(patch: string | undefined): void {
 }
 
 export interface PatchWindow {
-  patches: readonly string[]; // sorted with comparePatches
-  patchIndex: ReadonlyMap<string, number>; // dense index
-  currentPatchIndex: number; // patches.length - 1
+  patches: readonly string[]; // version labels, sorted by patch_index
+  patchIndex: ReadonlyMap<string, number>; // version_label -> patch_index (<= bound)
+  currentPatchIndex: number; // snapshot index, else max stored patch_index (-1 when empty)
+  snapshotIndex?: number; // resolved patch_index of the snapshot patch
 }
 
 /**
- * Distinct stored patches <= snapshot (numeric compare in JS), plus the
- * snapshot itself when at least one stored patch qualifies.
+ * Patch window from the `patches` table (D-043, SPECS §12): `patch_index` is
+ * the real release ordinal, so gaps between collected patches count as real
+ * patch distance (supersedes D-033's dense-over-stored-patches index).
  *
- * Patch -> numeric index. Only distinct stored patches are indexed (dense),
- * so a gap in collected patches counts as one step of recency decay.
- * comparePatches is numeric, so the snapshot filter is applied in JS
- * (SQL string comparison would misorder "16.9" and "16.10").
+ * The window covers every `patches` row with `patch_index <= bound`, where
+ * bound is the snapshot index (or +infinity). `currentPatchIndex` is the
+ * snapshot index when given — promoted even with no stored games at it, as
+ * before — else the highest `patch_index` among stored matches. Stored match
+ * labels absent from `patches` cannot be ordered and are excluded.
  */
 export function loadPatchWindow(db: Database.Database, snapshotPatch?: string): PatchWindow {
-  const storedPatches = (
+  const allPatches = db
+    .prepare('SELECT version_label, patch_index FROM patches ORDER BY patch_index')
+    .all() as Array<{ version_label: string; patch_index: number }>;
+  const indexByLabel = new Map(allPatches.map((row) => [row.version_label, row.patch_index]));
+
+  let snapshotIndex: number | undefined;
+  if (snapshotPatch !== undefined) {
+    snapshotIndex = indexByLabel.get(snapshotPatch);
+    if (snapshotIndex === undefined) {
+      throw new Error(
+        `Unknown patch "${snapshotPatch}": not present in the patches table (run \`pnpm etl aggregate\` to refresh it).`,
+      );
+    }
+  }
+
+  const storedLabels = (
     db.prepare('SELECT DISTINCT patch FROM matches').all() as Array<{ patch: string }>
-  )
-    .map((row) => row.patch)
-    .filter((patch) => snapshotPatch === undefined || comparePatches(patch, snapshotPatch) <= 0);
-  const patchSet = new Set(storedPatches);
-  if (snapshotPatch !== undefined && patchSet.size > 0) patchSet.add(snapshotPatch);
-  const patches = [...patchSet].sort(comparePatches);
+  ).map((row) => row.patch);
+
+  const inWindow = storedLabels
+    .map((label) => ({ label, index: indexByLabel.get(label) }))
+    .filter(
+      (entry): entry is { label: string; index: number } =>
+        entry.index !== undefined && (snapshotIndex === undefined || entry.index <= snapshotIndex),
+    );
+
+  if (inWindow.length === 0) {
+    return { patches: [], patchIndex: new Map(), currentPatchIndex: -1, snapshotIndex };
+  }
+
+  const bound = snapshotIndex ?? Math.max(...inWindow.map((entry) => entry.index));
   const patchIndex = new Map<string, number>();
-  patches.forEach((patch, i) => {
-    patchIndex.set(patch, i);
-  });
-  return { patches, patchIndex, currentPatchIndex: patches.length - 1 };
+  const patches: string[] = [];
+  for (const row of allPatches) {
+    if (row.patch_index > bound) break;
+    patchIndex.set(row.version_label, row.patch_index);
+    patches.push(row.version_label);
+  }
+  return { patches, patchIndex, currentPatchIndex: bound, snapshotIndex };
 }
 
 /** rank_score scale: integer part = RANK_BUCKET_ORDER index (6.5 = DIAMOND); clamped to [0, last bucket]. */

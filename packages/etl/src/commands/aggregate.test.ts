@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { UsageError } from '../cli-args';
 import { migrate, openDb } from '../db';
+import { seedPatches } from '../patches.test-helpers';
 import { aggregateCommand } from './aggregate';
 
 describe('aggregateCommand', () => {
@@ -51,6 +52,7 @@ describe('aggregateCommand', () => {
     process.env.DRAFTORB_DB_PATH = dbPath;
     const db = openDb(dbPath);
     migrate(db);
+    seedPatches(db, ['16.20', '16.21']);
     db.prepare(
       `INSERT INTO matches (
         match_id, platform, patch, queue_id, duration, created_at, avg_rank_score
@@ -82,6 +84,7 @@ describe('aggregateCommand', () => {
     process.env.DRAFTORB_DB_PATH = dbPath;
     const db = openDb(dbPath);
     migrate(db);
+    seedPatches(db, ['16.21']);
     db.prepare(
       `INSERT INTO matches (
         match_id, platform, patch, queue_id, duration, created_at, avg_rank_score
@@ -117,6 +120,7 @@ describe('aggregateCommand', () => {
     process.env.DRAFTORB_DB_PATH = dbPath;
     const db = openDb(dbPath);
     migrate(db);
+    seedPatches(db, ['16.20', '16.21']);
     db.prepare(
       `INSERT INTO matches (
         match_id, platform, patch, queue_id, duration, created_at, avg_rank_score, rank_known_count

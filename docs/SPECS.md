@@ -41,7 +41,7 @@ Rank buckets for weighting (distinct from persisted `rank_score` in DATA_MODEL.m
 - **Draft probabilities** (pairs, matchups, baselines): weight per game `w = exp(-|gameRank - userRank| / tau)`, tau=1.25 (config). Never use data below userRank-2 tiers.
 - **Runes & items**: use games with `gameRank >= userRank` (up to Challenger). Weight `w = min(1 + alpha*(gameRank-userRank), wMax)`, alpha=0.25, wMax=2.0. Only expert players (D-022): `champion_games >= minChampGames` (default 30) in our data, with the champion-mastery-v4 fallback applied only to participants of the user's role (`is_expert` flag). Show both winrate and pick share among those players.
 - Optional UI toggle: "Master+ only".
-- Recency: multiply by `decay^(currentPatchIndex - gamePatchIndex)` (decay=0.85). Indices come from the `patches` table (SPECS §12) once T-019.b is implemented; until then D-033's dense index over stored patches applies.
+- Recency: multiply by `decay^(currentPatchIndex - gamePatchIndex)` (decay=0.85). Indices come from the `patches` table (SPECS §12, T-019.b/D-043): gaps in collected patches count as real patch distance.
 - Patch window: ingestion keeps every patch >= `--since-patch` (D-017); recency is applied here, at aggregation time, never by dropping games at ingestion.
 - Rank reliability: games with `matches.rank_known_count = 1` (only the seed player's rank is known, D-019) are multiplied by `unknownRankFactor` (default 0.5, config).
 - Known limitation (D-004/D-021): draft baselines and pairs are not expert-filtered, so one-trick players can inflate some picks; T-027.a includes an optional ablation that down-weights games by `champion_games` to measure it.
@@ -198,7 +198,7 @@ Non-support roles, accounts/login, pool sync across devices or auto-import of th
 
 ## 12-17. Storage, retention, weights, change scoring, breakpoints (target model)
 
-**Target model, implemented by T-019.b..T-019.f.** These sections describe the target storage and weighting model; they are normative once implemented and do not describe current code. Until T-019.b lands, SPECS §3 recency uses the dense stored-patch index from D-033 and aggregation stays clear-and-rewrite (DATA_MODEL.md, T-015..T-018); until T-019.f lands and T-027.a passes the D-023 gate, change weighting is off (`changeWeightEnabled = false`). No new tables are created and no rows are soft-deleted until T-019.b..f are done.
+**Target model, implemented by T-019.b..T-019.f.** These sections describe the target storage and weighting model; they are normative once implemented and do not describe current code. §12 is live since T-019.b (migration `012_patches`; recency and `--since-patch` use `patch_index`). §13..§17 remain target until T-019.c..f land and T-027.a passes the D-023 gate; until then change weighting is off (`changeWeightEnabled = false`), no rows are soft-deleted, and `entity_change_scores`/`data_breakpoints` do not exist.
 
 ## 12. Patch index (D-043)
 

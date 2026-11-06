@@ -3,13 +3,20 @@ import { describe, expect, it } from 'vitest';
 import { openDb, migrate } from './db';
 import { ingestMatches } from './matches';
 import { cursorKey } from './matches-store';
-import { makeMatch, mockClient, PLATFORM, seedPlayer } from './matches.test-helpers';
+import {
+  makeMatch,
+  mockClient,
+  PLATFORM,
+  seedMatchPatches,
+  seedPlayer,
+} from './matches.test-helpers';
 import { RiotApiError } from './riot';
 
 describe('participant match ingestion', () => {
   it('stores all ten extracted participants with the match', async () => {
     const db = openDb(':memory:');
     migrate(db);
+    seedMatchPatches(db);
     seedPlayer(db, 'p-alpha', 6.5);
     const match = makeMatch('EUW1_PARTICIPANTS');
     const client = mockClient({ 'p-alpha': ['EUW1_PARTICIPANTS'] }, { EUW1_PARTICIPANTS: match });
@@ -33,6 +40,7 @@ describe('participant match ingestion', () => {
   it('re-fetches a stored match with fewer than ten participants and completes it', async () => {
     const db = openDb(':memory:');
     migrate(db);
+    seedMatchPatches(db);
     seedPlayer(db, 'p-alpha', 6.5);
     seedPlayer(db, 'p-beta', 7);
     db.prepare(
@@ -74,6 +82,7 @@ describe('participant match ingestion', () => {
   it('does not count metadata-only puuids in the stored rank summary', async () => {
     const db = openDb(':memory:');
     migrate(db);
+    seedMatchPatches(db);
     seedPlayer(db, 'p-alpha', 6.5);
     seedPlayer(db, 'p-beta', 9);
     const match = makeMatch('EUW1_META');
@@ -94,6 +103,7 @@ describe('participant match ingestion', () => {
   it('rolls back the match and cursor when a participant insert fails', async () => {
     const db = openDb(':memory:');
     migrate(db);
+    seedMatchPatches(db);
     seedPlayer(db, 'p-alpha', 6.5);
     db.exec(`
       CREATE TRIGGER fail_participant_insert
@@ -125,6 +135,7 @@ describe('participant match ingestion', () => {
   it('rejects invalid role layouts without storing matches or participants', async () => {
     const db = openDb(':memory:');
     migrate(db);
+    seedMatchPatches(db);
     seedPlayer(db, 'p-alpha', 6.5);
     const match = makeMatch('EUW1_BAD_ROLES');
     const firstParticipant = match.info.participants[1];
@@ -152,6 +163,7 @@ describe('participant match ingestion', () => {
   it('rejects persistent 404 match responses and continues to the next match', async () => {
     const db = openDb(':memory:');
     migrate(db);
+    seedMatchPatches(db);
     seedPlayer(db, 'p-alpha', 6.5);
     const client = mockClient(
       { 'p-alpha': ['EUW1_MISSING', 'EUW1_VALID'] },

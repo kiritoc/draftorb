@@ -38,15 +38,17 @@ CREATE TABLE item_events (    -- from timelines (epic E5)
 CREATE TABLE ingest_state (key TEXT PRIMARY KEY, value TEXT);  -- cursors for resumability
 CREATE TABLE match_rejects (  -- matches seen and rejected, deduped across players
   match_id TEXT PRIMARY KEY, reason TEXT NOT NULL,
-  patch TEXT,                 -- actual patch of the match (reason='patch' only)
+  patch TEXT,                 -- actual major.minor label (reason='patch'; also set for 'invalid' rejects caused by an unknown patch label)
   checked_at INTEGER NOT NULL
 );
 CREATE INDEX idx_part_champ_role ON participants(champion_id, role);
 
--- PLANNED (T-019.b, D-043): not migrated yet.
+-- Migration 012 (T-019.b, D-043): ordered patch catalog. matches.patch stays a
+-- TEXT label resolved to patch_index through this table; no patch_index column
+-- on matches. released_at stays NULL until a release-date source exists.
 CREATE TABLE patches (
   patch_index INTEGER PRIMARY KEY,
-  version_label TEXT NOT NULL UNIQUE,   -- major.minor, matches matches.patch
+  version_label TEXT NOT NULL UNIQUE,   -- major.minor, identical to matches.patch
   released_at INTEGER
 );
 
@@ -83,7 +85,7 @@ CREATE TABLE data_breakpoints (
 CREATE UNIQUE INDEX idx_data_breakpoints_unique ON data_breakpoints(scope_type, COALESCE(scope_id, -1), from_patch_index, source);
 ```
 
-Notes: match ingestion persists the match row and its 10 participant rows in one transaction. A match is accepted only when each of two teams has exactly one participant in each role; invalid layouts are rejected and have no stored participants. `rank_score` = coarse tier/division score at collection time (approximation, documented in RIOT_API.md). Exact rank ordering uses the stored `tier`, `division`, and `lp` fields separately. The score uses the D-016 tier base and division bonus formula; it excludes LP and is distinct from the SPECS §3 weighting buckets. Store only needed fields. `match_rejects` records match ids already evaluated and rejected (wrong queue, too short, off-patch, invalid payload) so shared matches are not re-fetched per player; a `patch` reject keeps the match's actual patch so it is re-evaluated once a run's `--since-patch` window includes it (D-017). `reason` is `queue|short|patch|invalid` today, `pruned` planned (`pnpm etl prune`, T-019.c, D-044): `pruned` is written by `pnpm etl prune` (reason for deletion = retention, actual `patch`, `checked_at`) and is permanent: `findRejection` never deletes or re-evaluates it, whatever `--since-patch` says (D-044).
+Notes: match ingestion persists the match row and its 10 participant rows in one transaction. A match is accepted only when each of two teams has exactly one participant in each role; invalid layouts are rejected and have no stored participants. `rank_score` = coarse tier/division score at collection time (approximation, documented in RIOT_API.md). Exact rank ordering uses the stored `tier`, `division`, and `lp` fields separately. The score uses the D-016 tier base and division bonus formula; it excludes LP and is distinct from the SPECS §3 weighting buckets. Store only needed fields. `match_rejects` records match ids already evaluated and rejected (wrong queue, too short, off-patch window, invalid payload, unknown patch label) so shared matches are not re-fetched per player; a `patch` reject keeps the match's actual patch label and is deleted and re-evaluated once a run's `--since-patch` window (compared on `patch_index`, D-043) includes it (D-017). An `invalid` reject caused by a patch label absent from `patches` also stores that label in `patch` for diagnosis. `reason` is `queue|short|patch|invalid` today, `pruned` planned (`pnpm etl prune`, T-019.c, D-044): `pruned` is written by `pnpm etl prune` (reason for deletion = retention, actual `patch`, `checked_at`) and is permanent: `findRejection` never deletes or re-evaluates it, whatever `--since-patch` says (D-044).
 
 `champions.json.roles` is kept (D-034). `pnpm etl derive-roles` rewrites it with the roles observed for that patch's participants (probability >= `roleProbThreshold` (default 0.05), canonical order). Champions with no observations keep the Data Dragon tag roles, read from an untouched `champions.bootstrap.json` snapshot. Re-run `derive-roles` after `static`, because `static` restores the tag roles.
 

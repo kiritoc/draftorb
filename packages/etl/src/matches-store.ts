@@ -7,6 +7,7 @@
 import type Database from 'better-sqlite3';
 
 import type { Platform, RiotClient, RiotMatchDto } from './riot';
+import { lookupPatchIndex } from './patches';
 
 export const MATCH_IDS_PAGE_SIZE = 100;
 
@@ -23,8 +24,10 @@ export interface PlayerCursor {
   snapshot: string[];
   processed: number;
   lastGameCreation: number;
-  /** Lower-bound patch window used by the cursor. */
+  /** Lower-bound patch window used by the cursor (version label). */
   sincePatch?: string;
+  /** `patch_index` of `sincePatch` resolved via the `patches` table (D-043). */
+  sincePatchIndex?: number;
   stored: number;
   duplicates: number;
   filtered: number;
@@ -40,12 +43,14 @@ export const newCursor = (
   snapshot: string[],
   lastGameCreation = 0,
   sincePatch?: string,
+  sincePatchIndex?: number,
 ): PlayerCursor => ({
   status: 'partial',
   snapshot,
   processed: 0,
   lastGameCreation,
   sincePatch,
+  sincePatchIndex,
   stored: 0,
   duplicates: 0,
   filtered: 0,
@@ -68,6 +73,8 @@ export function readCursor(db: Database.Database, key: string): PlayerCursor | n
       processed: Math.max(0, Math.min(parsed.processed, parsed.snapshot.length)),
       lastGameCreation: typeof parsed.lastGameCreation === 'number' ? parsed.lastGameCreation : 0,
       sincePatch: typeof parsed.sincePatch === 'string' ? parsed.sincePatch : undefined,
+      sincePatchIndex:
+        typeof parsed.sincePatchIndex === 'number' ? parsed.sincePatchIndex : undefined,
       stored: parsed.stored ?? 0,
       duplicates: parsed.duplicates ?? 0,
       filtered: parsed.filtered ?? 0,
@@ -89,23 +96,28 @@ export function writeCursor(db: Database.Database, key: string, cursor: PlayerCu
 /**
  * Returns the known rejection for a match id, `null` when it must be
  * (re-)evaluated. A 'patch' reject is dropped when the run's window includes
- * the match's actual patch, or when no lower bound is set.
+ * the match's actual patch, or when no lower bound is set. The comparison is
+ * on `patch_index` (D-043); a reject whose label cannot be resolved keeps its
+ * rejection (conservative: it cannot be proven in-window).
  */
 export function findRejection(
   db: Database.Database,
   matchId: string,
-  sincePatch?: string,
+  sincePatchIndex?: number,
 ): RejectRow | null {
   const row = db
     .prepare('SELECT reason, patch FROM match_rejects WHERE match_id = ?')
     .get(matchId) as RejectRow | undefined;
   if (!row) return null;
-  if (
-    row.reason === 'patch' &&
-    (sincePatch === undefined || (row.patch !== null && comparePatches(row.patch, sincePatch) >= 0))
-  ) {
-    db.prepare('DELETE FROM match_rejects WHERE match_id = ?').run(matchId);
-    return null;
+  if (row.reason === 'patch') {
+    const rejectIndex = row.patch === null ? undefined : lookupPatchIndex(db, row.patch);
+    if (
+      sincePatchIndex === undefined ||
+      (rejectIndex !== undefined && rejectIndex >= sincePatchIndex)
+    ) {
+      db.prepare('DELETE FROM match_rejects WHERE match_id = ?').run(matchId);
+      return null;
+    }
   }
   return row;
 }
@@ -187,9 +199,12 @@ export function listUnenrichedMatches(
   return rows.map((row) => ({ matchId: row.match_id, platform: row.platform as Platform }));
 }
 
-/** Whether `next` expands the previously ingested lower-bound window. */
-export function windowWidened(previous?: string, next?: string): boolean {
-  return previous !== undefined && (next === undefined || comparePatches(next, previous) < 0);
+/** Whether `next` expands the previously ingested lower-bound window (patch_index). */
+export function windowWidened(
+  previousIndex: number | undefined,
+  nextIndex: number | undefined,
+): boolean {
+  return previousIndex !== undefined && (nextIndex === undefined || nextIndex < previousIndex);
 }
 
 /** Wipe a platform's cursors and every shared rejection (`--reset`). */
@@ -198,22 +213,38 @@ export function clearIngestState(db: Database.Database, platform: string): void 
   db.prepare('DELETE FROM match_rejects').run();
 }
 
-/** Classify a validated match against this run's filters. */
-export function evaluateMatch(
+export interface MatchEvaluation {
+  outcome: MatchOutcome;
+  reason: RejectReason | null;
+  /** The match's `major.minor` label when it was computed (patch/invalid-label rejects). */
+  patchLabel?: string;
+}
+
+/**
+ * Classify a validated match against this run's filters. The patch window is
+ * compared on `patch_index` (D-043): `resolvePatchIndex` maps the match's
+ * `major.minor` label through the `patches` table (refreshing it first when
+ * needed). A label still unknown after the refresh yields an `invalid`
+ * reject — distinct from `patch` (outside the window) and `pruned`.
+ */
+export async function evaluateMatch(
   match: RiotMatchDto,
   queueId: number,
   minDuration: number,
-  sincePatch?: string,
-): { outcome: MatchOutcome; reason: RejectReason | null } {
+  resolvePatchIndex: (versionLabel: string) => Promise<number | undefined>,
+  sincePatchIndex?: number,
+): Promise<MatchEvaluation> {
   if (match.info.queueId !== queueId) return { outcome: 'filtered', reason: 'queue' };
   if (match.info.gameDuration <= minDuration) return { outcome: 'filtered', reason: 'short' };
-  if (
-    sincePatch !== undefined &&
-    comparePatches(patchFromGameVersion(match.info.gameVersion), sincePatch) < 0
-  ) {
-    return { outcome: 'filtered', reason: 'patch' };
+  const patchLabel = patchFromGameVersion(match.info.gameVersion);
+  const matchIndex = await resolvePatchIndex(patchLabel);
+  if (matchIndex === undefined) {
+    return { outcome: 'invalid', reason: 'invalid', patchLabel };
   }
-  return { outcome: 'stored', reason: null };
+  if (sincePatchIndex !== undefined && matchIndex < sincePatchIndex) {
+    return { outcome: 'filtered', reason: 'patch', patchLabel };
+  }
+  return { outcome: 'stored', reason: null, patchLabel };
 }
 
 export async function listMatchIds(

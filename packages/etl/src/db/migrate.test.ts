@@ -123,6 +123,7 @@ describe('migration runner', () => {
     expect(tableNames).toContain('item_build');
     expect(tableNames).toContain('lane_vs');
     expect(tableNames).toContain('lane_full');
+    expect(tableNames).toContain('patches');
 
     db.close();
   });
@@ -246,6 +247,7 @@ describe('migration runner', () => {
       '009_role_prob_decay_weights',
       '010_rune_ctx_context_level',
       '011_rune_ctx_rank_bucket',
+      '012_patches',
     ]);
     expect(migrate(db)).toEqual([]);
 
@@ -313,7 +315,7 @@ describe('migration runner', () => {
       ) VALUES (1, 'TOP', NULL, 10, 5, 'DIAMOND', 1, 1, 1)`,
     ).run();
     expect(db.prepare('SELECT COUNT(*) AS count FROM _migrations').get()).toMatchObject({
-      count: 11,
+      count: 12,
     });
     db.close();
   });
@@ -387,6 +389,7 @@ describe('migration runner', () => {
       '009_role_prob_decay_weights',
       '010_rune_ctx_context_level',
       '011_rune_ctx_rank_bucket',
+      '012_patches',
     ]);
     expect(migrate(db)).toEqual([]);
 

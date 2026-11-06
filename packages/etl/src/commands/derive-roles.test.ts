@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { openDb, migrate } from '../db';
+import { seedPatches } from '../patches.test-helpers';
 import { UsageError } from '../cli-args';
 import { deriveRolesCommand } from './derive-roles';
 
@@ -79,6 +80,7 @@ describe('deriveRolesCommand', () => {
     process.env.DRAFTORB_DB_PATH = dbPath;
     const db = openDb(dbPath);
     migrate(db);
+    seedPatches(db, ['16.21']);
     db.prepare(
       `INSERT INTO matches (match_id, platform, patch, queue_id, duration, created_at, avg_rank_score) VALUES ('m1', 'euw1', '16.21', 420, 1800, 1, 6.5)`,
     ).run();
@@ -124,6 +126,7 @@ describe('deriveRolesCommand', () => {
     process.env.DRAFTORB_DB_PATH = dbPath;
     const db = openDb(dbPath);
     migrate(db);
+    seedPatches(db, ['16.21']);
     db.prepare(
       `INSERT INTO matches (match_id, platform, patch, queue_id, duration, created_at, avg_rank_score) VALUES ('m1', 'euw1', '16.21', 420, 1800, 1, 6.5)`,
     ).run();
@@ -150,6 +153,7 @@ describe('deriveRolesCommand', () => {
     process.env.DRAFTORB_DB_PATH = dbPath;
     const db = openDb(dbPath);
     migrate(db);
+    seedPatches(db, ['16.21']);
     db.prepare(
       `INSERT INTO matches (match_id, platform, patch, queue_id, duration, created_at, avg_rank_score) VALUES ('m1', 'euw1', '16.21', 420, 1800, 1, 6.5)`,
     ).run();
@@ -164,6 +168,7 @@ describe('deriveRolesCommand', () => {
     process.env.DRAFTORB_DB_PATH = dbPath;
     const db = openDb(dbPath);
     migrate(db);
+    seedPatches(db, ['16.20', '16.21']);
     db.prepare(
       `INSERT INTO matches (match_id, platform, patch, queue_id, duration, created_at, avg_rank_score) VALUES ('m1', 'euw1', '16.21', 420, 1800, 1, 6.5)`,
     ).run();
@@ -192,6 +197,7 @@ describe('deriveRolesCommand', () => {
     const dbPath = join(directory, 'test.sqlite');
     const db = openDb(dbPath);
     migrate(db);
+    seedPatches(db, ['16.21']);
     db.prepare(
       `INSERT INTO matches (match_id, platform, patch, queue_id, duration, created_at, avg_rank_score) VALUES ('m1', 'euw1', '16.21', 420, 1800, 1, 6.5)`,
     ).run();

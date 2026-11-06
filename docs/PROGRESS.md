@@ -3,21 +3,21 @@
 ## Current status
 
 - Phase: 1 (Support / Diamond)
-- Current milestone: M3 Web MVP implementation complete (T-030..T-035 DONE); the backtest harness (T-027.a) remains under review because D-023 paired-bootstrap validation is not implemented. M1 ETL tickets T-019.b..f remain TODO.
-- Last updated: 2026-11-05 by Devin (D-054 accepted; B-060 Ekko/Sylas tags fixed)
+- Current milestone: M3 Web MVP implementation complete (T-030..T-035 DONE); the backtest harness (T-027.a) remains under review because D-023 paired-bootstrap validation is not implemented. T-019.b (patch index) is in REVIEW; T-019.c..f remain TODO.
+- Last updated: 2026-11-05 by Devin (T-019.b patch index implemented, REVIEW)
 
 ## Epic status
 
-| Epic           | Status      | Notes                                                                                                                                       |
-| -------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b DONE                                                                                                             |
-| E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e, T-014, T-015, T-015.b, T-016, T-017, T-018, T-019 DONE; T-019.b..f TODO |
-| E2 Engine      | IN PROGRESS | T-020..T-025 DONE; T-026, T-027.b TODO; T-027.a REVIEW                                                                                      |
-| E3 Web MVP     | DONE        | T-030..T-035 complete; recommendation flow, Support pool, regression coverage, deploy assets and visible unvalidated-model state            |
-| E4 Runes       | NOT STARTED |                                                                                                                                             |
-| E5 Items       | NOT STARTED |                                                                                                                                             |
-| E6 Live        | NOT STARTED |                                                                                                                                             |
-| E7 Vision      | NOT STARTED |                                                                                                                                             |
+| Epic           | Status      | Notes                                                                                                                                                       |
+| -------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b DONE                                                                                                                             |
+| E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e, T-014, T-015, T-015.b, T-016, T-017, T-018, T-019 DONE; T-019.b REVIEW; T-019.c..f TODO |
+| E2 Engine      | IN PROGRESS | T-020..T-025 DONE; T-026, T-027.b TODO; T-027.a REVIEW                                                                                                      |
+| E3 Web MVP     | DONE        | T-030..T-035 complete; recommendation flow, Support pool, regression coverage, deploy assets and visible unvalidated-model state                            |
+| E4 Runes       | NOT STARTED |                                                                                                                                                             |
+| E5 Items       | NOT STARTED |                                                                                                                                                             |
+| E6 Live        | NOT STARTED |                                                                                                                                                             |
+| E7 Vision      | NOT STARTED |                                                                                                                                                             |
 
 ## Data collection status
 
@@ -29,7 +29,7 @@
 ## Next recommended ticket
 
 T-023 is **DONE** (Role-generic recommendation engine with explanations, layered shrinkage scoring, pool contract D-024, composition needs, golden test runner and golden fixtures including non-support TOP 1v1 lane group). The Web MVP implementation is complete; its model remains visibly unvalidated until D-023's paired-bootstrap gate is implemented and passed.
-Next ETL ticket: **T-019.b** (Patches table, label mapping, patch_index switch, --since-patch). Next validation work: complete D-023 and revisit T-027.a before claiming model validation.
+Next ETL ticket: **T-019.c** (`pnpm etl prune`, `pruned` tombstones, default ingestion window bound — SPECS §13/D-044) once T-019.b is accepted. Next validation work: complete D-023 and revisit T-027.a before claiming model validation.
 
 Session entries before 2026-10-29 live in [PROGRESS_ARCHIVE.md](./PROGRESS_ARCHIVE.md).
 
@@ -40,6 +40,20 @@ Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-0
 - T-019.d verification: please compare the champion and item lists in the 2026-11-04 "T-019.d verification step" entry below with the official 16.21 and 16.22 patch notes (misses and false positives).
 
 ## Session log (newest first)
+
+### 2026-11-05 — Devin — T-019.b patch index table + `patch_index` switch (REVIEW)
+
+- Done:
+  - Migration `012_patches.sql`: `patches(patch_index INTEGER PK, version_label TEXT UNIQUE, released_at INTEGER)` per D-043/SPECS §12. `matches.patch` stays a TEXT label resolved through the table (no new columns).
+  - New `packages/etl/src/patches.ts`: `parsePatchLabel`/`parsePatchLabels` (versions.json newest-first -> oldest-first, hotfix collapse, `lolpatch_*` ignored), `refreshPatches` (append-only, existing indices never renumbered), `createPatchIndexLookup`/`lookupPatchIndex`, `ensurePatchesFresh`, `createPatchResolver` (lazy one-fetch-per-run refresh; failed refresh = transient, not `invalid`).
+  - Ingestion: `--since-patch` label resolves to `patch_index` (unknown after refresh -> `UsageError`); match labels resolve per match — unknown after refresh -> `invalid` reject (stores the label in `match_rejects.patch`); `patch`-reject re-evaluation and cursor `windowWidened` compare indices (cursor gains `sincePatchIndex`, legacy cursors resolve their label once).
+  - Aggregation: `loadPatchWindow` reads `patches` instead of building a dense stored-patch index — recency now follows real patch distance (gaps count); snapshot resolves via the table (unknown -> error); `latestPatch` prefers `patch_index` ordering with numeric fallback; rune `futureGames` compares indices. `aggregate`/`derive-roles` refresh the catalog once when a stored label is missing; `backtest` copies `patches` into its in-memory DB.
+  - Docs: D-033 SUPERSEDED by D-043, numeric-compare part of D-017 noted superseded, D-055 PROPOSED (implementation details: label resolution, `currentPatchIndex` = snapshot index else max stored index, lazy refresh, `released_at` NULL), SPECS §3/§12 banner, DATA_MODEL.
+- Files touched: `packages/etl/migrations/012_patches.sql` (new), `packages/etl/src/{patches.ts,patches.test.ts,patches.test-helpers.ts}` (new), `aggregate-shared.ts(.test)`, `aggregate.ts`, `aggregate-runes.ts`, `aggregate-baseline-patch.test.ts`, `aggregate-baseline(-helpers).ts(.test)`, `aggregate-pairs-helpers.ts`, `aggregate.test.ts`, `aggregate-runes.test.ts`, `matches-store.ts`, `matches-process.ts`, `matches.ts`, `matches.test.ts`, `matches.test-helpers.ts`, `participants-ingestion.test.ts`, `commands/{aggregate,derive-roles,backtest}.ts`, `commands/{aggregate,derive-roles,backtest}.test.ts`, `db/migrate.test.ts`, `index.ts`, `docs/{DATA_MODEL,DECISIONS,SPECS,TICKETS,PROGRESS}.md`.
+- Tests: `pnpm check` green (80 files, 894 tests). New coverage: season-change ordering, hotfix collapse, legacy ignore, append-only refresh, unknown match label -> refresh -> stored / still-unknown -> `invalid`, failed refresh -> transient, unknown `--since-patch` -> usage error, real-distance recency across a collection gap, snapshot filtering by index.
+- State left: REVIEW. Recency weights change for the existing 3,311-match DB (patches 16.19-16.22 are contiguous in `versions.json`, so distances are unchanged there; gaps only appear for never-collected patches). `pnpm etl aggregate`/`derive-roles`/`matches` will fetch `versions.json` once on first run to populate `patches`.
+- Next step: owner review (D-055 + behavioral change); then T-019.c.
+- Pitfalls / notes for next AI: `patches` must be populated before aggregates produce rows — tests seed it via `seedPatches(db, labels)` (contiguous indices; insert rows manually for gap fixtures). `ensurePatchesFresh`/`createPatchResolver` accept `fetchFn` for tests; commands use real `fetch`. `latestPatch` falls back to numeric compare only when NO stored label resolves. BUGS.md: no new bugs found.
 
 ### 2026-11-05 — Devin — D-054 accepted + B-060 champion tags fix
 

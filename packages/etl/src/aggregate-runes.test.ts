@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_CONFIG, nEff } from '@draftorb/engine';
 
 import { openDb, migrate } from './db';
+import { seedPatches } from './patches.test-helpers';
 import {
   aggregateRunesByContext,
   canonicalPerksJson,
@@ -148,6 +149,7 @@ export function seedMatch(
     participants?: Participant[];
   } = {},
 ): string {
+  seedPatches(db, [patch]);
   const matchId = `m${++matchIndex}`;
   db.prepare(
     `INSERT INTO matches (
@@ -409,6 +411,7 @@ describe('aggregateRunesByContext', () => {
     withSeededDb([{ patch: PATCH_16_21 }], (db) => {
       const before = aggregateRunesByContext(db);
       expect(before.length).toBeGreaterThan(0);
+      seedPatches(db, ['16.1']);
       expect(aggregateRunesByContext(db, { patch: '16.1' })).toEqual([]);
       expect(db.prepare('SELECT COUNT(*) AS count FROM rune_ctx').get()).toMatchObject({
         count: before.length,

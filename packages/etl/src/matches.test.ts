@@ -3,7 +3,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { openDb, migrate } from './db';
 import { ingestMatches } from './matches';
 import { comparePatches, cursorKey, patchFromGameVersion, windowWidened } from './matches-store';
-import { makeMatch, mockClient, PLATFORM, seedPlayer } from './matches.test-helpers';
+import {
+  makeMatch,
+  mockClient,
+  PLATFORM,
+  seedMatchPatches,
+  seedPlayer,
+} from './matches.test-helpers';
 import { RiotApiError, RiotRateLimitError, RiotSchemaError } from './riot';
 import type { Platform, RiotClient } from './riot';
 
@@ -17,15 +23,16 @@ describe('match ingestion', () => {
     expect(comparePatches('16.9', '16.10')).toBeLessThan(0);
     expect(comparePatches('15.24', '16.1')).toBeLessThan(0);
     expect(comparePatches('16.10', '16.10')).toBe(0);
-    expect(windowWidened('16.21', '16.19')).toBe(true);
-    expect(windowWidened('16.21', undefined)).toBe(true);
-    expect(windowWidened('16.19', '16.21')).toBe(false);
-    expect(windowWidened(undefined, '16.21')).toBe(false);
+    expect(windowWidened(3, 1)).toBe(true);
+    expect(windowWidened(3, undefined)).toBe(true);
+    expect(windowWidened(1, 3)).toBe(false);
+    expect(windowWidened(undefined, 3)).toBe(false);
   });
 
   it('stores valid matches with avg rank score from known participants', async () => {
     const db = openDb(':memory:');
     migrate(db);
+    seedMatchPatches(db);
     seedPlayer(db, 'p-alpha', 6.5);
     seedPlayer(db, 'p-beta', 7);
 
@@ -59,6 +66,7 @@ describe('match ingestion', () => {
   it('includes the seed rank in every stored match rank summary', async () => {
     const db = openDb(':memory:');
     migrate(db);
+    seedMatchPatches(db);
     seedPlayer(db, 'p-alpha', 6.5);
     seedPlayer(db, 'p-beta', 7);
 
@@ -95,6 +103,7 @@ describe('match ingestion', () => {
   it('dedupes a match shared by two players without refetching it', async () => {
     const db = openDb(':memory:');
     migrate(db);
+    seedMatchPatches(db);
     seedPlayer(db, 'p-alpha', 6.5);
     seedPlayer(db, 'p-beta', 7);
 
@@ -116,6 +125,7 @@ describe('match ingestion', () => {
   it('continues to later players after transient match-ID listing failures', async () => {
     const db = openDb(':memory:');
     migrate(db);
+    seedMatchPatches(db);
     seedPlayer(db, 'p-alpha', 8);
     seedPlayer(db, 'p-beta', 7);
     seedPlayer(db, 'p-gamma', 6);
@@ -171,6 +181,7 @@ describe('match ingestion', () => {
   it('applies the consecutive transient-failure limit across listing and detail requests', async () => {
     const db = openDb(':memory:');
     migrate(db);
+    seedMatchPatches(db);
     seedPlayer(db, 'p-alpha', 10);
     seedPlayer(db, 'p-beta', 9);
     seedPlayer(db, 'p-gamma', 8);
@@ -201,6 +212,7 @@ describe('match ingestion', () => {
   it('keeps equal and newer patches and rejects older patches into match_rejects', async () => {
     const db = openDb(':memory:');
     migrate(db);
+    seedMatchPatches(db);
     seedPlayer(db, 'p-alpha', 6.5);
 
     const client = mockClient(
@@ -234,6 +246,7 @@ describe('match ingestion', () => {
   it('marks client schema failures as invalid matches', async () => {
     const db = openDb(':memory:');
     migrate(db);
+    seedMatchPatches(db);
     seedPlayer(db, 'p-alpha', 6.5);
 
     const client = mockClient({ 'p-alpha': ['EUW1_BAD'] }, {});
@@ -262,6 +275,7 @@ describe('match ingestion', () => {
   it('resumes a killed run from the stored cursor', async () => {
     const db = openDb(':memory:');
     migrate(db);
+    seedMatchPatches(db);
     seedPlayer(db, 'p-alpha', 6.5);
 
     // Simulate a kill after the first of two ids was processed.
@@ -305,6 +319,7 @@ describe('match ingestion', () => {
   it('incrementally picks up new matches for a completed player', async () => {
     const db = openDb(':memory:');
     migrate(db);
+    seedMatchPatches(db);
     seedPlayer(db, 'p-alpha', 6.5);
 
     const client = mockClient({ 'p-alpha': ['EUW1_1'] }, { EUW1_1: makeMatch('EUW1_1') });
@@ -346,6 +361,7 @@ describe('match ingestion', () => {
   it('does not refetch a match rejected for patch until the target patch changes', async () => {
     const db = openDb(':memory:');
     migrate(db);
+    seedMatchPatches(db);
     seedPlayer(db, 'p-alpha', 6.5);
     seedPlayer(db, 'p-beta', 7);
 
@@ -379,6 +395,7 @@ describe('match ingestion', () => {
   it('removing sincePatch relists in full and recovers a patch-rejected match', async () => {
     const db = openDb(':memory:');
     migrate(db);
+    seedMatchPatches(db);
     seedPlayer(db, 'p-alpha', 6.5);
     const client = mockClient(
       { 'p-alpha': ['EUW1_OLD'] },
@@ -409,6 +426,7 @@ describe('match ingestion', () => {
   it('reset clears rejections so newly eligible matches are re-evaluated', async () => {
     const db = openDb(':memory:');
     migrate(db);
+    seedMatchPatches(db);
     seedPlayer(db, 'p-alpha', 6.5);
 
     const client = mockClient(
@@ -439,6 +457,7 @@ describe('match ingestion', () => {
   it('limit processes pending players before players already done', async () => {
     const db = openDb(':memory:');
     migrate(db);
+    seedMatchPatches(db);
     seedPlayer(db, 'p-alpha', 7);
     seedPlayer(db, 'p-beta', 6.5);
 
@@ -459,6 +478,7 @@ describe('match ingestion', () => {
   it('emits a progress log with per-player counts', async () => {
     const db = openDb(':memory:');
     migrate(db);
+    seedMatchPatches(db);
     seedPlayer(db, 'p-alpha', 6.5);
 
     const lines: string[] = [];
@@ -473,6 +493,7 @@ describe('match ingestion', () => {
   it('awaits the unenriched-match reprocess pass before returning (B-044)', async () => {
     const db = openDb(':memory:');
     migrate(db);
+    seedMatchPatches(db);
     db.prepare(
       `INSERT INTO matches (match_id, platform, patch, queue_id, duration, created_at,
         avg_rank_score, rank_known_count)
@@ -525,6 +546,117 @@ describe('match ingestion', () => {
       enriched: number;
     };
     expect(row.enriched).toBe(1);
+    db.close();
+  });
+
+  it('refreshes the patches table once when a match label is unknown, then stores it', async () => {
+    const db = openDb(':memory:');
+    migrate(db);
+    seedMatchPatches(db);
+    seedPlayer(db, 'p-alpha', 6.5);
+
+    const match = makeMatch('EUW1_FUTURE', { gameVersion: '16.23.1.7' });
+    const client = mockClient({ 'p-alpha': ['EUW1_FUTURE'] }, { EUW1_FUTURE: match });
+    const versionsFetch = vi.fn(
+      async () =>
+        new Response(JSON.stringify(['16.23.1', '16.22.1', '16.21.1', '16.20.1', '16.19.1']), {
+          status: 200,
+        }),
+    );
+
+    const result = await ingestMatches({
+      platform: PLATFORM,
+      db,
+      client,
+      patchesFetchFn: versionsFetch as unknown as typeof fetch,
+    });
+
+    expect(result.stored).toBe(1);
+    expect(versionsFetch).toHaveBeenCalledTimes(1);
+    const patchRow = db
+      .prepare('SELECT patch_index, version_label FROM patches WHERE version_label = ?')
+      .get('16.23') as { patch_index: number; version_label: string };
+    // Appended after the seeded maximum (4), never renumbered.
+    expect(patchRow.patch_index).toBe(5);
+    db.close();
+  });
+
+  it('rejects a match as invalid when its patch label is still unknown after refresh', async () => {
+    const db = openDb(':memory:');
+    migrate(db);
+    seedMatchPatches(db);
+    seedPlayer(db, 'p-alpha', 6.5);
+
+    const match = makeMatch('EUW1_ODD', { gameVersion: '99.1.3.3' });
+    const client = mockClient({ 'p-alpha': ['EUW1_ODD'] }, { EUW1_ODD: match });
+    const versionsFetch = vi.fn(
+      async () => new Response(JSON.stringify(['16.23.1', '16.22.1']), { status: 200 }),
+    );
+
+    const result = await ingestMatches({
+      platform: PLATFORM,
+      db,
+      client,
+      patchesFetchFn: versionsFetch as unknown as typeof fetch,
+    });
+
+    expect(result.invalid).toBe(1);
+    expect(result.stored).toBe(0);
+    expect(
+      db.prepare('SELECT reason, patch FROM match_rejects WHERE match_id = ?').get('EUW1_ODD'),
+    ).toMatchObject({ reason: 'invalid', patch: '99.1' });
+    db.close();
+  });
+
+  it('treats a failed patches refresh as a transient player failure, not an invalid reject', async () => {
+    const db = openDb(':memory:');
+    migrate(db);
+    // No seedMatchPatches: every label is unknown, so resolution must refresh.
+    seedPlayer(db, 'p-alpha', 6.5);
+    seedPlayer(db, 'p-beta', 7);
+    seedPlayer(db, 'p-gamma', 6);
+
+    const client = mockClient(
+      { 'p-alpha': ['EUW1_1'], 'p-beta': ['EUW1_1'], 'p-gamma': ['EUW1_1'] },
+      { EUW1_1: makeMatch('EUW1_1') },
+    );
+    const versionsFetch = vi.fn(async () => {
+      throw new Error('socket hangup');
+    });
+
+    const result = await ingestMatches({
+      platform: PLATFORM,
+      db,
+      client,
+      patchesFetchFn: versionsFetch as unknown as typeof fetch,
+    });
+
+    expect(result.playersFailed).toBe(3);
+    expect(result.stored).toBe(0);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM match_rejects').get()).toMatchObject({ n: 0 });
+    db.close();
+  });
+
+  it('rejects an unknown --since-patch label instead of comparing version strings', async () => {
+    const db = openDb(':memory:');
+    migrate(db);
+    seedMatchPatches(db);
+    seedPlayer(db, 'p-alpha', 6.5);
+
+    const client = mockClient({ 'p-alpha': [] }, {});
+    const versionsFetch = vi.fn(
+      async () => new Response(JSON.stringify(['16.23.1', '16.22.1']), { status: 200 }),
+    );
+
+    await expect(
+      ingestMatches({
+        platform: PLATFORM,
+        sincePatch: '16.99',
+        db,
+        client,
+        patchesFetchFn: versionsFetch as unknown as typeof fetch,
+      }),
+    ).rejects.toThrow('Unknown patch "16.99"');
     db.close();
   });
 });

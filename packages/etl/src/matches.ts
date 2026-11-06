@@ -5,6 +5,8 @@ import type { Role } from '@draftorb/shared';
 import { DEFAULT_CONFIG } from '@draftorb/engine';
 import { openDb, migrate } from './db';
 import { resolveDbPath } from './config/paths';
+import { createPatchIndexLookup, createPatchResolver } from './patches';
+import { UsageError } from './cli-args';
 import {
   clearIngestState,
   createRankLoader,
@@ -38,6 +40,8 @@ export interface MatchIngestionOptions {
   minDurationSeconds?: number;
   db?: Database.Database;
   client?: RiotClient;
+  /** Data Dragon `fetch` override for the `patches` refresh (tests). */
+  patchesFetchFn?: typeof fetch;
   reset?: boolean;
   onProgress?: (message: string) => void;
   myRole?: Role;
@@ -92,6 +96,26 @@ export async function ingestMatches(
     migrate(db);
     if (options.reset) clearIngestState(db, platform);
 
+    // --since-patch is a version label resolved to patch_index via `patches`
+    // (D-043); the resolver refreshes the table from Data Dragon on a miss.
+    const patchResolver = createPatchResolver(db, {
+      fetchFn: options.patchesFetchFn,
+      onRefresh: (result) => {
+        if (result.added > 0) {
+          log(`Refreshed patches from Data Dragon: +${result.added} (total ${result.total}).`);
+        }
+      },
+      onWarn: (message) => log(`Warning: ${message}`),
+    });
+    const patchLookup = createPatchIndexLookup(db);
+    const sincePatchIndex =
+      sincePatch === undefined ? undefined : await patchResolver.resolve(sincePatch);
+    if (sincePatch !== undefined && sincePatchIndex === undefined) {
+      throw new UsageError(
+        `Unknown patch "${sincePatch}": not present in Data Dragon versions after refreshing the patches table.`,
+      );
+    }
+
     const allPlayers = db
       .prepare(
         'SELECT puuid, rank_score FROM players WHERE platform = ? AND rank_score IS NOT NULL ORDER BY rank_score DESC, puuid',
@@ -129,9 +153,14 @@ export async function ingestMatches(
       let cursor = options.reset ? null : readCursor(db, key);
 
       try {
-        if (cursor && windowWidened(cursor.sincePatch, sincePatch)) {
+        // Legacy cursors carry only the sincePatch label; resolve it to a
+        // patch_index once (post-refresh) for the widening comparison.
+        const previousIndex =
+          cursor?.sincePatchIndex ??
+          (cursor?.sincePatch === undefined ? undefined : patchLookup(cursor.sincePatch));
+        if (cursor && windowWidened(previousIndex, sincePatchIndex)) {
           const ids = await listMatchIds(client, platform, player.puuid, queueId, perPlayer);
-          cursor = newCursor(ids, cursor.lastGameCreation, sincePatch);
+          cursor = newCursor(ids, cursor.lastGameCreation, sincePatch, sincePatchIndex);
         } else if (cursor?.status === 'done') {
           const newIds = await listMatchIds(
             client,
@@ -147,10 +176,10 @@ export async function ingestMatches(
             playerResults.push(buildPlayerResult(player.puuid, 'skipped', 0, ZERO_RUN));
             continue;
           }
-          cursor = newCursor(newIds, cursor.lastGameCreation, sincePatch);
+          cursor = newCursor(newIds, cursor.lastGameCreation, sincePatch, sincePatchIndex);
         } else if (!cursor) {
           const ids = await listMatchIds(client, platform, player.puuid, queueId, perPlayer);
-          cursor = newCursor(ids, 0, sincePatch);
+          cursor = newCursor(ids, 0, sincePatch, sincePatchIndex);
         }
       } catch (error) {
         if (error instanceof RiotAuthError) {
@@ -190,7 +219,8 @@ export async function ingestMatches(
         cursorKey: key,
         queueId,
         minDuration,
-        sincePatch,
+        sincePatchIndex,
+        resolvePatchIndex: patchResolver.resolve,
         player: { puuid: player.puuid, rank_score: player.rank_score },
         loadRanks,
         base,

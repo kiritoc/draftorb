@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_CONFIG, nEff } from '@draftorb/engine';
 
 import { openDb, migrate } from './db';
+import { seedPatches } from './patches.test-helpers';
 import { aggregateBaseline, type BaselineRow } from './aggregate-baseline';
 import {
   requireRow,
@@ -187,6 +188,7 @@ describe('aggregateBaseline', () => {
     withSeededDb([{ patch: '16.21', rankScore: 6.5, win: 1 }], (db) => {
       const before = aggregateBaseline(db);
       expect(before.length).toBeGreaterThan(0);
+      seedPatches(db, ['16.1']);
       expect(aggregateBaseline(db, { patch: '16.1' })).toEqual([]);
       expect(db.prepare('SELECT COUNT(*) AS count FROM baseline').get()).toMatchObject({
         count: before.length,

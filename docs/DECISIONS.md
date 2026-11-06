@@ -109,6 +109,8 @@ Owner decision 2026-10-29.
 - Alternatives: (a) drop filtered ids silently — rejected, duplicates work across players; (b) store rejected ids inside the per-player cursor JSON — rejected, dedupe must be global; (c) exact `--patch` match — rejected, discards the older patches that recency decay is meant to down-weight and forces a full re-ingestion every patch; (d) re-evaluate every reject on any filter change — rejected for `queue`/`short`/`invalid` since those properties cannot change.
 - Consequences: one extra table (migration `002_match_rejects`); recency is handled at aggregation time, not ingestion; the database grows with the window (pruning old patches is a separate concern).
 
+Update (T-019.b, D-043): the numeric `major.minor` compare for the `--since-patch` window and `patch`-reject re-evaluation is SUPERSEDED — both now compare `patch_index` from the `patches` table. The rest of this decision (reject table, window lower bound, permanence of `queue`/`short`/`invalid`) stands.
+
 Owner decision 2026-10-29.
 
 ### D-018 — Incremental match listing via `startTime` on done cursors — ACCEPTED
@@ -266,7 +268,7 @@ Accepted by the owner on 2026-10-31. SPECS §5/§7 text derived from this decisi
 
 Owner decision 2026-10-31.
 
-### D-033 — Recency `patchIndex` and game rank bucket in ETL aggregation — ACCEPTED (to be superseded by D-043 when T-019.b lands)
+### D-033 — Recency `patchIndex` and game rank bucket in ETL aggregation — SUPERSEDED by D-043 (T-019.b)
 
 - Context: SPECS §3 defines recency as `decay ^ (currentPatchIndex - patchIndex)` but does not define `patchIndex`. It also does not say how a match's `avg_rank_score` maps to a rank bucket. T-016 needs both.
 - Question: should a patch gap (no stored games on some patches) count as one decay step or as the real number of patches released in between?
@@ -527,6 +529,17 @@ Owner decision 2026-11-05 (avatar source chosen in session).
 - Consequences: SPECS §7/§7.1 updated; UI strings stay centralized; ETL exports and the backtest are unaffected (engine output only).
 
 Owner decision 2026-11-05.
+
+### D-055 — Patch-index implementation details for T-019.b — PROPOSED
+
+- Context: D-043 fixes the `patches` table and the source ordinal, but leaves a few implementation choices open: where `patch_index` lives for stored matches, what `currentPatchIndex` is when no snapshot is given, and when `patches` is refreshed.
+- Decision (implementation, pending owner review):
+  1. `matches.patch` stays a TEXT `major.minor` label; there is no `patch_index` column. Aggregation and ingestion resolve labels through `patches` (prepared lookup / in-memory map), matching the planned DATA_MODEL schema. Stored labels absent from `patches` cannot be ordered and are excluded from aggregates.
+  2. `currentPatchIndex` = the snapshot's `patch_index` when `aggregate [patch]` is given (promoted even with no stored games at it, as before), else the highest `patch_index` among stored matches. `loadPatchWindow` returns an empty window (`currentPatchIndex = -1`) when no stored label resolves within the bound.
+  3. `patches` is refreshed lazily: ingestion resolves each match label through `createPatchResolver` (one fetch of `versions.json` per run, on the first miss; a failed refresh is a transient player failure, not an `invalid` reject); `aggregate`/`derive-roles` call `ensurePatchesFresh` once before aggregating and reject an explicit snapshot label Data Dragon does not know; `backtest` copies `patches` into its in-memory database.
+  4. `released_at` stays NULL: `versions.json` carries no release dates and none are invented.
+- Alternatives: a `patch_index` column on `matches`/`match_rejects` (denormalized, needs backfill and rewrite on catalog changes — rejected, the join/map lookup is cheap and labels are already stored); `currentPatchIndex` = max `patch_index` in `patches` (penalizes all games by a constant when a brand-new patch has no games yet — rejected, the stored-max matches prior semantics).
+- Consequences: recency now follows real patch distance (gaps in collected data count); `aggregate`/`derive-roles`/`matches` may perform one Data Dragon `versions.json` fetch per run when the catalog is stale; tests seed `patches` via `seedPatches`.
 
 ### Template
 

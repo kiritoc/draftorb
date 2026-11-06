@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { migrate, openDb } from './db';
+import { seedPatches } from './patches.test-helpers';
 import {
   accumulateWeighted,
   assertPatchFormat,
@@ -52,43 +53,69 @@ describe('loadPatchWindow', () => {
     expect(window.currentPatchIndex).toBe(-1);
   });
 
-  it('builds a dense index over distinct stored patches, sorted numerically', () => {
+  it('resolves stored patches through the patches table, ordered by patch_index', () => {
     seedMatch(db, 'm2', '16.10');
     seedMatch(db, 'm1', '16.9');
+    seedPatches(db, ['16.9', '16.10']);
     const window = loadPatchWindow(db);
-    expect(window.patches).toEqual(['16.9', '16.10']);
-    expect(window.patchIndex.get('16.9')).toBe(0);
-    expect(window.patchIndex.get('16.10')).toBe(1);
+    expect(window.patchIndex.get('16.9')).toBe(1);
+    expect(window.patchIndex.get('16.10')).toBe(2);
+    expect(window.currentPatchIndex).toBe(2);
+  });
+
+  it('keeps real patch distance across a gap in collected patches', () => {
+    seedMatch(db, 'm1', '16.19');
+    seedMatch(db, 'm2', '16.22');
+    db.prepare('INSERT INTO patches (patch_index, version_label) VALUES (1, ?)').run('16.19');
+    db.prepare('INSERT INTO patches (patch_index, version_label) VALUES (4, ?)').run('16.22');
+    const window = loadPatchWindow(db);
+    expect(window.patchIndex.get('16.19')).toBe(1);
+    expect(window.patchIndex.get('16.22')).toBe(4);
+    expect(window.currentPatchIndex).toBe(4);
+  });
+
+  it('excludes stored match labels absent from the patches table', () => {
+    seedMatch(db, 'm1', '16.21');
+    seedMatch(db, 'm2', '99.1');
+    seedPatches(db, ['16.21']);
+    const window = loadPatchWindow(db);
+    expect(window.patchIndex.get('16.21')).toBe(1);
+    expect(window.patchIndex.get('99.1')).toBeUndefined();
+  });
+
+  it('filters stored patches newer than the snapshot index', () => {
+    seedMatch(db, 'm1', '16.20');
+    seedMatch(db, 'm2', '16.21');
+    seedPatches(db, ['16.20', '16.21']);
+    const window = loadPatchWindow(db, '16.20');
+    expect(window.patchIndex.get('16.20')).toBe(1);
+    expect(window.patchIndex.get('16.21')).toBeUndefined();
     expect(window.currentPatchIndex).toBe(1);
   });
 
-  it('compares patches numerically ("16.10" > "16.9", not string order)', () => {
-    seedMatch(db, 'm1', '16.9');
-    seedMatch(db, 'm2', '16.10');
-    const window = loadPatchWindow(db);
-    expect(window.patches.indexOf('16.10')).toBeGreaterThan(window.patches.indexOf('16.9'));
-  });
-
-  it('filters stored patches newer than the snapshot and adds the snapshot', () => {
+  it('promotes the snapshot index even when no stored patch carries it', () => {
     seedMatch(db, 'm1', '16.20');
-    seedMatch(db, 'm2', '16.21');
-    const window = loadPatchWindow(db, '16.20');
-    expect(window.patches).toEqual(['16.20']);
-    expect(window.patchIndex.get('16.21')).toBeUndefined();
-  });
-
-  it('adds the snapshot patch even when no stored patch carries it', () => {
-    seedMatch(db, 'm1', '16.20');
+    seedPatches(db, ['16.20', '16.21']);
     const window = loadPatchWindow(db, '16.21');
-    expect(window.patches).toEqual(['16.20', '16.21']);
-    expect(window.patchIndex.get('16.21')).toBe(1);
+    expect(window.patchIndex.get('16.21')).toBe(2);
+    expect(window.currentPatchIndex).toBe(2);
+    expect(window.snapshotIndex).toBe(2);
   });
 
   it('does not add the snapshot when no stored patch qualifies', () => {
     seedMatch(db, 'm1', '16.21');
+    seedPatches(db, ['16.20', '16.21']);
     const window = loadPatchWindow(db, '16.20');
     expect(window.patches).toEqual([]);
     expect(window.currentPatchIndex).toBe(-1);
+  });
+
+  it('throws on a snapshot patch absent from the patches table', () => {
+    seedMatch(db, 'm1', '16.21');
+    seedPatches(db, ['16.21']);
+    expect(() => loadPatchWindow(db, '16.20')).toThrow(
+      'Unknown patch "16.20": not present in the patches table',
+    );
   });
 });
 

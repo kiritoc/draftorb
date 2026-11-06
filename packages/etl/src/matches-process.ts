@@ -38,7 +38,10 @@ export interface MatchProcessContext {
   cursorKey: string;
   queueId: number;
   minDuration: number;
-  sincePatch?: string;
+  /** `patch_index` lower bound for this run (D-043); undefined = no window. */
+  sincePatchIndex?: number;
+  /** `version_label -> patch_index` via the `patches` table (refreshes on miss). */
+  resolvePatchIndex: (versionLabel: string) => Promise<number | undefined>;
   player: { puuid: string; rank_score: number };
   loadRanks: (puuids: readonly string[]) => Map<string, number>;
   base: { stored: number; duplicates: number; filtered: number; invalid: number };
@@ -117,7 +120,7 @@ export async function processMatch(
 
   try {
     const participantCount = storedParticipantCount(ctx.stmts, matchId);
-    if (findRejection(ctx.db, matchId, ctx.sincePatch)) {
+    if (findRejection(ctx.db, matchId, ctx.sincePatchIndex)) {
       outcome = 'filtered';
     } else if (isCompleteStoredMatch(participantCount)) {
       outcome = 'duplicate';
@@ -136,7 +139,13 @@ export async function processMatch(
         throw new RiotSchemaError(matchId, parsed.error.message);
       }
       const match = parsed.data;
-      const evaluated = evaluateMatch(match, ctx.queueId, ctx.minDuration, ctx.sincePatch);
+      const evaluated = await evaluateMatch(
+        match,
+        ctx.queueId,
+        ctx.minDuration,
+        ctx.resolvePatchIndex,
+        ctx.sincePatchIndex,
+      );
       outcome = evaluated.outcome;
       if (evaluated.reason === null) {
         lastGameCreation = Math.max(lastGameCreation, match.info.gameCreation);
@@ -194,22 +203,28 @@ export async function processMatch(
           ctx.stmts.insertReject.run({
             match_id: matchId,
             reason: evaluated.reason,
-            patch:
-              evaluated.reason === 'patch' ? patchFromGameVersion(match.info.gameVersion) : null,
+            patch: evaluated.patchLabel ?? null,
             checked_at: Date.now(),
           });
           if (repairingIncompleteMatch) {
             ctx.stmts.deleteMatch.run(matchId);
           }
           cursor.processed = index + 1;
-          cursor.filtered = ctx.base.filtered + run.filtered + 1;
-          cursor.invalid = ctx.base.invalid + run.invalid;
+          if (evaluated.outcome === 'invalid') {
+            cursor.invalid = ctx.base.invalid + run.invalid + 1;
+          } else {
+            cursor.filtered = ctx.base.filtered + run.filtered + 1;
+          }
           cursor.lastGameCreation = lastGameCreation;
           cursor.updatedAt = Date.now();
           writeCursor(ctx.db, ctx.cursorKey, cursor);
         });
         persist();
-        run.filtered += 1;
+        if (evaluated.outcome === 'invalid') {
+          run.invalid += 1;
+        } else {
+          run.filtered += 1;
+        }
         didCountOutcome = true;
       }
     }

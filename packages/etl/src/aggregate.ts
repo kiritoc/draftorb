@@ -20,11 +20,23 @@ export interface RoleProbRow {
 }
 
 /**
- * Highest stored patch, compared numerically on major.minor (16.10 > 16.9,
- * same rule as D-017). Using `created_at` order instead could pick an older
- * patch after an out-of-order ingest.
+ * Latest stored patch. Prefers the `patches` table ordinal (D-043): the match
+ * whose label has the highest `patch_index` wins, so real release order — not
+ * version-string or `created_at` order — decides. Falls back to the numeric
+ * major.minor compare for databases whose `patches` table is not populated yet.
  */
 export function latestPatch(db: Database.Database): string | undefined {
+  const indexed = db
+    .prepare(
+      `SELECT m.patch AS patch
+       FROM matches m
+       JOIN patches p ON p.version_label = m.patch
+       ORDER BY p.patch_index DESC
+       LIMIT 1`,
+    )
+    .get() as { patch: string } | undefined;
+  if (indexed !== undefined) return indexed.patch;
+
   const row = db
     .prepare(
       `SELECT patch FROM matches

@@ -35,7 +35,7 @@ import {
   reliabilityFactor,
   type RankWeightingConfig,
 } from '@draftorb/engine';
-import { comparePatches } from './matches-store';
+import { lookupPatchIndex } from './patches';
 import { defaultManualDataDir } from './config/paths';
 import {
   accumulateWeighted,
@@ -139,7 +139,7 @@ export function aggregateRunesByContext(
   assertPatchFormat(options.patch);
 
   const snapshotPatch = options.patch;
-  const { patchIndex, currentPatchIndex } = loadPatchWindow(db, snapshotPatch);
+  const { patchIndex, currentPatchIndex, snapshotIndex } = loadPatchWindow(db, snapshotPatch);
 
   const tags = loadChampionTags(
     options.tagsPath ?? join(defaultManualDataDir(), 'champion-tags.json'),
@@ -158,7 +158,12 @@ export function aggregateRunesByContext(
       )
       .all() as Array<{ puuid: string; championId: number; patch: string; games: number }>;
     for (const c of counts) {
-      if (comparePatches(c.patch, snapshotPatch) <= 0) continue;
+      // patch_index comparison (D-043): labels absent from `patches` cannot be
+      // ordered, so their games are conservatively not counted as future.
+      const gameIndex = lookupPatchIndex(db, c.patch);
+      if (gameIndex === undefined || snapshotIndex === undefined || gameIndex <= snapshotIndex) {
+        continue;
+      }
       const key = `${c.puuid}|${c.championId}`;
       futureGames.set(key, (futureGames.get(key) ?? 0) + c.games);
     }

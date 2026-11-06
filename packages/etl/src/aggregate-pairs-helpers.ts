@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { migrate, openDb } from './db';
+import { seedPatches } from './patches.test-helpers';
 
 export interface PairRow {
   championId: number;
@@ -65,6 +66,10 @@ let toyMatchIndex = 0;
  * All participants share the same patch / rankKnownCount / avg_rank_score.
  */
 export function seedMatches(db: Database.Database, matches: ToyMatch[]): void {
+  seedPatches(
+    db,
+    matches.map((match) => match.patch),
+  );
   const insertMatch = db.prepare(
     `INSERT INTO matches (
       match_id, platform, patch, queue_id, duration, created_at, avg_rank_score, rank_known_count

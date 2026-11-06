@@ -44,6 +44,16 @@ gzip -9 -c data/DraftOrb.sqlite > DraftOrb.sqlite.gz
 
 Tuning: change the cron or the `--limit 100` pending-player cap in the workflow file; ingestion is resumable via cursors, so smaller caps just spread the work over more runs. Watch the gzipped size — GitHub rejects files >100 MB, so if `DraftOrb.sqlite.gz` approaches that, reduce `--per-player`/retention or move the state to external storage (see D-057).
 
+## Profile sync (D-067..D-071)
+
+Personalization is fed by configured profiles declared in `data/profiles.config.json` (committed, no secrets). Default and only entry: `KiriToc#Toc` on `EUW1`. Only configured profiles are ever synced — visitors cannot add any, and adding another person's profile requires their consent.
+
+- Local: `pnpm etl profile-sync [profileId] [--publish]` uses `RIOT_API_KEY` from `.env` (same key as the other ETL commands; see "Riot key" above — a dev key expires every 24 h and cannot drive the schedule, use the personal key).
+- CI: `etl.yml` runs `profile-sync` for every configured profile on each scheduled run and on `workflow_dispatch`, using the `RIOT_API_KEY` GitHub Actions secret. Profile tables live in the same `etl-db` state branch as the rest of the database.
+- Exports land in `data/public/profiles/` (`<id>.json` + `index.json`), anonymized per D-069; without `--publish` a local run keeps them out of the deployed tree.
+- GitHub Pages: the site is already deployed by `deploy.yml`; no extra Pages configuration is needed for profiles — they are plain static JSON under `data/public/`.
+- Key rotation: if `RIOT_API_KEY` ever changes, stored profile puuids are encrypted per key like match puuids (B-062/D-060) — re-resolve/re-key before the next sync (procedure in D-071, implementation detail in T-091).
+
 ## ETL commands
 
 The database is `data/DraftOrb.sqlite` unless `DRAFTORB_DB_PATH` is set. `pnpm etl help` lists the commands and exit codes.
@@ -71,6 +81,7 @@ Planned (target state, see TICKETS.md):
 
 ```
 pnpm etl backtest              # offline validation (T-027.a, T-027.b)
+pnpm etl profile-sync [id]     # sync configured profiles -> SQLite -> data/public/profiles/ (T-091, D-068)
 ```
 
 ## Troubleshooting

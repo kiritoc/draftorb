@@ -8,7 +8,7 @@ import { getMigrationStatus, openDb } from '../db';
 import { invalidateManifest } from '../public-data';
 import { applyDerivedRoles } from '../derive-roles';
 import { computeRoleProb, latestPatch, PATCH_PATTERN } from '../aggregate';
-import { ensurePatchesFresh, lookupPatchIndex } from '../patches';
+import { ensurePatchCoverage, lookupPatchIndex } from '../patches';
 import { CliError, UsageError } from '../cli-args';
 import { log, parsePositionals, type Command } from './shared';
 
@@ -36,15 +36,31 @@ export async function runDeriveRoles(args: string[]): Promise<void> {
         `Database schema is out of date (${pending} pending migration(s)); run \`pnpm etl migrate\` first.`,
       );
     }
-    await ensurePatchesFresh(db, {
+    // Refresh-on-miss only (D-055): `versions.json` is fetched at most once,
+    // and only when the explicit patch or a stored label is absent from
+    // `patches`. Orphaned stored labels are excluded from the computation and
+    // reported, never dropped silently.
+    const coverage = await ensurePatchCoverage(db, {
       extraLabels: patch === undefined ? [] : [patch],
       onWarn: (message) => log.info(`Warning: ${message}`),
     });
+    if (patch !== undefined && lookupPatchIndex(db, patch) === undefined) {
+      throw new UsageError(
+        coverage.status === 'failed'
+          ? `Could not refresh patches from Data Dragon; unknown patch "${patch}".`
+          : `Unknown patch "${patch}": not present in Data Dragon versions.`,
+      );
+    }
+    if (coverage.orphanMatches > 0) {
+      log.info(
+        `Warning: excluded ${coverage.orphanMatches} match(es) whose patch label(s) ` +
+          `are absent from the patches table: ${coverage.orphanLabels.join(', ')}`,
+      );
+    }
     targetPatch = patch ?? latestPatch(db);
     if (targetPatch !== undefined && lookupPatchIndex(db, targetPatch) === undefined) {
-      if (patch !== undefined) {
-        throw new UsageError(`Unknown patch "${patch}": not present in Data Dragon versions.`);
-      }
+      // Only reachable for the default target: an explicit patch that does
+      // not resolve already threw above.
       log.info(
         `patch ${targetPatch} is not present in the patches table; run \`pnpm etl aggregate\` to refresh it`,
       );

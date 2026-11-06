@@ -2,8 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { migrate, openDb } from './db';
 import {
+  comparePatchLabels,
   createPatchResolver,
-  ensurePatchesFresh,
+  ensurePatchCoverage,
   lookupPatchIndex,
   parsePatchLabel,
   parsePatchLabels,
@@ -39,18 +40,40 @@ describe('parsePatchLabel', () => {
   });
 });
 
+describe('comparePatchLabels', () => {
+  it('orders numerically, never by string compare', () => {
+    expect(comparePatchLabels('14.9', '14.10')).toBeLessThan(0);
+    expect(comparePatchLabels('14.10', '14.9')).toBeGreaterThan(0);
+    expect(comparePatchLabels('15.24', '16.1')).toBeLessThan(0);
+    expect(comparePatchLabels('16.10', '16.10')).toBe(0);
+  });
+});
+
 describe('parsePatchLabels', () => {
-  it('reverses newest-first versions to oldest-first labels', () => {
-    // Season boundary: source order decides, never a numeric compare (14.24 -> 15.1).
+  it('orders labels numerically across a season change', () => {
+    // 14.24 -> 15.1 orders by (major, minor), and input order does not matter.
     expect(parsePatchLabels(['15.1', '14.24.1', '14.23.1'])).toEqual(['14.23', '14.24', '15.1']);
+    expect(parsePatchLabels(['14.23.1', '15.1', '14.24.1'])).toEqual(['14.23', '14.24', '15.1']);
+  });
+
+  it('orders 14.9 before 14.10 regardless of input order', () => {
+    expect(parsePatchLabels(['14.10.1', '14.9.1'])).toEqual(['14.9', '14.10']);
+    expect(parsePatchLabels(['14.9.1', '14.10.1'])).toEqual(['14.9', '14.10']);
   });
 
   it('collapses hotfixes sharing a major.minor label', () => {
     expect(parsePatchLabels(['16.21.2', '16.21.1', '16.20.1'])).toEqual(['16.20', '16.21']);
   });
 
-  it('ignores legacy lolpatch_* entries', () => {
-    expect(parsePatchLabels(['16.1', 'lolpatch_7.20', 'lolpatch_6.18'])).toEqual(['16.1']);
+  it('skips unparseable entries with a single warning', () => {
+    const warnings: string[] = [];
+    const labels = parsePatchLabels(['16.1', 'lolpatch_7.20', 'bogus', '16.2.1'], {
+      onWarn: (message) => warnings.push(message),
+    });
+    expect(labels).toEqual(['16.1', '16.2']);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('lolpatch_7.20');
+    expect(warnings[0]).toContain('bogus');
   });
 });
 
@@ -82,6 +105,27 @@ describe('refreshPatches', () => {
     db.close();
   });
 
+  it('keeps existing indices stable when a new patch is appended', async () => {
+    const db = openDb(':memory:');
+    migrate(db);
+    await refreshPatches(db, {
+      fetchFn: versionsResponse(['14.10.1', '14.9.1', '14.8.1']),
+    });
+    // Numeric order: 14.8 < 14.9 < 14.10 (string order would differ).
+    expect(lookupPatchIndex(db, '14.8')).toBe(1);
+    expect(lookupPatchIndex(db, '14.9')).toBe(2);
+    expect(lookupPatchIndex(db, '14.10')).toBe(3);
+
+    await refreshPatches(db, {
+      fetchFn: versionsResponse(['14.11.1', '14.10.1', '14.9.1', '14.8.1']),
+    });
+    expect(lookupPatchIndex(db, '14.8')).toBe(1);
+    expect(lookupPatchIndex(db, '14.9')).toBe(2);
+    expect(lookupPatchIndex(db, '14.10')).toBe(3);
+    expect(lookupPatchIndex(db, '14.11')).toBe(4);
+    db.close();
+  });
+
   it('is a no-op when every label is already known', async () => {
     const db = openDb(':memory:');
     migrate(db);
@@ -90,6 +134,42 @@ describe('refreshPatches', () => {
     const again = await refreshPatches(db, { fetchFn });
     expect(again).toEqual({ added: 0, total: 1 });
     db.close();
+  });
+
+  it('refuses to insert a label that sorts before the newest stored patch', async () => {
+    const db = openDb(':memory:');
+    migrate(db);
+    db.prepare('INSERT INTO patches (patch_index, version_label) VALUES (1, ?)').run('16.20');
+    db.prepare('INSERT INTO patches (patch_index, version_label) VALUES (2, ?)').run('16.22');
+
+    // 16.21 is missing from the table but sorts before the newest stored
+    // label: appending it would break numeric ordering, so refresh fails.
+    await expect(
+      refreshPatches(db, {
+        fetchFn: versionsResponse(['16.22.1', '16.21.1', '16.20.1']),
+      }),
+    ).rejects.toThrow(/do not sort after the newest stored patch/);
+    db.close();
+  });
+
+  it('refuses to refresh a non gap-free or misordered table', async () => {
+    const db = openDb(':memory:');
+    migrate(db);
+    db.prepare('INSERT INTO patches (patch_index, version_label) VALUES (1, ?)').run('16.20');
+    db.prepare('INSERT INTO patches (patch_index, version_label) VALUES (3, ?)').run('16.21');
+    await expect(
+      refreshPatches(db, { fetchFn: versionsResponse(['16.22.1', '16.21.1', '16.20.1']) }),
+    ).rejects.toThrow(/not gap-free/);
+
+    const db2 = openDb(':memory:');
+    migrate(db2);
+    db2.prepare('INSERT INTO patches (patch_index, version_label) VALUES (1, ?)').run('16.10');
+    db2.prepare('INSERT INTO patches (patch_index, version_label) VALUES (2, ?)').run('16.9');
+    await expect(
+      refreshPatches(db2, { fetchFn: versionsResponse(['16.11.1', '16.10.1', '16.9.1']) }),
+    ).rejects.toThrow(/not numeric/);
+    db.close();
+    db2.close();
   });
 });
 
@@ -102,19 +182,23 @@ describe('lookupPatchIndex / createPatchIndexLookup', () => {
   });
 });
 
-describe('ensurePatchesFresh', () => {
+describe('ensurePatchCoverage', () => {
   it('does not fetch when stored labels and extras are covered', async () => {
     const db = openDb(':memory:');
     migrate(db);
     seedStoredPatch(db, 'm1', '16.21');
     const fetchFn = vi.fn(versionsResponse(['16.22.1', '16.21.1']));
-    const result = await ensurePatchesFresh(db, { fetchFn, extraLabels: ['16.21'] });
+    const result = await ensurePatchCoverage(db, { fetchFn, extraLabels: ['16.21'] });
     // '16.21' is stored but not in patches -> uncovered -> refresh happens.
     expect(result.status).toBe('refreshed');
     expect(fetchFn).toHaveBeenCalledTimes(1);
+    expect(result.unresolvedLabels).toEqual([]);
+    expect(result.orphanLabels).toEqual([]);
+    expect(result.orphanMatches).toBe(0);
 
-    const covered = await ensurePatchesFresh(db, { fetchFn, extraLabels: ['16.21', '16.22'] });
+    const covered = await ensurePatchCoverage(db, { fetchFn, extraLabels: ['16.21', '16.22'] });
     expect(covered.status).toBe('current');
+    expect(covered.orphanMatches).toBe(0);
     expect(fetchFn).toHaveBeenCalledTimes(1);
     db.close();
   });
@@ -124,13 +208,33 @@ describe('ensurePatchesFresh', () => {
     migrate(db);
     seedStoredPatch(db, 'm1', '16.21');
     const warnings: string[] = [];
-    const result = await ensurePatchesFresh(db, {
+    const result = await ensurePatchCoverage(db, {
       fetchFn: failingFetch(),
       onWarn: (message) => warnings.push(message),
     });
     expect(result.status).toBe('failed');
     expect(result.error).toContain('socket hangup');
+    expect(result.unresolvedLabels).toEqual(['16.21']);
+    expect(result.orphanLabels).toEqual(['16.21']);
+    expect(result.orphanMatches).toBe(1);
     expect(warnings).toHaveLength(1);
+    db.close();
+  });
+
+  it('reports orphan labels and match counts for stored labels still missing after refresh', async () => {
+    const db = openDb(':memory:');
+    migrate(db);
+    seedStoredPatch(db, 'm1', '16.21');
+    seedStoredPatch(db, 'm2', '16.21');
+    seedStoredPatch(db, 'm3', '99.1');
+    const result = await ensurePatchCoverage(db, {
+      fetchFn: versionsResponse(['16.22.1', '16.21.1']),
+      extraLabels: ['16.22'],
+    });
+    expect(result.status).toBe('refreshed');
+    expect(result.unresolvedLabels).toEqual(['99.1']);
+    expect(result.orphanLabels).toEqual(['99.1']);
+    expect(result.orphanMatches).toBe(1);
     db.close();
   });
 });
@@ -155,6 +259,18 @@ describe('createPatchResolver', () => {
     const resolver = createPatchResolver(db, { fetchFn });
     expect(await resolver.resolve('16.22')).toBe(2);
     expect(await resolver.resolve('16.21')).toBe(1);
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    db.close();
+  });
+
+  it('shares a single fetch between refresh() and resolve() misses', async () => {
+    const db = openDb(':memory:');
+    migrate(db);
+    const fetchFn = vi.fn(versionsResponse(['16.22.1', '16.21.1']));
+    const resolver = createPatchResolver(db, { fetchFn });
+    await resolver.refresh();
+    expect(await resolver.resolve('16.21')).toBe(1);
+    expect(await resolver.resolve('16.22')).toBe(2);
     expect(fetchFn).toHaveBeenCalledTimes(1);
     db.close();
   });

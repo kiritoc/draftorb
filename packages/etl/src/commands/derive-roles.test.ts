@@ -193,6 +193,71 @@ describe('deriveRolesCommand', () => {
     expect(written['412'].roles).toEqual(['SUPPORT']);
   });
 
+  it('fetches versions.json once when a stored label is missing (D-055)', async () => {
+    const dbPath = join(directory, 'test.sqlite');
+    process.env.DRAFTORB_DB_PATH = dbPath;
+    const db = openDb(dbPath);
+    migrate(db);
+    seedPatches(db, ['16.21']);
+    db.prepare(
+      `INSERT INTO matches (match_id, platform, patch, queue_id, duration, created_at, avg_rank_score) VALUES ('m1', 'euw1', '16.22', 420, 1800, 1, 6.5)`,
+    ).run();
+    db.close();
+
+    const fetchSpy = vi.fn(
+      (async () =>
+        new Response(JSON.stringify(['16.22.1', '16.21.1']), { status: 200 })) as typeof fetch,
+    );
+    vi.stubGlobal('fetch', fetchSpy);
+    try {
+      await deriveRolesCommand.run([]);
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+    // Coverage resolved, then the run stopped at the missing champions.json.
+    expect(output()).toMatch(/no champions\.json at/);
+  });
+
+  it('does not fetch versions.json when every needed label already resolves', async () => {
+    const dbPath = join(directory, 'test.sqlite');
+    process.env.DRAFTORB_DB_PATH = dbPath;
+    const db = openDb(dbPath);
+    migrate(db);
+    seedPatches(db, ['16.21']);
+    db.prepare(
+      `INSERT INTO matches (match_id, platform, patch, queue_id, duration, created_at, avg_rank_score) VALUES ('m1', 'euw1', '16.21', 420, 1800, 1, 6.5)`,
+    ).run();
+    db.close();
+
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+    try {
+      await deriveRolesCommand.run([]);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('fails naming the label when the refresh fails and the patch is unknown', async () => {
+    const dbPath = join(directory, 'test.sqlite');
+    process.env.DRAFTORB_DB_PATH = dbPath;
+    const db = openDb(dbPath);
+    migrate(db);
+    seedPatches(db, ['16.21']);
+    db.close();
+
+    vi.stubGlobal('fetch', (async () => {
+      throw new Error('socket hangup');
+    }) as typeof fetch);
+    try {
+      await expect(deriveRolesCommand.run(['16.22'])).rejects.toThrow(/unknown patch "16\.22"/i);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('restores bootstrap roles when a champion is no longer observed', async () => {
     const dbPath = join(directory, 'test.sqlite');
     const db = openDb(dbPath);

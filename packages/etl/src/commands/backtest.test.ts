@@ -108,6 +108,27 @@ describe('backtestCommand', () => {
     expect(report.logLoss).toBeTypeOf('number');
   });
 
+  it('copies patches into the in-memory database without touching the live table', async () => {
+    const db = openDb(dbPath);
+    migrate(db);
+    seed(db);
+    const before = db
+      .prepare('SELECT patch_index, version_label FROM patches ORDER BY patch_index')
+      .all();
+    db.close();
+
+    await backtestCommand.run(['draft']);
+
+    const after = openDb(dbPath);
+    try {
+      expect(
+        after.prepare('SELECT patch_index, version_label FROM patches ORDER BY patch_index').all(),
+      ).toEqual(before);
+    } finally {
+      after.close();
+    }
+  });
+
   it('writes the report to a custom --out path', async () => {
     const db = openDb(dbPath);
     migrate(db);

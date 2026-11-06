@@ -5,8 +5,10 @@ import { getMigrationStatus, openDb } from '../db';
 import { aggregateBaseline } from '../aggregate-baseline';
 import { aggregatePairTables } from '../aggregate-pairs';
 import { aggregateRunesByContext } from '../aggregate-runes';
-import { aggregateRoleProb, PATCH_PATTERN } from '../aggregate';
-import { ensurePatchesFresh, lookupPatchIndex } from '../patches';
+import { aggregateRoleProb, latestPatch, PATCH_PATTERN } from '../aggregate';
+import { loadPatchWindow } from '../aggregate-shared';
+import { recordAggregateSnapshot } from '../aggregate-meta';
+import { ensurePatchCoverage, latestPatchIndex, lookupPatchIndex } from '../patches';
 import { CliError, UsageError } from '../cli-args';
 import { parsePositionals, type Command } from './shared';
 
@@ -32,9 +34,11 @@ async function runAggregate(args: string[]): Promise<void> {
     }
 
     // Aggregation resolves every stored match label through `patches`
-    // (D-043): refresh the catalog once when a label is missing, and reject an
-    // explicit snapshot that Data Dragon does not know.
-    const coverage = await ensurePatchesFresh(db, {
+    // (D-043/D-055): `versions.json` is fetched at most once and only when the
+    // explicit snapshot or a stored label is missing. Stored labels still
+    // unresolved afterwards are orphans: excluded from the aggregates and
+    // reported, never dropped silently.
+    const coverage = await ensurePatchCoverage(db, {
       extraLabels: patch === undefined ? [] : [patch],
       onWarn: (message) => console.log(`[ETL] Warning: ${message}`),
     });
@@ -43,6 +47,12 @@ async function runAggregate(args: string[]): Promise<void> {
         coverage.status === 'failed'
           ? `Could not refresh patches from Data Dragon; unknown patch "${patch}".`
           : `Unknown patch "${patch}": not present in Data Dragon versions.`,
+      );
+    }
+    if (coverage.orphanMatches > 0) {
+      console.log(
+        `[ETL] Warning: excluded ${coverage.orphanMatches} match(es) whose patch label(s) ` +
+          `are absent from the patches table: ${coverage.orphanLabels.join(', ')}`,
       );
     }
 
@@ -96,6 +106,31 @@ async function runAggregate(args: string[]): Promise<void> {
       console.log(
         `Aggregated rune contexts: ${runeRows.length} row(s) for ${champions} champion(s) written to rune_ctx.`,
       );
+    }
+
+    // Record which patch-catalog state the aggregates were computed against
+    // (D-055): exported as patch-meta.json so results stay explainable when
+    // the catalog later grows. Only when at least one table was rewritten —
+    // an all-empty run leaves the previous aggregates (and their meta) intact.
+    const wroteRows =
+      rows.length +
+        baselineRows.length +
+        pairTables.pairAlly.length +
+        pairTables.pairEnemy.length +
+        pairTables.laneVs.length +
+        pairTables.laneFull.length +
+        runeRows.length >
+      0;
+    if (wroteRows) {
+      const snapshotLabel = patch ?? latestPatch(db) ?? null;
+      const window = loadPatchWindow(db, patch);
+      recordAggregateSnapshot(db, {
+        patch: snapshotLabel,
+        patchIndex: snapshotLabel === null ? null : (lookupPatchIndex(db, snapshotLabel) ?? null),
+        currentPatchIndex: window.currentPatchIndex,
+        patchesMaxIndex: latestPatchIndex(db),
+        aggregatedAt: new Date().toISOString(),
+      });
     }
   } finally {
     db.close();

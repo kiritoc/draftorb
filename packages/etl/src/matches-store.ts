@@ -7,7 +7,10 @@
 import type Database from 'better-sqlite3';
 
 import type { Platform, RiotClient, RiotMatchDto } from './riot';
-import { lookupPatchIndex } from './patches';
+import { comparePatchLabels, lookupPatchIndex } from './patches';
+
+/** Numeric `major.minor` compare lives in `patches.ts` (D-055); re-exported here. */
+export { comparePatchLabels as comparePatches };
 
 export const MATCH_IDS_PAGE_SIZE = 100;
 
@@ -168,13 +171,6 @@ export function rankSummary(
 /** First two numbers of `gameVersion` (e.g. "14.21.628.9812" -> "14.21"). */
 export function patchFromGameVersion(gameVersion: string): string {
   return gameVersion.split('.').slice(0, 2).join('.');
-}
-
-/** Compare two major.minor patches numerically. */
-export function comparePatches(a: string, b: string): number {
-  const [aMajor = 0, aMinor = 0] = a.split('.').map(Number);
-  const [bMajor = 0, bMinor = 0] = b.split('.').map(Number);
-  return aMajor - bMajor || aMinor - bMinor;
 }
 
 /** Updates a match's rank summary columns after enrichment. */

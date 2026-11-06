@@ -74,13 +74,25 @@ describe('loadPatchWindow', () => {
     expect(window.currentPatchIndex).toBe(4);
   });
 
-  it('excludes stored match labels absent from the patches table', () => {
+  it('excludes stored match labels absent from the patches table and reports them', () => {
     seedMatch(db, 'm1', '16.21');
     seedMatch(db, 'm2', '99.1');
+    seedMatch(db, 'm3', '99.1');
     seedPatches(db, ['16.21']);
     const window = loadPatchWindow(db);
     expect(window.patchIndex.get('16.21')).toBe(1);
     expect(window.patchIndex.get('99.1')).toBeUndefined();
+    expect(window.orphanLabels).toEqual(['99.1']);
+    expect(window.orphanMatches).toBe(2);
+  });
+
+  it('reports orphans even when the window is empty', () => {
+    seedMatch(db, 'm1', '99.1');
+    seedPatches(db, ['16.21']);
+    const window = loadPatchWindow(db);
+    expect(window.currentPatchIndex).toBe(-1);
+    expect(window.orphanLabels).toEqual(['99.1']);
+    expect(window.orphanMatches).toBe(1);
   });
 
   it('filters stored patches newer than the snapshot index', () => {

@@ -202,13 +202,13 @@ Non-support roles, accounts/login, pool sync across devices or auto-import of th
 
 ## 12. Patch index (D-043)
 
-Table `patches(patch_index INTEGER PRIMARY KEY, version_label TEXT NOT NULL UNIQUE, released_at INTEGER)`:
+Table `patches(patch_index INTEGER PRIMARY KEY, version_label TEXT NOT NULL UNIQUE)` (`released_at` was dropped by migration 014, D-055 — no release-date source exists):
 
 - `version_label` = `major.minor`, identical to `matches.patch` (RIOT_API.md).
-- `patch_index` assigned once, oldest-first starting at 1, append-only, never reassigned or renumbered.
-- Ordering source: Data Dragon `versions.json`, reversed (newest-first -> oldest-first ordinal). Version strings are never compared for age, windows, or breakpoints; one parse (`gameVersion` -> `major.minor` label) is allowed, defined once. All age/window/breakpoint logic uses `patch_index` only.
+- `patch_index` assigned once, gap-free starting at 1, ordered NUMERICALLY by (major, minor) — never string order (`14.10` > `14.9`) — and append-only, never reassigned or renumbered. Ordering source: Data Dragon `versions.json` deduplicated to `major.minor` labels and sorted numerically (D-055); unparseable entries are skipped with a warning. Refresh verifies the stored table is gap-free and numerically ordered and that every new label sorts after the newest stored one, then appends; it refuses to renumber or misorder. Version strings are never compared for age, windows, or breakpoints; one parse (`gameVersion` -> `major.minor` label) is allowed, defined once. All age/window/breakpoint logic uses `patch_index` only.
 - Hotfixes: all source versions sharing the same `major.minor` label collapse to one `patch_index`; one patch = one `patch_index`.
 - A match whose label is absent from `patches`: refresh `patches` from the source first; if still absent, record an `invalid` reject. This is distinct from `patch` and `pruned` rejects.
+- Read commands (`aggregate`, `derive-roles`) fetch `versions.json` at most once per run and only when the explicit snapshot label or a stored label is missing (D-055). Stored labels still unresolved afterwards are orphans: excluded from aggregates and reported by count and label, never silently. `currentPatchIndex` = the snapshot's `patch_index` when given, else the highest `patch_index` among stored matches (never the max in `patches`).
 
 ## 13. Retention and prune (D-044)
 

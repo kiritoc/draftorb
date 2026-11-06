@@ -117,19 +117,27 @@ export { exportJson, type ExportResult } from './export';
 export { aggregateRoleProb, type RoleProbRow } from './aggregate';
 
 export {
+  AGGREGATE_SNAPSHOT_KEY,
+  comparePatchLabels,
   createPatchIndexLookup,
   createPatchResolver,
-  ensurePatchesFresh,
+  ensurePatchCoverage,
   fetchPatchVersions,
   latestPatchIndex,
   lookupPatchIndex,
   parsePatchLabel,
   parsePatchLabels,
   refreshPatches,
-  type EnsurePatchesResult,
+  type EnsurePatchCoverageResult,
   type PatchRefreshResult,
   type PatchResolver,
 } from './patches';
+
+export {
+  readAggregateSnapshot,
+  recordAggregateSnapshot,
+  type AggregateSnapshotMeta,
+} from './aggregate-meta';
 
 export { applyDerivedRoles, deriveChampionRoles } from './derive-roles';
 

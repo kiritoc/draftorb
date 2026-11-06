@@ -6,6 +6,7 @@ import { ingestMatches } from './matches';
 import { pruneMatches } from './prune';
 import { seedPatches } from './patches.test-helpers';
 import { comparePatches, cursorKey, patchFromGameVersion, windowWidened } from './matches-store';
+import { parsePatchLabel, PATCH_LABEL_PATTERN } from './patches';
 import {
   makeMatch,
   mockClient,
@@ -20,6 +21,41 @@ describe('match ingestion', () => {
   it('extracts the patch from a game version', () => {
     expect(patchFromGameVersion('14.21.628.9812')).toBe('14.21');
     expect(patchFromGameVersion('16.21.1')).toBe('16.21');
+  });
+
+  it('derives the same major.minor label from gameVersion as Data Dragon versions (D-055)', () => {
+    // Representative gameVersion strings: the stored matches.patch label must
+    // equal the label Data Dragon assigns to the same patch, or it becomes an
+    // orphan that aggregates exclude.
+    for (const gameVersion of ['14.21.628.9812', '16.21.1.42', '15.1.1', '16.10.1.5']) {
+      const label = patchFromGameVersion(gameVersion);
+      expect(label).toBe(parsePatchLabel(gameVersion));
+      expect(PATCH_LABEL_PATTERN.test(label)).toBe(true);
+    }
+  });
+
+  it('stores no match whose patch label is absent from the patches table', async () => {
+    const db = openDb(':memory:');
+    migrate(db);
+    seedMatchPatches(db);
+    seedPlayer(db, 'p-alpha', 6.5);
+
+    const client = mockClient(
+      { 'p-alpha': ['EUW1_1'] },
+      { EUW1_1: makeMatch('EUW1_1', { gameVersion: '16.22.1.9' }) },
+    );
+    await ingestMatches({ platform: PLATFORM, db, client });
+
+    const orphans = db
+      .prepare(
+        `SELECT DISTINCT m.patch AS patch
+         FROM matches m
+         LEFT JOIN patches p ON p.version_label = m.patch
+         WHERE p.version_label IS NULL`,
+      )
+      .all();
+    expect(orphans).toEqual([]);
+    db.close();
   });
 
   it('compares patches numerically and detects wider windows', () => {

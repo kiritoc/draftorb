@@ -66,15 +66,16 @@ function buildEngineData(dbPath: string, rows: readonly DraftRow[]): BacktestEng
         )
         .run();
       // The training-window aggregates resolve labels through `patches`
-      // (D-043); copy the catalog when the source schema has it.
+      // (D-043); copy the catalog into the in-memory database so the live
+      // table is never touched (D-055).
       const hasPatches = memory
         .prepare(`SELECT 1 FROM src.sqlite_master WHERE type = 'table' AND name = 'patches'`)
         .get();
       if (hasPatches !== undefined) {
         memory
           .prepare(
-            `INSERT INTO patches (patch_index, version_label, released_at)
-             SELECT patch_index, version_label, released_at FROM src.patches`,
+            `INSERT INTO patches (patch_index, version_label)
+             SELECT patch_index, version_label FROM src.patches`,
           )
           .run();
       }

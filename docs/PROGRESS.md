@@ -3,8 +3,8 @@
 ## Current status
 
 - Phase: 1 (Support / Diamond)
-- Current milestone: M3 Web MVP implementation complete (T-030..T-035 DONE); the backtest harness (T-027.a) remains under review because D-023 paired-bootstrap validation is not implemented. T-019.b (patch index) and T-019.c (retention prune) are in REVIEW; T-019.d..f remain TODO.
-- Last updated: 2026-11-06 by Devin (T-019.c retention prune implemented, REVIEW)
+- Current milestone: M3 Web MVP implementation complete (T-030..T-035 DONE); the backtest harness (T-027.a) remains under review because D-023 paired-bootstrap validation is not implemented. T-019.b (patch index, now incl. D-055) and T-019.c (retention prune) are in REVIEW; T-019.d..f remain TODO.
+- Last updated: 2026-11-06 by Devin (D-055 patch-index implementation details implemented, T-019.b stays REVIEW)
 
 ## Epic status
 
@@ -40,6 +40,22 @@ Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-0
 - T-019.d verification: please compare the champion and item lists in the 2026-11-04 "T-019.d verification step" entry below with the official 16.21 and 16.22 patch notes (misses and false positives).
 
 ## Session log (newest first)
+
+### 2026-11-06 — Devin — D-055 patch-index implementation details (T-019.b stays REVIEW)
+
+- Done:
+  - `patches.ts` reworked per D-055: `parsePatchLabels` now sorts NUMERICALLY by (major, minor) (never string/source order), dedupes hotfixes, and skips unparseable `versions.json` entries with a single warning; `comparePatchLabels` is the shared numeric comparator (`matches-store.comparePatches` re-exports it). `refreshPatches` is append-only AND verified: it refuses to run on a non gap-free/misordered table or when a missing label does not sort after the newest stored one.
+  - `ensurePatchesFresh` renamed to `ensurePatchCoverage` and now reports `unresolvedLabels`, `orphanLabels`, `orphanMatches` (stored `matches.patch` labels absent from `patches`). Read commands fetch `versions.json` only on a miss, at most once per run; graceful degradation per D-055 (warning when only stored labels are missing, error naming the label when the explicit snapshot cannot be resolved).
+  - `loadPatchWindow` returns `orphanLabels`/`orphanMatches`; `aggregate`/`derive-roles` log the excluded count and labels. `matches` routes its empty-table refresh through `patchResolver.refresh()` so a run still fetches at most once.
+  - Migration `014_patches_drop_released_at.sql`: `released_at` removed (nothing populated it; column was permanently NULL).
+  - Snapshot metadata: `aggregate` records `{ patch, patchIndex, currentPatchIndex, patchesMaxIndex, aggregatedAt }` in `ingest_state` key `aggregate:snapshot` (only when a table was rewritten); `export` publishes it as `patch-meta.json` (hashed in `manifest.files`; manifest schema unchanged, existing snapshots stay valid).
+  - `backtest` copies `patches` without `released_at`, so it also works against pre-014 source databases.
+  - Docs: D-055 marked ACCEPTED with the reviewed decisions, DATA_MODEL (DDL, orphan rules, `aggregate:snapshot`, `patch-meta.json`), SPECS §12.
+- Files touched: `packages/etl/src/{patches.ts,aggregate-meta.ts(new),aggregate-shared.ts,matches-store.ts,matches.ts,commands/{aggregate,derive-roles,backtest}.ts,export/index.ts,index.ts}`, `packages/etl/migrations/014_patches_drop_released_at.sql` (new), tests (`patches.test.ts`, `aggregate-shared.test.ts`, `commands/{aggregate,derive-roles,backtest}.test.ts`, `matches.test.ts`, `db/migrate.test.ts`), `docs/{DECISIONS,DATA_MODEL,SPECS,PROGRESS}.md`.
+- Tests: `pnpm check` green (typecheck + lint + format + 924 tests). New coverage: numeric ordering (14.9 < 14.10, season change, unsorted input), hotfix dedupe, malformed-entry warning, stable indices after append, consistency refusals (gap, misorder, non-newer missing label), refresh-on-miss (no fetch when covered, one fetch on miss) for `aggregate`/`derive-roles`, all three degradation scenarios, orphan count/label reporting, `gameVersion`->label equivalence, no-orphan-after-ingestion, backtest `patches` isolation, migration 014.
+- State left: REVIEW (T-019.b). Behavioral notes: `aggregate`/`derive-roles` now warn-and-proceed when stored labels are orphaned instead of only excluding them silently; `patch-meta.json` appears in exports after the next `aggregate`+`export`; `pnpm etl aggregate` on the real DB will fetch `versions.json` once if any stored label is missing from `patches`.
+- Next step: owner review of D-055 implementation; then T-019.d once T-019.b/T-019.c are accepted.
+- Pitfalls / notes for next AI: `seedPatches` renumbers contiguously via `comparePatchLabels` — it cannot create gap/misorder fixtures; insert `patches` rows manually for those (and `refreshPatches` will refuse them). `ensurePatchCoverage`/`createPatchResolver`/`refreshPatches` accept `fetchFn`; commands use the global `fetch` (tests `vi.stubGlobal('fetch', ...)`). `patches` must still be populated before aggregates produce rows. BUGS.md: no new bugs found.
 
 ### 2026-11-06 — Devin — T-019.c retention prune + `pruned` tombstones + default ingestion window (REVIEW)
 

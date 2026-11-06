@@ -25,6 +25,10 @@ export interface PatchWindow {
   patchIndex: ReadonlyMap<string, number>; // version_label -> patch_index (<= bound)
   currentPatchIndex: number; // snapshot index, else max stored patch_index (-1 when empty)
   snapshotIndex?: number; // resolved patch_index of the snapshot patch
+  /** Distinct stored `matches.patch` labels absent from `patches` (orphans, D-055). */
+  orphanLabels: readonly string[];
+  /** Number of stored matches whose patch label is orphaned (excluded from aggregates). */
+  orphanMatches: number;
 }
 
 /**
@@ -36,7 +40,9 @@ export interface PatchWindow {
  * bound is the snapshot index (or +infinity). `currentPatchIndex` is the
  * snapshot index when given — promoted even with no stored games at it, as
  * before — else the highest `patch_index` among stored matches. Stored match
- * labels absent from `patches` cannot be ordered and are excluded.
+ * labels absent from `patches` cannot be ordered: they are excluded from the
+ * aggregates and reported via `orphanLabels`/`orphanMatches` so the exclusion
+ * is never silent (D-055).
  */
 export function loadPatchWindow(db: Database.Database, snapshotPatch?: string): PatchWindow {
   const allPatches = db
@@ -54,9 +60,14 @@ export function loadPatchWindow(db: Database.Database, snapshotPatch?: string): 
     }
   }
 
-  const storedLabels = (
-    db.prepare('SELECT DISTINCT patch FROM matches').all() as Array<{ patch: string }>
-  ).map((row) => row.patch);
+  const storedRows = db
+    .prepare('SELECT patch, COUNT(*) AS n FROM matches GROUP BY patch')
+    .all() as Array<{ patch: string; n: number }>;
+  const storedLabels = storedRows.map((row) => row.patch);
+
+  const orphans = storedRows.filter((row) => indexByLabel.get(row.patch) === undefined);
+  const orphanLabels = orphans.map((row) => row.patch).sort();
+  const orphanMatches = orphans.reduce((sum, row) => sum + row.n, 0);
 
   const inWindow = storedLabels
     .map((label) => ({ label, index: indexByLabel.get(label) }))
@@ -66,7 +77,14 @@ export function loadPatchWindow(db: Database.Database, snapshotPatch?: string): 
     );
 
   if (inWindow.length === 0) {
-    return { patches: [], patchIndex: new Map(), currentPatchIndex: -1, snapshotIndex };
+    return {
+      patches: [],
+      patchIndex: new Map(),
+      currentPatchIndex: -1,
+      snapshotIndex,
+      orphanLabels,
+      orphanMatches,
+    };
   }
 
   const bound = snapshotIndex ?? Math.max(...inWindow.map((entry) => entry.index));
@@ -77,7 +95,14 @@ export function loadPatchWindow(db: Database.Database, snapshotPatch?: string): 
     patchIndex.set(row.version_label, row.patch_index);
     patches.push(row.version_label);
   }
-  return { patches, patchIndex, currentPatchIndex: bound, snapshotIndex };
+  return {
+    patches,
+    patchIndex,
+    currentPatchIndex: bound,
+    snapshotIndex,
+    orphanLabels,
+    orphanMatches,
+  };
 }
 
 /** rank_score scale: integer part = RANK_BUCKET_ORDER index (6.5 = DIAMOND); clamped to [0, last bucket]. */

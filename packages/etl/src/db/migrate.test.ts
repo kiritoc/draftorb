@@ -253,6 +253,7 @@ describe('migration runner', () => {
       '011_rune_ctx_rank_bucket',
       '012_patches',
       '013_match_rejects_pruned',
+      '014_patches_drop_released_at',
     ]);
     expect(migrate(db)).toEqual([]);
 
@@ -329,8 +330,35 @@ describe('migration runner', () => {
       ) VALUES (1, 'TOP', NULL, 10, 5, 'DIAMOND', 1, 1, 1)`,
     ).run();
     expect(db.prepare('SELECT COUNT(*) AS count FROM _migrations').get()).toMatchObject({
-      count: 13,
+      count: 14,
     });
+    db.close();
+  });
+
+  it('migration 014 drops patches.released_at and preserves rows', () => {
+    const db = openDb(':memory:');
+    db.exec(`
+      CREATE TABLE _migrations (
+        version TEXT PRIMARY KEY,
+        applied_at INTEGER NOT NULL
+      )
+    `);
+    const priorVersions = expectedVersions().filter((v) => v < '014_patches_drop_released_at');
+    for (const version of priorVersions) {
+      db.exec(readFileSync(join(MIGRATIONS_DIR, `${version}.sql`), 'utf8'));
+      db.prepare('INSERT INTO _migrations (version, applied_at) VALUES (?, ?)').run(version, 1);
+    }
+    db.prepare(
+      'INSERT INTO patches (patch_index, version_label, released_at) VALUES (?, ?, ?)',
+    ).run(1, '16.21', null);
+
+    expect(migrate(db)).toEqual(['014_patches_drop_released_at']);
+
+    const columns = db.prepare('PRAGMA table_info(patches)').all() as { name: string }[];
+    expect(columns.map((c) => c.name)).toEqual(['patch_index', 'version_label']);
+    expect(db.prepare('SELECT patch_index, version_label FROM patches').all()).toEqual([
+      { patch_index: 1, version_label: '16.21' },
+    ]);
     db.close();
   });
 
@@ -405,6 +433,7 @@ describe('migration runner', () => {
       '011_rune_ctx_rank_bucket',
       '012_patches',
       '013_match_rejects_pruned',
+      '014_patches_drop_released_at',
     ]);
     expect(migrate(db)).toEqual([]);
 

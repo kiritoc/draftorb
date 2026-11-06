@@ -6,12 +6,7 @@ import { DEFAULT_CONFIG } from '@draftorb/engine';
 import { openDb, migrate } from './db';
 import { resolveDbPath } from './config/paths';
 import { ETL_CONFIG } from './config/etl-config';
-import {
-  createPatchIndexLookup,
-  createPatchResolver,
-  latestPatchIndex,
-  refreshPatches,
-} from './patches';
+import { createPatchIndexLookup, createPatchResolver, latestPatchIndex } from './patches';
 import { UsageError } from './cli-args';
 import {
   clearIngestState,
@@ -134,21 +129,16 @@ export async function ingestMatches(
     // Default ingestion window (SPECS §13, D-044): patch_index >=
     // latest - retentionPatches + 1, so ingestion never re-adds data the
     // next prune would delete. When the table is still empty it is refreshed
-    // once so the bound reflects the real latest patch; on failure the run
+    // once through the shared resolver (same single fetch as label misses)
+    // so the bound reflects the real latest patch; on failure the run
     // proceeds unbounded (same as before the window existed).
     let latestIndex = latestPatchIndex(db);
     if (latestIndex === null) {
       try {
-        const refreshed = await refreshPatches(db, { fetchFn: options.patchesFetchFn });
-        if (refreshed.added > 0) {
-          log(
-            `Refreshed patches from Data Dragon: +${refreshed.added} (total ${refreshed.total}).`,
-          );
-        }
+        await patchResolver.refresh();
         latestIndex = latestPatchIndex(db);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        log(`Warning: could not refresh patches from Data Dragon: ${message}`);
+      } catch {
+        // onWarn already logged the fetch failure; proceed unbounded.
       }
     }
     const retentionBound =

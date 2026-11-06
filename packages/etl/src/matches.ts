@@ -100,13 +100,6 @@ export async function ingestMatches(
   const db = options.db ?? openDb(resolveDbPath());
   try {
     migrate(db);
-    if (options.reset) clearIngestState(db, platform);
-    if (options.resetTombstones) {
-      clearPrunedTombstones(db);
-      log(
-        'Warning: --reset-tombstones cleared pruned tombstones; pruned matches become fetchable again.',
-      );
-    }
 
     // --since-patch is a version label resolved to patch_index via `patches`
     // (D-043); the resolver refreshes the table from Data Dragon on a miss.
@@ -159,6 +152,17 @@ export async function ingestMatches(
       );
     }
     const sincePatchIndex = explicitSincePatchIndex ?? retentionBound;
+
+    // State resets run only after every validation above has passed, so a
+    // failed run (unknown --since-patch, failed catalog refresh) never
+    // destroys cursors, rejects or pruned tombstones.
+    if (options.reset) clearIngestState(db, platform);
+    if (options.resetTombstones) {
+      clearPrunedTombstones(db);
+      log(
+        'Warning: --reset-tombstones cleared pruned tombstones; pruned matches become fetchable again.',
+      );
+    }
 
     const allPlayers = db
       .prepare(
@@ -214,13 +218,16 @@ export async function ingestMatches(
           const ids = await listMatchIds(client, platform, player.puuid, queueId, perPlayer);
           cursor = newCursor(ids, cursor.lastGameCreation, sincePatch, sincePatchIndex);
         } else if (cursor?.status === 'done') {
+          // --reset-tombstones clears pruned markers, so done cursors must
+          // relist in full: incremental listing (startTime = lastGameCreation)
+          // would never reach the old matches the tombstones covered.
           const newIds = await listMatchIds(
             client,
             platform,
             player.puuid,
             queueId,
             perPlayer,
-            cursor.lastGameCreation,
+            options.resetTombstones ? undefined : cursor.lastGameCreation,
           );
           if (newIds.length === 0) {
             consecutiveFailed = 0;

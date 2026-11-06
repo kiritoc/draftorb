@@ -4,7 +4,7 @@
 
 - Phase: 1 (Support / Diamond)
 - Current milestone: M3 Web MVP implementation complete (T-030..T-035 DONE); the backtest harness (T-027.a) remains under review because D-023 paired-bootstrap validation is not implemented. T-019.b (patch index, now incl. D-055), T-019.c (retention prune) and T-026 (golden suite, 23 scenarios) are in REVIEW; T-019.d..f and T-027.b remain TODO.
-- Last updated: 2026-11-06 by Devin (scheduled ETL refresh workflow + `etl-db` state branch set up; D-057 PROPOSED)
+- Last updated: 2026-11-06 by Devin (PR #49 review fixes: tombstone/reset ordering, retriable unknown-label invalid rejects, full relist on --reset-tombstones; D-058 PROPOSED)
 
 ## Epic status
 
@@ -42,6 +42,19 @@ Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-0
 - T-019.d verification: please compare the champion and item lists in the 2026-11-04 "T-019.d verification step" entry below with the official 16.21 and 16.22 patch notes (misses and false positives).
 
 ## Session log (newest first)
+
+### 2026-11-06 — Devin — PR #49 review fixes (matches ingestion, D-058 PROPOSED)
+
+- Done: addressed the 3 Devin Review comments on PR #49 (`improvements-bugs`):
+  - `packages/etl/src/matches.ts`: `--reset`/`--reset-tombstones` state clears now run AFTER `--since-patch` resolution and the retention-window check, so a failed run (unknown patch label, failed catalog refresh) no longer destroys cursors, rejects or pruned tombstones.
+  - `packages/etl/src/matches.ts`: done cursors relist in full (`startTime` omitted) when `resetTombstones` is set — incremental listing from `lastGameCreation` could never reach the old matches the cleared tombstones covered.
+  - `packages/etl/src/matches-store.ts` + `matches-process.ts`: `findRejection` is now async and takes the run's `resolvePatchIndex`; an `invalid` reject carrying a patch label (recorded only when the label was missing from `patches`) is dropped once the label resolves, so the match is refetched and re-evaluated instead of staying rejected forever. `invalid` rejects without a label, `queue`/`short`/`pruned` stay permanent. Logged as D-058 PROPOSED (carves an exception to D-017's "invalid is permanent").
+  - Tests: 3 new cases in `matches.test.ts` (tombstones/cursors survive failed `--since-patch` validation; invalid reject recovered after catalog refresh; done cursor full relist on `--reset-tombstones`).
+- Files touched: `packages/etl/src/{matches,matches-store,matches-process,matches.test}.ts`, `docs/{DECISIONS,PROGRESS}.md`
+- Tests: `pnpm check` — green (81 files, 976 tests).
+- State left: DONE pending owner review; fixes are on `improvements-bugs` (PR #49 branch).
+- Next step: owner reviews PR #49; D-058 awaits owner accept/reject.
+- Pitfalls / notes for next AI: `findRejection` is internal (not exported via `index.ts`); its new resolver param triggers the shared one-per-run `versions.json` fetch on a miss, and a failed refresh surfaces as a transient player failure (same as `evaluateMatch`). Partial (non-done) cursors do NOT rewind `processed` on `--reset-tombstones`: snapshot ids already processed stay skipped — use `--reset` for a full re-evaluation.
 
 ### 2026-11-06 — Devin — Scheduled ETL refresh in CI + `etl-db` state branch (ops, D-057 PROPOSED)
 

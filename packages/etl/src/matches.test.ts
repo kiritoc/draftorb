@@ -893,4 +893,135 @@ describe('match ingestion', () => {
     expect(result.filtered).toBe(1);
     db.close();
   });
+
+  it('keeps pruned tombstones and cursors when --since-patch validation fails', async () => {
+    const db = openDb(':memory:');
+    migrate(db);
+    seedMatchPatches(db);
+    seedPlayer(db, 'p-alpha', 6.5);
+    db.prepare(
+      `INSERT INTO match_rejects (match_id, reason, patch, checked_at)
+       VALUES ('EUW1_P', 'pruned', '16.19', 1)`,
+    ).run();
+    db.prepare('INSERT INTO ingest_state (key, value) VALUES (?, ?)').run(
+      cursorKey(PLATFORM, 'p-alpha'),
+      JSON.stringify({ status: 'done', snapshot: [], processed: 0, lastGameCreation: 1 }),
+    );
+
+    const client = mockClient({}, {});
+    const versionsFetch = vi.fn(
+      async () =>
+        new Response(JSON.stringify(['16.22.1', '16.21.1', '16.20.1', '16.19.1']), {
+          status: 200,
+        }),
+    );
+
+    // The unknown --since-patch must fail BEFORE any state reset runs, or the
+    // tombstones and cursors would be destroyed by a run that ingested nothing.
+    await expect(
+      ingestMatches({
+        platform: PLATFORM,
+        sincePatch: '16.99',
+        reset: true,
+        resetTombstones: true,
+        db,
+        client,
+        patchesFetchFn: versionsFetch as unknown as typeof fetch,
+      }),
+    ).rejects.toThrow(/Unknown patch "16\.99"/);
+
+    expect(
+      db.prepare('SELECT reason FROM match_rejects WHERE match_id = ?').get('EUW1_P'),
+    ).toMatchObject({ reason: 'pruned' });
+    expect(
+      db
+        .prepare('SELECT value FROM ingest_state WHERE key = ?')
+        .get(cursorKey(PLATFORM, 'p-alpha')),
+    ).toBeDefined();
+    db.close();
+  });
+
+  it('re-evaluates an invalid reject once its patch label resolves in the catalog', async () => {
+    const db = openDb(':memory:');
+    migrate(db);
+    seedMatchPatches(db);
+    seedPlayer(db, 'p-alpha', 6.5);
+
+    const match = makeMatch('EUW1_FUTURE', { gameVersion: '16.23.1.7' });
+    const client = mockClient({ 'p-alpha': ['EUW1_FUTURE'] }, { EUW1_FUTURE: match });
+    const knownVersions = ['16.22.1', '16.21.1', '16.20.1', '16.19.1'];
+    const versionsFetch = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(knownVersions), { status: 200 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(['16.23.1', ...knownVersions]), { status: 200 }),
+      );
+
+    // Run 1: Data Dragon does not know '16.23' yet -> 'invalid' reject.
+    const r1 = await ingestMatches({
+      platform: PLATFORM,
+      db,
+      client,
+      patchesFetchFn: versionsFetch as unknown as typeof fetch,
+    });
+    expect(r1.invalid).toBe(1);
+    expect(r1.stored).toBe(0);
+    expect(
+      db.prepare('SELECT reason, patch FROM match_rejects WHERE match_id = ?').get('EUW1_FUTURE'),
+    ).toMatchObject({ reason: 'invalid', patch: '16.23' });
+
+    // Run 2: the catalog now knows '16.23' -> the stale reject is dropped and
+    // the match is fetched and stored instead of staying rejected forever.
+    const r2 = await ingestMatches({
+      platform: PLATFORM,
+      db,
+      client,
+      patchesFetchFn: versionsFetch as unknown as typeof fetch,
+    });
+    expect(r2.stored).toBe(1);
+    expect(client.getMatch).toHaveBeenCalledTimes(2);
+    expect(client.getMatch).toHaveBeenLastCalledWith('euw1', 'EUW1_FUTURE');
+    expect(
+      db.prepare('SELECT COUNT(*) AS n FROM match_rejects').get() as { n: number },
+    ).toMatchObject({ n: 0 });
+    expect(versionsFetch).toHaveBeenCalledTimes(2);
+    db.close();
+  });
+
+  it('relists done cursors in full when resetTombstones clears pruned matches', async () => {
+    const db = openDb(':memory:');
+    migrate(db);
+    seedMatchPatches(db);
+    seedPlayer(db, 'p-alpha', 6.5);
+
+    const c1 = mockClient({ 'p-alpha': ['EUW1_NEW'] }, { EUW1_NEW: makeMatch('EUW1_NEW') });
+    await ingestMatches({ platform: PLATFORM, db, client: c1 });
+
+    // A pruned match older than lastGameCreation would never be listed again
+    // by the incremental done-cursor path unless the run relists in full.
+    db.prepare(
+      `INSERT INTO match_rejects (match_id, reason, patch, checked_at)
+       VALUES ('EUW1_P', 'pruned', '16.21', 1)`,
+    ).run();
+    const c2 = mockClient(
+      { 'p-alpha': ['EUW1_NEW', 'EUW1_P'] },
+      { EUW1_NEW: makeMatch('EUW1_NEW'), EUW1_P: makeMatch('EUW1_P') },
+    );
+    const result = await ingestMatches({
+      platform: PLATFORM,
+      db,
+      client: c2,
+      resetTombstones: true,
+    });
+
+    expect(c2.getMatchIdsByPuuid).toHaveBeenCalledWith(
+      'euw1',
+      'p-alpha',
+      expect.objectContaining({ startTime: undefined }),
+    );
+    expect(c2.getMatch).toHaveBeenCalledWith('euw1', 'EUW1_P');
+    expect(result.stored).toBe(1); // EUW1_P stored; EUW1_NEW is a duplicate
+    expect(result.duplicates).toBe(1);
+    db.close();
+  });
 });

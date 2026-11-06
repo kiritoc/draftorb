@@ -120,7 +120,7 @@ export async function processMatch(
 
   try {
     const participantCount = storedParticipantCount(ctx.stmts, matchId);
-    if (findRejection(ctx.db, matchId, ctx.sincePatchIndex)) {
+    if (await findRejection(ctx.db, matchId, ctx.sincePatchIndex, ctx.resolvePatchIndex)) {
       outcome = 'filtered';
     } else if (isCompleteStoredMatch(participantCount)) {
       outcome = 'duplicate';

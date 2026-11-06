@@ -101,15 +101,23 @@ export function writeCursor(db: Database.Database, key: string, cursor: PlayerCu
  * (re-)evaluated. A 'patch' reject is dropped when the run's window includes
  * the match's actual patch, or when no lower bound is set. The comparison is
  * on `patch_index` (D-043); a reject whose label cannot be resolved keeps its
- * rejection (conservative: it cannot be proven in-window). A 'pruned'
- * tombstone (D-044) is permanent: it is never deleted or re-evaluated,
- * whatever `--since-patch` says; only `--reset-tombstones` clears it.
+ * rejection (conservative: it cannot be proven in-window). An 'invalid'
+ * reject that carries a patch label was recorded only because the label was
+ * missing from `patches` (D-043); once `resolvePatchIndex` resolves it the
+ * stale reject is dropped so the match is fetched and re-evaluated — this is
+ * how matches rejected during a Data Dragon lag recover after the catalog
+ * catches up. 'invalid' rejects without a label (schema/participant
+ * failures), 'queue' and 'short' rejects stay permanent until `--reset`.
+ * A 'pruned' tombstone (D-044) is permanent: it is never deleted or
+ * re-evaluated, whatever `--since-patch` says; only `--reset-tombstones`
+ * clears it.
  */
-export function findRejection(
+export async function findRejection(
   db: Database.Database,
   matchId: string,
   sincePatchIndex?: number,
-): RejectRow | null {
+  resolvePatchIndex?: (versionLabel: string) => Promise<number | undefined>,
+): Promise<RejectRow | null> {
   const row = db
     .prepare('SELECT reason, patch FROM match_rejects WHERE match_id = ?')
     .get(matchId) as RejectRow | undefined;
@@ -124,6 +132,15 @@ export function findRejection(
       db.prepare('DELETE FROM match_rejects WHERE match_id = ?').run(matchId);
       return null;
     }
+  }
+  if (
+    row.reason === 'invalid' &&
+    row.patch !== null &&
+    resolvePatchIndex !== undefined &&
+    (await resolvePatchIndex(row.patch)) !== undefined
+  ) {
+    db.prepare('DELETE FROM match_rejects WHERE match_id = ?').run(matchId);
+    return null;
   }
   return row;
 }

@@ -21,6 +21,9 @@ export interface RecommendationCardProps {
    *  pool-list entries, so the overall list passes membership explicitly to
    *  get the "In your pool" tag (SPECS §7.1). */
   inPool?: boolean;
+  /** True when the champion is one of the loaded profile's favorites —
+   *  renders the star badge in `include` favorites mode (SPECS §18.4). */
+  favorite?: boolean;
 }
 
 const LEVEL_LABEL: Record<number, string> = {
@@ -80,6 +83,7 @@ export function RecommendationCard({
   recommendation,
   champions,
   inPool = false,
+  favorite = false,
 }: RecommendationCardProps) {
   const { score, poolRank, reasons, reliability, warnings } = recommendation;
   const name = championName(champions, recommendation.championId);
@@ -94,6 +98,14 @@ export function RecommendationCard({
           {(poolRank !== undefined || inPool) && (
             <span className="ml-2 px-1.5 py-0.5 rounded text-xs font-bold bg-indigo-900/50 text-indigo-300 border border-indigo-600/30">
               {poolRank !== undefined ? strings.inPool(poolRank) : strings.inPoolTag}
+            </span>
+          )}
+          {favorite && (
+            <span
+              className="ml-2 px-1.5 py-0.5 rounded text-xs font-bold bg-amber-900/50 text-amber-300 border border-amber-600/30"
+              title={strings.favoriteBadge}
+            >
+              ★
             </span>
           )}
         </div>

@@ -130,20 +130,20 @@ Recommendation {
 DraftResult {
   recommendations: Recommendation[]                    // overall ranking: ALL scored candidates, never truncated by the engine (D-024)
   schemaVersion: 1   // DRAFT_RESULT_SCHEMA_VERSION, bumped on every breaking output change (D-030)
-  insufficientData: { championId, nEff: number, rawGames?: number }[]  // baseline n_eff < minGames (§5), unscored; rawGames omitted when unknown (B-033)
+  insufficientData: { championId, nEff: number, rawGames?: number, winRate?: number }[]  // baseline n_eff < minGames (§5), unscored; rawGames omitted when unknown (B-033); winRate = baseline p0 fraction when weighted evidence exists (D-054)
   poolRecommendations?: Recommendation[]               // only when input.pool is non-empty: scored pool champions in overall order (`rank` = overall rank, `poolRank` = rank in the pool)
   poolUnavailable?: { championId, reason: 'insufficientData' | 'unknownChampion' | 'picked' }[]  // pool champions without a score (numbers live in insufficientData); 'picked' = already on the board
 }
 ```
 
-Sorted desc. Always show why + sample sizes. Never show a % without sample size. A `Reason.n` and `Recommendation.reliability.nEff` carry the **effective sample size** `n_eff = (sum w)^2 / sum w^2` (a real number, not a raw game count), because every threshold and `lowData` flag in §5/§7 is evaluated against `n_eff`; `DraftResult.insufficientData` separately exposes `nEff` and `rawGames` for champions that fail the baseline gate. Reason type `lane`, `DraftResult.insufficientData` and the pool fields (`poolRank`, `poolRecommendations`, `poolUnavailable`) are added to the shared schemas by T-002.b.
+Sorted desc. Always show why + sample sizes. Never show a % without sample size. A `Reason.n` and `Recommendation.reliability.nEff` carry the **effective sample size** `n_eff = (sum w)^2 / sum w^2` (a real number, not a raw game count), because every threshold and `lowData` flag in §5/§7 is evaluated against `n_eff`; `DraftResult.insufficientData` separately exposes `nEff`, `rawGames` and, when weighted baseline evidence exists, `winRate` for champions that fail the baseline gate. Reason type `lane`, `DraftResult.insufficientData` and the pool fields (`poolRank`, `poolRecommendations`, `poolUnavailable`) are added to the shared schemas by T-002.b.
 
 ## 7.1 Recommendation lists (D-024)
 
-- Two lists, one card component: **From your pool** (`poolRecommendations`, shown first when the pool is non-empty; with an empty pool a one-line call to action to add champions) and **Best overall** (`recommendations`, always shown, even with an empty pool).
+- Two lists: **From your pool** (`poolRecommendations`, shown first when the pool is non-empty; with an empty pool a one-line call to action to add champions) and **Best overall** (`recommendations`, always shown, even with an empty pool).
 - Both lists are the engine's complete output, sliced client-side: the first `recommendationPageSize` items (default 5, `apps/web/src/config.ts`), then a "Show N more" button reveals the next N (N = page size) each time until the list is exhausted. A "Showing X of Y" label is always visible and the button disappears when nothing remains. The two lists are paginated independently.
 - The overall list also contains pool champions, tagged "In your pool". A UI-only toggle "Hide my pool" (default off) lets the user focus on champions to learn. Ranks always stay global, so gaps are expected when the toggle is on.
-- Pool cards show both ranks ("#2 in your pool · #14 overall"). Pool champions without a score are listed after the ranked ones with the reason and sample size ("not enough data (n_eff 12)"); they are never hidden.
+- Pool cards show both ranks ("#2 in your pool · #14 overall"). Pool champions without a score are listed after the ranked ones as unavailable cards with a "Not recommended" badge, the reason (insufficient data with `n_eff`/raw games and baseline win rate when available, already picked, or not in the champion catalogue); they are never hidden.
 - Visible counts reset to the page size when the draft input changes (and the pool list when the pool changes). The "Show more" control is a real `<button>`, keyboard reachable, and the count label is an `aria-live="polite"` region.
 - Determinism: the same draft input gives the same lists in the same order. The pool never changes `score(c)` or reasons. Pool-only candidates can appear in `recommendations` (SPECS §5), which may insert extra rows and shift global `rank` numbers; the relative order of champions that were already in the roleProb set stays the same. `poolRecommendations` is the subsequence of scored pool champions.
 

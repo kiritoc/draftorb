@@ -514,6 +514,18 @@ Owner decision 2026-11-04.
 
 Owner decision 2026-11-05 (avatar source chosen in session).
 
+### D-054 — Insufficient-data pool champions render as list cards with baseline win rate — PROPOSED
+
+- Context: pool champions that fail the baseline gate were only summarized in a warning line ("Pool champions not recommended: ..."), so the user could not see them in the "From your pool" list or read a win rate when data exists. SPECS §7.1 already requires unscored pool champions to be listed after the ranked ones.
+- Decision:
+  1. `insufficientData` entries may carry `winRate`: the baseline `p0` fraction (SPECS §5) for the user's rank bucket, present only when the baseline row has weighted evidence (`games_e > 0`). Missing or empty baseline rows omit it rather than inventing a prior-only 50%.
+  2. `DRAFT_RESULT_SCHEMA_VERSION` stays 1: the field is optional and additive.
+  3. The web "From your pool" list renders `poolUnavailable` champions after ranked recommendations as cards with a "Not recommended" badge, the reason (insufficient data with `n_eff`/raw games, already picked, or not in the champion catalogue) and the win rate when present. The warning line is removed.
+- Alternatives:
+  - Show the raw (unshrunk) win rate — rejected: tiny samples can read 0%/100% and contradict the engine's `p0`.
+  - Compute the win rate in the web layer — rejected: it would duplicate baseline indexing/weighting logic that belongs to the engine.
+- Consequences: SPECS §7/§7.1 updated; UI strings stay centralized; ETL exports and the backtest are unaffected (engine output only).
+
 ### Template
 
 ```

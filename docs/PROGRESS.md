@@ -4,7 +4,7 @@
 
 - Phase: 1 (Support / Diamond)
 - Current milestone: M3 Web MVP implementation complete (T-030..T-035 DONE); the backtest harness (T-027.a) remains under review because D-023 paired-bootstrap validation is not implemented. M1 ETL tickets T-019.b..f remain TODO.
-- Last updated: 2026-11-05 by Devin (PR #47 review fixes B-057..B-059 + export JSDoc)
+- Last updated: 2026-11-05 by Devin (pool unavailable cards + baseline win rate, D-054 PROPOSED)
 
 ## Epic status
 
@@ -40,6 +40,19 @@ Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-0
 - T-019.d verification: please compare the champion and item lists in the 2026-11-04 "T-019.d verification step" entry below with the official 16.21 and 16.22 patch notes (misses and false positives).
 
 ## Session log (newest first)
+
+### 2026-11-05 — Devin — Pool unavailable champions as list cards with win rate (owner request, D-054 PROPOSED)
+
+- Done:
+  - Replaced the amber "Pool champions not recommended" warning line with in-list cards: `poolUnavailable` entries are joined to `insufficientData` samples and rendered after the ranked "From your pool" recommendations by `RecommendationsList` (pagination counts recommendations + unavailable entries).
+  - New `UnavailableChampionCard` shows a "Not recommended" badge plus the reason: insufficient data with formatted `n_eff`/raw games, already picked, or not in the champion catalogue. For insufficient data it also shows the baseline win rate when available (`Win rate —` when the baseline has no weighted evidence).
+  - Engine/shared: `InsufficientDataEntry` gains optional `winRate` = baseline `p0` fraction for the user's rank bucket, emitted only when `games_e > 0` (no prior-only 50%). `DRAFT_RESULT_SCHEMA_VERSION` stays 1 (additive optional field; D-054 PROPOSED).
+  - Docs: SPECS §7/§7.1, DECISIONS D-054, BUGS B-060 (pre-existing tags validation failure).
+- Files touched: `packages/shared/src/schemas/draft.ts`, `packages/shared/test/index.test.ts`, `packages/engine/src/recommend.ts`, `packages/engine/test/recommend-ranking.test.ts`, `apps/web/src/{strings.ts,pool/unavailable.ts,pool/unavailable.test.ts,components/{DraftScreen,RecommendationsList,UnavailableChampionCard}.tsx,components/{unavailable-champion-card.test.ts,recommendations-list.test.ts}}`, `docs/{SPECS,DECISIONS,BUGS,PROGRESS}.md`.
+- Tests: `pnpm check` typecheck/lint/format green; targeted vitest green (49 tests); `pnpm test` still has the pre-existing B-060 failure (`champion-tags.json` missing Ekko/Sylas SUPPORT), unrelated to this change.
+- State left: DONE pending owner review. D-054 is PROPOSED (winRate = shrunk baseline `p0`, schemaVersion unchanged).
+- Next step: owner review; decide D-054 and fix B-060 (tag Ekko/Sylas or adjust role derivation) before the next `pnpm check` can be green. Then T-019.b.
+- Pitfalls / notes for next AI: unavailable pool cards are filtered out when the champion is the user's own pick (`user.championId`), matching `excludePick`; `winRate` is omitted for missing/empty baseline rows so a 50% prior is never shown as data.
 
 ### 2026-11-05 — Devin — First real match-data collection (ops, no ticket)
 

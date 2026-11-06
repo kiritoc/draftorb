@@ -394,7 +394,7 @@ describe('shared schemas', () => {
           warnings: [],
         },
       ],
-      insufficientData: [{ championId: 54, nEff: 12.5, rawGames: 20 }],
+      insufficientData: [{ championId: 54, nEff: 12.5, rawGames: 20, winRate: 0.6 }],
       poolRecommendations: [
         {
           championId: 41,

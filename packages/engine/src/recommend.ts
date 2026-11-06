@@ -157,6 +157,7 @@ export function recommend(
         championId: c,
         nEff: nE,
         ...(raw !== undefined && raw > 0 ? { rawGames: raw } : {}),
+        ...(gamesE > 0 ? { winRate: baselinePrior(winsE, gamesE, config.k0) } : {}),
       });
       continue;
     }

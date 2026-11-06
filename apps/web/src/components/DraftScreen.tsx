@@ -41,6 +41,7 @@ import { DraftSlot, type DraftSlotState } from './DraftSlot.js';
 import { RecommendationsList } from './RecommendationsList.js';
 import { PoolEditor } from './PoolEditor.js';
 import { filterPoolByCatalogue, readPool, savePool } from '../pool/storage.js';
+import { buildPoolUnavailableItems } from '../pool/unavailable.js';
 
 const USER_ROLE: Role = 'SUPPORT';
 const DEFAULT_RANK: Rank = 'DIAMOND';
@@ -218,6 +219,11 @@ export function DraftScreen() {
     user.championId,
     removedRanks,
   );
+  const poolUnavailableItems = useMemo(
+    () =>
+      buildPoolUnavailableItems(poolUnavailable, insufficientData, user.championId ?? undefined),
+    [poolUnavailable, insufficientData, user.championId],
+  );
 
   if (error) {
     return (
@@ -340,21 +346,8 @@ export function DraftScreen() {
               champions={champions}
               pageSize={recommendationPageSize}
               resetKey={draftInput}
+              unavailable={poolUnavailableItems}
             />
-            {poolUnavailable.length > 0 && (
-              <div className="mt-3 p-3 rounded bg-amber-900/20 border border-amber-600/30 text-xs text-amber-300">
-                {strings.poolUnavailable}{' '}
-                {poolUnavailable
-                  .map((entry) => {
-                    const sample = insufficientData.find(
-                      (item) => item.championId === entry.championId,
-                    );
-                    const reason = poolUnavailableReason(entry, sample);
-                    return strings.dataReason(championName(champions, entry.championId), reason);
-                  })
-                  .join(', ')}
-              </div>
-            )}
           </div>
         )}
 
@@ -435,24 +428,4 @@ export function DraftScreen() {
       />
     </div>
   );
-}
-
-function poolUnavailableReason(
-  entry: PoolUnavailableEntry,
-  sample: InsufficientDataEntry | undefined,
-): string {
-  if (entry.reason === 'insufficientData' && sample !== undefined) {
-    return strings.insufficientData(sample.nEff);
-  }
-  if (entry.reason === 'picked') {
-    return strings.poolReasonPicked;
-  }
-  if (entry.reason === 'unknownChampion') {
-    return strings.poolReasonUnknownChampion;
-  }
-  return entry.reason;
-}
-
-function championName(champions: Champion[], id: number): string {
-  return champions.find((c) => c.id === id)?.name ?? strings.championFallback(id);
 }

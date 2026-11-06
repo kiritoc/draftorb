@@ -20,8 +20,28 @@ pnpm dev
 
 ## Riot key
 
-1. Sign in at https://developer.riotgames.com, copy the Development API Key (expires every 24h).
-2. Paste into `.env`. Re-paste daily until a production key is approved.
+1. Sign in at https://developer.riotgames.com, copy the Development API Key (expires every 24h) or your Personal key (no expiry — recommended).
+2. Paste into `.env`. With a dev key, re-paste daily.
+
+## Scheduled CI refresh (D-057)
+
+`.github/workflows/etl.yml` runs the pipeline every 12h (and on demand via _Actions → ETL refresh → Run workflow_):
+
+1. Restores `data/DraftOrb.sqlite` from the orphan branch `etl-db` (single gzipped file `DraftOrb.sqlite.gz`, ~58 MB, force-pushed/amended each run — the job refuses to run if the branch is missing, so an empty DB can never overwrite good state).
+2. `migrate` → `check-key` → `static` → `matches euw1 --refresh` → `matches euw1 --limit 100` (bounded pending-player ingest) → `prune` → `aggregate` → `derive-roles` → `export` → `status`.
+3. Checkpoints WAL + VACUUMs the DB, pushes the new state to `etl-db`, and commits changed `data/public/**` to `main`. Because `GITHUB_TOKEN` pushes do not trigger `push`-event workflows, the job then dispatches `deploy.yml` explicitly (`gh workflow run`).
+
+Setup: add the **personal** Riot key as repo secret `RIOT_API_KEY` (Settings → Secrets and variables → Actions). `GITHUB_TOKEN` needs `contents: write` + `actions: write` (already granted by the workflow's `permissions` block).
+
+To reseed `etl-db` from a local database:
+
+```
+sqlite3 data/DraftOrb.sqlite "PRAGMA wal_checkpoint(TRUNCATE);"
+gzip -9 -c data/DraftOrb.sqlite > DraftOrb.sqlite.gz
+# in a temp dir: git init -b etl-db, add the .gz, commit, push -u origin etl-db --force
+```
+
+Tuning: change the cron or the `--limit 100` pending-player cap in the workflow file; ingestion is resumable via cursors, so smaller caps just spread the work over more runs. Watch the gzipped size — GitHub rejects files >100 MB, so if `DraftOrb.sqlite.gz` approaches that, reduce `--per-player`/retention or move the state to external storage (see D-057).
 
 ## ETL commands
 

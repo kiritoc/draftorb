@@ -4,7 +4,7 @@
 
 - Phase: 1 (Support / Diamond)
 - Current milestone: M3 Web MVP implementation complete (T-030..T-035 DONE); the backtest harness (T-027.a) remains under review because D-023 paired-bootstrap validation is not implemented. T-019.b (patch index, now incl. D-055), T-019.c (retention prune) and T-026 (golden suite, 23 scenarios) are in REVIEW; T-019.d..f and T-027.b remain TODO.
-- Last updated: 2026-11-06 by Devin (T-026 golden test suite completed: 23 scenarios, reason-order/lane-correction pinning; `pnpm check` green, 973 tests)
+- Last updated: 2026-11-06 by Devin (scheduled ETL refresh workflow + `etl-db` state branch set up; D-057 PROPOSED)
 
 ## Epic status
 
@@ -21,11 +21,12 @@
 
 ## Data collection status
 
-- Riot key: present in `.env` (development keys expire every 24 h).
+- Riot key: personal key obtained 2026-11-06 (no expiry; limits verified: 20 req/s, 100 req/2 min — same envelope as dev). Stored locally in `.env` and as GitHub Actions secret `RIOT_API_KEY` for the scheduled ETL workflow (D-057 PROPOSED).
+- Scheduled refresh: `.github/workflows/etl.yml` runs every 12h — restores the DB from orphan branch `etl-db` (`DraftOrb.sqlite.gz`, ~58 MB, seeded 2026-11-06 from the local DB), runs check-key → static → `matches --refresh` → `matches --limit 100` → prune → aggregate → derive-roles → export → status, then pushes the amended state branch and commits changed `data/public/**` to main (triggers Deploy).
 - Games collected: 3,597 matches, ~36k participants (euw1, patches 16.19–16.22; top-250 players by rank_score — Challenger/Grandmaster/Master — ingested via `matches --limit=250`, refreshed 2026-11-06 via the new `matches --refresh` flag: +286 matches, all in patch 16.22). 2,994 players discovered (2,648 still pending ingestion). Patch catalogs imported for 16.21 and 16.22. `data/public/latest.json` (D-051, T-029) points at patch 16.22, written by `pnpm etl export` after a successful publish.
 - Match rank distribution: all stored matches sit in the top buckets — MASTER_PLUS plus a few DIAMOND (rank_score >= 7 dominates; lower buckets receive only kernel-decayed weight). Participant `rank_score`: 7/8/9 dominate; ~7k NULL (rank unknown).
 - Last aggregation: 2026-11-06 — role_prob (553 rows/173 champions), baseline (4,464 rows), pair tables (pair_ally 357,184; pair_enemy 449,408; lane_vs 146,648; lane_full 109,152 rows), rune_ctx (175,006 rows/114 champions) aggregated from the full 3,597-match database; `derive-roles` re-run and `pnpm etl export` re-published patch 16.22 (37 files). Data sufficiency per rank bucket is near-identical across buckets (kernel weights are per-game scalars). Below `minGames` (n_eff 25) per bucket: ~99.4% of pair rows, ALL lane_full rows (n_eff < 10 -> `lane-full.json` exports empty), 324/558 baseline rows, ~99.8% rune_ctx rows. Rows passing n_eff >= 25 per bucket: pair_ally ~284, pair_enemy ~372, lane_vs ~21, lane_full 0.
-- Weekly refresh estimate: ~1.5–3 h incremental for the same 250 players (cursors fetch only new matches); first run on a fresh DB ~4–6 h. A scheduled GitHub Action is feasible but blocked on key strategy (dev keys expire in 24 h; production key needs Riot approval).
+- Refresh estimate: ~1.5–3 h incremental for the same 250 players (cursors fetch only new matches); first run on a fresh DB ~4–6 h. Scheduled GitHub Action now live (D-057): every 12h, bounded to `matches --refresh` + `matches --limit 100` per run so it stays well under the 6 h job limit at the personal key's 100 req/2 min.
 
 ## Next recommended ticket
 
@@ -41,6 +42,19 @@ Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-0
 - T-019.d verification: please compare the champion and item lists in the 2026-11-04 "T-019.d verification step" entry below with the official 16.21 and 16.22 patch notes (misses and false positives).
 
 ## Session log (newest first)
+
+### 2026-11-06 — Devin — Scheduled ETL refresh in CI + `etl-db` state branch (ops, D-057 PROPOSED)
+
+- Done:
+  - Owner obtained a Riot **personal key** (validated by Riot; no expiry). Rate limits verified by owner in the dev portal: 20 req/s, 100 req/2 min — same envelope as the dev key (recorded in RIOT_API.md).
+  - DB persistence design (owner chose 12h cadence, refresh + bounded pending ingest + prune, auto-commit exports): orphan branch `etl-db` holds `DraftOrb.sqlite.gz` (~58 MB gzipped / ~248 MB after VACUUM). Seeded from the local DB and pushed. Alternatives rejected in D-057: actions/cache and artifacts (cannot be seeded outside a workflow + quota/eviction risk), R2/B2 (external account, deferred), committing to main (>100 MB/file limit).
+  - New `.github/workflows/etl.yml`: every 12h (`37 */12 * * *`) + `workflow_dispatch`; restores DB from `etl-db` (refuses to run if the branch is missing), then migrate → check-key → static → `matches euw1 --refresh` → `matches euw1 --limit 100` → prune → aggregate → derive-roles → export → status; WAL checkpoint + VACUUM + gzip; force-pushes the amended single-commit state branch; commits changed `data/public/**` to main and dispatches `deploy.yml` explicitly (GITHUB_TOKEN pushes don't trigger push-event workflows). Compact/upload steps use `if: always()` so partial progress survives step failures. Review fixes: added the missing `migrate` step, `actions: write` permission, non-fatal publish step, `gzip -n`.
+  - Docs: SETUP.md (CI section + reseed procedure + tuning), RIOT_API.md (personal key + verified limits), DECISIONS.md D-057 PROPOSED, .env.example.
+- Files touched: `.github/workflows/etl.yml` (new), `docs/{SETUP,RIOT_API,DECISIONS,PROGRESS}.md`, `.env.example`; orphan branch `etl-db` created on origin (not part of main).
+- Tests: none (CI YAML + docs; the compact script was exercised on a scratch DB copy — checkpoint + VACUUM verified).
+- State left: DONE pending owner review (D-057 PROPOSED). Owner must add the `RIOT_API_KEY` secret in repo Settings → Secrets and variables → Actions before the first scheduled run; can also trigger manually via _Actions → ETL refresh → Run workflow_.
+- Next step: owner adds the secret and runs the workflow once manually to validate end-to-end; review D-057.
+- Pitfalls / notes for next AI: the state branch is force-pushed (amended single commit) — never merge or build on it; `git clone --depth 1` of it yields only the .gz. If `DraftOrb.sqlite.gz` approaches 100 MB, reduce `--per-player`/retention or move state to R2/B2 (D-057). Pending ingest advances ~100 players/run (~26 days to cover the ~2,648 pending at 12h cadence).
 
 ### 2026-11-06 — Devin — T-026 golden test suite completed (REVIEW)
 

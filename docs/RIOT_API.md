@@ -4,8 +4,9 @@ Always verify details at https://developer.riotgames.com (limits and endpoints m
 
 ## Keys
 
-- Dev key: free, expires every 24h, low limits (commonly 20 req/s and 100 req/2 min — VERIFY). Stored in `.env` (`RIOT_API_KEY`).
-- Production key: free but requires an approved application. Apply early, with a clear product description (free, no paywall).
+- Dev key: free, expires every 24h, low limits (commonly 20 req/s and 100 req/2 min — VERIFY). Stored in `.env` (`RIOT_API_KEY`) for local runs.
+- Personal key: free, no expiry, higher limits; requires a project description on the dev portal (no website/verification). Obtained 2026-11-06 for DraftOrb; stored as the GitHub Actions secret `RIOT_API_KEY` used by `.github/workflows/etl.yml` (D-057). If the public site launches, apply for a production key.
+- Verified 2026-11-06 (owner, dev portal): the personal key's rate limits are **20 req/s and 100 req/2 min** — the same envelope as the dev key. Budget CI runs accordingly: `matches --refresh` (~250 players) ≈ 15–25 min; `matches --limit 100` on pending players ≈ 40–70 min (up to ~20 match-detail calls per player plus enrichment).
 
 ## Routing
 

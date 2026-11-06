@@ -555,6 +555,18 @@ Owner decision 2026-11-05.
 - Alternatives: (a) reorder done players first globally — rejected, it would starve pending ingestion; (b) a `--tier`/`--players-file` filter — rejected as more machinery than needed for the weekly-refresh use case; (c) selecting by stored `matches` instead of cursors — rejected, the cursor is the resume mechanism and a stored match without a cursor cannot happen.
 - Consequences: `pnpm etl matches euw1 --refresh` refreshes exactly the ingested set (e.g. the top-250 batch) without touching pending players; full-population ingestion remains the default no-flag behavior.
 
+### D-057 — Scheduled ETL refresh in GitHub Actions with DB state on an orphan branch — PROPOSED
+
+- Context: the owner obtained a Riot **personal key** (no expiry) and wants the pipeline to refresh the database every 12h, persist the ~265 MB SQLite between runs, and auto-publish `data/public` exports. Constraints: the DB is gitignored and >100 MB (GitHub's per-file limit) uncompressed; the deployed site serves only committed `data/public` JSON; ingestion must stay resumable and bounded under the 6h job limit.
+- Decision:
+  1. State lives on orphan branch `etl-db` as a single gzipped file `DraftOrb.sqlite.gz` (~58 MB, under the 100 MB limit). Each run fetches it, and at the end checkpoints WAL + VACUUMs, re-gzips and force-pushes an **amended single commit** so branch history stays ~58 MB.
+  2. The job refuses to run when `etl-db` is missing (a fresh empty DB could otherwise overwrite good state); reseeding is a documented manual git procedure (SETUP.md).
+  3. Cadence: cron every 12h (`37 */12 * * *`) + `workflow_dispatch`. Each run: `migrate` → `check-key` → `static` → `matches --refresh` → `matches --limit 100` (bounded pending ingest) → `prune` → `aggregate` → `derive-roles` → `export` → `status`.
+  4. Compact/upload steps use `if: always()` so partial progress (cursors, stored matches) is saved even when a pipeline step fails; exports are committed to `main` only on success. `GITHUB_TOKEN` pushes do not trigger `push`-event workflows, so the job dispatches `deploy.yml` via `gh workflow run` (workflow_dispatch is the allowed exception) when exports changed; the workflow holds `contents: write` + `actions: write`.
+  5. Secret: `RIOT_API_KEY` (personal key) in Actions secrets; `GITHUB_TOKEN` with `contents: write` covers clone/push of both branches.
+- Alternatives: (a) `actions/cache` — rejected: cache entries can only be written from inside a workflow, so the existing local DB could never be seeded; eviction would force a multi-day rebuild. (b) GitHub artifacts — rejected: same seeding problem plus the ~500 MB free storage quota vs ~58-150 MB per run. (c) Cloudflare R2/B2 — viable and more durable, deferred: needs an external account and secrets; revisit if the gzipped DB approaches 100 MB. (d) Committing the DB to `main` — impossible (>100 MB/file). (e) `workflow_dispatch`-only — rejected, the owner wants automatic refresh.
+- Consequences: every run costs ~58 MB download + ~58 MB upload; pending-player ingest advances ~100 players/run (~2,648 pending → ~26 days to fill at current cadence); the state branch must never be deleted; if the gzipped DB nears 100 MB, reduce `--per-player`/retention or migrate to R2/B2.
+
 ### Template
 
 ```

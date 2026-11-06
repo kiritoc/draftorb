@@ -35,7 +35,7 @@ pnpm etl static [version]      # Data Dragon import -> data/public/<patch>/
 pnpm etl validate-tags         # validate data/manual/champion-tags.json (also: pnpm validate:tags)
 pnpm etl check-key [platform]  # test the Riot API key (default: euw1)
 pnpm etl players [platform]    # discover players by tier (--tiers, --quota, --reset)
-pnpm etl matches [platform]    # ingest matches, resumable, Ctrl+C safe (--since-patch, --per-player, --limit, --queue, --min-duration, --reset, --reset-tombstones)
+pnpm etl matches [platform]    # ingest matches, resumable, Ctrl+C safe (--since-patch, --per-player, --limit, --queue, --min-duration, --reset, --reset-tombstones, --refresh)
 pnpm etl prune [--keep-patches=N] [--dry-run]  # delete matches older than the retention window and tombstone them as pruned (D-044; default keep: 20 patches)
 pnpm etl status [platform]     # counts and progress
 pnpm etl aggregate [patch]     # compute every aggregated table (role probabilities, baselines, pair and lane tables, rune contexts; T-015..T-018)

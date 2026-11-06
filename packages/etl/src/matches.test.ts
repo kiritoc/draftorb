@@ -514,6 +514,44 @@ describe('match ingestion', () => {
     db.close();
   });
 
+  it('refresh only processes players that already have an ingest cursor', async () => {
+    const db = openDb(':memory:');
+    migrate(db);
+    seedMatchPatches(db);
+    seedPlayer(db, 'p-alpha', 7);
+    seedPlayer(db, 'p-beta', 6.5);
+
+    // First batch ingests only p-alpha (higher rank_score, --limit=1).
+    const c1 = mockClient({ 'p-alpha': ['EUW1_1'] }, { EUW1_1: makeMatch('EUW1_1') });
+    await ingestMatches({ platform: PLATFORM, playerLimit: 1, db, client: c1 });
+
+    // Refresh run: p-beta has no cursor and must not even be listed; p-alpha's
+    // done cursor lists incrementally (startTime = lastGameCreation) and picks
+    // up the new match.
+    const c2 = mockClient(
+      { 'p-alpha': ['EUW1_2'], 'p-beta': ['EUW1_3'] },
+      {
+        EUW1_2: makeMatch('EUW1_2', { gameCreation: 1_760_100_000_000 }),
+        EUW1_3: makeMatch('EUW1_3'),
+      },
+    );
+    const result = await ingestMatches({ platform: PLATFORM, db, client: c2, refresh: true });
+
+    expect(result.playersProcessed).toBe(1);
+    expect(result.playerResults.map((r) => r.puuid)).toEqual(['p-alpha']);
+    expect(c2.getMatchIdsByPuuid).toHaveBeenCalledTimes(1);
+    expect(c2.getMatchIdsByPuuid).toHaveBeenCalledWith(
+      'euw1',
+      'p-alpha',
+      expect.objectContaining({ startTime: Math.floor(1_760_000_000_000 / 1000) }),
+    );
+    expect(c2.getMatch).toHaveBeenCalledTimes(1);
+    expect(c2.getMatch).toHaveBeenCalledWith('euw1', 'EUW1_2');
+    const count = db.prepare('SELECT COUNT(*) AS n FROM matches').get() as { n: number };
+    expect(count.n).toBe(2);
+    db.close();
+  });
+
   it('emits a progress log with per-player counts', async () => {
     const db = openDb(':memory:');
     migrate(db);

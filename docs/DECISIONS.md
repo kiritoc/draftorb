@@ -548,6 +548,13 @@ Owner decision 2026-11-05.
 - Alternatives: a `patch_index` column on `matches`/`match_rejects` (denormalized, needs backfill and rewrite on catalog changes — rejected, the lookup is cheap and labels are already stored); `currentPatchIndex` = max `patch_index` in `patches` (penalizes all games by a constant when a brand-new patch has no games yet — rejected, the stored-max matches prior semantics); FK `matches.patch REFERENCES patches(version_label)` (rejected, see 1); keeping `released_at` NULL forever (rejected — a permanently empty column is worse than none).
 - Consequences: read commands fetch only on a miss; recency follows real patch distance (gaps in collected data count); aggregates written before this change keep working (snapshot metadata is simply absent until the next `aggregate` + `export`).
 
+### D-056 — `matches --refresh`: ingestion scoped to already-ingested players — PROPOSED
+
+- Context: `matches` orders pending (no/partial cursor) players before done players (D-018) so repeated `--limit` batches walk the whole discovered population. Once `players` has discovered more players than were ingested, there is no way to run a cheap "refresh the set we already collected" pass: a plain run walks all pending players first, and `--limit` can never reach the done players.
+- Decision: new boolean flag `--refresh` on `pnpm etl matches`. It restricts the player selection to puuids that already have an ingest cursor for the platform (any status, `partial` or `done`); ordering and `--limit` then apply within that subset. Done cursors keep the D-018 incremental listing (`startTime = lastGameCreation`), so a refresh costs ~1 match-list call per player plus any genuinely new games. `--refresh` combined with `--reset` is a usage error (reset clears the cursors the flag selects on).
+- Alternatives: (a) reorder done players first globally — rejected, it would starve pending ingestion; (b) a `--tier`/`--players-file` filter — rejected as more machinery than needed for the weekly-refresh use case; (c) selecting by stored `matches` instead of cursors — rejected, the cursor is the resume mechanism and a stored match without a cursor cannot happen.
+- Consequences: `pnpm etl matches euw1 --refresh` refreshes exactly the ingested set (e.g. the top-250 batch) without touching pending players; full-population ingestion remains the default no-flag behavior.
+
 ### Template
 
 ```

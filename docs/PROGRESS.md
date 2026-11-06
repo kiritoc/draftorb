@@ -4,7 +4,7 @@
 
 - Phase: 1 (Support / Diamond)
 - Current milestone: M3 Web MVP implementation complete (T-030..T-035 DONE); the backtest harness (T-027.a) remains under review because D-023 paired-bootstrap validation is not implemented. T-019.b (patch index, now incl. D-055) and T-019.c (retention prune) are in REVIEW; T-019.d..f remain TODO.
-- Last updated: 2026-11-06 by Devin (D-055 patch-index implementation details implemented, T-019.b stays REVIEW)
+- Last updated: 2026-11-06 by Devin (`matches --refresh` added (D-056 PROPOSED); existing 250 players refreshed: +286 matches -> 3,597 total; aggregate + export re-published 16.22)
 
 ## Epic status
 
@@ -22,8 +22,9 @@
 ## Data collection status
 
 - Riot key: present in `.env` (development keys expire every 24 h).
-- Games collected: 3,311 matches, ~33k participants (euw1, patches 16.19–16.22; top-250 players by rank_score — Challenger/Grandmaster/Master — via `matches --limit=250`, ~3 h on a dev key). Patch catalogs imported for 16.21 and 16.22. `data/public/latest.json` (D-051, T-029) points at patch 16.22, written by `pnpm etl export` after a successful publish.
-- Last aggregation: 2026-11-05 — role_prob (553 rows/173 champions), baseline (4424 rows), pair tables (~912k rows), rune_ctx (159,918 rows) aggregated from the full 3,311-match database; `pnpm etl export` published patch 16.22 and re-exported 16.21. Both dirs include `pick-rate.json` and rune files. Champion roles re-derived (`derive-roles`) for 16.22.
+- Games collected: 3,597 matches, ~36k participants (euw1, patches 16.19–16.22; top-250 players by rank_score — Challenger/Grandmaster/Master — ingested via `matches --limit=250`, refreshed 2026-11-06 via the new `matches --refresh` flag: +286 matches, all in patch 16.22). 2,994 players discovered (2,648 still pending ingestion). Patch catalogs imported for 16.21 and 16.22. `data/public/latest.json` (D-051, T-029) points at patch 16.22, written by `pnpm etl export` after a successful publish.
+- Match rank distribution: all stored matches sit in the top buckets — MASTER_PLUS plus a few DIAMOND (rank_score >= 7 dominates; lower buckets receive only kernel-decayed weight). Participant `rank_score`: 7/8/9 dominate; ~7k NULL (rank unknown).
+- Last aggregation: 2026-11-06 — role_prob (553 rows/173 champions), baseline (4,464 rows), pair tables (pair_ally 357,184; pair_enemy 449,408; lane_vs 146,648; lane_full 109,152 rows), rune_ctx (175,006 rows/114 champions) aggregated from the full 3,597-match database; `derive-roles` re-run and `pnpm etl export` re-published patch 16.22 (37 files). Data sufficiency per rank bucket is near-identical across buckets (kernel weights are per-game scalars). Below `minGames` (n_eff 25) per bucket: ~99.4% of pair rows, ALL lane_full rows (n_eff < 10 -> `lane-full.json` exports empty), 324/558 baseline rows, ~99.8% rune_ctx rows. Rows passing n_eff >= 25 per bucket: pair_ally ~284, pair_enemy ~372, lane_vs ~21, lane_full 0.
 - Weekly refresh estimate: ~1.5–3 h incremental for the same 250 players (cursors fetch only new matches); first run on a fresh DB ~4–6 h. A scheduled GitHub Action is feasible but blocked on key strategy (dev keys expire in 24 h; production key needs Riot approval).
 
 ## Next recommended ticket
@@ -40,6 +41,34 @@ Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-0
 - T-019.d verification: please compare the champion and item lists in the 2026-11-04 "T-019.d verification step" entry below with the official 16.21 and 16.22 patch notes (misses and false positives).
 
 ## Session log (newest first)
+
+### 2026-11-06 — Devin — `matches --refresh` flag (D-056 PROPOSED) + existing-set refresh run (ops)
+
+- Done:
+  - New `--refresh` flag on `pnpm etl matches` (owner request: refresh only the already-ingested players instead of walking all 2,994 discovered ones): player selection is restricted to puuids with an existing ingest cursor (partial or done); `--limit`/ordering apply within that subset; done cursors keep the D-018 incremental `startTime` listing. `--refresh --reset` is a usage error. D-056 logged PROPOSED.
+  - `pnpm check` green (81 files, 925 tests); new regression test: refresh skips cursor-less players entirely (no list call) and incrementally refreshes the done player.
+  - Ran `pnpm etl matches euw1 --refresh` on the real DB: 250/250 cursor players processed in ~15 min, 286 new matches stored (all patch 16.22), 877 duplicates, 20 filtered, 0 invalid/failed. Matches total 3,311 -> 3,597; players table grew 2,898 -> 2,994 (enrichment upserts discovered participants).
+  - Re-ran `aggregate` (pair tables now 357k/449k/147k/109k rows; rune_ctx 175,006 rows/114 champs), `derive-roles 16.22`, `export` (37 files, `latest.json` still 16.22).
+- Files touched: `packages/etl/src/{matches.ts,matches.test.ts,commands/matches.ts}`, `docs/{SETUP,DECISIONS,PROGRESS}.md`, `data/public/16.22/*`, `data/DraftOrb.sqlite` (gitignored).
+- Tests: `pnpm check` green (925 tests).
+- State left: DONE pending owner review (D-056 PROPOSED). lane_full still exports empty (no row reaches exportMinGames). 2,648 discovered players remain pending — ingest them with plain `pnpm etl matches euw1` (many hours on a dev key; key expires every 24 h).
+- Next step: owner review of D-056; decide whether to ingest the pending players; T-019.d once T-019.b/T-019.c are accepted.
+- Pitfalls / notes for next AI: `--refresh` selects on cursor presence, not stored matches; a `--reset` run must not be combined with it (usage error). Refresh cost is ~1 match-list call per done player plus new games — orders of magnitude cheaper than a full walk.
+
+### 2026-11-06 — Devin — ETL refresh attempt (ops, no ticket); `matches` blocked on expired key
+
+- Done:
+  - `pnpm etl migrate` (applied pending `014_patches_drop_released_at`; 14/14 now).
+  - `pnpm etl check-key euw1` -> 401 "Unknown apikey": the dev key in `.env` is expired (dev keys last 24 h). `matches` could not run; owner must paste a fresh key.
+  - `pnpm etl static` -> re-imported patch 16.22 (Data Dragon 16.22.1 still latest): 173 champions, 859 items, 5 rune trees.
+  - `pnpm etl aggregate` -> role_prob 553 rows/173 champs, baseline 4,424 rows, pair tables 342,992 ally / 430,560 enemy / 138,440 lane_vs / 100,864 lane_full, rune_ctx 159,790 rows (one expected warning: 98 unparseable `versions.json` entries skipped, D-055).
+  - `pnpm etl derive-roles 16.22` + `pnpm etl export` -> patch 16.22 re-published (36 files, `patch-meta.json` included), `latest.json` still points at 16.22.
+  - Data sufficiency audit (n_eff = games_w^2/games_w2 vs `minGames` 25 / `exportMinGames` 10): counts per rank bucket are near-identical across all 8 buckets because the rank kernel weights every game into every bucket; stored games themselves are 3,308 MASTER_PLUS + 3 DIAMOND. Below minGames: ~99.5% of pair rows, 100% of lane_full rows (all n_eff < 10, so `lane-full.json` exports as an empty array — pre-existing, see 2026-11-05 B-053 note), 325/553 baseline rows per bucket, ~99.9% rune_ctx rows.
+- Files touched: `docs/PROGRESS.md`, `data/public/16.22/*` (re-export), `data/DraftOrb.sqlite` (gitignored; migration 014 only).
+- Tests: none (ops run; all touched paths already covered).
+- State left: DONE except `matches` resume — BLOCKED on a fresh Riot dev key in `.env`. After the key is refreshed: `pnpm etl matches euw1` (resumes via cursors, ~45 s/player), then re-run `aggregate` + `derive-roles` + `export`.
+- Next step: owner pastes a new dev key; then resume ingestion. T-019.d still next ticket once T-019.b/T-019.c are accepted.
+- Pitfalls / notes for next AI: pair/lane/rune tables have no raw `games` column — only `wins_w`/`games_w`/`games_w2`; compute n_eff in SQL as `games_w*games_w/games_w2`. `baseline` is the only aggregate table with a raw `games` column.
 
 ### 2026-11-06 — Devin — D-055 patch-index implementation details (T-019.b stays REVIEW)
 

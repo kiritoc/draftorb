@@ -22,12 +22,13 @@ async function runMatches(args: string[]): Promise<void> {
         'min-duration': { type: 'string' },
         reset: { type: 'boolean', default: false },
         'reset-tombstones': { type: 'boolean', default: false },
+        refresh: { type: 'boolean', default: false },
       },
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     throw new UsageError(
-      `${message}\nUsage: etl matches [platform] [--since-patch=16.19] [--per-player=20] [--limit=N] [--queue=420] [--min-duration=900] [--reset] [--reset-tombstones]`,
+      `${message}\nUsage: etl matches [platform] [--since-patch=16.19] [--per-player=20] [--limit=N] [--queue=420] [--min-duration=900] [--reset] [--reset-tombstones] [--refresh]`,
     );
   }
   const { values, positionals } = parsed;
@@ -63,6 +64,13 @@ async function runMatches(args: string[]): Promise<void> {
   );
   const resetValue = values.reset === true;
   const resetTombstonesValue = values['reset-tombstones'] === true;
+  const refreshValue = values.refresh === true;
+  if (refreshValue && resetValue) {
+    throw new UsageError(
+      '--refresh cannot be combined with --reset (reset clears the cursors --refresh selects on).\n' +
+        'Usage: etl matches [platform] [--since-patch=16.19] [--per-player=20] [--limit=N] [--queue=420] [--min-duration=900] [--reset] [--reset-tombstones] [--refresh]',
+    );
+  }
 
   log.info(
     `Ingesting ranked matches for platform "${platform}"` +
@@ -80,6 +88,7 @@ async function runMatches(args: string[]): Promise<void> {
       minDurationSeconds,
       reset: resetValue,
       resetTombstones: resetTombstonesValue,
+      refresh: refreshValue,
       db,
       onProgress: (message) => log.info(message),
     });
@@ -97,9 +106,10 @@ async function runMatches(args: string[]): Promise<void> {
 export const matchesCommand: Command = {
   name: 'matches',
   usage:
-    'matches [platform] [--since-patch=16.19] [--per-player=20] [--limit=N] [--queue=420] [--min-duration=900] [--reset] [--reset-tombstones]',
+    'matches [platform] [--since-patch=16.19] [--per-player=20] [--limit=N] [--queue=420] [--min-duration=900] [--reset] [--reset-tombstones] [--refresh]',
   description:
     'Ingest ranked solo matches for discovered players (resumable, Ctrl+C safe). ' +
-    '--reset-tombstones clears pruned tombstones: pruned matches become fetchable again',
+    '--reset-tombstones clears pruned tombstones: pruned matches become fetchable again. ' +
+    '--refresh only processes players that already have an ingest cursor',
   run: runMatches,
 };

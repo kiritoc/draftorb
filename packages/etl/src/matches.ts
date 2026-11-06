@@ -47,6 +47,8 @@ export interface MatchIngestionOptions {
   reset?: boolean;
   /** Clear 'pruned' tombstones so pruned matches become fetchable again (D-044). */
   resetTombstones?: boolean;
+  /** Restrict ingestion to players that already have an ingest cursor (refresh run). */
+  refresh?: boolean;
   onProgress?: (message: string) => void;
   myRole?: Role;
   minChampGames?: number;
@@ -165,9 +167,12 @@ export async function ingestMatches(
       .all(platform) as PlayerRow[];
 
     const done = new Set<string>();
+    const hasCursor = new Set<string>();
     if (!options.reset) {
       for (const player of allPlayers) {
-        if (readCursor(db, cursorKey(platform, player.puuid))?.status === 'done') {
+        const cursor = readCursor(db, cursorKey(platform, player.puuid));
+        if (cursor !== null) hasCursor.add(player.puuid);
+        if (cursor?.status === 'done') {
           done.add(player.puuid);
         }
       }
@@ -179,8 +184,13 @@ export async function ingestMatches(
         b.rank_score - a.rank_score ||
         (a.puuid < b.puuid ? -1 : a.puuid > b.puuid ? 1 : 0),
     );
+    // --refresh: only players with an existing cursor (partial or done) are
+    // selected, so a run refreshes the already-ingested set instead of
+    // walking the whole discovered population (pending-first ordering,
+    // D-018). Done cursors still list incrementally via lastGameCreation.
+    const scoped = options.refresh ? ordered.filter((p) => hasCursor.has(p.puuid)) : ordered;
     const players =
-      options.playerLimit !== undefined ? ordered.slice(0, options.playerLimit) : ordered;
+      options.playerLimit !== undefined ? scoped.slice(0, options.playerLimit) : scoped;
 
     const playerResults: PlayerIngestionResult[] = [];
     let playersSkipped = 0;

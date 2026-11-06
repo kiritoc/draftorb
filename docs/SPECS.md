@@ -140,8 +140,8 @@ Sorted desc. Always show why + sample sizes. Never show a % without sample size.
 
 ## 7.1 Recommendation lists (D-024)
 
-- Two lists: **From your pool** (`poolRecommendations`, shown first when the pool is non-empty; with an empty pool a one-line call to action to add champions) and **Best overall** (`recommendations`, always shown, even with an empty pool).
-- Both lists are the engine's complete output, sliced client-side: the first `recommendationPageSize` items (default 5, `apps/web/src/config.ts`), then a "Show N more" button reveals the next N (N = page size) each time until the list is exhausted. A "Showing X of Y" label is always visible and the button disappears when nothing remains. The two lists are paginated independently.
+- Two lists: **From your pool** (`poolRecommendations`, shown first when the pool is non-empty; with an empty pool a one-line call to action to add champions) and **Best overall** (`recommendations`, always shown, even with an empty pool). When a profile is exported (§18), a third list labeled with the profile label (e.g. "KiriToc's picks") is shown beside them; it never changes `score(c)` or the other two lists (D-072).
+- All lists are the engine's complete output, sliced client-side: the first `recommendationPageSize` items (default 5, `apps/web/src/config.ts`), then a "Show N more" button reveals the next N (N = page size) each time until the list is exhausted. A "Showing X of Y" label is always visible and the button disappears when nothing remains. The lists are paginated independently.
 - The overall list also contains pool champions, tagged "In your pool". A UI-only toggle "Hide my pool" (default off) lets the user focus on champions to learn. Ranks always stay global, so gaps are expected when the toggle is on.
 - Pool cards show both ranks ("#2 in your pool · #14 overall"). Pool champions without a score are listed after the ranked ones as unavailable cards with a "Not recommended" badge, the reason (insufficient data with `n_eff`/raw games and baseline win rate when available, already picked, or not in the champion catalogue); they are never hidden.
 - Visible counts reset to the page size when the draft input changes (and the pool list when the pool changes). The "Show more" control is a real `<button>`, keyboard reachable, and the count label is an `aria-live="polite"` region.
@@ -316,5 +316,46 @@ Only edge cases not owned by sections 12-16; all other rules reference those sec
 - Missing source data: `change_score = NULL`, weight 1.0, warning logged (first patch: NULL, no warning). Stated once in SPECS §15; referenced here.
 - Entity renamed / ID changed between patches: new `entity_id` = new row; cross-patch comparison uses `entity_id`, so renamed entities are separate rows. Champions are keyed by numeric id from CommunityDragon `champion-summary.json` (alias such as `monkeyking` only builds the file path).
 - Item passives: numeric values come from the item `DataValues` in `items.cdtb.bin.json`; description HTML is never parsed.
-- Runes are scored: `rune_ctx` rows whose page contains a rune affected by a rune breakpoint are downweighted; `baseline` is identical. Change scoring downloads CommunityDragon files itself (§15); the T-003 Data Dragon import is unchanged.
+
+## 18. Personalization (D-067..D-075)
+
+Personal recommendations use a **configured profile's** match history, synced by the pipeline and shipped as static JSON — visitors never call Riot and there is no login or server (D-002, D-067). `score(c)` and every existing list are **unchanged** by personalization (D-072, same invariant as D-024).
+
+### 18.1 Profile
+
+- Declared in the committed `data/profiles.config.json` (D-068): `{ id, riotId: { gameName, tagLine }, platform, label, options }`. Default and only entry: `KiriToc#Toc`, `EUW1`. Only configured profiles are ever synced — visitors cannot add one; adding another person's profile requires their consent.
+- Synced by `pnpm etl profile-sync` inside the scheduled `etl.yml` run (D-070): account-v1 resolves the Riot ID to a puuid (`europe` routing for EUW1), match-v5 fetches ranked solo/duo games (queue 420) incrementally (per-profile `last_game_creation` cursor, D-018 pattern), champion-mastery-v4 provides mastery. Stored in `profiles`/`profile_games`/`profile_mastery` (DATA_MODEL.md) and exported as `data/public/profiles/<id>.json` + `index.json`, anonymized per D-069 (no foreign names/Riot IDs/puuids/match ids; last 180 days, max `profileMaxGames` = 500).
+- The web app loads the exported JSON statically and displays the profile label (e.g. "Profile: KiriToc#Toc (EUW)"); the personalized list is labeled "<gameName>'s picks" — never "For you" (D-072). No profile selector UI for now; a selector among exported profiles is future work.
+- Phase 1 uses Support games only; other roles are stored but ignored by the engine.
+
+### 18.2 Profile win rate (champions)
+
+For candidate `c` in the current draft, over the profile's in-scope games:
+
+- Recency weight `w = 0.5^(age_days / 60)` per game (`HALF_LIFE_DAYS = 60`); `n_eff = (sum w)^2 / sum w^2`.
+- Profile win rate at a context level: `p = (wins_w + K_SHRINK * p_profile) / (games_w + K_SHRINK)`, `K_SHRINK = 15`, `p_profile` = the profile's recency-weighted win rate over all in-scope games.
+- Fallback hierarchy — first level with `n_eff >= MIN_GAMES` (`MIN_GAMES` = 3): L1 same ally ADC + same enemy support; L2 same enemy support; L3 enemy composition tags (`champion-tags.json`); L4 role overall; L5 champion overall. `levelFactor` = 1.0/0.9/0.8/0.7/0.6 for L1..L5. The same hierarchy gives the profile's win rate "in the current matchup/setup".
+- Trust: `trust = (n_eff * levelFactor) / (n_eff * levelFactor + K_TRUST)`, `K_TRUST` = 20.
+- Meta normalization: `metaNorm(c) = 1 - (rank - 1) / (N - 1)` over the complete overall list (N > 1; 1 when N = 1) — `score(c) = sigmoid(x)` is uncalibrated in absolute terms, rank position is stable.
+- `personalizedScore(c) = (1 - trust) * metaNorm(c) + trust * p`. The personalized list sorts desc, tie-break overall `rank`. Entries with `n_eff < MIN_GAMES` at every level show "insufficient data" with `n_eff` (D-075), never a number.
+- Reason badge per entry: shrunk profile WR %, effective games, fallback level, and `+d vs meta` = `round(100 * (p - score(c)))` pp against the unchanged meta score.
+
+### 18.3 Personalized list UI
+
+- List labeled with the profile label (e.g. "KiriToc's picks"), beside "Best overall" and "From your pool", same pagination (5 by 5, "Show more", independent state, resets on draft/profile change) and a11y rules as §7.1. Absent when no profile JSON is exported/loaded. Insufficient-data entries render the sample size, never a percentage.
+
+### 18.4 Favorites (D-074)
+
+- Computed at export: top 15 champions by recency-weighted Support games (last 90 days) union top 5 by mastery points.
+- "Import favorites into pool" is explicit and respects `poolMaxSize`.
+- `favoritesMode`: `include` (default, star badge) / `only` (favorites only in the lists) / `hide` (favorites removed). Filters/flags displayed entries only; `score(c)` unchanged.
+
+### 18.5 Runes and summoner spells
+
+- Runes screen: two columns — "Profile's best" (shrunk profile WR of the profile's rune pages for that champion, matched per draft context when possible, same fallback/shrinkage rules) and "Top players" (existing `recommendRunes` output); a marker highlights entries that differ. Fewer than 5 games on a setup -> "Profile's best" shows insufficient data.
+- Summoner spells: same two-column layout from `profile_games` spell ids (profile WR per spell pair vs the champion's global recommendation).
+
+### 18.6 Items (last)
+
+- Personalized items reuse the GameState model (§8.2, T-052+) and the profile's own purchase outcomes per state/context. Open questions (recorded before implementation): which state-bucket dimensions profile games can reproduce offline (gold diff needs timeline data — confirm `profile_games` timeline coverage), whether item personalization waits for T-056 data-driven scoring, and minimum sample sizes per item context.
 - One normative statement per rule; cross-references (§14, §15, §16) used elsewhere.

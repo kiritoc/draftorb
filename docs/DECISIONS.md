@@ -109,6 +109,8 @@ Owner decision 2026-10-29.
 - Alternatives: (a) drop filtered ids silently — rejected, duplicates work across players; (b) store rejected ids inside the per-player cursor JSON — rejected, dedupe must be global; (c) exact `--patch` match — rejected, discards the older patches that recency decay is meant to down-weight and forces a full re-ingestion every patch; (d) re-evaluate every reject on any filter change — rejected for `queue`/`short`/`invalid` since those properties cannot change.
 - Consequences: one extra table (migration `002_match_rejects`); recency is handled at aggregation time, not ingestion; the database grows with the window (pruning old patches is a separate concern).
 
+Update (T-019.b, D-043): the numeric `major.minor` compare for the `--since-patch` window and `patch`-reject re-evaluation is SUPERSEDED — both now compare `patch_index` from the `patches` table. The rest of this decision (reject table, window lower bound, permanence of `queue`/`short`/`invalid`) stands.
+
 Owner decision 2026-10-29.
 
 ### D-018 — Incremental match listing via `startTime` on done cursors — ACCEPTED
@@ -266,7 +268,7 @@ Accepted by the owner on 2026-10-31. SPECS §5/§7 text derived from this decisi
 
 Owner decision 2026-10-31.
 
-### D-033 — Recency `patchIndex` and game rank bucket in ETL aggregation — ACCEPTED (to be superseded by D-043 when T-019.b lands)
+### D-033 — Recency `patchIndex` and game rank bucket in ETL aggregation — SUPERSEDED by D-043 (T-019.b)
 
 - Context: SPECS §3 defines recency as `decay ^ (currentPatchIndex - patchIndex)` but does not define `patchIndex`. It also does not say how a match's `avg_rank_score` maps to a rank bucket. T-016 needs both.
 - Question: should a patch gap (no stored games on some patches) count as one decay step or as the real number of patches released in between?
@@ -513,6 +515,64 @@ Owner decision 2026-11-04.
 - Consequences: one extra small fetch (`versions.json`) per session; avatar availability depends on Riot's CDN, mitigated by the placeholder fallback. `square/` portraits return AccessDenied on this CDN, so the 128x128 `img/champion/` portrait is used.
 
 Owner decision 2026-11-05 (avatar source chosen in session).
+
+### D-054 — Insufficient-data pool champions render as list cards with baseline win rate — ACCEPTED
+
+- Context: pool champions that fail the baseline gate were only summarized in a warning line ("Pool champions not recommended: ..."), so the user could not see them in the "From your pool" list or read a win rate when data exists. SPECS §7.1 already requires unscored pool champions to be listed after the ranked ones.
+- Decision:
+  1. `insufficientData` entries may carry `winRate`: the baseline `p0` fraction (SPECS §5) for the user's rank bucket, present only when the baseline row has weighted evidence (`games_e > 0`). Missing or empty baseline rows omit it rather than inventing a prior-only 50%.
+  2. `DRAFT_RESULT_SCHEMA_VERSION` stays 1: the field is optional and additive.
+  3. The web "From your pool" list renders `poolUnavailable` champions after ranked recommendations as cards with a "Not recommended" badge, the reason (insufficient data with `n_eff`/raw games, already picked, or not in the champion catalogue) and the win rate when present. The warning line is removed.
+- Alternatives:
+  - Show the raw (unshrunk) win rate — rejected: tiny samples can read 0%/100% and contradict the engine's `p0`.
+  - Compute the win rate in the web layer — rejected: it would duplicate baseline indexing/weighting logic that belongs to the engine.
+- Consequences: SPECS §7/§7.1 updated; UI strings stay centralized; ETL exports and the backtest are unaffected (engine output only).
+
+Owner decision 2026-11-05.
+
+### D-055 — Patch-index implementation details for T-019.b — ACCEPTED
+
+- Context: D-043 fixes the `patches` table and the source ordinal, but leaves implementation choices open: where `patch_index` lives for stored matches, what `currentPatchIndex` is when no snapshot is given, when `patches` is refreshed, and how orphans and catalog drift are handled. The draft below was owner-reviewed; the revisions are part of this decision.
+- Decision (implemented 2026-11-06):
+  1. `matches.patch` stays a TEXT `major.minor` label; there is no `patch_index` column on `matches` or `match_rejects`. Aggregation and ingestion resolve labels through `patches` (prepared lookup / in-memory map). A `REFERENCES` FK was rejected: the real database can hold labels absent from `patches` until the first refresh, and rebuilding `matches` under `foreign_keys = ON` would cascade-delete `participants`. Instead a regression test asserts no orphan labels exist after ingestion, and read commands report orphans (below).
+  2. `currentPatchIndex` = the snapshot's `patch_index` when `aggregate [patch]` is given (promoted even with no stored games at it, as before), else the highest `patch_index` among stored matches. The max in `patches` is NOT used. `loadPatchWindow` returns an empty window (`currentPatchIndex = -1`) when no stored label resolves within the bound.
+  3. Ingestion resolves each match label through `createPatchResolver`: one `versions.json` fetch per run, on the first miss (shared with the empty-table retention refresh via `resolver.refresh()`). A failed refresh is a transient player failure, not an `invalid` reject.
+  4. `aggregate`, `derive-roles` and `matches` fetch `versions.json` only on a miss — when the explicit snapshot label or a stored label needed for the run is absent from `patches` — at most once per run (`ensurePatchCoverage`). Offline runs work whenever every needed label already resolves.
+  5. Graceful degradation on the read path: fetch fails but every needed label resolves -> proceed with a warning; fetch fails and the explicit snapshot label cannot be resolved -> fail with an error naming the label; fetch fails and only stored labels are missing -> proceed, exclude them, and log the excluded match count plus the distinct labels; fetch succeeds but Data Dragon still does not know the explicit label -> reject with a clear error.
+  6. Orphan labels are rare and visible: `loadPatchWindow` returns `orphanLabels`/`orphanMatches`; the exclusion path never drops silently.
+  7. Ordering is NUMERIC by (major, minor), never string order (`14.10` > `14.9`) and independent of `versions.json` position: `parsePatchLabels` dedupes hotfixes and sorts numerically; unparseable entries are skipped with a warning. `patch_index` is gap-free from 1 and stable: `refreshPatches` verifies the stored table is contiguous and numerically ordered and that every missing label sorts after the newest stored one, then appends — it refuses to renumber or misorder.
+  8. `gameVersion` -> label uses the same `major.minor` format as the Data Dragon label (tested on representative strings).
+  9. `backtest` copies `patches` into its in-memory database.
+  10. `released_at` is removed (migration `014_patches_drop_released_at`): `versions.json` carries no release dates and nothing populated the column.
+  11. Reproducibility: `aggregate` records `{ patch, patchIndex, currentPatchIndex, patchesMaxIndex, aggregatedAt }` in `ingest_state` (`aggregate:snapshot`); `export` publishes it as `patch-meta.json` (hashed in `manifest.files`, not schema-validated — the strict manifest schema is unchanged, so existing snapshots stay valid).
+- Alternatives: a `patch_index` column on `matches`/`match_rejects` (denormalized, needs backfill and rewrite on catalog changes — rejected, the lookup is cheap and labels are already stored); `currentPatchIndex` = max `patch_index` in `patches` (penalizes all games by a constant when a brand-new patch has no games yet — rejected, the stored-max matches prior semantics); FK `matches.patch REFERENCES patches(version_label)` (rejected, see 1); keeping `released_at` NULL forever (rejected — a permanently empty column is worse than none).
+- Consequences: read commands fetch only on a miss; recency follows real patch distance (gaps in collected data count); aggregates written before this change keep working (snapshot metadata is simply absent until the next `aggregate` + `export`).
+
+### D-056 — `matches --refresh`: ingestion scoped to already-ingested players — PROPOSED
+
+- Context: `matches` orders pending (no/partial cursor) players before done players (D-018) so repeated `--limit` batches walk the whole discovered population. Once `players` has discovered more players than were ingested, there is no way to run a cheap "refresh the set we already collected" pass: a plain run walks all pending players first, and `--limit` can never reach the done players.
+- Decision: new boolean flag `--refresh` on `pnpm etl matches`. It restricts the player selection to puuids that already have an ingest cursor for the platform (any status, `partial` or `done`); ordering and `--limit` then apply within that subset. Done cursors keep the D-018 incremental listing (`startTime = lastGameCreation`), so a refresh costs ~1 match-list call per player plus any genuinely new games. `--refresh` combined with `--reset` is a usage error (reset clears the cursors the flag selects on).
+- Alternatives: (a) reorder done players first globally — rejected, it would starve pending ingestion; (b) a `--tier`/`--players-file` filter — rejected as more machinery than needed for the weekly-refresh use case; (c) selecting by stored `matches` instead of cursors — rejected, the cursor is the resume mechanism and a stored match without a cursor cannot happen.
+- Consequences: `pnpm etl matches euw1 --refresh` refreshes exactly the ingested set (e.g. the top-250 batch) without touching pending players; full-population ingestion remains the default no-flag behavior.
+
+### D-057 — Scheduled ETL refresh in GitHub Actions with DB state on an orphan branch — PROPOSED
+
+- Context: the owner obtained a Riot **personal key** (no expiry) and wants the pipeline to refresh the database every 12h, persist the ~265 MB SQLite between runs, and auto-publish `data/public` exports. Constraints: the DB is gitignored and >100 MB (GitHub's per-file limit) uncompressed; the deployed site serves only committed `data/public` JSON; ingestion must stay resumable and bounded under the 6h job limit.
+- Decision:
+  1. State lives on orphan branch `etl-db` as a single gzipped file `DraftOrb.sqlite.gz` (~58 MB, under the 100 MB limit). Each run fetches it, and at the end checkpoints WAL + VACUUMs, re-gzips and force-pushes an **amended single commit** so branch history stays ~58 MB.
+  2. The job refuses to run when `etl-db` is missing (a fresh empty DB could otherwise overwrite good state); reseeding is a documented manual git procedure (SETUP.md).
+  3. Cadence: cron every 12h (`37 */12 * * *`) + `workflow_dispatch`. Each run: `migrate` → `check-key` → `static` → `matches --refresh` → `matches --limit 100` (bounded pending ingest) → `prune` → `aggregate` → `derive-roles` → `export` → `status`.
+  4. Compact/upload steps use `if: always()` so partial progress (cursors, stored matches) is saved even when a pipeline step fails; exports are committed to `main` only on success. `GITHUB_TOKEN` pushes do not trigger `push`-event workflows, so the job dispatches `deploy.yml` via `gh workflow run` (workflow_dispatch is the allowed exception) when exports changed; the workflow holds `contents: write` + `actions: write`.
+  5. Secret: `RIOT_API_KEY` (personal key) in Actions secrets; `GITHUB_TOKEN` with `contents: write` covers clone/push of both branches.
+- Alternatives: (a) `actions/cache` — rejected: cache entries can only be written from inside a workflow, so the existing local DB could never be seeded; eviction would force a multi-day rebuild. (b) GitHub artifacts — rejected: same seeding problem plus the ~500 MB free storage quota vs ~58-150 MB per run. (c) Cloudflare R2/B2 — viable and more durable, deferred: needs an external account and secrets; revisit if the gzipped DB approaches 100 MB. (d) Committing the DB to `main` — impossible (>100 MB/file). (e) `workflow_dispatch`-only — rejected, the owner wants automatic refresh.
+- Consequences: every run costs ~58 MB download + ~58 MB upload; pending-player ingest advances ~100 players/run (~2,648 pending → ~26 days to fill at current cadence); the state branch must never be deleted; if the gzipped DB nears 100 MB, reduce `--per-player`/retention or migrate to R2/B2.
+
+### D-058 — Retriable `invalid` rejects for unknown patch labels — PROPOSED
+
+- Context: PR #49 review pointed out that a match rejected `invalid` only because its `major.minor` label was absent from `patches` (D-043/D-055, e.g. Riot returns a match from a patch Data Dragon has not published yet) stays rejected forever: `findRejection` only re-evaluates `patch` rejects, and D-017's update says `invalid` rejects are permanent until `--reset`. The spec does not distinguish label-unknown `invalid` rejects from genuinely broken payloads.
+- Decision (assumption, PROPOSED): `findRejection` treats an `invalid` reject that carries a patch label as retriable — it re-resolves the label through the run's patch resolver and drops the reject once the label is known, so the match is refetched and re-evaluated. `invalid` rejects without a label (schema/participant failures), `queue`, `short` and `pruned` rejects stay permanent as before. Related review fixes in the same change: `--reset`/`--reset-tombstones` now run only after `--since-patch` validation succeeds (a failed run no longer destroys cursors or tombstones); `--reset-tombstones` forces done cursors to relist in full AND uncapped so cleared tombstones' matches are actually reachable however old they are; `ingestMatches` reports `stoppedEarly` when the 3-consecutive-failure breaker trips and `etl matches` exits non-zero on it, so scheduled runs never publish a partial refresh (isolated transient failures still exit 0 — the breaker exists to tolerate them); the ETL workflow refuses to run on non-`main` refs so a manual dispatch cannot publish exports to a branch `deploy.yml` does not build.
+- Alternatives: (a) a new reject reason + migration — rejected, the label-carrying `invalid` row already identifies the retriable case; (b) revisiting completed cursors on every catalog refresh — rejected, far broader than the rare Data Dragon lag; (c) keeping `invalid` fully permanent per D-017 — rejected, it makes the lag case unrecoverable without a manual `--reset`.
+- Consequences: matches rejected during a catalog lag self-heal on a later run once `versions.json` catches up (the rejected match's `gameCreation` never advanced `lastGameCreation`, so incremental listing still returns its id); the "`invalid` is permanent" wording in D-017/SPECS §13 now has this one exception.
 
 ### Template
 

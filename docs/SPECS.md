@@ -41,7 +41,7 @@ Rank buckets for weighting (distinct from persisted `rank_score` in DATA_MODEL.m
 - **Draft probabilities** (pairs, matchups, baselines): weight per game `w = exp(-|gameRank - userRank| / tau)`, tau=1.25 (config). Never use data below userRank-2 tiers.
 - **Runes & items**: use games with `gameRank >= userRank` (up to Challenger). Weight `w = min(1 + alpha*(gameRank-userRank), wMax)`, alpha=0.25, wMax=2.0. Only expert players (D-022): `champion_games >= minChampGames` (default 30) in our data, with the champion-mastery-v4 fallback applied only to participants of the user's role (`is_expert` flag). Show both winrate and pick share among those players.
 - Optional UI toggle: "Master+ only".
-- Recency: multiply by `decay^(currentPatchIndex - gamePatchIndex)` (decay=0.85). Indices come from the `patches` table (SPECS §12) once T-019.b is implemented; until then D-033's dense index over stored patches applies.
+- Recency: multiply by `decay^(currentPatchIndex - gamePatchIndex)` (decay=0.85). Indices come from the `patches` table (SPECS §12, T-019.b/D-043): gaps in collected patches count as real patch distance.
 - Patch window: ingestion keeps every patch >= `--since-patch` (D-017); recency is applied here, at aggregation time, never by dropping games at ingestion.
 - Rank reliability: games with `matches.rank_known_count = 1` (only the seed player's rank is known, D-019) are multiplied by `unknownRankFactor` (default 0.5, config).
 - Known limitation (D-004/D-021): draft baselines and pairs are not expert-filtered, so one-trick players can inflate some picks; T-027.a includes an optional ablation that down-weights games by `champion_games` to measure it.
@@ -130,20 +130,20 @@ Recommendation {
 DraftResult {
   recommendations: Recommendation[]                    // overall ranking: ALL scored candidates, never truncated by the engine (D-024)
   schemaVersion: 1   // DRAFT_RESULT_SCHEMA_VERSION, bumped on every breaking output change (D-030)
-  insufficientData: { championId, nEff: number, rawGames?: number }[]  // baseline n_eff < minGames (§5), unscored; rawGames omitted when unknown (B-033)
+  insufficientData: { championId, nEff: number, rawGames?: number, winRate?: number }[]  // baseline n_eff < minGames (§5), unscored; rawGames omitted when unknown (B-033); winRate = baseline p0 fraction when weighted evidence exists (D-054)
   poolRecommendations?: Recommendation[]               // only when input.pool is non-empty: scored pool champions in overall order (`rank` = overall rank, `poolRank` = rank in the pool)
   poolUnavailable?: { championId, reason: 'insufficientData' | 'unknownChampion' | 'picked' }[]  // pool champions without a score (numbers live in insufficientData); 'picked' = already on the board
 }
 ```
 
-Sorted desc. Always show why + sample sizes. Never show a % without sample size. A `Reason.n` and `Recommendation.reliability.nEff` carry the **effective sample size** `n_eff = (sum w)^2 / sum w^2` (a real number, not a raw game count), because every threshold and `lowData` flag in §5/§7 is evaluated against `n_eff`; `DraftResult.insufficientData` separately exposes `nEff` and `rawGames` for champions that fail the baseline gate. Reason type `lane`, `DraftResult.insufficientData` and the pool fields (`poolRank`, `poolRecommendations`, `poolUnavailable`) are added to the shared schemas by T-002.b.
+Sorted desc. Always show why + sample sizes. Never show a % without sample size. A `Reason.n` and `Recommendation.reliability.nEff` carry the **effective sample size** `n_eff = (sum w)^2 / sum w^2` (a real number, not a raw game count), because every threshold and `lowData` flag in §5/§7 is evaluated against `n_eff`; `DraftResult.insufficientData` separately exposes `nEff`, `rawGames` and, when weighted baseline evidence exists, `winRate` for champions that fail the baseline gate. Reason type `lane`, `DraftResult.insufficientData` and the pool fields (`poolRank`, `poolRecommendations`, `poolUnavailable`) are added to the shared schemas by T-002.b.
 
 ## 7.1 Recommendation lists (D-024)
 
-- Two lists, one card component: **From your pool** (`poolRecommendations`, shown first when the pool is non-empty; with an empty pool a one-line call to action to add champions) and **Best overall** (`recommendations`, always shown, even with an empty pool).
+- Two lists: **From your pool** (`poolRecommendations`, shown first when the pool is non-empty; with an empty pool a one-line call to action to add champions) and **Best overall** (`recommendations`, always shown, even with an empty pool).
 - Both lists are the engine's complete output, sliced client-side: the first `recommendationPageSize` items (default 5, `apps/web/src/config.ts`), then a "Show N more" button reveals the next N (N = page size) each time until the list is exhausted. A "Showing X of Y" label is always visible and the button disappears when nothing remains. The two lists are paginated independently.
 - The overall list also contains pool champions, tagged "In your pool". A UI-only toggle "Hide my pool" (default off) lets the user focus on champions to learn. Ranks always stay global, so gaps are expected when the toggle is on.
-- Pool cards show both ranks ("#2 in your pool · #14 overall"). Pool champions without a score are listed after the ranked ones with the reason and sample size ("not enough data (n_eff 12)"); they are never hidden.
+- Pool cards show both ranks ("#2 in your pool · #14 overall"). Pool champions without a score are listed after the ranked ones as unavailable cards with a "Not recommended" badge, the reason (insufficient data with `n_eff`/raw games and baseline win rate when available, already picked, or not in the champion catalogue); they are never hidden.
 - Visible counts reset to the page size when the draft input changes (and the pool list when the pool changes). The "Show more" control is a real `<button>`, keyboard reachable, and the count label is an `aria-live="polite"` region.
 - Determinism: the same draft input gives the same lists in the same order. The pool never changes `score(c)` or reasons. Pool-only candidates can appear in `recommendations` (SPECS §5), which may insert extra rows and shift global `rank` numbers; the relative order of champions that were already in the roleProb set stays the same. `poolRecommendations` is the subsequence of scored pool champions.
 
@@ -198,17 +198,17 @@ Non-support roles, accounts/login, pool sync across devices or auto-import of th
 
 ## 12-17. Storage, retention, weights, change scoring, breakpoints (target model)
 
-**Target model, implemented by T-019.b..T-019.f.** These sections describe the target storage and weighting model; they are normative once implemented and do not describe current code. Until T-019.b lands, SPECS §3 recency uses the dense stored-patch index from D-033 and aggregation stays clear-and-rewrite (DATA_MODEL.md, T-015..T-018); until T-019.f lands and T-027.a passes the D-023 gate, change weighting is off (`changeWeightEnabled = false`). No new tables are created and no rows are soft-deleted until T-019.b..f are done.
+**Target model, implemented by T-019.b..T-019.f.** These sections describe the target storage and weighting model; they are normative once implemented and do not describe current code. §12 is live since T-019.b (migration `012_patches`; recency and `--since-patch` use `patch_index`). §13 is live since T-019.c (migration `013_match_rejects_pruned`; `pnpm etl prune`, `pruned` tombstones, default ingestion window). §14..§17 remain target until T-019.d/T-019.f land and T-027.a passes the D-023 gate; until then change weighting is off (`changeWeightEnabled = false`) and `entity_change_scores`/`data_breakpoints` do not exist.
 
 ## 12. Patch index (D-043)
 
-Table `patches(patch_index INTEGER PRIMARY KEY, version_label TEXT NOT NULL UNIQUE, released_at INTEGER)`:
+Table `patches(patch_index INTEGER PRIMARY KEY, version_label TEXT NOT NULL UNIQUE)` (`released_at` was dropped by migration 014, D-055 — no release-date source exists):
 
 - `version_label` = `major.minor`, identical to `matches.patch` (RIOT_API.md).
-- `patch_index` assigned once, oldest-first starting at 1, append-only, never reassigned or renumbered.
-- Ordering source: Data Dragon `versions.json`, reversed (newest-first -> oldest-first ordinal). Version strings are never compared for age, windows, or breakpoints; one parse (`gameVersion` -> `major.minor` label) is allowed, defined once. All age/window/breakpoint logic uses `patch_index` only.
+- `patch_index` assigned once, gap-free starting at 1, ordered NUMERICALLY by (major, minor) — never string order (`14.10` > `14.9`) — and append-only, never reassigned or renumbered. Ordering source: Data Dragon `versions.json` deduplicated to `major.minor` labels and sorted numerically (D-055); unparseable entries are skipped with a warning. Refresh verifies the stored table is gap-free and numerically ordered and that every new label sorts after the newest stored one, then appends; it refuses to renumber or misorder. Version strings are never compared for age, windows, or breakpoints; one parse (`gameVersion` -> `major.minor` label) is allowed, defined once. All age/window/breakpoint logic uses `patch_index` only.
 - Hotfixes: all source versions sharing the same `major.minor` label collapse to one `patch_index`; one patch = one `patch_index`.
 - A match whose label is absent from `patches`: refresh `patches` from the source first; if still absent, record an `invalid` reject. This is distinct from `patch` and `pruned` rejects.
+- Read commands (`aggregate`, `derive-roles`) fetch `versions.json` at most once per run and only when the explicit snapshot label or a stored label is missing (D-055). Stored labels still unresolved afterwards are orphans: excluded from aggregates and reported by count and label, never silently. `currentPatchIndex` = the snapshot's `patch_index` when given, else the highest `patch_index` among stored matches (never the max in `patches`).
 
 ## 13. Retention and prune (D-044)
 

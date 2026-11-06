@@ -26,6 +26,7 @@ import {
   latestSchema,
 } from '@draftorb/shared';
 import { latestPatch, PATCH_PATTERN } from '../aggregate';
+import { readAggregateSnapshot } from '../aggregate-meta';
 import { comparePatches } from '../matches-store';
 import { defaultPublicDataDir } from '../config/paths';
 import { buildManifest } from './manifest.js';
@@ -245,6 +246,18 @@ export function exportJson(db: Database.Database, options: ExportOptions = {}): 
   }
 
   filesToWrite.push(...buildBuildFiles(buildRows, roles, exportMinGames).files);
+
+  // D-055: publish the patch-catalog state the aggregates were computed
+  // against (patch_index, currentPatchIndex, catalog max) so the snapshot
+  // stays explainable when `patches` later grows. Written only when an
+  // aggregate run recorded it; older databases simply omit the file.
+  const snapshotMeta = readAggregateSnapshot(db);
+  if (snapshotMeta !== undefined) {
+    filesToWrite.push({
+      relativePath: 'patch-meta.json',
+      content: JSON.stringify(snapshotMeta, null, 2),
+    });
+  }
 
   // --- Atomic write to a sibling temp dir, then publish (C4) ---
   const targetDir = join(publicDir, targetPatch);

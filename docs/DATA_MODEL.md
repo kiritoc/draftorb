@@ -37,17 +37,20 @@ CREATE TABLE item_events (    -- from timelines (epic E5)
 );
 CREATE TABLE ingest_state (key TEXT PRIMARY KEY, value TEXT);  -- cursors for resumability
 CREATE TABLE match_rejects (  -- matches seen and rejected, deduped across players
-  match_id TEXT PRIMARY KEY, reason TEXT NOT NULL,
-  patch TEXT,                 -- actual patch of the match (reason='patch' only)
+  match_id TEXT PRIMARY KEY,
+  reason TEXT NOT NULL CHECK (reason IN ('queue','short','patch','invalid','pruned')),
+  patch TEXT,                 -- actual major.minor label (reason='patch'; also set for 'invalid' rejects caused by an unknown patch label, and 'pruned' tombstones)
   checked_at INTEGER NOT NULL
 );
 CREATE INDEX idx_part_champ_role ON participants(champion_id, role);
 
--- PLANNED (T-019.b, D-043): not migrated yet.
+-- Migration 012 (T-019.b, D-043) created the ordered patch catalog;
+-- migration 014 (D-055) dropped released_at (nothing populated it).
+-- matches.patch stays a TEXT label resolved to patch_index through this
+-- table; no patch_index column on matches.
 CREATE TABLE patches (
-  patch_index INTEGER PRIMARY KEY,
-  version_label TEXT NOT NULL UNIQUE,   -- major.minor, matches matches.patch
-  released_at INTEGER
+  patch_index INTEGER PRIMARY KEY,   -- gap-free from 1, numeric (major, minor) order, append-only (D-055)
+  version_label TEXT NOT NULL UNIQUE   -- major.minor, identical to matches.patch
 );
 
 -- PLANNED (T-019.d, D-046): not migrated yet.
@@ -83,7 +86,9 @@ CREATE TABLE data_breakpoints (
 CREATE UNIQUE INDEX idx_data_breakpoints_unique ON data_breakpoints(scope_type, COALESCE(scope_id, -1), from_patch_index, source);
 ```
 
-Notes: match ingestion persists the match row and its 10 participant rows in one transaction. A match is accepted only when each of two teams has exactly one participant in each role; invalid layouts are rejected and have no stored participants. `rank_score` = coarse tier/division score at collection time (approximation, documented in RIOT_API.md). Exact rank ordering uses the stored `tier`, `division`, and `lp` fields separately. The score uses the D-016 tier base and division bonus formula; it excludes LP and is distinct from the SPECS §3 weighting buckets. Store only needed fields. `match_rejects` records match ids already evaluated and rejected (wrong queue, too short, off-patch, invalid payload) so shared matches are not re-fetched per player; a `patch` reject keeps the match's actual patch so it is re-evaluated once a run's `--since-patch` window includes it (D-017). `reason` is `queue|short|patch|invalid` today, `pruned` planned (`pnpm etl prune`, T-019.c, D-044): `pruned` is written by `pnpm etl prune` (reason for deletion = retention, actual `patch`, `checked_at`) and is permanent: `findRejection` never deletes or re-evaluates it, whatever `--since-patch` says (D-044).
+Notes: match ingestion persists the match row and its 10 participant rows in one transaction. A match is accepted only when each of two teams has exactly one participant in each role; invalid layouts are rejected and have no stored participants. `rank_score` = coarse tier/division score at collection time (approximation, documented in RIOT_API.md). Exact rank ordering uses the stored `tier`, `division`, and `lp` fields separately. The score uses the D-016 tier base and division bonus formula; it excludes LP and is distinct from the SPECS §3 weighting buckets. Store only needed fields. `match_rejects` records match ids already evaluated and rejected (wrong queue, too short, off-patch window, invalid payload, unknown patch label) so shared matches are not re-fetched per player; a `patch` reject keeps the match's actual patch label and is deleted and re-evaluated once a run's `--since-patch` window (compared on `patch_index`, D-043) includes it (D-017). An `invalid` reject caused by a patch label absent from `patches` also stores that label in `patch` for diagnosis. `reason` is `queue|short|patch|invalid|pruned` (D-044): `pruned` is written by `pnpm etl prune` (reason for deletion = retention, actual `patch`, `checked_at`) and is permanent: `findRejection` never deletes or re-evaluates it, whatever `--since-patch` says. `--reset` clears every reason except `pruned`; only `--reset-tombstones` clears `pruned`, after which pruned matches become fetchable again.
+
+Patch catalog rules (D-055): `patch_index` is gap-free from 1, ordered NUMERICALLY by (major, minor) — never string order — and append-only; `refreshPatches` refuses to insert a label that does not sort after the newest stored one or to touch a non gap-free/misordered table. Read commands (`aggregate`, `derive-roles`) fetch `versions.json` at most once per run and only when the explicit snapshot or a stored label is missing from `patches`; stored labels still unresolved afterwards are orphans — excluded from aggregates and reported by count and label, never silently. `pnpm etl aggregate` also records `{ patch, patchIndex, currentPatchIndex, patchesMaxIndex, aggregatedAt }` in `ingest_state` under key `aggregate:snapshot` (only when at least one aggregate table was rewritten); `export` publishes it verbatim as `patch-meta.json`.
 
 `champions.json.roles` is kept (D-034). `pnpm etl derive-roles` rewrites it with the roles observed for that patch's participants (probability >= `roleProbThreshold` (default 0.05), canonical order). Champions with no observations keep the Data Dragon tag roles, read from an untouched `champions.bootstrap.json` snapshot. Re-run `derive-roles` after `static`, because `static` restores the tag roles.
 
@@ -120,6 +125,7 @@ roles/<ROLE>/lane-vs.json     // [championId, opp1Id, opp2Id, bucket, wins_w, ga
 roles/<ROLE>/lane-full.json   // [championId, partnerId, opp1Id, opp2Id, bucket, wins_w, games_w, games_w2]
 roles/<ROLE>/runes/<championId>.json  // contexts (rankBucket, contextKey, contextLevel) -> top pages
 roles/<ROLE>/builds/<championId>.json // item build stats
+patch-meta.json          // patch-catalog state of the last aggregate run (D-055): { patch, patchIndex, currentPatchIndex, patchesMaxIndex, aggregatedAt }; absent until `aggregate` records it
 ```
 
 Every exported row carries `games_w2` so the engine can compute `n_eff` (SPECS §3). Rows, including rune global-context rows, are exported only when `n_eff >= exportMinGames` (default 10), and `exportMinGames <= minGames`. Rune and build `pickShare` values use each context's raw `games_w` total before this gate and are rounded once. Size budget: `lane-*` and `*-pairs` files are the largest; size is `zlib.gzipSync(content).length` vs `MAX_FILE_BYTES` (5 MB gzip); oversize files are returned in `ExportResult.warnings`.

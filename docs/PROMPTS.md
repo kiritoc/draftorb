@@ -163,3 +163,81 @@ What you could not see or verify (truncation, code not executed, missing data fi
 # FINAL REMINDER
 Read-only audit. Output ONLY the report above (sections 0–11), in English, grounded exclusively in cited files, with every claim tagged [FACT] / [HYPOTHESIS] / [UNKNOWN]. Do not modify or propose to modify files.
 ```
+
+## I. Implement Ticket (Autonomous, with Review)
+
+Implements a ticket following AGENTS.md, runs two review passes with test-first bug fixes, and ends with clean commit(s). Only asks questions when truly blocked.
+
+```
+Implement ticket <T-xxx>.
+
+## 1. Gather context first
+- Read AGENTS.md (and any CLAUDE.md, CONTRIBUTING.md, README, docs/ or
+  nested AGENTS.md files relevant to the areas you'll touch). Follow their
+  conventions for code style, architecture, tests, commit messages, and
+  tooling. If they conflict with this prompt, they win on project
+  conventions; this prompt wins on workflow.
+- Read the ticket in full, including comments, linked tickets, and
+  acceptance criteria.
+- Explore the relevant code, existing patterns, and similar past
+  implementations before writing anything.
+- Run the existing test suite, linter, and type checker to get a baseline,
+  so you can distinguish pre-existing failures from ones you introduce.
+
+## 2. Plan and implement
+- Write a brief plan (files to touch, approach, risks) and then implement it
+  without waiting for my approval.
+- Follow existing patterns. Keep the change minimal and focused on the
+  ticket; no unrelated refactors.
+- Add tests for the new behavior as you go, following the project's testing
+  conventions.
+
+## 3. First review pass
+Once the implementation is done, review your own diff as a skeptical
+reviewer would:
+- Correctness against every acceptance criterion in the ticket
+- Edge cases, error handling, null/empty inputs, concurrency, security
+- Consistency with AGENTS.md conventions and surrounding code
+- Missing or weak tests, leftover debug code, dead code, naming
+
+For every real bug you find:
+1. Write a failing test that reproduces it first.
+2. Fix the bug.
+3. Confirm the test now passes.
+
+Fix issues in place. Do NOT create new tickets, TODOs, or follow-up entries
+for them; just fix them.
+
+## 4. Second review pass
+Do a fresh review of the full diff, including the fixes from pass 1, since
+fixes can introduce new problems. Apply the same process (failing test, fix,
+verify). Also run the full test suite, linter, and type checker, and make
+sure nothing regressed compared to the baseline.
+
+## 5. Commit
+- Create clean, logical commit(s) following the commit conventions in
+  AGENTS.md (or the repo's git history if none are documented).
+- Use one commit if the change is cohesive. Use several if it splits
+  naturally (e.g. refactor / feature / tests / docs), with each commit
+  building and passing tests on its own.
+- Don't leave review-fix noise in history: fold the fixes into the relevant
+  commits rather than adding "fix review comments" commits.
+- Do not push, and do not open a PR unless AGENTS.md says to.
+
+## Autonomy rules
+- Do as much as you can on your own. Make reasonable assumptions, note them,
+  and keep going rather than asking me.
+- Only stop if you are truly blocked: ambiguous requirements that change the
+  outcome, missing access or credentials, conflicting instructions, or a
+  decision that is costly to reverse.
+- If you get stuck, ask me all your questions at once in a single message,
+  with your recommended answer for each so I can just reply "go with your
+  suggestions".
+
+## Final report
+When finished, give me a short summary:
+- What you implemented and the commit(s) created
+- Bugs found during review and how they were fixed
+- Assumptions you made
+- Anything you couldn't verify (e.g. tests you couldn't run)
+```

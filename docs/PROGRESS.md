@@ -3,42 +3,192 @@
 ## Current status
 
 - Phase: 1 (Support / Diamond)
-- Current milestone: M3 Web MVP implementation complete (T-030..T-035 DONE); the backtest harness (T-027.a) remains under review because D-023 paired-bootstrap validation is not implemented. M1 ETL tickets T-019.b..f remain TODO.
-- Last updated: 2026-11-05 by Devin (PR #47 review fixes B-057..B-059 + export JSDoc)
+- Current milestone: M3 Web MVP implementation complete (T-030..T-035 DONE); the backtest harness (T-027.a) remains under review because D-023 paired-bootstrap validation is not implemented. T-019.b (patch index, now incl. D-055), T-019.c (retention prune) and T-026 (golden suite, 23 scenarios) are in REVIEW; T-019.d..f and T-027.b remain TODO.
+- Last updated: 2026-11-06 by Devin (PR #49 review fixes: tombstone/reset ordering, retriable unknown-label invalid rejects, full relist on --reset-tombstones; D-058 PROPOSED)
 
 ## Epic status
 
-| Epic           | Status      | Notes                                                                                                                                       |
-| -------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b DONE                                                                                                             |
-| E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e, T-014, T-015, T-015.b, T-016, T-017, T-018, T-019 DONE; T-019.b..f TODO |
-| E2 Engine      | IN PROGRESS | T-020..T-025 DONE; T-026, T-027.b TODO; T-027.a REVIEW                                                                                      |
-| E3 Web MVP     | DONE        | T-030..T-035 complete; recommendation flow, Support pool, regression coverage, deploy assets and visible unvalidated-model state            |
-| E4 Runes       | NOT STARTED |                                                                                                                                             |
-| E5 Items       | NOT STARTED |                                                                                                                                             |
-| E6 Live        | NOT STARTED |                                                                                                                                             |
-| E7 Vision      | NOT STARTED |                                                                                                                                             |
+| Epic           | Status      | Notes                                                                                                                                                                |
+| -------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b DONE                                                                                                                                      |
+| E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e, T-014, T-015, T-015.b, T-016, T-017, T-018, T-019 DONE; T-019.b, T-019.c REVIEW; T-019.d..f TODO |
+| E2 Engine      | IN PROGRESS | T-020..T-025 DONE; T-026 REVIEW; T-027.b TODO; T-027.a REVIEW                                                                                                        |
+| E3 Web MVP     | DONE        | T-030..T-035 complete; recommendation flow, Support pool, regression coverage, deploy assets and visible unvalidated-model state                                     |
+| E4 Runes       | NOT STARTED |                                                                                                                                                                      |
+| E5 Items       | NOT STARTED |                                                                                                                                                                      |
+| E6 Live        | NOT STARTED |                                                                                                                                                                      |
+| E7 Vision      | NOT STARTED |                                                                                                                                                                      |
 
 ## Data collection status
 
-- Riot key: present in `.env` (development keys expire every 24 h).
-- Games collected: 883 matches, 8830 participants (euw1, patches 16.19–16.22; ingestion may still be running — counts grew during the B-052 session). Patch catalogs imported for 16.21 and 16.22. `data/public/latest.json` (D-051, T-029) points at patch 16.22, written by `pnpm etl export` after a successful publish.
-- Last aggregation: 2026-11-05 — role_prob (430 rows/173 champions), baseline (3440 rows), pair tables, rune_ctx (42816 rows) aggregated from the real database; `pnpm etl export` published patch 16.22 and re-exported 16.21 (B-052). Both dirs now include `pick-rate.json` and rune files.
+- Riot key: personal key obtained 2026-11-06 (no expiry; limits verified: 20 req/s, 100 req/2 min — same envelope as dev). Stored locally in `.env` and as GitHub Actions secret `RIOT_API_KEY` for the scheduled ETL workflow (D-057 PROPOSED).
+- Scheduled refresh: `.github/workflows/etl.yml` runs every 12h — restores the DB from orphan branch `etl-db` (`DraftOrb.sqlite.gz`, ~58 MB, seeded 2026-11-06 from the local DB), runs check-key → static → `matches --refresh` → `matches --limit 100` → prune → aggregate → derive-roles → export → status, then pushes the amended state branch and commits changed `data/public/**` to main (triggers Deploy).
+- Games collected: 3,597 matches, ~36k participants (euw1, patches 16.19–16.22; top-250 players by rank_score — Challenger/Grandmaster/Master — ingested via `matches --limit=250`, refreshed 2026-11-06 via the new `matches --refresh` flag: +286 matches, all in patch 16.22). 2,994 players discovered (2,648 still pending ingestion). Patch catalogs imported for 16.21 and 16.22. `data/public/latest.json` (D-051, T-029) points at patch 16.22, written by `pnpm etl export` after a successful publish.
+- Match rank distribution: all stored matches sit in the top buckets — MASTER_PLUS plus a few DIAMOND (rank_score >= 7 dominates; lower buckets receive only kernel-decayed weight). Participant `rank_score`: 7/8/9 dominate; ~7k NULL (rank unknown).
+- Last aggregation: 2026-11-06 — role_prob (553 rows/173 champions), baseline (4,464 rows), pair tables (pair_ally 357,184; pair_enemy 449,408; lane_vs 146,648; lane_full 109,152 rows), rune_ctx (175,006 rows/114 champions) aggregated from the full 3,597-match database; `derive-roles` re-run and `pnpm etl export` re-published patch 16.22 (37 files). Data sufficiency per rank bucket is near-identical across buckets (kernel weights are per-game scalars). Below `minGames` (n_eff 25) per bucket: ~99.4% of pair rows, ALL lane_full rows (n_eff < 10 -> `lane-full.json` exports empty), 324/558 baseline rows, ~99.8% rune_ctx rows. Rows passing n_eff >= 25 per bucket: pair_ally ~284, pair_enemy ~372, lane_vs ~21, lane_full 0.
+- Refresh estimate: ~1.5–3 h incremental for the same 250 players (cursors fetch only new matches); first run on a fresh DB ~4–6 h. Scheduled GitHub Action now live (D-057): every 12h, bounded to `matches --refresh` + `matches --limit 100` per run so it stays well under the 6 h job limit at the personal key's 100 req/2 min.
 
 ## Next recommended ticket
 
 T-023 is **DONE** (Role-generic recommendation engine with explanations, layered shrinkage scoring, pool contract D-024, composition needs, golden test runner and golden fixtures including non-support TOP 1v1 lane group). The Web MVP implementation is complete; its model remains visibly unvalidated until D-023's paired-bootstrap gate is implemented and passed.
-Next ETL ticket: **T-019.b** (Patches table, label mapping, patch_index switch, --since-patch). Next validation work: complete D-023 and revisit T-027.a before claiming model validation.
+Next ETL ticket: **T-019.d** (CommunityDragon change scores + real-JSON fixtures — SPECS §15/D-046) once T-019.b and T-019.c are accepted. Next validation work: complete D-023 and revisit T-027.a before claiming model validation.
 
 Session entries before 2026-10-29 live in [PROGRESS_ARCHIVE.md](./PROGRESS_ARCHIVE.md).
 
 ## Open questions for the owner
 
-Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-050 and D-051 ACCEPTED; D-044 ACCEPTED with 20 patches; D-046 ACCEPTED with CommunityDragon as the source. PROPOSED and awaiting owner review: D-052 (pick-rate export semantics for `blindSafety`, added with the B-026 fix).
+Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-050 and D-051 ACCEPTED; D-044 ACCEPTED with 20 patches; D-046 ACCEPTED with CommunityDragon as the source. Owner decisions 2026-11-05: D-053 and D-054 ACCEPTED. PROPOSED and awaiting owner review: D-052 (pick-rate export semantics for `blindSafety`, added with the B-026 fix).
 
 - T-019.d verification: please compare the champion and item lists in the 2026-11-04 "T-019.d verification step" entry below with the official 16.21 and 16.22 patch notes (misses and false positives).
 
 ## Session log (newest first)
+
+### 2026-11-06 — Devin — PR #49 review fixes (matches ingestion, D-058 PROPOSED)
+
+- Done: addressed the Devin Review comments on PR #49 (`improvements-bugs`), two rounds:
+  - Round 1 (`matches.ts`, `matches-store.ts`, `matches-process.ts`): `--reset`/`--reset-tombstones` state clears moved AFTER `--since-patch` validation; done cursors relist in full on `--reset-tombstones`; `findRejection` (now async, takes the run's patch resolver) drops `invalid` rejects whose patch label has since resolved so lag-rejected matches self-heal.
+  - Round 2 (`matches.ts`, `commands/matches.ts`, `.github/workflows/etl.yml`): `--reset-tombstones` relists are now UNCAPPED (`relistLimit = MAX_SAFE_INTEGER` on the widened/done branches; new players keep `perPlayer`) so pruned matches beyond the newest-N ids are reachable; `MatchIngestionResult.stoppedEarly` flags the 3-consecutive-failure breaker and `etl matches` exits non-zero on it (CliError) so etl.yml never publishes a partial refresh — the `always()` state-upload steps still save cursors; etl.yml gained a guard step refusing non-`main` refs (a manual dispatch on a branch would publish exports there while deploy.yml builds main).
+  - Tests: 4 new/extended cases in `matches.test.ts` (tombstones/cursors survive failed `--since-patch` validation; invalid reject recovered after catalog refresh; done cursor full relist; uncapped relist beyond `perPlayer` via a paginated mock; `stoppedEarly` assertions).
+- Files touched: `packages/etl/src/{matches,matches-store,matches-process,matches.test}.ts`, `packages/etl/src/commands/matches.ts`, `.github/workflows/etl.yml`, `docs/{DECISIONS,PROGRESS}.md`
+- Tests: `pnpm check` — green.
+- State left: DONE pending owner review; fixes are on `improvements-bugs` (PR #49 branch).
+- Next step: owner reviews PR #49; D-058 awaits owner accept/reject.
+- Pitfalls / notes for next AI: `findRejection` is internal (not exported via `index.ts`); its resolver param triggers the shared one-per-run `versions.json` fetch on a miss, and a failed refresh surfaces as a transient player failure (same as `evaluateMatch`). Partial (non-done) cursors do NOT rewind `processed` on `--reset-tombstones`: snapshot ids already processed stay skipped — use `--reset` for a full re-evaluation. `etl matches` now exits 1 when ingestion stops early; isolated transient player failures still exit 0.
+
+### 2026-11-06 — Devin — Scheduled ETL refresh in CI + `etl-db` state branch (ops, D-057 PROPOSED)
+
+- Done:
+  - Owner obtained a Riot **personal key** (validated by Riot; no expiry). Rate limits verified by owner in the dev portal: 20 req/s, 100 req/2 min — same envelope as the dev key (recorded in RIOT_API.md).
+  - DB persistence design (owner chose 12h cadence, refresh + bounded pending ingest + prune, auto-commit exports): orphan branch `etl-db` holds `DraftOrb.sqlite.gz` (~58 MB gzipped / ~248 MB after VACUUM). Seeded from the local DB and pushed. Alternatives rejected in D-057: actions/cache and artifacts (cannot be seeded outside a workflow + quota/eviction risk), R2/B2 (external account, deferred), committing to main (>100 MB/file limit).
+  - New `.github/workflows/etl.yml`: every 12h (`37 */12 * * *`) + `workflow_dispatch`; restores DB from `etl-db` (refuses to run if the branch is missing), then migrate → check-key → static → `matches euw1 --refresh` → `matches euw1 --limit 100` → prune → aggregate → derive-roles → export → status; WAL checkpoint + VACUUM + gzip; force-pushes the amended single-commit state branch; commits changed `data/public/**` to main and dispatches `deploy.yml` explicitly (GITHUB_TOKEN pushes don't trigger push-event workflows). Compact/upload steps use `if: always()` so partial progress survives step failures. Review fixes: added the missing `migrate` step, `actions: write` permission, non-fatal publish step, `gzip -n`.
+  - Docs: SETUP.md (CI section + reseed procedure + tuning), RIOT_API.md (personal key + verified limits), DECISIONS.md D-057 PROPOSED, .env.example.
+- Files touched: `.github/workflows/etl.yml` (new), `docs/{SETUP,RIOT_API,DECISIONS,PROGRESS}.md`, `.env.example`; orphan branch `etl-db` created on origin (not part of main).
+- Tests: none (CI YAML + docs; the compact script was exercised on a scratch DB copy — checkpoint + VACUUM verified).
+- State left: DONE pending owner review (D-057 PROPOSED). Owner must add the `RIOT_API_KEY` secret in repo Settings → Secrets and variables → Actions before the first scheduled run; can also trigger manually via _Actions → ETL refresh → Run workflow_.
+- Next step: owner adds the secret and runs the workflow once manually to validate end-to-end; review D-057.
+- Pitfalls / notes for next AI: the state branch is force-pushed (amended single commit) — never merge or build on it; `git clone --depth 1` of it yields only the .gz. If `DraftOrb.sqlite.gz` approaches 100 MB, reduce `--per-player`/retention or move state to R2/B2 (D-057). Pending ingest advances ~100 players/run (~26 days to cover the ~2,648 pending at 12h cadence).
+
+### 2026-11-06 — Devin — T-026 golden test suite completed (REVIEW)
+
+- Done:
+  - Golden runner (`packages/engine/test/golden.test.ts`) extended: expected reasons accept `with` (exact champion-id list, distinguishes pair slots and `lane_vs` vs `lane_full`) and `deltaPp`; new `allReasons: true` pins the complete reason list index-by-index; `poolRecommendations`/`poolUnavailable: null` asserts the fields are absent (empty pool); a new per-fixture invariant asserts canonical layer order (pairs -> lane -> comp -> blind) on every recommendation of every fixture.
+  - 5 new fixtures (23 total, was 18): `pool_empty` (explicit empty pool emits no pool fields), `pool_three_mixed` (pool of 3: one scored, one low-data -> `poolUnavailable`/`insufficientData`, one off-role -> `offRole` warning), `pool_contains_top_pick` (pool holds the overall #1: `poolRank` 1 / `rank` 1), `full_draft_support` (all 10 slots known; pins the full reason order — pairs by descending influence/ties by championId, then `lane_vs` `with` [200,201], `lane_full` `with` [10,200,201], comp — plus three `counteredBy` warnings), `lane_reason_correction` (lane `deltaPp` pinned as corrections to the pair estimate: a +35.95pp synergy is corrected by -35.89pp `lane_vs` and -49.98pp `lane_full`).
+  - Fixed pre-existing `pnpm format:check` failure: `docs/PROMPTS.md` (committed unformatted in 7c592c9 on this branch) reformatted with prettier, separate `style` commit.
+- Files touched: `packages/engine/test/golden.test.ts`, `packages/engine/test/golden/{pool_empty,pool_three_mixed,pool_contains_top_pick,full_draft_support,lane_reason_correction}.json` (new), `docs/{TICKETS,PROGRESS,BUGS}.md`, `docs/PROMPTS.md` (format only).
+- Tests: `pnpm check` green (81 files, 973 tests; golden suite now 139 tests across 23 fixtures).
+- State left: REVIEW. Interpretation note: the acceptance's "lane reason phrasing" was pinned engine-side as the correction semantics (lane `deltaPp` measured against the pair-running prediction, SPECS §5); the web card has no lane-specific UI string — the literal "in this exact lane..." phrasing would be a web ticket if the owner wants it.
+- Next step: owner review; then T-027.b or the D-023 paired-bootstrap gate work for T-027.a.
+- Pitfalls / notes for next AI: expected `reasons` remain an ordered subsequence unless `allReasons: true`; `with` is matched exactly when specified. `poolRecommendations: null`/`poolUnavailable: null` assert field absence — an empty array asserts a defined-but-empty list. `deltaPp` pins the rounded (2-decimal) reported value.
+
+### 2026-11-06 — Devin — `matches --refresh` flag (D-056 PROPOSED) + existing-set refresh run (ops)
+
+- Done:
+  - New `--refresh` flag on `pnpm etl matches` (owner request: refresh only the already-ingested players instead of walking all 2,994 discovered ones): player selection is restricted to puuids with an existing ingest cursor (partial or done); `--limit`/ordering apply within that subset; done cursors keep the D-018 incremental `startTime` listing. `--refresh --reset` is a usage error. D-056 logged PROPOSED.
+  - `pnpm check` green (81 files, 925 tests); new regression test: refresh skips cursor-less players entirely (no list call) and incrementally refreshes the done player.
+  - Ran `pnpm etl matches euw1 --refresh` on the real DB: 250/250 cursor players processed in ~15 min, 286 new matches stored (all patch 16.22), 877 duplicates, 20 filtered, 0 invalid/failed. Matches total 3,311 -> 3,597; players table grew 2,898 -> 2,994 (enrichment upserts discovered participants).
+  - Re-ran `aggregate` (pair tables now 357k/449k/147k/109k rows; rune_ctx 175,006 rows/114 champs), `derive-roles 16.22`, `export` (37 files, `latest.json` still 16.22).
+- Files touched: `packages/etl/src/{matches.ts,matches.test.ts,commands/matches.ts}`, `docs/{SETUP,DECISIONS,PROGRESS}.md`, `data/public/16.22/*`, `data/DraftOrb.sqlite` (gitignored).
+- Tests: `pnpm check` green (925 tests).
+- State left: DONE pending owner review (D-056 PROPOSED). lane_full still exports empty (no row reaches exportMinGames). 2,648 discovered players remain pending — ingest them with plain `pnpm etl matches euw1` (many hours on a dev key; key expires every 24 h).
+- Next step: owner review of D-056; decide whether to ingest the pending players; T-019.d once T-019.b/T-019.c are accepted.
+- Pitfalls / notes for next AI: `--refresh` selects on cursor presence, not stored matches; a `--reset` run must not be combined with it (usage error). Refresh cost is ~1 match-list call per done player plus new games — orders of magnitude cheaper than a full walk.
+
+### 2026-11-06 — Devin — ETL refresh attempt (ops, no ticket); `matches` blocked on expired key
+
+- Done:
+  - `pnpm etl migrate` (applied pending `014_patches_drop_released_at`; 14/14 now).
+  - `pnpm etl check-key euw1` -> 401 "Unknown apikey": the dev key in `.env` is expired (dev keys last 24 h). `matches` could not run; owner must paste a fresh key.
+  - `pnpm etl static` -> re-imported patch 16.22 (Data Dragon 16.22.1 still latest): 173 champions, 859 items, 5 rune trees.
+  - `pnpm etl aggregate` -> role_prob 553 rows/173 champs, baseline 4,424 rows, pair tables 342,992 ally / 430,560 enemy / 138,440 lane_vs / 100,864 lane_full, rune_ctx 159,790 rows (one expected warning: 98 unparseable `versions.json` entries skipped, D-055).
+  - `pnpm etl derive-roles 16.22` + `pnpm etl export` -> patch 16.22 re-published (36 files, `patch-meta.json` included), `latest.json` still points at 16.22.
+  - Data sufficiency audit (n_eff = games_w^2/games_w2 vs `minGames` 25 / `exportMinGames` 10): counts per rank bucket are near-identical across all 8 buckets because the rank kernel weights every game into every bucket; stored games themselves are 3,308 MASTER_PLUS + 3 DIAMOND. Below minGames: ~99.5% of pair rows, 100% of lane_full rows (all n_eff < 10, so `lane-full.json` exports as an empty array — pre-existing, see 2026-11-05 B-053 note), 325/553 baseline rows per bucket, ~99.9% rune_ctx rows.
+- Files touched: `docs/PROGRESS.md`, `data/public/16.22/*` (re-export), `data/DraftOrb.sqlite` (gitignored; migration 014 only).
+- Tests: none (ops run; all touched paths already covered).
+- State left: DONE except `matches` resume — BLOCKED on a fresh Riot dev key in `.env`. After the key is refreshed: `pnpm etl matches euw1` (resumes via cursors, ~45 s/player), then re-run `aggregate` + `derive-roles` + `export`.
+- Next step: owner pastes a new dev key; then resume ingestion. T-019.d still next ticket once T-019.b/T-019.c are accepted.
+- Pitfalls / notes for next AI: pair/lane/rune tables have no raw `games` column — only `wins_w`/`games_w`/`games_w2`; compute n_eff in SQL as `games_w*games_w/games_w2`. `baseline` is the only aggregate table with a raw `games` column.
+
+### 2026-11-06 — Devin — D-055 patch-index implementation details (T-019.b stays REVIEW)
+
+- Done:
+  - `patches.ts` reworked per D-055: `parsePatchLabels` now sorts NUMERICALLY by (major, minor) (never string/source order), dedupes hotfixes, and skips unparseable `versions.json` entries with a single warning; `comparePatchLabels` is the shared numeric comparator (`matches-store.comparePatches` re-exports it). `refreshPatches` is append-only AND verified: it refuses to run on a non gap-free/misordered table or when a missing label does not sort after the newest stored one.
+  - `ensurePatchesFresh` renamed to `ensurePatchCoverage` and now reports `unresolvedLabels`, `orphanLabels`, `orphanMatches` (stored `matches.patch` labels absent from `patches`). Read commands fetch `versions.json` only on a miss, at most once per run; graceful degradation per D-055 (warning when only stored labels are missing, error naming the label when the explicit snapshot cannot be resolved).
+  - `loadPatchWindow` returns `orphanLabels`/`orphanMatches`; `aggregate`/`derive-roles` log the excluded count and labels. `matches` routes its empty-table refresh through `patchResolver.refresh()` so a run still fetches at most once.
+  - Migration `014_patches_drop_released_at.sql`: `released_at` removed (nothing populated it; column was permanently NULL).
+  - Snapshot metadata: `aggregate` records `{ patch, patchIndex, currentPatchIndex, patchesMaxIndex, aggregatedAt }` in `ingest_state` key `aggregate:snapshot` (only when a table was rewritten); `export` publishes it as `patch-meta.json` (hashed in `manifest.files`; manifest schema unchanged, existing snapshots stay valid).
+  - `backtest` copies `patches` without `released_at`, so it also works against pre-014 source databases.
+  - Docs: D-055 marked ACCEPTED with the reviewed decisions, DATA_MODEL (DDL, orphan rules, `aggregate:snapshot`, `patch-meta.json`), SPECS §12.
+- Files touched: `packages/etl/src/{patches.ts,aggregate-meta.ts(new),aggregate-shared.ts,matches-store.ts,matches.ts,commands/{aggregate,derive-roles,backtest}.ts,export/index.ts,index.ts}`, `packages/etl/migrations/014_patches_drop_released_at.sql` (new), tests (`patches.test.ts`, `aggregate-shared.test.ts`, `commands/{aggregate,derive-roles,backtest}.test.ts`, `matches.test.ts`, `db/migrate.test.ts`), `docs/{DECISIONS,DATA_MODEL,SPECS,PROGRESS}.md`.
+- Tests: `pnpm check` green (typecheck + lint + format + 924 tests). New coverage: numeric ordering (14.9 < 14.10, season change, unsorted input), hotfix dedupe, malformed-entry warning, stable indices after append, consistency refusals (gap, misorder, non-newer missing label), refresh-on-miss (no fetch when covered, one fetch on miss) for `aggregate`/`derive-roles`, all three degradation scenarios, orphan count/label reporting, `gameVersion`->label equivalence, no-orphan-after-ingestion, backtest `patches` isolation, migration 014.
+- State left: REVIEW (T-019.b). Behavioral notes: `aggregate`/`derive-roles` now warn-and-proceed when stored labels are orphaned instead of only excluding them silently; `patch-meta.json` appears in exports after the next `aggregate`+`export`; `pnpm etl aggregate` on the real DB will fetch `versions.json` once if any stored label is missing from `patches`.
+- Next step: owner review of D-055 implementation; then T-019.d once T-019.b/T-019.c are accepted.
+- Pitfalls / notes for next AI: `seedPatches` renumbers contiguously via `comparePatchLabels` — it cannot create gap/misorder fixtures; insert `patches` rows manually for those (and `refreshPatches` will refuse them). `ensurePatchCoverage`/`createPatchResolver`/`refreshPatches` accept `fetchFn`; commands use the global `fetch` (tests `vi.stubGlobal('fetch', ...)`). `patches` must still be populated before aggregates produce rows. BUGS.md: no new bugs found.
+
+### 2026-11-06 — Devin — T-019.c retention prune + `pruned` tombstones + default ingestion window (REVIEW)
+
+- Done:
+  - Migration `013_match_rejects_pruned.sql`: rebuilt `match_rejects` so its CHECK accepts `reason='pruned'` (the CHECK from 002 cannot be altered); existing reject rows preserved.
+  - New `pnpm etl prune [--keep-patches N] [--dry-run]` (`commands/prune.ts` + `prune.ts`): N defaults to `ETL_CONFIG.retentionPatches` = 20 (new `config/etl-config.ts`, the ETL config home for D-044/D-045/D-047 camelCase names). One transaction upserts a `pruned` tombstone (actual `patch` label, `checked_at`) and deletes each match with `patch_index <= latest - N` (cascade removes `participants`/`item_events`). Idempotent; `--dry-run` counts only; matches whose patch label is absent from `patches` are kept and reported as skipped.
+  - `matches-store.ts`: `RejectReason` gains `'pruned'`; `findRejection` returns `pruned` rows unconditionally (never deleted/re-evaluated, whatever `--since-patch`); `clearIngestState` (`--reset`) now keeps `pruned`; new `clearPrunedTombstones` (`--reset-tombstones`).
+  - `matches` command: new `--reset-tombstones` flag (help warns pruned matches become fetchable again). Default ingestion window `patch_index >= latest - retentionPatches + 1` applied when `--since-patch` is absent; the `patches` table is refreshed once when still empty so the bound is real (failure -> warn + unbounded, same as before). Explicit `--since-patch` below the bound is a `UsageError` unless `--reset-tombstones`.
+  - Docs: SPECS §13 marked live, SETUP command list, DATA_MODEL `match_rejects` reason list/DDL.
+- Files touched: `packages/etl/migrations/013_match_rejects_pruned.sql` (new), `packages/etl/src/config/etl-config.ts` (new), `packages/etl/src/{prune.ts,prune.test.ts}` (new), `packages/etl/src/commands/{prune.ts,matches.ts}`, `packages/etl/src/{matches.ts,matches.test.ts,matches-store.ts,patches.ts,cli.ts,index.ts,db/migrate.test.ts}`, `docs/{SETUP,DATA_MODEL,SPECS,TICKETS,PROGRESS,BUGS}.md`.
+- Tests: `pnpm check` green (81 files, 904 tests). New coverage: prune cutoff/cascade/tombstone, idempotence, dry-run, manual smaller `--keep-patches`, empty `patches` table, `--reset` keeps `pruned`, `--reset-tombstones` resurrects, widened `--since-patch` does not resurrect, below-bound `--since-patch` usage error, migration 013 preserves rejects and accepts `pruned`.
+- State left: REVIEW. Behavioral changes to verify: (1) `matches` without `--since-patch` now applies the retention bound (with the current ~4-patch test fixtures the bound clamps to 1 = no-op; on the real DB it binds once `patches` is populated); (2) `--reset` no longer clears `pruned` tombstones; (3) `pnpm etl prune` deletes data — run `--dry-run` first. The real `data/DraftOrb.sqlite` has an empty `patches` table until the next `matches`/`aggregate` run refreshes it, so `prune` currently reports "nothing to prune".
+- Next step: owner review; then T-019.d (blocked on T-019.b + T-019.c acceptance per ticket deps).
+- Pitfalls / notes for next AI: `seedPatches` renumbers contiguously from 1, so retention tests need >`retentionPatches` labels to get a real bound (25 labels -> bound `patch_index >= 6`). `pruneMatches` resolves `matches.patch` through `patches`; unresolvable labels are kept, never guessed. `ingestMatches` refreshes `patches` eagerly only when the table is completely empty. BUGS.md: no new bugs found.
+
+### 2026-11-05 — Devin — T-019.b patch index table + `patch_index` switch (REVIEW)
+
+- Done:
+  - Migration `012_patches.sql`: `patches(patch_index INTEGER PK, version_label TEXT UNIQUE, released_at INTEGER)` per D-043/SPECS §12. `matches.patch` stays a TEXT label resolved through the table (no new columns).
+  - New `packages/etl/src/patches.ts`: `parsePatchLabel`/`parsePatchLabels` (versions.json newest-first -> oldest-first, hotfix collapse, `lolpatch_*` ignored), `refreshPatches` (append-only, existing indices never renumbered), `createPatchIndexLookup`/`lookupPatchIndex`, `ensurePatchesFresh`, `createPatchResolver` (lazy one-fetch-per-run refresh; failed refresh = transient, not `invalid`).
+  - Ingestion: `--since-patch` label resolves to `patch_index` (unknown after refresh -> `UsageError`); match labels resolve per match — unknown after refresh -> `invalid` reject (stores the label in `match_rejects.patch`); `patch`-reject re-evaluation and cursor `windowWidened` compare indices (cursor gains `sincePatchIndex`, legacy cursors resolve their label once).
+  - Aggregation: `loadPatchWindow` reads `patches` instead of building a dense stored-patch index — recency now follows real patch distance (gaps count); snapshot resolves via the table (unknown -> error); `latestPatch` prefers `patch_index` ordering with numeric fallback; rune `futureGames` compares indices. `aggregate`/`derive-roles` refresh the catalog once when a stored label is missing; `backtest` copies `patches` into its in-memory DB.
+  - Docs: D-033 SUPERSEDED by D-043, numeric-compare part of D-017 noted superseded, D-055 PROPOSED (implementation details: label resolution, `currentPatchIndex` = snapshot index else max stored index, lazy refresh, `released_at` NULL), SPECS §3/§12 banner, DATA_MODEL.
+- Files touched: `packages/etl/migrations/012_patches.sql` (new), `packages/etl/src/{patches.ts,patches.test.ts,patches.test-helpers.ts}` (new), `aggregate-shared.ts(.test)`, `aggregate.ts`, `aggregate-runes.ts`, `aggregate-baseline-patch.test.ts`, `aggregate-baseline(-helpers).ts(.test)`, `aggregate-pairs-helpers.ts`, `aggregate.test.ts`, `aggregate-runes.test.ts`, `matches-store.ts`, `matches-process.ts`, `matches.ts`, `matches.test.ts`, `matches.test-helpers.ts`, `participants-ingestion.test.ts`, `commands/{aggregate,derive-roles,backtest}.ts`, `commands/{aggregate,derive-roles,backtest}.test.ts`, `db/migrate.test.ts`, `index.ts`, `docs/{DATA_MODEL,DECISIONS,SPECS,TICKETS,PROGRESS}.md`.
+- Tests: `pnpm check` green (80 files, 894 tests). New coverage: season-change ordering, hotfix collapse, legacy ignore, append-only refresh, unknown match label -> refresh -> stored / still-unknown -> `invalid`, failed refresh -> transient, unknown `--since-patch` -> usage error, real-distance recency across a collection gap, snapshot filtering by index.
+- State left: REVIEW. Recency weights change for the existing 3,311-match DB (patches 16.19-16.22 are contiguous in `versions.json`, so distances are unchanged there; gaps only appear for never-collected patches). `pnpm etl aggregate`/`derive-roles`/`matches` will fetch `versions.json` once on first run to populate `patches`.
+- Next step: owner review (D-055 + behavioral change); then T-019.c.
+- Pitfalls / notes for next AI: `patches` must be populated before aggregates produce rows — tests seed it via `seedPatches(db, labels)` (contiguous indices; insert rows manually for gap fixtures). `ensurePatchesFresh`/`createPatchResolver` accept `fetchFn` for tests; commands use real `fetch`. `latestPatch` falls back to numeric compare only when NO stored label resolves. BUGS.md: no new bugs found.
+
+### 2026-11-05 — Devin — D-054 accepted + B-060 champion tags fix
+
+- Done:
+  - Marked D-054 ACCEPTED in `docs/DECISIONS.md` (insufficient-data pool champions render as list cards with baseline win rate).
+  - Fixed B-060: added manual tag entries for Ekko (245) and Sylas (517) in `data/manual/champion-tags.json` so every champion with SUPPORT in `champions.json.roles` is tagged.
+  - Updated `packages/etl/src/tags.test.ts` to assert full SUPPORT coverage dynamically (`taggedSupportCount === totalSupportCount`, 100%) instead of hard-coded counts that went stale as `derive-roles` expanded SUPPORT membership.
+- Files touched: `docs/DECISIONS.md`, `data/manual/champion-tags.json`, `packages/etl/src/tags.test.ts`, `docs/{BUGS,PROGRESS}.md`.
+- Tests: `pnpm validate:tags` PASSED (72 tagged champions, 52/52 SUPPORT coverage, 100%); `pnpm vitest run packages/etl/src/tags.test.ts` green (6 tests); `pnpm check` green (79 files, 873 tests).
+- State left: DONE. No open bugs in `docs/BUGS.md`; T-027.a remains REVIEW and D-052 remains PROPOSED.
+- Next step: owner review; then T-019.b or D-023 paired-bootstrap validation work.
+- Pitfalls / notes for next AI: `validateChampionTagsFile` treats every champion whose `roles` include SUPPORT as required; Ekko/Sylas are SUPPORT-capable flex picks, so they need tag entries even though they are not dedicated supports.
+
+### 2026-11-05 — Devin — Pool unavailable champions as list cards with win rate (owner request, D-054 PROPOSED)
+
+- Done:
+  - Replaced the amber "Pool champions not recommended" warning line with in-list cards: `poolUnavailable` entries are joined to `insufficientData` samples and rendered after the ranked "From your pool" recommendations by `RecommendationsList` (pagination counts recommendations + unavailable entries).
+  - New `UnavailableChampionCard` shows a "Not recommended" badge plus the reason: insufficient data with formatted `n_eff`/raw games, already picked, or not in the champion catalogue. For insufficient data it also shows the baseline win rate when available (`Win rate —` when the baseline has no weighted evidence).
+  - Engine/shared: `InsufficientDataEntry` gains optional `winRate` = baseline `p0` fraction for the user's rank bucket, emitted only when `games_e > 0` (no prior-only 50%). `DRAFT_RESULT_SCHEMA_VERSION` stays 1 (additive optional field; D-054 PROPOSED).
+  - Docs: SPECS §7/§7.1, DECISIONS D-054, BUGS B-060 (pre-existing tags validation failure).
+- Files touched: `packages/shared/src/schemas/draft.ts`, `packages/shared/test/index.test.ts`, `packages/engine/src/recommend.ts`, `packages/engine/test/recommend-ranking.test.ts`, `apps/web/src/{strings.ts,pool/unavailable.ts,pool/unavailable.test.ts,components/{DraftScreen,RecommendationsList,UnavailableChampionCard}.tsx,components/{unavailable-champion-card.test.ts,recommendations-list.test.ts}}`, `docs/{SPECS,DECISIONS,BUGS,PROGRESS}.md`.
+- Tests: `pnpm check` typecheck/lint/format green; targeted vitest green (49 tests); `pnpm test` still has the pre-existing B-060 failure (`champion-tags.json` missing Ekko/Sylas SUPPORT), unrelated to this change.
+- State left: DONE pending owner review. D-054 is PROPOSED (winRate = shrunk baseline `p0`, schemaVersion unchanged).
+- Next step: owner review; decide D-054 and fix B-060 (tag Ekko/Sylas or adjust role derivation) before the next `pnpm check` can be green. Then T-019.b.
+- Pitfalls / notes for next AI: unavailable pool cards are filtered out when the champion is the user's own pick (`user.championId`), matching `excludePick`; `winRate` is omitted for missing/empty baseline rows so a 50% prior is never shown as data.
+
+### 2026-11-05 — Devin — First real match-data collection (ops, no ticket)
+
+- Done:
+  - Verified the refreshed Riot dev key (`check-key euw1`), ran `migrate` (11 migrations), `players euw1` (850 players: 250 Emerald / 250 Diamond / 150 Master / 100 Grandmaster / 100 Challenger).
+  - `matches euw1 --limit=250` (top rank_score first: Challenger + Grandmaster + top Master), ~3 h: 250/250 players, 3,311 matches stored, 1,597 duplicates, 91 filtered, 1 invalid, 0 failures.
+  - `aggregate` + `derive-roles` + `export` (16.22 published, `latest.json` moved forward; 16.21 re-exported). Exports now carry real aggregates, `pick-rate.json` and SUPPORT rune files.
+  - OTP prototype (owner idea, not ticketed): champion+role concentration query over `participants` confirmed many true one-tricks (e.g. Senna/Sona SUPPORT at 100%, Thresh 97%, Bard 91%); all are Master+ rank, so an OTP weighting feature would need an ADR against the rank kernel. Possible follow-up: `pnpm etl otp` report, then optional aggregation weight.
+- Files touched: `data/DraftOrb.sqlite` (gitignored), `data/public/{latest.json,16.21/*,16.22/*}`, `docs/PROGRESS.md`.
+- Tests: none (ops run; export/aggregate paths already covered).
+- State left: DONE. `data/public` exports reflect the full match set; remaining 600 discovered players not yet ingested.
+- Next step: owner review; then T-019.b. Re-run `matches` (no `--limit`) later to ingest Emerald/Diamond players if wanted.
+- Pitfalls / notes for next AI: `matches` has no tier filter — `--limit` slices by `rank_score` DESC after done-cursor sorting, so it picks the highest ranks, not a chosen tier. Dev-key pace ≈ 45 s/player for 20 matches + enrichment.
 
 ### 2026-11-05 — Devin — Pool editor champion browser with avatars (owner request, D-053)
 

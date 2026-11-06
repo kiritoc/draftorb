@@ -1,0 +1,226 @@
+{
+  "name": "full_draft_support",
+  "input": {
+    "userRank": "DIAMOND",
+    "userRole": "SUPPORT",
+    "allies": [
+      { "championId": 10, "role": "ADC" },
+      { "championId": 11, "role": "TOP" },
+      { "championId": 12, "role": "JUNGLE" },
+      { "championId": 13, "role": "MID" }
+    ],
+    "enemies": [
+      { "championId": 200, "role": "SUPPORT" },
+      { "championId": 201, "role": "ADC" },
+      { "championId": 202, "role": "TOP" },
+      { "championId": 203, "role": "JUNGLE" },
+      { "championId": 204, "role": "MID" }
+    ],
+    "blindPick": false
+  },
+  "data": {
+    "championIds": [1, 2, 3, 10, 11, 12, 13, 200, 201, 202, 203, 204],
+    "roleProb": {
+      "1": { "SUPPORT": 1.0 },
+      "2": { "SUPPORT": 1.0 },
+      "3": { "SUPPORT": 1.0 },
+      "10": { "ADC": 1.0 },
+      "11": { "TOP": 1.0 },
+      "12": { "JUNGLE": 1.0 },
+      "13": { "MID": 1.0 },
+      "200": { "SUPPORT": 1.0 },
+      "201": { "ADC": 1.0 },
+      "202": { "TOP": 1.0 },
+      "203": { "JUNGLE": 1.0 },
+      "204": { "MID": 1.0 }
+    },
+    "baselines": [
+      [1, "DIAMOND", 35, 50, 0.1, 50],
+      [2, "DIAMOND", 30, 50, 0.1, 50],
+      [3, "DIAMOND", 25, 50, 0.1, 50]
+    ],
+    "allyPairs": [
+      [1, 10, "ADC", "DIAMOND", 45, 50, 0.1],
+      [1, 11, "TOP", "DIAMOND", 30, 50, 0.1],
+      [1, 12, "JUNGLE", "DIAMOND", 40, 50, 0.1],
+      [1, 13, "MID", "DIAMOND", 38, 50, 0.1],
+      [2, 10, "ADC", "DIAMOND", 30, 50, 0.1],
+      [2, 12, "JUNGLE", "DIAMOND", 28, 50, 0.1],
+      [3, 10, "ADC", "DIAMOND", 25, 50, 0.1]
+    ],
+    "enemyPairs": [
+      [1, 200, "SUPPORT", "DIAMOND", 15, 50, 0.1],
+      [1, 201, "ADC", "DIAMOND", 20, 50, 0.1],
+      [1, 202, "TOP", "DIAMOND", 40, 50, 0.1],
+      [1, 203, "JUNGLE", "DIAMOND", 25, 50, 0.1],
+      [1, 204, "MID", "DIAMOND", 35, 50, 0.1],
+      [2, 200, "SUPPORT", "DIAMOND", 45, 50, 0.1],
+      [2, 201, "ADC", "DIAMOND", 30, 50, 0.1],
+      [3, 200, "SUPPORT", "DIAMOND", 30, 50, 0.1]
+    ],
+    "laneVs": [
+      [1, 200, 201, "DIAMOND", 20, 50, 0.1],
+      [2, 200, 201, "DIAMOND", 45, 50, 0.1],
+      [3, 200, 201, "DIAMOND", 30, 50, 0.1]
+    ],
+    "laneFull": [
+      [1, 10, 200, 201, "DIAMOND", 10, 50, 0.1],
+      [2, 10, 200, 201, "DIAMOND", 45, 50, 0.1],
+      [3, 10, 200, 201, "DIAMOND", 30, 50, 0.1]
+    ],
+    "tags": {
+      "1": {
+        "championId": 1,
+        "damageType": "AP",
+        "archetype": "enchanter",
+        "hardEngage": false,
+        "peel": true,
+        "poke": true,
+        "waveclear": true,
+        "scaling": { "early": false, "mid": true, "late": true },
+        "range": "RANGED",
+        "ccCount": 1
+      },
+      "2": {
+        "championId": 2,
+        "damageType": "AD",
+        "archetype": "fighter",
+        "hardEngage": true,
+        "peel": false,
+        "poke": false,
+        "waveclear": true,
+        "scaling": { "early": false, "mid": true, "late": true },
+        "range": "MELEE",
+        "ccCount": 2
+      },
+      "3": {
+        "championId": 3,
+        "damageType": "AP",
+        "archetype": "tank",
+        "hardEngage": false,
+        "peel": true,
+        "poke": false,
+        "waveclear": false,
+        "scaling": { "early": false, "mid": true, "late": true },
+        "range": "MELEE",
+        "ccCount": 2
+      },
+      "10": {
+        "championId": 10,
+        "damageType": "AD",
+        "archetype": "marksman",
+        "hardEngage": false,
+        "peel": false,
+        "poke": false,
+        "waveclear": true,
+        "scaling": { "early": false, "mid": true, "late": true },
+        "range": "RANGED",
+        "ccCount": 0
+      },
+      "11": {
+        "championId": 11,
+        "damageType": "AD",
+        "archetype": "fighter",
+        "hardEngage": true,
+        "peel": false,
+        "poke": false,
+        "waveclear": true,
+        "scaling": { "early": false, "mid": true, "late": true },
+        "range": "MELEE",
+        "ccCount": 2
+      },
+      "12": {
+        "championId": 12,
+        "damageType": "AD",
+        "archetype": "tank",
+        "hardEngage": true,
+        "peel": false,
+        "poke": false,
+        "waveclear": false,
+        "scaling": { "early": false, "mid": true, "late": true },
+        "range": "MELEE",
+        "ccCount": 2
+      },
+      "13": {
+        "championId": 13,
+        "damageType": "AP",
+        "archetype": "mage",
+        "hardEngage": false,
+        "peel": false,
+        "poke": true,
+        "waveclear": true,
+        "scaling": { "early": false, "mid": true, "late": true },
+        "range": "RANGED",
+        "ccCount": 1
+      }
+    }
+  },
+  "expected": {
+    "recommendations": [
+      {
+        "championId": 2,
+        "rank": 1,
+        "allReasons": true,
+        "reasons": [
+          { "type": "synergy", "with": [10], "level": 0, "deltaPp": 0.01, "lowData": false },
+          { "type": "counter", "with": [200], "level": 3, "deltaPp": 29.96, "lowData": false },
+          { "type": "counter", "with": [201], "level": 0, "deltaPp": 0, "lowData": false },
+          { "type": "synergy", "with": [12], "level": 0, "deltaPp": -0.92, "lowData": false },
+          { "type": "lane", "with": [200, 201], "level": 0, "deltaPp": 0.96, "lowData": false },
+          {
+            "type": "lane",
+            "with": [10, 200, 201],
+            "level": 0,
+            "deltaPp": 0,
+            "lowData": false
+          }
+        ]
+      },
+      {
+        "championId": 3,
+        "rank": 2,
+        "allReasons": true,
+        "reasons": [
+          { "type": "synergy", "with": [10], "level": 0, "deltaPp": 0, "lowData": false },
+          { "type": "counter", "with": [200], "level": 3, "deltaPp": 9.98, "lowData": false },
+          { "type": "lane", "with": [200, 201], "level": 0, "deltaPp": 0.02, "lowData": false },
+          {
+            "type": "lane",
+            "with": [10, 200, 201],
+            "level": 0,
+            "deltaPp": 0,
+            "lowData": false
+          },
+          { "type": "comp", "level": 1, "deltaPp": 4.69, "lowData": false }
+        ]
+      },
+      {
+        "championId": 1,
+        "rank": 3,
+        "allReasons": true,
+        "reasons": [
+          { "type": "synergy", "with": [10], "level": 3, "deltaPp": 19.98, "lowData": false },
+          { "type": "counter", "with": [200], "level": -3, "deltaPp": -27.65, "lowData": false },
+          { "type": "counter", "with": [201], "level": -3, "deltaPp": -27.38, "lowData": false },
+          { "type": "synergy", "with": [12], "level": 3, "deltaPp": 7.65, "lowData": false },
+          { "type": "counter", "with": [203], "level": -3, "deltaPp": -7.99, "lowData": false },
+          { "type": "synergy", "with": [13], "level": 1, "deltaPp": 2.1, "lowData": false },
+          { "type": "synergy", "with": [11], "level": -1, "deltaPp": -2.02, "lowData": false },
+          { "type": "counter", "with": [204], "level": 0, "deltaPp": 0, "lowData": false },
+          { "type": "counter", "with": [202], "level": 1, "deltaPp": 1.23, "lowData": false },
+          { "type": "lane", "with": [200, 201], "level": 2, "deltaPp": 4.09, "lowData": false },
+          {
+            "type": "lane",
+            "with": [10, 200, 201],
+            "level": -3,
+            "deltaPp": -19.96,
+            "lowData": false
+          },
+          { "type": "comp", "level": 1, "deltaPp": 3.4, "lowData": false }
+        ],
+        "warnings": ["counteredBy:SUPPORT:200", "counteredBy:ADC:201", "counteredBy:JUNGLE:203"]
+      }
+    ],
+    "insufficientData": []
+  }
+}

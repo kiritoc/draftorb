@@ -1,5 +1,6 @@
 /**
- * Golden test runner for the recommendation engine (T-023, TESTING.md §2).
+ * Golden test runner for the recommendation engine (T-023, extended by T-026;
+ * TESTING.md §2).
  *
  * Loads fixture JSON files from `packages/engine/test/golden/*.json`, each
  * containing a `DraftInput`-style input, pre-loaded data tables, and the
@@ -27,20 +28,27 @@ interface GoldenFixture {
       rank: number;
       reasons?: Array<{
         type: string;
+        with?: number[];
         lowData?: boolean;
         level?: number;
+        deltaPp?: number;
       }>;
+      /** When true with `reasons`, the reason list must match exactly:
+       *  same length and each expected entry matches the actual reason at the
+       *  same index on every specified field (pins the full reason order). */
+      allReasons?: boolean;
       warnings?: string[];
     }>;
+    /** `null` asserts the field is absent from the result (e.g. empty pool). */
     poolRecommendations?: Array<{
       championId: number;
       rank: number;
       poolRank?: number;
-    }>;
+    }> | null;
     poolUnavailable?: Array<{
       championId: number;
       reason: string;
-    }>;
+    }> | null;
     insufficientData?: Array<{
       championId: number;
     }>;
@@ -59,6 +67,9 @@ const posInt: Check = (v, p) => {
 };
 const int: Check = (v, p) => {
   if (!Number.isInteger(v)) fail(p, 'expected an integer');
+};
+const num: Check = (v, p) => {
+  if (typeof v !== 'number' || !Number.isFinite(v)) fail(p, 'expected a finite number');
 };
 const str: Check = (v, p) => {
   if (typeof v !== 'string') fail(p, 'expected a string');
@@ -86,19 +97,32 @@ const strictObject =
     for (const [k, c] of Object.entries(optional)) if (o[k] !== undefined) c(o[k], `${p}.${k}`);
   };
 
+const nullableArrayOf =
+  (item: Check): Check =>
+  (v, p) => {
+    if (v === null) return;
+    arrayOf(item)(v, p);
+  };
+
 const idRank = { championId: posInt, rank: posInt };
 const checkExpected = strictObject(
   {
     recommendations: arrayOf(
       strictObject(idRank, {
-        reasons: arrayOf(strictObject({ type: str }, { lowData: bool, level: int })),
+        reasons: arrayOf(
+          strictObject(
+            { type: str },
+            { with: arrayOf(posInt), lowData: bool, level: int, deltaPp: num },
+          ),
+        ),
+        allReasons: bool,
         warnings: arrayOf(str),
       }),
     ),
   },
   {
-    poolRecommendations: arrayOf(strictObject(idRank, { poolRank: posInt })),
-    poolUnavailable: arrayOf(strictObject({ championId: posInt, reason: str })),
+    poolRecommendations: nullableArrayOf(strictObject(idRank, { poolRank: posInt })),
+    poolUnavailable: nullableArrayOf(strictObject({ championId: posInt, reason: str })),
     insufficientData: arrayOf(strictObject({ championId: posInt })),
   },
 );
@@ -161,21 +185,54 @@ for (const file of fixtureFiles) {
         if (expected.reasons) {
           // Expected reasons must appear in canonical order (an ordered
           // subsequence): each one matches the next actual reason of its type
-          // after the previous match, so repeated types and order are checked.
-          let cursor = 0;
-          for (const expReason of expected.reasons) {
-            const offset = rec.reasons.slice(cursor).findIndex((r) => r.type === expReason.type);
-            expect(offset).toBeGreaterThanOrEqual(0);
-            const idx = cursor + offset;
-            cursor = idx + 1;
-            const matchingReason = rec.reasons[idx];
-            expect(matchingReason).toBeDefined();
-
-            if (matchingReason && expReason.lowData !== undefined) {
-              expect(matchingReason.lowData).toBe(expReason.lowData);
+          // — and of its `with` list when the fixture pins one — after the
+          // previous match, so repeated types, lane contexts and order are
+          // checked. With `allReasons` the lists must match index by index.
+          const sameWith = (actual: number[] | undefined, expectedWith: number[]): boolean =>
+            actual !== undefined &&
+            actual.length === expectedWith.length &&
+            actual.every((id, i) => id === expectedWith[i]);
+          const matchesExpected = (
+            actual: (typeof rec.reasons)[number],
+            expReason: (typeof expected.reasons)[number],
+          ): boolean =>
+            actual.type === expReason.type &&
+            (expReason.with === undefined || sameWith(actual.with, expReason.with));
+          const assertFields = (
+            actual: (typeof rec.reasons)[number],
+            expReason: (typeof expected.reasons)[number],
+          ): void => {
+            if (expReason.lowData !== undefined) {
+              expect(actual.lowData).toBe(expReason.lowData);
             }
-            if (matchingReason && expReason.level !== undefined) {
-              expect(matchingReason.level).toBe(expReason.level);
+            if (expReason.level !== undefined) {
+              expect(actual.level).toBe(expReason.level);
+            }
+            if (expReason.deltaPp !== undefined) {
+              expect(actual.deltaPp).toBe(expReason.deltaPp);
+            }
+          };
+          if (expected.allReasons) {
+            expect(rec.reasons).toHaveLength(expected.reasons.length);
+            expected.reasons.forEach((expReason, i) => {
+              const actual = rec.reasons[i];
+              expect(actual).toBeDefined();
+              if (!actual) return;
+              expect(matchesExpected(actual, expReason)).toBe(true);
+              assertFields(actual, expReason);
+            });
+          } else {
+            let cursor = 0;
+            for (const expReason of expected.reasons) {
+              const offset = rec.reasons
+                .slice(cursor)
+                .findIndex((r) => matchesExpected(r, expReason));
+              expect(offset).toBeGreaterThanOrEqual(0);
+              const idx = cursor + offset;
+              cursor = idx + 1;
+              const matchingReason = rec.reasons[idx];
+              expect(matchingReason).toBeDefined();
+              if (matchingReason) assertFields(matchingReason, expReason);
             }
           }
         }
@@ -189,7 +246,10 @@ for (const file of fixtureFiles) {
     it('matches pool expectations when specified', () => {
       const result = recommend(fixture.input, fixture.data);
 
-      if (fixture.expected.poolRecommendations) {
+      // `null` asserts the field is absent (e.g. an empty pool emits no pool lists).
+      if (fixture.expected.poolRecommendations === null) {
+        expect(result.poolRecommendations).toBeUndefined();
+      } else if (fixture.expected.poolRecommendations) {
         expect(result.poolRecommendations).toBeDefined();
         const expectedPoolIds = fixture.expected.poolRecommendations.map((r) => r.championId);
         const actualPoolIds = result.poolRecommendations?.map((r) => r.championId) ?? [];
@@ -207,7 +267,9 @@ for (const file of fixtureFiles) {
         }
       }
 
-      if (fixture.expected.poolUnavailable) {
+      if (fixture.expected.poolUnavailable === null) {
+        expect(result.poolUnavailable).toBeUndefined();
+      } else if (fixture.expected.poolUnavailable) {
         expect(result.poolUnavailable).toBeDefined();
         // Exact set: an extra or duplicated entry must fail the fixture.
         const key = (u: { championId: number; reason: string }): string =>
@@ -238,6 +300,30 @@ for (const file of fixtureFiles) {
       const result1 = recommend(fixture.input, fixture.data);
       const result2 = recommend(fixture.input, fixture.data);
       expect(result1).toEqual(result2);
+    });
+
+    it('emits reasons in canonical layer order (pairs, lane, comp, blind)', () => {
+      // SPECS §5/T-026: pair reasons first (synergy/counter interleaved by
+      // influence), then lane reasons, then comp, then blind. Pair order within
+      // the first group and lane_vs vs lane_full order are pinned per-fixture
+      // via the `with` lists.
+      const layerOrder: Record<string, number> = {
+        synergy: 0,
+        counter: 0,
+        lane: 1,
+        comp: 2,
+        blind: 3,
+      };
+      const result = recommend(fixture.input, fixture.data);
+      for (const rec of result.recommendations) {
+        let previous = -1;
+        for (const reason of rec.reasons) {
+          const order = layerOrder[reason.type];
+          if (order === undefined) throw new Error(`unknown reason type ${reason.type}`);
+          expect(order).toBeGreaterThanOrEqual(previous);
+          previous = order;
+        }
+      }
     });
   });
 }

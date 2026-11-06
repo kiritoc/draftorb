@@ -32,6 +32,24 @@ Review notes that predate the bug log live in [Review history](#review-history) 
 
 ## Fixed
 
+### B-061 — `docs/PROMPTS.md` fails `pnpm format:check` on a clean checkout — FIXED
+
+- Severity / Area: S4 / docs
+- Steps to reproduce: run `pnpm check` on `improvements-bugs` after commit 7c592c9.
+- Expected / Actual: expected the format check to pass; actual `prettier --check` flagged `docs/PROMPTS.md`, failing `pnpm check` before tests ran.
+- Environment (OS, Node version, patch): macOS, Node >=22, branch `improvements-bugs`.
+- Fix: `prettier --write docs/PROMPTS.md` (formatting only, no content change).
+
+### B-060 — `champion-tags.json` missing Ekko/Sylas SUPPORT after role re-derivation — FIXED
+
+- Severity / Area: S2 / etl (data)
+- Steps to reproduce: run `pnpm test` (or `validateChampionTagsFile`) against the committed `data/manual/champion-tags.json` and the latest `data/public/*/champions.json`.
+- Expected / Actual: every champion whose `champions.json.roles` includes SUPPORT has a tag entry; actual validation reported missing tags for Ekko (245) and Sylas (517), so `packages/etl/src/tags.test.ts` failed and `pnpm check` could not go green.
+- Environment (OS, Node version, patch): macOS, Node v26.12.1 (repo requires >=22), patch 16.22 export.
+- Suspected cause: `derive-roles` marked Ekko/Sylas as SUPPORT in `champions.json`, but `data/manual/champion-tags.json` was not updated with tag entries for them.
+- Fix (commit/ticket): added manual tag entries for Ekko (245: AP assassin, MELEE, waveclear, early/mid scaling) and Sylas (517: AP diver, MELEE, poke, mid/late scaling) in `data/manual/champion-tags.json`; updated `packages/etl/src/tags.test.ts` to assert full support coverage dynamically instead of hard-coded counts that went stale as `derive-roles` expanded SUPPORT membership.
+- Verification: `pnpm validate:tags` reports 72 tagged champions and 52/52 SUPPORT coverage (100%) and PASSED; `pnpm vitest run packages/etl/src/tags.test.ts` green (6 tests); `pnpm check` green (79 files, 873 tests).
+
 ### B-059 — All-unscored backtest report dropped evaluated fallback counts — FIXED
 
 - Severity / Area: S3 / etl
@@ -706,3 +724,5 @@ No new bugs were identified during T-013 (match ingestion); rejected match ids a
 No new bugs were identified while revising T-013 patch-window and rank-known-count behavior.
 
 T-019 review follow-up found export regressions in paired-role serialization, rank-specific rune grouping, probability rounding, warnings, and post-publish backup cleanup; these are recorded as B-037 through B-042 below and fixed in this pass.
+
+No new bugs were identified during T-019.c (retention prune, `pruned` tombstones, default ingestion window).

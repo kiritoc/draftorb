@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { migrate, openDb } from './db';
+import { seedPatches } from './patches.test-helpers';
 import { aggregateRoleProb, latestPatch, type RoleProbRow } from './aggregate';
 
 function requireRow(rows: RoleProbRow[], championId: number, role: string): RoleProbRow {
@@ -31,6 +32,7 @@ async function withSeededDb(run: (dbPath: string) => Promise<void>, seed = true)
   try {
     const db = openDb(dbPath);
     migrate(db);
+    seedPatches(db, ['16.21']);
 
     if (!seed) {
       db.close();
@@ -168,6 +170,7 @@ describe('aggregateRoleProb', () => {
     await withSeededDb(async (dbPath) => {
       const db = openDb(dbPath);
       try {
+        seedPatches(db, ['16.20']);
         // Add an older-patch match for Aatrox mid.
         db.prepare(
           `INSERT INTO matches (
@@ -208,6 +211,7 @@ describe('aggregateRoleProb', () => {
     await withSeededDb(async (dbPath) => {
       const db = openDb(dbPath);
       try {
+        seedPatches(db, ['16.22']);
         // Aggregate first (16.21 has Soraka and Aatrox).
         const before = aggregateRoleProb(db);
         expect(before.find((r) => r.championId === 266)).toBeDefined();
@@ -244,6 +248,7 @@ describe('aggregateRoleProb', () => {
     await withSeededDb(async (dbPath) => {
       const db = openDb(dbPath);
       try {
+        seedPatches(db, ['16.22']);
         // 16.21: Soraka support games.
         const before = aggregateRoleProb(db);
         const sorakaBefore = requireRow(before, 412, 'SUPPORT');
@@ -280,6 +285,7 @@ describe('aggregateRoleProb', () => {
     await withSeededDb(async (dbPath) => {
       const db = openDb(dbPath);
       try {
+        seedPatches(db, ['16.10']);
         // Add a much older patch match for Soraka support.
         db.prepare(
           `INSERT INTO matches (
@@ -313,7 +319,8 @@ describe('aggregateRoleProb', () => {
       const db = openDb(dbPath);
       try {
         const before = aggregateRoleProb(db);
-        const future = aggregateRoleProb(db, { patch: '99.1' });
+        seedPatches(db, ['16.22']);
+        const future = aggregateRoleProb(db, { patch: '16.22' });
         // Future snapshot patch: existing evidence is decayed relative to it, not wiped.
         expect(future.length).toBeGreaterThan(0);
         for (const row of future) {
@@ -355,6 +362,7 @@ describe('aggregateRoleProb', () => {
     await withSeededDb(async (dbPath) => {
       const db = openDb(dbPath);
       try {
+        seedPatches(db, ['16.9', '16.100']);
         // 16.9 ingested later (newer created_at) must not beat 16.21 / 16.10.
         const insert = db.prepare(
           `INSERT INTO matches (
@@ -365,6 +373,44 @@ describe('aggregateRoleProb', () => {
         expect(latestPatch(db)).toBe('16.21');
         insert.run('p10', '16.100');
         expect(latestPatch(db)).toBe('16.100');
+      } finally {
+        db.close();
+      }
+    });
+  });
+
+  it('decays by real patch_index distance across a gap in collected patches', async () => {
+    await withSeededDb(async (dbPath) => {
+      const db = openDb(dbPath);
+      try {
+        // Catalog with a gap: 16.19 -> 1, 16.21 -> 4 (two releases were never
+        // collected). Recency must measure the real distance 4 - 1 = 3, not
+        // the single stored-patch step of the old dense index (D-043).
+        db.prepare('DELETE FROM patches').run();
+        db.prepare('INSERT INTO patches (patch_index, version_label) VALUES (1, ?)').run('16.19');
+        db.prepare('INSERT INTO patches (patch_index, version_label) VALUES (4, ?)').run('16.21');
+        db.prepare(
+          `INSERT INTO matches (
+            match_id, platform, patch, queue_id, duration, created_at, avg_rank_score,
+            rank_known_count
+          ) VALUES ('gapold', 'euw1', '16.19', 420, 1800, 0, 6.5, 2)`,
+        ).run();
+        db.prepare(
+          `INSERT INTO participants (
+            match_id, puuid, team_id, champion_id, role, win, rank_score,
+            champion_games, mastery_points, is_expert, keystone, primary_style,
+            sub_style, perks_json, items_json, kills, deaths, assists
+          ) VALUES (
+            'gapold', 'gap', 100, 999, 'SUPPORT', 1, null, 0, NULL, NULL, 8439, 8400, 8300, '{}', '[]', 0, 0, 0
+          )`,
+        ).run();
+
+        const rows = aggregateRoleProb(db);
+        const gap = requireRow(rows, 999, 'SUPPORT');
+        const decay = 0.85 ** 3;
+        expect(gap.games).toBe(1);
+        expect(gap.gamesW).toBeCloseTo(decay);
+        expect(gap.gamesW2).toBeCloseTo(decay * decay);
       } finally {
         db.close();
       }

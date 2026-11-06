@@ -1,0 +1,78 @@
+{
+  "name": "lane_reason_correction",
+  "input": {
+    "userRank": "DIAMOND",
+    "userRole": "SUPPORT",
+    "allies": [{ "championId": 10, "role": "ADC" }],
+    "enemies": [
+      { "championId": 200, "role": "SUPPORT" },
+      { "championId": 201, "role": "ADC" }
+    ],
+    "blindPick": false
+  },
+  "data": {
+    "championIds": [1, 2, 10, 200, 201],
+    "roleProb": {
+      "1": { "SUPPORT": 1.0 },
+      "2": { "SUPPORT": 1.0 },
+      "10": { "ADC": 1.0 },
+      "200": { "SUPPORT": 1.0 },
+      "201": { "ADC": 1.0 }
+    },
+    "baselines": [
+      [1, "DIAMOND", 30, 50, 0.1, 50],
+      [2, "DIAMOND", 30, 50, 0.1, 50]
+    ],
+    "allyPairs": [
+      [1, 10, "ADC", "DIAMOND", 48, 50, 0.1],
+      [2, 10, "ADC", "DIAMOND", 30, 50, 0.1]
+    ],
+    "enemyPairs": [],
+    "laneVs": [
+      [1, 200, 201, "DIAMOND", 30, 50, 0.1],
+      [2, 200, 201, "DIAMOND", 30, 50, 0.1]
+    ],
+    "laneFull": [
+      [1, 10, 200, 201, "DIAMOND", 5, 50, 0.1],
+      [2, 10, 200, 201, "DIAMOND", 48, 50, 0.1]
+    ],
+    "tags": {}
+  },
+  "expected": {
+    "recommendations": [
+      {
+        "championId": 2,
+        "rank": 1,
+        "allReasons": true,
+        "reasons": [
+          { "type": "synergy", "with": [10], "level": 0, "deltaPp": 0.01, "lowData": false },
+          { "type": "lane", "with": [200, 201], "level": 0, "deltaPp": 0, "lowData": false },
+          {
+            "type": "lane",
+            "with": [10, 200, 201],
+            "level": 3,
+            "deltaPp": 35.94,
+            "lowData": false
+          }
+        ]
+      },
+      {
+        "championId": 1,
+        "rank": 2,
+        "allReasons": true,
+        "reasons": [
+          { "type": "synergy", "with": [10], "level": 3, "deltaPp": 35.95, "lowData": false },
+          { "type": "lane", "with": [200, 201], "level": -3, "deltaPp": -35.89, "lowData": false },
+          {
+            "type": "lane",
+            "with": [10, 200, 201],
+            "level": -3,
+            "deltaPp": -49.98,
+            "lowData": false
+          }
+        ]
+      }
+    ],
+    "insufficientData": []
+  }
+}

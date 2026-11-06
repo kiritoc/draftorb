@@ -1,0 +1,185 @@
+name: ETL refresh
+
+# Scheduled data pipeline (D-057): restores the SQLite state from the orphan
+# branch `etl-db`, refreshes matches, re-aggregates and re-exports
+# data/public, then force-pushes the amended single-commit state branch,
+# commits the refreshed exports to main and dispatches deploy.yml
+# (GITHUB_TOKEN pushes do not trigger push-event workflows).
+#
+# Secrets: RIOT_API_KEY (personal key, repo Settings -> Secrets -> Actions).
+# The state branch is required: the job refuses to run without it so an empty
+# database can never overwrite good state.
+
+on:
+  schedule:
+    - cron: '37 */12 * * *' # every 12h, off-peak minute
+  workflow_dispatch:
+
+permissions:
+  contents: write # push exports to main + force-push the etl-db state branch
+  actions: write # gh workflow run deploy.yml: GITHUB_TOKEN pushes do not
+  # trigger push-event workflows, so Deploy must be dispatched explicitly
+
+concurrency:
+  group: etl-refresh
+  cancel-in-progress: false
+
+env:
+  DB_BRANCH: etl-db
+  DB_FILE: DraftOrb.sqlite.gz
+  DB_PATH: ${{ github.workspace }}/data/DraftOrb.sqlite
+  BOT_NAME: github-actions[bot]
+  BOT_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      # The pipeline mutates the shared etl-db state and publishes exports to
+      # the dispatched ref; deploy.yml always builds main, so a manual run on
+      # another branch would report success while the site stays stale.
+      - name: Restrict to main
+        if: github.ref_name != 'main'
+        run: |
+          echo "::error::ETL refresh only runs on the main branch (dispatched ref: ${{ github.ref_name }})"
+          exit 1
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # full history: the publish step rebases onto origin/main
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # $RUNNER_TEMP persists across steps of this job: the clone is reused by
+      # the upload step at the end.
+      - name: Fetch database state
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          STATE="$RUNNER_TEMP/dbstate"
+          REMOTE="https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          if ! git ls-remote --exit-code --heads "$REMOTE" "$DB_BRANCH" >/dev/null; then
+            echo "::error::State branch '$DB_BRANCH' not found; refusing to start from an empty database"
+            exit 1
+          fi
+          git clone --depth 1 --branch "$DB_BRANCH" "$REMOTE" "$STATE"
+          mkdir -p "$(dirname "$DB_PATH")"
+          gunzip -c "$STATE/$DB_FILE" > "$DB_PATH"
+          echo "Database restored from $DB_BRANCH"
+
+      - name: Apply pending migrations
+        run: pnpm etl migrate
+
+      - name: Check Riot API key
+        env:
+          RIOT_API_KEY: ${{ secrets.RIOT_API_KEY }}
+        run: pnpm etl check-key euw1
+
+      - name: Import latest static data
+        run: pnpm etl static
+
+      - name: Refresh already-ingested players
+        env:
+          RIOT_API_KEY: ${{ secrets.RIOT_API_KEY }}
+        run: pnpm etl matches euw1 --refresh
+
+      - name: Ingest pending players (bounded)
+        env:
+          RIOT_API_KEY: ${{ secrets.RIOT_API_KEY }}
+        run: pnpm etl matches euw1 --limit 100
+
+      - name: Prune matches beyond retention window
+        run: pnpm etl prune
+
+      - name: Rebuild aggregates and export
+        run: |
+          pnpm etl aggregate
+          pnpm etl derive-roles
+          pnpm etl export
+          pnpm etl status euw1 || echo "::warning::status command failed"
+
+      # always(): partial progress (cursors, stored matches) must be saved even
+      # when a pipeline step failed — ingestion is resumable from the cursors.
+      - name: Compact and compress database
+        if: always()
+        run: |
+          if [ ! -f "$DB_PATH" ]; then
+            echo "No database file; nothing to save"
+            exit 0
+          fi
+          cd packages/etl
+          node -e '
+            const Database = require("better-sqlite3");
+            const db = new Database(process.env.DB_PATH);
+            db.pragma("busy_timeout = 30000");
+            db.pragma("wal_checkpoint(TRUNCATE)");
+            db.exec("VACUUM");
+            db.close();
+          '
+          gzip -9 -n -c "$DB_PATH" > "$RUNNER_TEMP/$DB_FILE"
+
+      - name: Upload database state
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          if [ ! -f "$RUNNER_TEMP/$DB_FILE" ]; then
+            echo "No compressed database; skipping state upload"
+            exit 0
+          fi
+          STATE="$RUNNER_TEMP/dbstate"
+          if [ ! -d "$STATE/.git" ]; then
+            echo "::warning::State clone missing; cannot upload database state"
+            exit 0
+          fi
+          cp "$RUNNER_TEMP/$DB_FILE" "$STATE/$DB_FILE"
+          cd "$STATE"
+          git status --porcelain -- "$DB_FILE" | grep -q . || {
+            echo "Database unchanged; nothing to push"
+            exit 0
+          }
+          git config user.name "$BOT_NAME"
+          git config user.email "$BOT_EMAIL"
+          git add "$DB_FILE"
+          # Single-commit history: amend keeps the state branch at ~58 MB.
+          git commit --amend --no-edit -q
+          if git push --force-with-lease origin "HEAD:$DB_BRANCH"; then
+            echo "Database state pushed to $DB_BRANCH"
+          else
+            echo "::warning::State push rejected; the next run retries from the previous state"
+          fi
+
+      - name: Publish refreshed exports
+        id: publish
+        run: |
+          git add data/public
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No data/public changes to publish"
+            exit 0
+          fi
+          git -c user.name="$BOT_NAME" -c user.email="$BOT_EMAIL" \
+            commit -qm "data: refresh ETL export ($(date -u +%Y-%m-%dT%H:%MZ))"
+          # Publish problems must not fail the run: the DB state is already
+          # saved and the next run re-exports anyway.
+          git pull --rebase origin "${{ github.ref_name }}" || \
+            echo "::warning::Rebase failed; push may be rejected"
+          if git push origin "HEAD:${{ github.ref_name }}"; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Push rejected; exports will be retried on the next run"
+          fi
+
+      # GITHUB_TOKEN pushes do not trigger push-event workflows, so Deploy is
+      # dispatched explicitly (workflow_dispatch is the allowed exception).
+      - name: Trigger deploy
+        if: steps.publish.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run deploy.yml --repo "${{ github.repository }}" --ref main

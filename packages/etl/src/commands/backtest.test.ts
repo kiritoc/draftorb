@@ -7,6 +7,7 @@ import Database from 'better-sqlite3';
 
 import { openDb, migrate } from '../db';
 import { seedGames } from '../aggregate-baseline-helpers';
+import { seedPatches } from '../patches.test-helpers';
 import { backtestCommand } from './backtest';
 
 describe('backtestCommand', () => {
@@ -40,6 +41,7 @@ describe('backtestCommand', () => {
   });
 
   const seed = (db: Database.Database) => {
+    seedPatches(db, ['16.20', '16.21']);
     const insertMatch = db.prepare(
       `INSERT INTO matches (match_id, platform, patch, queue_id, duration, created_at, avg_rank_score, rank_known_count)
        VALUES (?, 'euw1', ?, 420, 1800, ?, 6.5, 10)`,
@@ -104,6 +106,27 @@ describe('backtestCommand', () => {
     expect(report.insufficientData).toBe(false);
     expect(report.validationStatus).toBe('unvalidated');
     expect(report.logLoss).toBeTypeOf('number');
+  });
+
+  it('copies patches into the in-memory database without touching the live table', async () => {
+    const db = openDb(dbPath);
+    migrate(db);
+    seed(db);
+    const before = db
+      .prepare('SELECT patch_index, version_label FROM patches ORDER BY patch_index')
+      .all();
+    db.close();
+
+    await backtestCommand.run(['draft']);
+
+    const after = openDb(dbPath);
+    try {
+      expect(
+        after.prepare('SELECT patch_index, version_label FROM patches ORDER BY patch_index').all(),
+      ).toEqual(before);
+    } finally {
+      after.close();
+    }
   });
 
   it('writes the report to a custom --out path', async () => {

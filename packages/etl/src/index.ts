@@ -96,6 +96,7 @@ export {
   type ParticipantRow,
 } from './participants';
 export {
+  clearPrunedTombstones,
   comparePatches,
   createRankLoader,
   evaluateMatch,
@@ -114,6 +115,29 @@ export { enrichParticipants, type EnrichmentOptions, type EnrichmentSummary } fr
 export { exportJson, type ExportResult } from './export';
 
 export { aggregateRoleProb, type RoleProbRow } from './aggregate';
+
+export {
+  AGGREGATE_SNAPSHOT_KEY,
+  comparePatchLabels,
+  createPatchIndexLookup,
+  createPatchResolver,
+  ensurePatchCoverage,
+  fetchPatchVersions,
+  latestPatchIndex,
+  lookupPatchIndex,
+  parsePatchLabel,
+  parsePatchLabels,
+  refreshPatches,
+  type EnsurePatchCoverageResult,
+  type PatchRefreshResult,
+  type PatchResolver,
+} from './patches';
+
+export {
+  readAggregateSnapshot,
+  recordAggregateSnapshot,
+  type AggregateSnapshotMeta,
+} from './aggregate-meta';
 
 export { applyDerivedRoles, deriveChampionRoles } from './derive-roles';
 
@@ -141,6 +165,10 @@ export {
 } from './players';
 
 export { getMigrationStatus, migrate, openDb } from './db';
+
+export { ETL_CONFIG } from './config/etl-config';
+
+export { pruneMatches, type PruneOptions, type PruneResult } from './prune';
 
 export {
   formatEtlStatus,

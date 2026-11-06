@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { UsageError } from '../cli-args';
 import { migrate, openDb } from '../db';
+import { seedPatches } from '../patches.test-helpers';
 import { aggregateCommand } from './aggregate';
 
 describe('aggregateCommand', () => {
@@ -51,6 +52,7 @@ describe('aggregateCommand', () => {
     process.env.DRAFTORB_DB_PATH = dbPath;
     const db = openDb(dbPath);
     migrate(db);
+    seedPatches(db, ['16.20', '16.21']);
     db.prepare(
       `INSERT INTO matches (
         match_id, platform, patch, queue_id, duration, created_at, avg_rank_score
@@ -82,6 +84,7 @@ describe('aggregateCommand', () => {
     process.env.DRAFTORB_DB_PATH = dbPath;
     const db = openDb(dbPath);
     migrate(db);
+    seedPatches(db, ['16.21']);
     db.prepare(
       `INSERT INTO matches (
         match_id, platform, patch, queue_id, duration, created_at, avg_rank_score
@@ -117,6 +120,7 @@ describe('aggregateCommand', () => {
     process.env.DRAFTORB_DB_PATH = dbPath;
     const db = openDb(dbPath);
     migrate(db);
+    seedPatches(db, ['16.20', '16.21']);
     db.prepare(
       `INSERT INTO matches (
         match_id, platform, patch, queue_id, duration, created_at, avg_rank_score, rank_known_count
@@ -152,6 +156,136 @@ describe('aggregateCommand', () => {
       expect(row.games).toBe(1);
     } finally {
       db2.close();
+    }
+  });
+
+  const seedMatch = (dbPath: string, matchId: string, patch: string): void => {
+    const db = openDb(dbPath);
+    migrate(db);
+    db.prepare(
+      `INSERT INTO matches (
+        match_id, platform, patch, queue_id, duration, created_at, avg_rank_score
+      ) VALUES (?, 'euw1', ?, 420, 1800, 1, 6.5)`,
+    ).run(matchId, patch);
+    db.close();
+  };
+
+  const versionsFetch = (versions: string[]): typeof fetch =>
+    (async () => new Response(JSON.stringify(versions), { status: 200 })) as typeof fetch;
+
+  it('does not fetch versions.json when every needed label already resolves', async () => {
+    const dbPath = join(directory, 'test.sqlite');
+    process.env.DRAFTORB_DB_PATH = dbPath;
+    const db = openDb(dbPath);
+    migrate(db);
+    seedPatches(db, ['16.20', '16.21']);
+    db.prepare(
+      `INSERT INTO matches (
+        match_id, platform, patch, queue_id, duration, created_at, avg_rank_score
+      ) VALUES ('m1', 'euw1', '16.21', 420, 1800, 1, 6.5)`,
+    ).run();
+    db.close();
+
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+    try {
+      await aggregateCommand.run(['16.21']);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('fetches versions.json once when a stored label is missing, then resolves it', async () => {
+    const dbPath = join(directory, 'test.sqlite');
+    process.env.DRAFTORB_DB_PATH = dbPath;
+    const db = openDb(dbPath);
+    migrate(db);
+    seedPatches(db, ['16.21']);
+    db.prepare(
+      `INSERT INTO matches (
+        match_id, platform, patch, queue_id, duration, created_at, avg_rank_score
+      ) VALUES ('m1', 'euw1', '16.22', 420, 1800, 1, 6.5)`,
+    ).run();
+    db.close();
+
+    const fetchSpy = vi.fn(versionsFetch(['16.22.1', '16.21.1']));
+    vi.stubGlobal('fetch', fetchSpy);
+    try {
+      await aggregateCommand.run([]);
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+
+    const db2 = openDb(dbPath);
+    try {
+      expect(
+        db2.prepare('SELECT patch_index FROM patches WHERE version_label = ?').get('16.22'),
+      ).toEqual({ patch_index: 2 });
+    } finally {
+      db2.close();
+    }
+  });
+
+  it('proceeds with a warning when the refresh fails but only stored labels are missing', async () => {
+    const dbPath = join(directory, 'test.sqlite');
+    process.env.DRAFTORB_DB_PATH = dbPath;
+    const db = openDb(dbPath);
+    migrate(db);
+    seedPatches(db, ['16.21']);
+    db.prepare(
+      `INSERT INTO matches (
+        match_id, platform, patch, queue_id, duration, created_at, avg_rank_score
+      ) VALUES ('m1', 'euw1', '16.22', 420, 1800, 1, 6.5)`,
+    ).run();
+    db.close();
+
+    vi.stubGlobal('fetch', (async () => {
+      throw new Error('socket hangup');
+    }) as typeof fetch);
+    try {
+      await aggregateCommand.run(['16.21']);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+    expect(output()).toMatch(/could not refresh patches from Data Dragon/);
+    expect(output()).toMatch(/excluded 1 match\(es\).*16\.22/);
+  });
+
+  it('fails naming the label when the refresh fails and the snapshot patch is unknown', async () => {
+    const dbPath = join(directory, 'test.sqlite');
+    process.env.DRAFTORB_DB_PATH = dbPath;
+    const db = openDb(dbPath);
+    migrate(db);
+    seedPatches(db, ['16.21']);
+    db.close();
+
+    vi.stubGlobal('fetch', (async () => {
+      throw new Error('socket hangup');
+    }) as typeof fetch);
+    try {
+      await expect(aggregateCommand.run(['16.22'])).rejects.toThrow(/unknown patch "16\.22"/i);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('fails naming the label when Data Dragon still does not know the snapshot patch', async () => {
+    const dbPath = join(directory, 'test.sqlite');
+    process.env.DRAFTORB_DB_PATH = dbPath;
+    seedMatch(dbPath, 'm1', '16.21');
+    const db = openDb(dbPath);
+    seedPatches(db, ['16.21']);
+    db.close();
+
+    vi.stubGlobal('fetch', versionsFetch(['16.21.1']));
+    try {
+      await expect(aggregateCommand.run(['16.22'])).rejects.toThrow(
+        /Unknown patch "16\.22": not present in Data Dragon versions/,
+      );
+    } finally {
+      vi.unstubAllGlobals();
     }
   });
 

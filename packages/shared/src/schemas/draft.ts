@@ -54,6 +54,10 @@ export const insufficientDataEntrySchema = z
     nEff: z.number().nonnegative(),
     // Omitted when the raw match count is unknown (golden rule 8, B-025).
     rawGames: z.number().int().nonnegative().optional(),
+    // Baseline win rate fraction (`p0`, SPECS §5) for the user's rank bucket.
+    // Present only when the baseline row has weighted evidence; omitted for
+    // missing or empty baseline rows so no prior-only 50% is invented.
+    winRate: z.number().min(0).max(1).optional(),
   })
   .strict();
 export type InsufficientDataEntry = z.infer<typeof insufficientDataEntrySchema>;

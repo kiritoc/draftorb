@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { migrate, openDb } from './db';
+import { seedPatches } from './patches.test-helpers';
 
 export interface ToyGame {
   patch: string;
@@ -29,6 +30,10 @@ export interface BaselineRow {
 let toyMatchIndex = 0;
 
 export function seedGames(db: Database.Database, games: ToyGame[]): void {
+  seedPatches(
+    db,
+    games.map((game) => game.patch),
+  );
   const insertMatch = db.prepare(
     `INSERT INTO matches (
       match_id, platform, patch, queue_id, duration, created_at, avg_rank_score, rank_known_count
@@ -106,6 +111,7 @@ export function withSeededDb(games: ToyGame[], run: (db: Database.Database) => v
 export function seedBasic(dbPath: string): void {
   const db = openDb(dbPath);
   migrate(db);
+  seedPatches(db, ['16.21']);
   const insertMatch = db.prepare(
     `INSERT INTO matches (
       match_id, platform, patch, queue_id, duration, created_at, avg_rank_score, rank_known_count

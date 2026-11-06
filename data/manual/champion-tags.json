@@ -879,6 +879,22 @@
     "range": "RANGED",
     "ccCount": 2
   },
+  "245": {
+    "championId": 245,
+    "damageType": "AP",
+    "archetype": "assassin",
+    "hardEngage": false,
+    "peel": false,
+    "poke": false,
+    "waveclear": true,
+    "scaling": {
+      "early": true,
+      "mid": true,
+      "late": false
+    },
+    "range": "MELEE",
+    "ccCount": 2
+  },
   "267": {
     "championId": 267,
     "damageType": "AP",
@@ -973,6 +989,22 @@
       "late": true
     },
     "range": "RANGED",
+    "ccCount": 2
+  },
+  "517": {
+    "championId": 517,
+    "damageType": "AP",
+    "archetype": "diver",
+    "hardEngage": true,
+    "peel": false,
+    "poke": true,
+    "waveclear": false,
+    "scaling": {
+      "early": false,
+      "mid": true,
+      "late": true
+    },
+    "range": "MELEE",
     "ccCount": 2
   },
   "518": {

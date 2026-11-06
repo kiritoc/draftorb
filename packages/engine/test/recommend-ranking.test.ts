@@ -34,6 +34,16 @@ describe('recommend: candidate set and baseline gate', () => {
     expect(result.insufficientData).toHaveLength(1);
     expect(result.insufficientData[0]?.nEff).toBeCloseTo(10, 5);
     expect(result.insufficientData[0]?.rawGames).toBe(10);
+    expect(result.insufficientData[0]?.winRate).toBeCloseTo(0.5, 5);
+  });
+
+  it('reports the shrunk baseline win rate for insufficient data', () => {
+    const baselines: BaselineTable = [
+      [1, 'DIAMOND', 8, 10, 10, 10],
+      [2, 'DIAMOND', 30, 50, 0.1, 50],
+    ];
+    const result = recommend(makeInput(), makeData({ champions: [1, 2], baselines }));
+    expect(result.insufficientData[0]?.winRate).toBeCloseTo(0.6, 5);
   });
 
   it('excludes champions missing from roleProb entirely', () => {
@@ -72,6 +82,15 @@ describe('recommend: candidate set and baseline gate', () => {
     });
     const entry = recommend(makeInput(), data).insufficientData.find((i) => i.championId === 2);
     expect(entry).toEqual({ championId: 2, nEff: 0 });
+  });
+
+  it('omits winRate when the baseline row has no weighted evidence', () => {
+    const baselines: BaselineTable = [
+      [1, 'DIAMOND', 0, 0, 0, 0],
+      [2, 'DIAMOND', 30, 50, 0.1, 50],
+    ];
+    const result = recommend(makeInput(), makeData({ champions: [1, 2], baselines }));
+    expect(result.insufficientData.find((i) => i.championId === 1)).not.toHaveProperty('winRate');
   });
 
   it('ignores rows from other rank buckets', () => {

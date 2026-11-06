@@ -1,6 +1,6 @@
 {
   "patch": "16.22",
-  "generatedAt": "2026-11-05T16:15:08.249Z",
+  "generatedAt": "2026-11-06T09:03:46.738Z",
   "region": "euw1",
   "rankBuckets": [
     "IRON",
@@ -18,31 +18,35 @@
   "files": [
     {
       "path": "champions.json",
-      "sha256": "c5714b5e62a1473523498edcf7731d4a3f18ce4f43bffdaaae408d657d99bc6d"
+      "sha256": "43443828ddbad2085673e2669d300c9c9cd68fdd482cb35191c376e3833271d9"
     },
     {
       "path": "items.json",
       "sha256": "cd7e0577034af57e03a945139dc1401cfca3d287a3cf13d902f14c666589faf3"
     },
     {
+      "path": "patch-meta.json",
+      "sha256": "7eb11cdda4c0d0b05af25d8b2029f48fc31e0f596b48e2222245229c5835839f"
+    },
+    {
       "path": "pick-rate.json",
-      "sha256": "e08a60e4ffeaeb0714068cdb7b36fba06d428558c1cbdf0aa3ee5e1b843fee2b"
+      "sha256": "9b3d873b69e3752f6c4db73f5bc216fc6ec6bd542d74b3562bfabc3aef77d684"
     },
     {
       "path": "role-prob.json",
-      "sha256": "5af9041b96c094650415f3949bc4f26a1e017aba00080de74c89083d6e6f8bcb"
+      "sha256": "b8dfaac14f280d374df7ff878de60756bd8ba74ea02666be9244595ab606d5f9"
     },
     {
       "path": "roles/SUPPORT/ally-pairs.json",
-      "sha256": "03abcbf6ce7d0294e8e04a7ef7bac000513df9e0d8ebe97c95fa7c1a8e8f8b55"
+      "sha256": "b07958ac203f7d9e09a57a24a29b2153f8cf207d9e4853c18185c1a9f8c21308"
     },
     {
       "path": "roles/SUPPORT/baseline.json",
-      "sha256": "9ca1e2b432119060dea8a294ef1e9d6434aa834e75bfbab74d142bf0ee75f655"
+      "sha256": "a25bbc55fd0c29e47f16533c54e7c2be4f51c75c0752a7a66530c024b92c9f15"
     },
     {
       "path": "roles/SUPPORT/enemy-pairs.json",
-      "sha256": "3245e8855bd5fdd2cfdaede68a803119521ca4768072b813f8956ddce5d3f1b1"
+      "sha256": "78869da807bb88fd74762a4cf56e808a0368c87bd3d7d21e20923a35dd2e235f"
     },
     {
       "path": "roles/SUPPORT/lane-full.json",
@@ -50,31 +54,31 @@
     },
     {
       "path": "roles/SUPPORT/lane-vs.json",
-      "sha256": "2199a67ebf8a364b4c5aac480b2ca1775d56a407755dad8d82ee222a6c4dea79"
+      "sha256": "bec4cc7bcff44b9f3d9f62aefc2db3cae25d8efc0b3e9496e185f39e96634536"
     },
     {
       "path": "roles/SUPPORT/runes/111.json",
-      "sha256": "988fbcc3ed2adbe6f1a6fb67e931d313b49ace980eb4b27953b4a0167744202e"
+      "sha256": "7dd1bfaaca596820b534c908cc0666ec1323bf1aea158d21fecddcdb11c9c15a"
     },
     {
       "path": "roles/SUPPORT/runes/117.json",
-      "sha256": "aa3979bad0ddd554fe7d8efa03621d4fa52b5175e9bd968d1b63e1de74e6f7c8"
+      "sha256": "b6c3e08bd8344b9b955fa2f86be383417242ecd416ba4cc5cec73358732b849b"
     },
     {
       "path": "roles/SUPPORT/runes/12.json",
-      "sha256": "7450de37dae10c90c4cd072f70c49fae30e1e84e5158162aad6b4abe6abe6a9c"
+      "sha256": "814073108416c4137fd2a286ba5112e7735cdfde62fce4f5eda6f41e71fe8f1b"
     },
     {
       "path": "roles/SUPPORT/runes/142.json",
-      "sha256": "ae5a42f2fcb5f4836a7b9ff7fed6dc948a1c3e968f67c6518a3c8d3cbf87c031"
+      "sha256": "8e1a865eca930bc343f454a2c8bb7fdda775a501e70f6258d0983ed7408ae393"
     },
     {
       "path": "roles/SUPPORT/runes/16.json",
-      "sha256": "7bc1abafc915bc4045e39f4996e6e43b8f492f537e5efe79561e9d39d799e942"
+      "sha256": "10bc267e2596be25f2fbcd3590267acbda4715656603963ac40518acdaa7e3d9"
     },
     {
       "path": "roles/SUPPORT/runes/161.json",
-      "sha256": "0cc8ec2b124333cbe993547a58d9b787f5baa50955efc628ca127c8dd823f199"
+      "sha256": "3af1ac53d2f4f20bff1c4c31595edd5c1239e9eadc1b25b50af552a9f4205115"
     },
     {
       "path": "roles/SUPPORT/runes/164.json",
@@ -82,71 +86,75 @@
     },
     {
       "path": "roles/SUPPORT/runes/201.json",
-      "sha256": "8e4877c08ed2fe6a51cdfe62ff21b310b2c5ec62fa8a30aba2ff632e0d53677a"
+      "sha256": "25bb589daf9072ea3e5bb328bcaeddb5f30d36487663c3b6ef3639b346fc1471"
     },
     {
       "path": "roles/SUPPORT/runes/235.json",
-      "sha256": "6baf4403e0db149e5849dcab3da8d54949caf676244b5861d23b72007fbd8133"
+      "sha256": "924809efa631d49d44b97d7cdffb09f859a405629b3300373a2f9215b55e0532"
     },
     {
       "path": "roles/SUPPORT/runes/26.json",
-      "sha256": "ef4a01c4c7b11c2adcc6e54b17be6acb4d0ea3107a19f07f1af3106aa6d3d51f"
+      "sha256": "591ba6244ce9f0eb83a89e3eed58d44bd11c322a343a6884ef1420c8ae111cfa"
     },
     {
       "path": "roles/SUPPORT/runes/267.json",
-      "sha256": "2b0631b938da8477084a233f992870469493adb482be8fac6961d72169bbfcfc"
+      "sha256": "e589a6836700e7c0ed573760643d2db15043aa9aa0221c9477c2bac3db0a461a"
     },
     {
       "path": "roles/SUPPORT/runes/37.json",
-      "sha256": "03ec4074c1df394773f668f867c4c2abb26a30d1f6651641ab7c316f2165259b"
+      "sha256": "2917a9e29807d192ad383a50404d6906a33a1cf920ce9d0e764171731e15faa9"
     },
     {
       "path": "roles/SUPPORT/runes/40.json",
-      "sha256": "6493b89061a877b6e934f57dae0134f6e11c7867e2fe488061de360934b8def4"
+      "sha256": "22607462c13902fa691bd1ec82d052ad58a8d4222a6de09153622deb68ef0d35"
     },
     {
       "path": "roles/SUPPORT/runes/412.json",
-      "sha256": "600d199944d7d69ca9999e7b5322ccc166703c3e49afe43e0bb86a7213606b6c"
+      "sha256": "0118ff5e1102b04d9942ebad4cb2e233461e09e08d8d2df24dcebd2e57eed36b"
     },
     {
       "path": "roles/SUPPORT/runes/43.json",
-      "sha256": "ddc553b3bd9c10cd05cdde752212da068d169ca1ec2eec31d5f827f339037110"
+      "sha256": "581072739d8f49805731a3dd3116fb4083ff8126025edc88ec179f50156e5445"
     },
     {
       "path": "roles/SUPPORT/runes/432.json",
-      "sha256": "007d22c973e428c847d289b4c7ac0ee8e49e91662aa5f43b07de2c97839f0c95"
+      "sha256": "31c7004e8a597e3ccf632c1af076d0cc5828b4e5fcf169838d7dfeea2d52a2d2"
     },
     {
       "path": "roles/SUPPORT/runes/497.json",
-      "sha256": "1df43ba6a231d18f852cc800f5e36d074838fc10b43526063fb52281a34a086b"
+      "sha256": "3d326b42e7648062d4ff85c9f483848f35bfba349981f8ce13b830f5f3879355"
     },
     {
       "path": "roles/SUPPORT/runes/526.json",
-      "sha256": "13f015972ef03ba2dd41536cdb9b3397ab6bbde4c2b0f797af9ea6e63494cf72"
+      "sha256": "203f4cf1540532e9928bd6b4c6801d2eec376afc99eec5db024730c28ba6b290"
     },
     {
       "path": "roles/SUPPORT/runes/53.json",
-      "sha256": "79590688ed6f6658232495a41ed2e3531aed34769fff078b2566e24f1853b4b7"
+      "sha256": "139f7d67146a068d5f0312325f97c0d7169e843581824532381ff6c9d5fb4798"
     },
     {
       "path": "roles/SUPPORT/runes/555.json",
-      "sha256": "61b6c66090062c304c19b58fa3b551b617e90cfe3dac5f2664e8915c54f4be40"
+      "sha256": "b8c19d6bd480bb55debe3183869d35caa09098e2b5f6a3a48339c65f250a2086"
     },
     {
       "path": "roles/SUPPORT/runes/60.json",
-      "sha256": "19399bc530858183150d6882e4b5801399896ec96d901f76f60a26aed6402b12"
+      "sha256": "519f3303eef8bb7fea71359697e1d280011e48b8e761d7dcb8af5e91518303d5"
+    },
+    {
+      "path": "roles/SUPPORT/runes/78.json",
+      "sha256": "5c4909850c027763eece0770bd9cf8a5ff95b4b7e180b6621bbab165c48a7200"
     },
     {
       "path": "roles/SUPPORT/runes/888.json",
-      "sha256": "dcabb7d55c3c3cbd424c27ab7957df4c73b52ff8aed71c9d19ab010445fa9c91"
+      "sha256": "6f56f5fe14e73a520134867dea0965486aa68fb8dd2926eaffbdc5900076ae7a"
     },
     {
       "path": "roles/SUPPORT/runes/89.json",
-      "sha256": "5ab98f2c3d54924115b0b049f41b69f0dfd764c6236048779a534efe4cd93d78"
+      "sha256": "831f502de2224a6f2cd8fa4fa758d4bfd5411979c3675d73897fab12b519463b"
     },
     {
       "path": "roles/SUPPORT/runes/99.json",
-      "sha256": "a07207ceb19071289688ffe4c1ebcb5f13bf1d0dd2a88a6148936c97017ede9c"
+      "sha256": "73c1d001717300143de27352711e3202dc882d91aa7e68dc633872865f01e2fc"
     },
     {
       "path": "runes.json",

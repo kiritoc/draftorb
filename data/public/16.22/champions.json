@@ -52,8 +52,7 @@
     "name": "Urgot",
     "icon": "Urgot.png",
     "roles": [
-      "TOP",
-      "MID"
+      "TOP"
     ]
   },
   "7": {
@@ -240,7 +239,8 @@
     "icon": "Singed.png",
     "roles": [
       "TOP",
-      "MID"
+      "MID",
+      "ADC"
     ]
   },
   "28": {
@@ -258,7 +258,8 @@
     "roles": [
       "TOP",
       "MID",
-      "ADC"
+      "ADC",
+      "SUPPORT"
     ]
   },
   "30": {
@@ -453,7 +454,8 @@
     "name": "Malphite",
     "icon": "Malphite.png",
     "roles": [
-      "TOP"
+      "TOP",
+      "MID"
     ]
   },
   "55": {
@@ -588,7 +590,8 @@
     "icon": "Heimerdinger.png",
     "roles": [
       "TOP",
-      "ADC"
+      "ADC",
+      "SUPPORT"
     ]
   },
   "75": {
@@ -663,7 +666,8 @@
     "icon": "Mordekaiser.png",
     "roles": [
       "TOP",
-      "JUNGLE"
+      "JUNGLE",
+      "MID"
     ]
   },
   "83": {
@@ -744,7 +748,6 @@
     "icon": "KogMaw.png",
     "roles": [
       "TOP",
-      "JUNGLE",
       "MID",
       "ADC"
     ]
@@ -996,7 +999,6 @@
     "roles": [
       "TOP",
       "MID",
-      "ADC",
       "SUPPORT"
     ]
   },
@@ -1209,8 +1211,7 @@
       "TOP",
       "JUNGLE",
       "MID",
-      "ADC",
-      "SUPPORT"
+      "ADC"
     ]
   },
   "246": {
@@ -1304,6 +1305,7 @@
     "name": "Ivern",
     "icon": "Ivern.png",
     "roles": [
+      "TOP",
       "JUNGLE"
     ]
   },
@@ -1425,7 +1427,8 @@
     "icon": "Mel.png",
     "roles": [
       "MID",
-      "ADC"
+      "ADC",
+      "SUPPORT"
     ]
   },
   "804": {
@@ -1539,8 +1542,7 @@
     "roles": [
       "TOP",
       "MID",
-      "ADC",
-      "SUPPORT"
+      "ADC"
     ]
   },
   "950": {

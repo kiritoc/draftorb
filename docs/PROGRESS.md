@@ -54,6 +54,18 @@ Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-0
 - Next step: none — feeds T-041 (runes UI) once T-040 is accepted.
 - Pitfalls / notes for next AI: `n_eff` is nonlinear — never sum per-row equivalent counts across a merge; accumulate raw `winsW`/`gamesW`/`gamesW2` and call `toEquivalentCounts` once.
 
+### 2026-11-06 — Devin — B-062 `400 Exception decrypting` on refresh; `etl rekey` command (FIXED pending owner run, D-060 PROPOSED)
+
+- Done:
+  - Diagnosed the failed `matches euw1 --refresh` (CI + local): not a code bug — Riot encrypts PUUIDs per API key, so every puuid stored under the previous `RIOT_API_KEY` returns `400 Exception decrypting` under the current one. Verified: league entries by rank work, fresh puuids work, all ~3k stored puuids fail; a re-fetched match returns entirely different participant puuids for the same players. Match IDs are unaffected.
+  - New `pnpm etl rekey [platform] [--dry-run] [--limit=N]` (`packages/etl/src/rekey.ts` + `commands/rekey.ts`): re-fetches every stored match by ID, pairs stored participants with fresh ones via a team/champion/KDA fingerprint, and rewrites `participants`, `item_events`, `players` and `match-ingest:` cursors in one transaction. Conflicting mappings abort; failed matches are reported and re-runnable (idempotent); stale unmapped players/cursors are dropped (`etl players` re-creates pending players). 7 tests in `rekey.test.ts`.
+  - Docs: BUGS.md B-062, DECISIONS.md D-060 PROPOSED, RIOT_API.md (per-key puuid note), SETUP.md (key-change step + command + troubleshooting).
+- Files touched: `packages/etl/src/{rekey.ts,rekey.test.ts,cli.ts,commands/rekey.ts}`, `docs/{BUGS,DECISIONS,RIOT_API,SETUP,PROGRESS}.md`.
+- Tests: `pnpm check` green (83 files, 1000 tests).
+- State left: DONE — rekey executed on the local DB 2026-11-06 (~70 min, 3,597 matches, 0 failures): 35,970 participant rows + 2,492 players + 250 cursors rewritten, 502 stale players dropped; `etl players euw1 --reset` rediscovered 850 players under the new key (3,016 players total); `etl-db` reseeded twice (rekeyed DB, then post-rediscovery DB — 42 MB gz). Verified a stored puuid resolves via league-v4. Next scheduled `etl.yml` run should pass `matches --refresh` again.
+- Next step: owner reviews D-060; optionally trigger `etl.yml` manually to confirm end-to-end.
+- Pitfalls / notes for next AI: never assume stored puuids survive an API key change — `400 Exception decrypting` always means key/puuid mismatch, not a malformed URL. `etl rekey` costs ~1 match-detail call per stored match (~3.6k calls).
+
 ### 2026-11-06 — Devin — T-040 rune recommender in engine (REVIEW, D-059 PROPOSED)
 
 - Done:

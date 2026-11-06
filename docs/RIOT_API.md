@@ -7,6 +7,7 @@ Always verify details at https://developer.riotgames.com (limits and endpoints m
 - Dev key: free, expires every 24h, low limits (commonly 20 req/s and 100 req/2 min — VERIFY). Stored in `.env` (`RIOT_API_KEY`) for local runs.
 - Personal key: free, no expiry, higher limits; requires a project description on the dev portal (no website/verification). Obtained 2026-11-06 for DraftOrb; stored as the GitHub Actions secret `RIOT_API_KEY` used by `.github/workflows/etl.yml` (D-057). If the public site launches, apply for a production key.
 - Verified 2026-11-06 (owner, dev portal): the personal key's rate limits are **20 req/s and 100 req/2 min** — the same envelope as the dev key. Budget CI runs accordingly: `matches --refresh` (~250 players) ≈ 15–25 min; `matches --limit 100` on pending players ≈ 40–70 min (up to ~20 match-detail calls per player plus enrichment).
+- **PUUIDs are encrypted per API key** (verified 2026-11-06, B-062/D-060): a puuid fetched with one key returns `400 Exception decrypting` under another, on every by-puuid endpoint (league-v4, summoner-v4, champion-mastery-v4, match-v5). Match IDs are NOT affected. After changing `RIOT_API_KEY`, run `pnpm etl rekey` before any ingestion or every stored puuid is unusable.
 
 ## Routing
 

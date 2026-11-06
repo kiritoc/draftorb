@@ -22,6 +22,7 @@ pnpm dev
 
 1. Sign in at https://developer.riotgames.com, copy the Development API Key (expires every 24h) or your Personal key (no expiry — recommended).
 2. Paste into `.env`. With a dev key, re-paste daily.
+3. **Changing keys?** PUUIDs are encrypted per API key — run `pnpm etl rekey` (try `--dry-run` first) before the next `matches` run, then re-run `pnpm etl players` to repopulate pending players (B-062/D-060).
 
 ## Scheduled CI refresh (D-057)
 
@@ -61,6 +62,7 @@ pnpm etl status [platform]     # counts and progress
 pnpm etl aggregate [patch]     # compute every aggregated table (role probabilities, baselines, pair and lane tables, rune contexts; T-015..T-018)
 pnpm etl export [patch] [--region=<platform>]  # write versioned JSON and manifest for a patch (T-019)
 pnpm etl derive-roles [patch]  # rewrite champions.json.roles from observed roles (T-015.b); run after `matches`, and re-run after every `static`
+pnpm etl rekey [platform]      # rewrite stored PUUIDs to the current API key (after an RIOT_API_KEY change; --dry-run, --limit=N)
 ```
 
 Database commands (`aggregate`, `derive-roles`, `export`, `status`, `matches`, `players`, `migrate`) resolve the SQLite path the same way (`DRAFTORB_DB_PATH` env or repo default). `aggregate` and `derive-roles` refuse to run on a database with pending migrations — run `pnpm etl migrate` first.
@@ -74,6 +76,6 @@ pnpm etl backtest              # offline validation (T-027.a, T-027.b)
 ## Troubleshooting
 
 - `better-sqlite3` install or load fails -> use Node 22 (prebuilt binaries; `better-sqlite3` 13.x requires Node >=22 and segfaults on Node 20, B-015); log anything new in BUGS.md.
-- 401/403 from Riot -> key expired.
+- 401/403 from Riot -> key expired. `400 Exception decrypting <puuid>` -> the key changed since the DB was built; run `pnpm etl rekey` (B-062/D-060).
 - 429 -> normal, the client waits for `Retry-After` and retries (up to 5 times).
 - PowerShell script policy errors -> use `pnpm` commands only, avoid `.ps1` scripts.

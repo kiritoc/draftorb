@@ -41,6 +41,16 @@ Review notes that predate the bug log live in [Review history](#review-history) 
 - Suspected cause: `aggregateContextPages` called `toEquivalentCounts` per row and added the results, but `n_eff` is nonlinear in the weights — it must be computed once on the merged `winsW`/`gamesW`/`gamesW2`.
 - Fix (commit/ticket): `aggregateContextPages` now accumulates `winsW`, `gamesW`, `gamesW2` per page key first, then calls `toEquivalentCounts` once per merged page; context totals are summed from those merged counts. Regression test: duplicate pages with unequal game weights assert `n_eff ≈ 11.98` and `lowData` true.
 
+### B-062 — All stored PUUIDs undecryptable after `RIOT_API_KEY` change (`400 Exception decrypting`) — FIXED
+
+- Severity / Area: S1 / etl (ops)
+- Steps to reproduce: swap `.env`/`RIOT_API_KEY` to a different Riot key, then run `pnpm etl matches euw1 --refresh` (or any by-puuid call).
+- Expected / Actual: expected match listing to work; actual every by-puuid endpoint returns `400 Bad Request - Exception decrypting <puuid>` for all ~3k stored puuids, while league entries by rank and fresh puuids work.
+- Environment (OS, Node version, patch): GitHub Actions `etl.yml` run + local repro, 2026-11-06.
+- Logs / screenshot: `[ETL] Fatal error: Riot API request failed with status 400 ... "Exception decrypting -x2yA_sa…"`.
+- Suspected cause: Riot encrypts PUUIDs per API key (DevRel: developer-relations#759, #471, #20). Puuids stored under the previous key cannot be decrypted by the new key; match IDs are unaffected.
+- Fix (commit/ticket): new `pnpm etl rekey` command (`packages/etl/src/rekey.ts`) re-fetches every stored match by match ID and rewrites `participants`, `item_events`, `players` and `match-ingest:` cursors to the current key's puuids (old->new pairing via team/champion/KDA fingerprint). Pending owner run on `data/DraftOrb.sqlite` + `etl-db` reseed. See D-060.
+
 ### B-061 — `docs/PROMPTS.md` fails `pnpm format:check` on a clean checkout — FIXED
 
 - Severity / Area: S4 / docs

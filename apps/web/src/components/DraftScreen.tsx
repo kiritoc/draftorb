@@ -24,6 +24,7 @@ import {
   type Recommendation,
   type Role,
 } from '@draftorb/shared';
+import { personalize, personalizeContext } from '@draftorb/engine';
 import { recommend } from '@draftorb/engine';
 import {
   loadChampionTags,
@@ -41,6 +42,7 @@ import { recommendationPageSize } from '../config.js';
 import { strings } from '../strings.js';
 import { DraftSlot, type DraftSlotState } from './DraftSlot.js';
 import { RecommendationsList } from './RecommendationsList.js';
+import { PersonalizedList } from './PersonalizedList.js';
 import { PoolEditor } from './PoolEditor.js';
 import { filterPoolByCatalogue, readPool, savePool } from '../pool/storage.js';
 import {
@@ -147,10 +149,7 @@ export function DraftScreen() {
 
   const poolChampionIds = useMemo(() => pool?.pools[USER_ROLE] ?? [], [pool]);
   const poolSet = useMemo(() => new Set(poolChampionIds), [poolChampionIds]);
-  const favoriteIds = useMemo(
-    () => new Set(profile?.favorites.combined ?? []),
-    [profile],
-  );
+  const favoriteIds = useMemo(() => new Set(profile?.favorites.combined ?? []), [profile]);
 
   const draftInput: DraftInput = useMemo(
     () => ({
@@ -239,6 +238,21 @@ export function DraftScreen() {
     excludePick(poolRecommendations, user.championId, removedRanks),
     favoritesMode,
     favoriteIds,
+  );
+
+  // Personalized list (T-096): engine output for the configured profile.
+  // `score(c)` and the other lists are untouched (D-072 invariant).
+  const personalizedEntries = useMemo(() => {
+    if (profile === null || data === null || recommendations.length === 0) {
+      return [];
+    }
+    const context = personalizeContext(draftInput, data);
+    return personalize(recommendations, profile, context, data, Date.now()).entries;
+  }, [recommendations, profile, data, draftInput]);
+  const visiblePersonalized = applyFavoritesMode(personalizedEntries, favoritesMode, favoriteIds);
+  const personalizedResetKey = useMemo(
+    () => ({ draft: draftInput, profileId: profile?.id ?? null }),
+    [draftInput, profile],
   );
 
   const importFavorites = useCallback(() => {
@@ -411,6 +425,18 @@ export function DraftScreen() {
               poolIds={poolSet}
               favoriteIds={favoritesMode === 'include' ? favoriteIds : undefined}
               unavailable={poolUnavailableItems}
+            />
+          </div>
+        )}
+
+        {profile !== null && visiblePersonalized.length > 0 && (
+          <div className="mb-4">
+            <PersonalizedList
+              title={profile.label}
+              entries={visiblePersonalized}
+              champions={champions}
+              pageSize={recommendationPageSize}
+              resetKey={personalizedResetKey}
             />
           </div>
         )}

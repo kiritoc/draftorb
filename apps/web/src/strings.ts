@@ -6,6 +6,8 @@ export const strings = {
   patchLabel: 'Patch',
   championsLabel: 'Champions',
   poolLabel: 'Pool',
+  profileLabel: (label: string, riotId: string, platform: string): string =>
+    `Profile: ${label} — ${riotId} (${platform})`,
   rolesLabel: 'Roles',
   loading: 'Loading data…',
   loadFailed: (error: string): string => `Failed to load data: ${error}`,

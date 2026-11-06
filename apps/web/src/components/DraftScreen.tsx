@@ -17,6 +17,7 @@ import {
   type DraftInput,
   type InsufficientDataEntry,
   type PoolUnavailableEntry,
+  type ProfileExport,
   type Rank,
   rankSchema,
   type RecommendData,
@@ -32,6 +33,7 @@ import {
   loadManifest,
 } from '../data/loader.js';
 import { loadChampionIconVersion } from '../data/champion-icons.js';
+import { loadProfile } from '../data/profile.js';
 import { createRecommendData } from '../data/recommend-data.js';
 import { excludePick, excludedRanks } from '../data/exclude-pick.js';
 import { championsForSlot } from '../champion-availability.js';
@@ -64,6 +66,7 @@ export function DraftScreen() {
   const [error, setError] = useState<string | null>(null);
   const [recommendationError, setRecommendationError] = useState<string | null>(null);
   const [pool, setPool] = useState<ChampionPool | null>(null);
+  const [profile, setProfile] = useState<ProfileExport | null>(null);
   const [poolStorageIssue, setPoolStorageIssue] = useState<'corrupt' | 'unavailable' | null>(null);
   const [poolDropped, setPoolDropped] = useState<number[]>([]);
   const [user, setUser] = useState<DraftSlotState>({ championId: null });
@@ -99,9 +102,10 @@ export function DraftScreen() {
           );
         }
         const loadedChampions = await loadChampions(latest.patch);
-        const [loadedFiles, tags] = await Promise.all([
+        const [loadedFiles, tags, loadedProfile] = await Promise.all([
           loadExportFiles(manifest),
           loadChampionTags(),
+          loadProfile(),
         ]);
         const loadedPool = readPool();
         if (cancelled) {
@@ -109,6 +113,7 @@ export function DraftScreen() {
         }
         setPatch(latest.patch);
         setChampions(loadedChampions);
+        setProfile(loadedProfile);
         setData(createRecommendData(loadedFiles.files, loadedChampions, tags));
         const { pool: filteredPool, dropped } = filterPoolByCatalogue(
           loadedPool.pool ?? { version: 1, pools: {} },
@@ -250,6 +255,15 @@ export function DraftScreen() {
                   {strings.championsLabel}: {champions.length}
                   {' · '}
                   {strings.poolLabel}: {poolSize}
+                </p>
+              )}
+              {profile !== null && (
+                <p className="text-sm text-emerald-300/90">
+                  {strings.profileLabel(
+                    profile.label,
+                    `${profile.riotId.gameName}#${profile.riotId.tagLine}`,
+                    profile.riotId.platform,
+                  )}
                 </p>
               )}
             </div>

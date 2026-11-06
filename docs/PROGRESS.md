@@ -45,16 +45,15 @@ Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-0
 
 ### 2026-11-06 — Devin — PR #49 review fixes (matches ingestion, D-058 PROPOSED)
 
-- Done: addressed the 3 Devin Review comments on PR #49 (`improvements-bugs`):
-  - `packages/etl/src/matches.ts`: `--reset`/`--reset-tombstones` state clears now run AFTER `--since-patch` resolution and the retention-window check, so a failed run (unknown patch label, failed catalog refresh) no longer destroys cursors, rejects or pruned tombstones.
-  - `packages/etl/src/matches.ts`: done cursors relist in full (`startTime` omitted) when `resetTombstones` is set — incremental listing from `lastGameCreation` could never reach the old matches the cleared tombstones covered.
-  - `packages/etl/src/matches-store.ts` + `matches-process.ts`: `findRejection` is now async and takes the run's `resolvePatchIndex`; an `invalid` reject carrying a patch label (recorded only when the label was missing from `patches`) is dropped once the label resolves, so the match is refetched and re-evaluated instead of staying rejected forever. `invalid` rejects without a label, `queue`/`short`/`pruned` stay permanent. Logged as D-058 PROPOSED (carves an exception to D-017's "invalid is permanent").
-  - Tests: 3 new cases in `matches.test.ts` (tombstones/cursors survive failed `--since-patch` validation; invalid reject recovered after catalog refresh; done cursor full relist on `--reset-tombstones`).
-- Files touched: `packages/etl/src/{matches,matches-store,matches-process,matches.test}.ts`, `docs/{DECISIONS,PROGRESS}.md`
-- Tests: `pnpm check` — green (81 files, 976 tests).
+- Done: addressed the Devin Review comments on PR #49 (`improvements-bugs`), two rounds:
+  - Round 1 (`matches.ts`, `matches-store.ts`, `matches-process.ts`): `--reset`/`--reset-tombstones` state clears moved AFTER `--since-patch` validation; done cursors relist in full on `--reset-tombstones`; `findRejection` (now async, takes the run's patch resolver) drops `invalid` rejects whose patch label has since resolved so lag-rejected matches self-heal.
+  - Round 2 (`matches.ts`, `commands/matches.ts`, `.github/workflows/etl.yml`): `--reset-tombstones` relists are now UNCAPPED (`relistLimit = MAX_SAFE_INTEGER` on the widened/done branches; new players keep `perPlayer`) so pruned matches beyond the newest-N ids are reachable; `MatchIngestionResult.stoppedEarly` flags the 3-consecutive-failure breaker and `etl matches` exits non-zero on it (CliError) so etl.yml never publishes a partial refresh — the `always()` state-upload steps still save cursors; etl.yml gained a guard step refusing non-`main` refs (a manual dispatch on a branch would publish exports there while deploy.yml builds main).
+  - Tests: 4 new/extended cases in `matches.test.ts` (tombstones/cursors survive failed `--since-patch` validation; invalid reject recovered after catalog refresh; done cursor full relist; uncapped relist beyond `perPlayer` via a paginated mock; `stoppedEarly` assertions).
+- Files touched: `packages/etl/src/{matches,matches-store,matches-process,matches.test}.ts`, `packages/etl/src/commands/matches.ts`, `.github/workflows/etl.yml`, `docs/{DECISIONS,PROGRESS}.md`
+- Tests: `pnpm check` — green.
 - State left: DONE pending owner review; fixes are on `improvements-bugs` (PR #49 branch).
 - Next step: owner reviews PR #49; D-058 awaits owner accept/reject.
-- Pitfalls / notes for next AI: `findRejection` is internal (not exported via `index.ts`); its new resolver param triggers the shared one-per-run `versions.json` fetch on a miss, and a failed refresh surfaces as a transient player failure (same as `evaluateMatch`). Partial (non-done) cursors do NOT rewind `processed` on `--reset-tombstones`: snapshot ids already processed stay skipped — use `--reset` for a full re-evaluation.
+- Pitfalls / notes for next AI: `findRejection` is internal (not exported via `index.ts`); its resolver param triggers the shared one-per-run `versions.json` fetch on a miss, and a failed refresh surfaces as a transient player failure (same as `evaluateMatch`). Partial (non-done) cursors do NOT rewind `processed` on `--reset-tombstones`: snapshot ids already processed stay skipped — use `--reset` for a full re-evaluation. `etl matches` now exits 1 when ingestion stops early; isolated transient player failures still exit 0.
 
 ### 2026-11-06 — Devin — Scheduled ETL refresh in CI + `etl-db` state branch (ops, D-057 PROPOSED)
 

@@ -70,6 +70,8 @@ export interface MatchIngestionResult {
   playersProcessed: number;
   playersSkipped: number;
   playersFailed: number;
+  /** True when the run stopped early after 3 consecutive transient failures. */
+  stoppedEarly: boolean;
   listed: number;
   stored: number;
   duplicates: number;
@@ -92,6 +94,11 @@ export async function ingestMatches(
   const queueId = options.queueId ?? RANKED_SOLO_QUEUE_ID;
   const minDuration = options.minDurationSeconds ?? DEFAULT_MIN_DURATION_SECONDS;
   const perPlayer = options.matchesPerPlayer ?? DEFAULT_MATCHES_PER_PLAYER;
+  // --reset-tombstones relists must reach every historical id, not just the
+  // newest `perPlayer`: pruned matches are old by definition and would
+  // otherwise stay unreachable. New players keep the perPlayer cap (they
+  // have no ingest history to backfill).
+  const relistLimit = options.resetTombstones ? Number.MAX_SAFE_INTEGER : perPlayer;
   const sincePatch = options.sincePatch;
   const log = options.onProgress ?? (() => {});
 
@@ -200,6 +207,7 @@ export async function ingestMatches(
     let playersSkipped = 0;
     let playersFailed = 0;
     let consecutiveFailed = 0;
+    let stoppedEarly = false;
 
     const stmts = prepareMatchPersist(db);
     const loadRanks = createRankLoader(db);
@@ -215,7 +223,7 @@ export async function ingestMatches(
           cursor?.sincePatchIndex ??
           (cursor?.sincePatch === undefined ? undefined : patchLookup(cursor.sincePatch));
         if (cursor && windowWidened(previousIndex, sincePatchIndex)) {
-          const ids = await listMatchIds(client, platform, player.puuid, queueId, perPlayer);
+          const ids = await listMatchIds(client, platform, player.puuid, queueId, relistLimit);
           cursor = newCursor(ids, cursor.lastGameCreation, sincePatch, sincePatchIndex);
         } else if (cursor?.status === 'done') {
           // --reset-tombstones clears pruned markers, so done cursors must
@@ -226,7 +234,7 @@ export async function ingestMatches(
             platform,
             player.puuid,
             queueId,
-            perPlayer,
+            relistLimit,
             options.resetTombstones ? undefined : cursor.lastGameCreation,
           );
           if (newIds.length === 0) {
@@ -254,6 +262,7 @@ export async function ingestMatches(
             `[${index + 1}/${players.length}] ${player.puuid.slice(0, 12)}… transient failure while listing match ids`,
           );
           if (consecutiveFailed >= 3) {
+            stoppedEarly = true;
             break;
           }
           continue;
@@ -313,6 +322,7 @@ export async function ingestMatches(
           `[${index + 1}/${players.length}] ${player.puuid.slice(0, 12)}… transient failure (player failed)`,
         );
         if (consecutiveFailed >= 3) {
+          stoppedEarly = true;
           break;
         }
         continue;
@@ -355,7 +365,8 @@ export async function ingestMatches(
     );
 
     log(
-      `Ingestion complete: ${players.length - playersSkipped}/${players.length} players, ` +
+      `Ingestion ${stoppedEarly ? 'stopped early' : 'complete'}: ` +
+        `${players.length - playersSkipped}/${players.length} players, ` +
         `${totals.stored} stored, ${totals.duplicates} duplicates, ${totals.filtered} filtered, ` +
         `${totals.invalid} invalid; failed=${playersFailed}.`,
     );
@@ -366,6 +377,7 @@ export async function ingestMatches(
       playersProcessed: players.length - playersSkipped,
       playersSkipped,
       playersFailed,
+      stoppedEarly,
       ...totals,
       playerResults,
     };

@@ -36,6 +36,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 300
     steps:
+      # The pipeline mutates the shared etl-db state and publishes exports to
+      # the dispatched ref; deploy.yml always builds main, so a manual run on
+      # another branch would report success while the site stays stale.
+      - name: Restrict to main
+        if: github.ref_name != 'main'
+        run: |
+          echo "::error::ETL refresh only runs on the main branch (dispatched ref: ${{ github.ref_name }})"
+          exit 1
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # full history: the publish step rebases onto origin/main

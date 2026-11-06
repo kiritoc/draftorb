@@ -3,7 +3,7 @@ import { parseArgs } from 'node:util';
 import { ingestMatches } from '../matches';
 import { resolveDbPath } from '../config/paths';
 import { openDb } from '../db';
-import { UsageError, parseStrictPositiveInt } from '../cli-args';
+import { CliError, UsageError, parseStrictPositiveInt } from '../cli-args';
 import { log, parsePlatform, type Command } from './shared';
 
 async function runMatches(args: string[]): Promise<void> {
@@ -96,8 +96,18 @@ async function runMatches(args: string[]): Promise<void> {
     log.info(
       `Done: ${result.playersProcessed} players processed (${result.playersSkipped} skipped), ` +
         `${result.stored} matches stored, ${result.duplicates} duplicates, ` +
-        `${result.filtered} filtered, ${result.invalid} invalid.`,
+        `${result.filtered} filtered, ${result.invalid} invalid` +
+        `${result.playersFailed > 0 ? `, ${result.playersFailed} failed` : ''}.`,
     );
+    if (result.stoppedEarly) {
+      // Non-zero exit so scheduled runs (etl.yml) do not publish a partial
+      // refresh; completed cursors are still saved by the caller's finally.
+      throw new CliError(
+        `Ingestion stopped early after 3 consecutive transient failures ` +
+          `(${result.playersFailed} players failed). Completed cursors are saved; ` +
+          'rerun the command to resume.',
+      );
+    }
   } finally {
     db.close();
   }

@@ -83,6 +83,7 @@ describe('match ingestion', () => {
     const result = await ingestMatches({ platform: PLATFORM, db, client });
 
     expect(result.stored).toBe(1);
+    expect(result.stoppedEarly).toBe(false);
     const row = db.prepare('SELECT * FROM matches WHERE match_id = ?').get('EUW1_1') as {
       platform: string;
       patch: string;
@@ -243,6 +244,7 @@ describe('match ingestion', () => {
 
     expect(result.playersFailed).toBe(3);
     expect(result.playerResults).toHaveLength(3);
+    expect(result.stoppedEarly).toBe(true);
     expect(client.getMatchIdsByPuuid).toHaveBeenCalledTimes(3);
     expect(client.getMatchIdsByPuuid).not.toHaveBeenCalledWith(PLATFORM, 'p-delta');
     db.close();
@@ -1022,6 +1024,73 @@ describe('match ingestion', () => {
     expect(c2.getMatch).toHaveBeenCalledWith('euw1', 'EUW1_P');
     expect(result.stored).toBe(1); // EUW1_P stored; EUW1_NEW is a duplicate
     expect(result.duplicates).toBe(1);
+    db.close();
+  });
+
+  it('relists beyond perPlayer on resetTombstones so old pruned matches are reachable', async () => {
+    const db = openDb(':memory:');
+    migrate(db);
+    seedMatchPatches(db);
+    seedPlayer(db, 'p-alpha', 6.5);
+
+    // Done cursor: only a full relist surfaces EUW1_P, which sits beyond the
+    // perPlayer cap of the 20 (here 2) most recent ids.
+    db.prepare('INSERT INTO ingest_state (key, value) VALUES (?, ?)').run(
+      cursorKey(PLATFORM, 'p-alpha'),
+      JSON.stringify({
+        status: 'done',
+        snapshot: ['EUW1_1'],
+        processed: 1,
+        lastGameCreation: 1_760_000_000_000,
+        sincePatchIndex: 1,
+        stored: 1,
+        duplicates: 0,
+        filtered: 0,
+        invalid: 0,
+        updatedAt: 1,
+      }),
+    );
+    db.prepare(
+      `INSERT INTO match_rejects (match_id, reason, patch, checked_at)
+       VALUES ('EUW1_P', 'pruned', '16.21', 1)`,
+    ).run();
+
+    const allIds = ['EUW1_1', 'EUW1_2', 'EUW1_3', 'EUW1_4', 'EUW1_P'];
+    const matchesById: Record<string, unknown> = {};
+    for (const id of allIds) matchesById[id] = makeMatch(id);
+    const client = {
+      getMatchIdsByPuuid: vi.fn(
+        async (_platform: Platform, _puuid: string, opts?: { start?: number; count?: number }) => {
+          const start = opts?.start ?? 0;
+          const count = opts?.count ?? 100;
+          return allIds.slice(start, start + count);
+        },
+      ),
+      getMatch: vi.fn(async (_platform: Platform, matchId: string) => matchesById[matchId]),
+      getLeagueEntriesByPuuid: vi.fn(async () => []),
+      getChampionMastery: vi.fn(async () => null),
+    } as unknown as RiotClient & {
+      getMatchIdsByPuuid: ReturnType<typeof vi.fn>;
+      getMatch: ReturnType<typeof vi.fn>;
+    };
+
+    const result = await ingestMatches({
+      platform: PLATFORM,
+      db,
+      client,
+      matchesPerPlayer: 2,
+      resetTombstones: true,
+    });
+
+    // Without the uncapped relist, listMatchIds would stop after 2 ids and
+    // EUW1_P would never be fetched.
+    expect(client.getMatchIdsByPuuid).toHaveBeenCalledWith(
+      'euw1',
+      'p-alpha',
+      expect.objectContaining({ count: 100, startTime: undefined }),
+    );
+    expect(client.getMatch).toHaveBeenCalledWith('euw1', 'EUW1_P');
+    expect(result.stored).toBe(5);
     db.close();
   });
 });

@@ -24,7 +24,6 @@ import {
   type Recommendation,
   type Role,
 } from '@draftorb/shared';
-import { personalize, personalizeContext } from '@draftorb/engine';
 import { recommend } from '@draftorb/engine';
 import {
   loadChampionTags,
@@ -37,6 +36,7 @@ import { loadChampionIconVersion } from '../data/champion-icons.js';
 import { loadProfile } from '../data/profile.js';
 import { createRecommendData } from '../data/recommend-data.js';
 import { excludePick, excludedRanks } from '../data/exclude-pick.js';
+import { computePersonalizedEntries } from '../personalized.js';
 import { championsForSlot } from '../champion-availability.js';
 import { recommendationPageSize } from '../config.js';
 import { strings } from '../strings.js';
@@ -226,7 +226,10 @@ export function DraftScreen() {
   const poolSize = poolChampionIds.length;
   // The user's own pick is already taken: never suggest it again, and close
   // the rank gaps it leaves in both lists.
-  const removedRanks = excludedRanks(user.championId, recommendations, poolRecommendations);
+  const removedRanks = useMemo(
+    () => excludedRanks(user.championId, recommendations, poolRecommendations),
+    [user.championId, recommendations, poolRecommendations],
+  );
   const overallRecommendations = applyFavoritesMode(
     excludePick(recommendations, user.championId, removedRanks).filter(
       (r) => !hideMyPool || !poolSet.has(r.championId),
@@ -246,9 +249,16 @@ export function DraftScreen() {
     if (profile === null || data === null || recommendations.length === 0) {
       return [];
     }
-    const context = personalizeContext(draftInput, data);
-    return personalize(recommendations, profile, context, data, Date.now()).entries;
-  }, [recommendations, profile, data, draftInput]);
+    return computePersonalizedEntries(
+      recommendations,
+      profile,
+      draftInput,
+      data,
+      user.championId,
+      removedRanks,
+      Date.now(),
+    );
+  }, [recommendations, profile, data, draftInput, user.championId, removedRanks]);
   const visiblePersonalized = applyFavoritesMode(personalizedEntries, favoritesMode, favoriteIds);
   const personalizedResetKey = useMemo(
     () => ({ draft: draftInput, profileId: profile?.id ?? null }),

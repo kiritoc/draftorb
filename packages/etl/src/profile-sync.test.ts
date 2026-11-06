@@ -10,6 +10,7 @@ import { makeMatch } from './matches.test-helpers';
 import { syncProfiles, type ProfileSyncOptions } from './profile-sync';
 import type { RiotClient, RiotMatchDto } from './riot';
 import { CliError } from './cli-args';
+import { RiotAuthError } from './riot/types';
 
 const DAY_MS = 86_400_000;
 const NOW_MS = 1_760_000_000_000;
@@ -230,6 +231,35 @@ describe('syncProfiles', () => {
     expect(readFileSync(exportPath, 'utf-8')).toBe(before);
   });
 
+  it('does not advance syncedAt when a later sync fails', async () => {
+    const dir = tempDir();
+    const matches = { M1: profileMatch('M1', NOW_MS - 2 * DAY_MS) };
+    const client1 = mockClient({ ids: ['M1'], matches });
+    const options = baseOptions(dir, client1);
+    migrate(options.db!);
+    await syncProfiles(options);
+    const exportPath = join(dir, 'out', 'test-profile.json');
+    const syncedAtBefore = profileExportSchema.parse(
+      JSON.parse(readFileSync(exportPath, 'utf-8')),
+    ).syncedAt;
+
+    // A newer match appears but its fetch fails, one day later.
+    const later = NOW_MS + DAY_MS;
+    const failing = mockClient({
+      ids: ['M2', 'M1'],
+      matches: { ...matches, M2: profileMatch('M2', later - DAY_MS) },
+      failOn: ['M2'],
+    });
+    await expect(
+      syncProfiles({ ...options, db: options.db, client: failing, now: () => later }),
+    ).rejects.toThrow(CliError);
+    options.db!.close();
+    const syncedAtAfter = profileExportSchema.parse(
+      JSON.parse(readFileSync(exportPath, 'utf-8')),
+    ).syncedAt;
+    expect(syncedAtAfter).toBe(syncedAtBefore);
+  });
+
   it('skips games older than the 180-day export window', async () => {
     const dir = tempDir();
     const matches = {
@@ -246,6 +276,23 @@ describe('syncProfiles', () => {
       JSON.parse(readFileSync(join(dir, 'out', 'test-profile.json'), 'utf-8')),
     );
     expect(exported.gameCount).toBe(1);
+  });
+
+  it('aborts the whole run on auth errors without writing exports', async () => {
+    const dir = tempDir();
+    const client = mockClient({
+      ids: ['M1'],
+      matches: { M1: profileMatch('M1', NOW_MS - DAY_MS) },
+    });
+    client.getMatch.mockImplementation(async () => {
+      throw new RiotAuthError('unauthorized', 401, 'https://example.test');
+    });
+    const options = baseOptions(dir, client);
+    migrate(options.db!);
+    await expect(syncProfiles(options)).rejects.toThrow(RiotAuthError);
+    options.db!.close();
+    // No export files at all: a bad key must not publish partial state (D-070).
+    expect(() => readFileSync(join(dir, 'out', 'test-profile.json'), 'utf-8')).toThrow();
   });
 
   it('rejects an unknown profile id as a usage error', async () => {

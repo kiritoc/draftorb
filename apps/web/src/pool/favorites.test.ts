@@ -3,11 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { championPoolSchema, type ChampionPool } from '@draftorb/shared';
 
 import { poolMaxSize } from '../config.js';
-import {
-  applyFavoritesMode,
-  FAVORITES_MODES,
-  importFavoritesIntoPool,
-} from './favorites';
+import { applyFavoritesMode, FAVORITES_MODES, importFavoritesIntoPool } from './favorites';
 
 function poolWithSupport(ids: number[]): ChampionPool {
   return { version: 1, pools: { SUPPORT: ids } };

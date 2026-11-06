@@ -10,7 +10,13 @@
  * No DOM, no Node APIs, no network, no file I/O, no randomness.
  */
 
-import type { DraftInput, ProfileExport, ProfileGame, Recommendation, RecommendData } from '@draftorb/shared';
+import type {
+  DraftInput,
+  ProfileExport,
+  ProfileGame,
+  Recommendation,
+  RecommendData,
+} from '@draftorb/shared';
 
 import { resolveKnownSlots } from './recommend-slots.js';
 
@@ -89,10 +95,7 @@ interface WeightedGame {
  * enemy support champion ids (via the same role inference as `recommend`)
  * and the enemy composition signature built from `champion-tags.json`.
  */
-export function personalizeContext(
-  input: DraftInput,
-  data: RecommendData,
-): PersonalizeContext {
+export function personalizeContext(input: DraftInput, data: RecommendData): PersonalizeContext {
   const allySlots = resolveKnownSlots(input.allies, 'ally', data.roleProb, [input.userRole]);
   const enemySlots = resolveKnownSlots(input.enemies, 'enemy', data.roleProb);
   const allyAdcId = allySlots.find((slot) => slot.role === 'ADC')?.championId ?? null;
@@ -117,7 +120,8 @@ function gameSignature(
     let pair = signatureCache.get(championId);
     if (pair === undefined) {
       const championTags = tags[String(championId)];
-      pair = championTags === undefined ? '' : `${championTags.damageType}:${championTags.archetype}`;
+      pair =
+        championTags === undefined ? '' : `${championTags.damageType}:${championTags.archetype}`;
       signatureCache.set(championId, pair);
     }
     if (pair !== '') signature.add(pair);
@@ -272,8 +276,7 @@ export function personalize(
       };
     }
 
-    const p =
-      (matched.winsW + config.kShrink * pProfile) / (matched.gamesW + config.kShrink);
+    const p = (matched.winsW + config.kShrink * pProfile) / (matched.gamesW + config.kShrink);
     const levelFactor = config.levelFactors[matchedLevel - 1] ?? 0.6;
     const trust = (matched.nEff * levelFactor) / (matched.nEff * levelFactor + config.kTrust);
     const personalizedScore = (1 - trust) * metaNorm + trust * p;
@@ -294,8 +297,11 @@ export function personalize(
   // Sort by personalizedScore desc; ties break by overall rank (D-073).
   const sorted = [...entries].sort(
     (a, b) =>
-      (a.personalizedScore === b.personalizedScore ? 0 : b.personalizedScore > a.personalizedScore ? 1 : -1) ||
-      a.overallRank - b.overallRank,
+      (a.personalizedScore === b.personalizedScore
+        ? 0
+        : b.personalizedScore > a.personalizedScore
+          ? 1
+          : -1) || a.overallRank - b.overallRank,
   );
   return {
     entries: sorted.map((entry, index) => ({ ...entry, rank: index + 1 })),

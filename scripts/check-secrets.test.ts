@@ -32,7 +32,8 @@ function runCheck(args: string[], env: NodeJS.ProcessEnv = {}): ReturnType<typeo
   });
 }
 
-const PLANTED_KEY = 'RGAPI-abcdef1234567890abcdef1234567890abcdef12';
+// Split so this committed file never contains a contiguous RGAPI- token.
+const PLANTED_KEY = 'RGAPI-' + 'abcdef1234567890abcdef1234567890abcdef12';
 
 describe('check-secrets', () => {
   it('fails on a planted RGAPI- key in a scanned file', () => {

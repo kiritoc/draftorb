@@ -193,8 +193,7 @@ export async function syncProfile(
        game_name = excluded.game_name,
        tag_line = excluded.tag_line,
        platform = excluded.platform,
-       region = excluded.region,
-       synced_at = excluded.synced_at`,
+       region = excluded.region`,
   ).run(
     entry.id,
     puuid,
@@ -372,6 +371,11 @@ export async function syncProfile(
   });
   replaceMastery();
   result.mastery = mastery.length;
+
+  // synced_at marks the last SUCCESSFUL sync: it is stamped here, after every
+  // Riot call and write above, so a failed run keeps the previous export's
+  // timestamp instead of presenting stale rows as fresh (D-070).
+  db.prepare('UPDATE profiles SET synced_at = ? WHERE id = ?').run(now(), entry.id);
 
   // Export is the last step of writeProfileExports: any Riot failure above
   // keeps the previously published files and the stored rows (D-070).

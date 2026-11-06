@@ -13,11 +13,7 @@ import {
   type RecommendData,
 } from '@draftorb/shared';
 
-import {
-  personalize,
-  personalizeContext,
-  type PersonalizeContext,
-} from '../src/personalize.js';
+import { personalize, personalizeContext, type PersonalizeContext } from '../src/personalize.js';
 import { makeChampionTags, makeData, makeInput, makeTag } from '../src/recommend-test-utils.js';
 
 const DAY_MS = 86_400_000;
@@ -96,17 +92,15 @@ describe('personalize: fallback levels and shrinkage', () => {
   });
 
   it('falls back to L2 when only the enemy support matches', () => {
-    const games = [1, 2, 3].map(() =>
-      makeGame({ allyAdcId: 99 }), // different ally ADC -> L1 impossible
+    const games = [1, 2, 3].map(
+      () => makeGame({ allyAdcId: 99 }), // different ally ADC -> L1 impossible
     );
     const result = personalize([rec(1, 1, 0.55)], makeProfile(games), L1_CONTEXT, data, NOW_MS);
     expect(result.entries[0]!.fallbackLevel).toBe(2);
   });
 
   it('falls back to L4 (champion overall) when no context matches', () => {
-    const games = [1, 2, 3].map(() =>
-      makeGame({ allyAdcId: 99, enemySupportId: 88 }),
-    );
+    const games = [1, 2, 3].map(() => makeGame({ allyAdcId: 99, enemySupportId: 88 }));
     const result = personalize([rec(1, 1, 0.55)], makeProfile(games), L1_CONTEXT, data, NOW_MS);
     expect(result.entries[0]!.fallbackLevel).toBe(4);
   });
@@ -118,9 +112,7 @@ describe('personalize: fallback levels and shrinkage', () => {
       tags[String(id)] = makeTag(id, { damageType: 'AD', archetype: 'marksman' });
     }
     const tagData = makeData({ champions: [1, 2, 3], tags });
-    const games = [1, 2, 3].map(() =>
-      makeGame({ allyAdcId: 99, enemySupportId: 88 }),
-    );
+    const games = [1, 2, 3].map(() => makeGame({ allyAdcId: 99, enemySupportId: 88 }));
     const context: PersonalizeContext = {
       allyAdcId: null,
       enemySupportId: null,
@@ -276,12 +268,7 @@ describe('personalizeContext', () => {
     });
     const input = makeInput({
       allies: [{ championId: 10 }],
-      enemies: [
-        { championId: 200 },
-        { championId: 30 },
-        { championId: 31 },
-        { championId: 32 },
-      ],
+      enemies: [{ championId: 200 }, { championId: 30 }, { championId: 31 }, { championId: 32 }],
     });
     const context = personalizeContext(input, tagData);
     expect(context.allyAdcId).toBe(10);

@@ -154,7 +154,8 @@ export const profileIndexEntrySchema = z
     label: z.string().min(1),
     syncedAt: z.number().int().nonnegative(),
     gameCount: z.number().int().nonnegative(),
-    file: z.string().min(1),
+    /** Plain file name inside `profiles/` — never a path (traversal guard). */
+    file: z.string().regex(/^[a-z0-9][a-z0-9-]*\.json$/),
   })
   .strict();
 export type ProfileIndexEntry = z.infer<typeof profileIndexEntrySchema>;

@@ -4,18 +4,8 @@ Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATI
 
 ## Open
 
-| ID    | Sev | Area     | Title                                                                    | Status | Found by/date    | Ticket |
-| ----- | --- | -------- | ------------------------------------------------------------------------ | ------ | ---------------- | ------ |
-| B-060 | S2  | etl/data | `champion-tags.json` missing Ekko/Sylas SUPPORT after role re-derivation | OPEN   | Devin 2026-11-05 | —      |
-
-### B-060 — `champion-tags.json` missing Ekko/Sylas SUPPORT after role re-derivation
-
-- Severity / Area: S2 / etl (data)
-- Steps to reproduce: run `pnpm test` (or `validateChampionTagsFile`) against the committed `data/manual/champion-tags.json` and the latest `data/public/*/champions.json`.
-- Expected / Actual: every champion whose `champions.json.roles` includes SUPPORT has a tag entry; actual validation reports missing tags for Ekko (245) and Sylas (517), so `packages/etl/src/tags.test.ts` fails and `pnpm check` cannot go green.
-- Environment: macOS, Node v26.12.1 (repo requires >=22), patch 16.22 export.
-- Suspected cause: `derive-roles` marked Ekko/Sylas as SUPPORT in `champions.json`, but `data/manual/champion-tags.json` was not updated with tag entries for them.
-- Fix: pending owner decision — tag Ekko/Sylas (and re-check coverage) or adjust the role-derivation/tags policy.
+| ID  | Sev | Area | Title | Status | Found by/date | Ticket |
+| --- | --- | ---- | ----- | ------ | ------------- | ------ |
 
 ## Duplicate bug IDs (not renumbered)
 
@@ -41,6 +31,16 @@ Review notes that predate the bug log live in [Review history](#review-history) 
 ```
 
 ## Fixed
+
+### B-060 — `champion-tags.json` missing Ekko/Sylas SUPPORT after role re-derivation — FIXED
+
+- Severity / Area: S2 / etl (data)
+- Steps to reproduce: run `pnpm test` (or `validateChampionTagsFile`) against the committed `data/manual/champion-tags.json` and the latest `data/public/*/champions.json`.
+- Expected / Actual: every champion whose `champions.json.roles` includes SUPPORT has a tag entry; actual validation reported missing tags for Ekko (245) and Sylas (517), so `packages/etl/src/tags.test.ts` failed and `pnpm check` could not go green.
+- Environment (OS, Node version, patch): macOS, Node v26.12.1 (repo requires >=22), patch 16.22 export.
+- Suspected cause: `derive-roles` marked Ekko/Sylas as SUPPORT in `champions.json`, but `data/manual/champion-tags.json` was not updated with tag entries for them.
+- Fix (commit/ticket): added manual tag entries for Ekko (245: AP assassin, MELEE, waveclear, early/mid scaling) and Sylas (517: AP diver, MELEE, poke, mid/late scaling) in `data/manual/champion-tags.json`; updated `packages/etl/src/tags.test.ts` to assert full support coverage dynamically instead of hard-coded counts that went stale as `derive-roles` expanded SUPPORT membership.
+- Verification: `pnpm validate:tags` reports 72 tagged champions and 52/52 SUPPORT coverage (100%) and PASSED; `pnpm vitest run packages/etl/src/tags.test.ts` green (6 tests); `pnpm check` green (79 files, 873 tests).
 
 ### B-059 — All-unscored backtest report dropped evaluated fallback counts — FIXED
 

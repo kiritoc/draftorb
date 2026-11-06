@@ -110,8 +110,8 @@ describe('champion tags coverage and validation', () => {
     expect(result.isValid).toBe(true);
     expect(result.errors).toEqual([]);
     expect(result.coverage.taggedCount).toBeGreaterThanOrEqual(70);
-    expect(result.coverage.totalSupportCount).toBe(43);
-    expect(result.coverage.taggedSupportCount).toBe(43);
+    expect(result.coverage.totalSupportCount).toBeGreaterThan(0);
+    expect(result.coverage.taggedSupportCount).toBe(result.coverage.totalSupportCount);
     expect(result.coverage.supportCoveragePercent).toBe(100);
     expect(result.coverage.missingSupports).toHaveLength(0);
     expect(result.coverage.flexPicks.length).toBeGreaterThan(0);

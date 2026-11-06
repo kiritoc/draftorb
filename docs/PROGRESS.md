@@ -4,7 +4,7 @@
 
 - Phase: 1 (Support / Diamond)
 - Current milestone: M3 Web MVP implementation complete (T-030..T-035 DONE); the backtest harness (T-027.a) remains under review because D-023 paired-bootstrap validation is not implemented. M1 ETL tickets T-019.b..f remain TODO.
-- Last updated: 2026-11-05 by Devin (pool unavailable cards + baseline win rate, D-054 PROPOSED)
+- Last updated: 2026-11-05 by Devin (D-054 accepted; B-060 Ekko/Sylas tags fixed)
 
 ## Epic status
 
@@ -35,11 +35,23 @@ Session entries before 2026-10-29 live in [PROGRESS_ARCHIVE.md](./PROGRESS_ARCHI
 
 ## Open questions for the owner
 
-Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-050 and D-051 ACCEPTED; D-044 ACCEPTED with 20 patches; D-046 ACCEPTED with CommunityDragon as the source. PROPOSED and awaiting owner review: D-052 (pick-rate export semantics for `blindSafety`, added with the B-026 fix).
+Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-050 and D-051 ACCEPTED; D-044 ACCEPTED with 20 patches; D-046 ACCEPTED with CommunityDragon as the source. Owner decisions 2026-11-05: D-053 and D-054 ACCEPTED. PROPOSED and awaiting owner review: D-052 (pick-rate export semantics for `blindSafety`, added with the B-026 fix).
 
 - T-019.d verification: please compare the champion and item lists in the 2026-11-04 "T-019.d verification step" entry below with the official 16.21 and 16.22 patch notes (misses and false positives).
 
 ## Session log (newest first)
+
+### 2026-11-05 — Devin — D-054 accepted + B-060 champion tags fix
+
+- Done:
+  - Marked D-054 ACCEPTED in `docs/DECISIONS.md` (insufficient-data pool champions render as list cards with baseline win rate).
+  - Fixed B-060: added manual tag entries for Ekko (245) and Sylas (517) in `data/manual/champion-tags.json` so every champion with SUPPORT in `champions.json.roles` is tagged.
+  - Updated `packages/etl/src/tags.test.ts` to assert full SUPPORT coverage dynamically (`taggedSupportCount === totalSupportCount`, 100%) instead of hard-coded counts that went stale as `derive-roles` expanded SUPPORT membership.
+- Files touched: `docs/DECISIONS.md`, `data/manual/champion-tags.json`, `packages/etl/src/tags.test.ts`, `docs/{BUGS,PROGRESS}.md`.
+- Tests: `pnpm validate:tags` PASSED (72 tagged champions, 52/52 SUPPORT coverage, 100%); `pnpm vitest run packages/etl/src/tags.test.ts` green (6 tests); `pnpm check` green (79 files, 873 tests).
+- State left: DONE. No open bugs in `docs/BUGS.md`; T-027.a remains REVIEW and D-052 remains PROPOSED.
+- Next step: owner review; then T-019.b or D-023 paired-bootstrap validation work.
+- Pitfalls / notes for next AI: `validateChampionTagsFile` treats every champion whose `roles` include SUPPORT as required; Ekko/Sylas are SUPPORT-capable flex picks, so they need tag entries even though they are not dedicated supports.
 
 ### 2026-11-05 — Devin — Pool unavailable champions as list cards with win rate (owner request, D-054 PROPOSED)
 

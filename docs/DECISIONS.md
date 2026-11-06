@@ -760,6 +760,13 @@ Owner decision 2026-11-05.
 - Alternatives: (a) hide insufficient entries — rejected; (b) lower thresholds — rejected until real profile volumes are known; revisit with data.
 - Consequences: shared result schemas carry the insufficient-data fields; UI renders badges per SPECS §18.
 
+### D-076 — Personalize fallback levels are champion-scoped at every level — PROPOSED
+
+- Context: SPECS §18.2 / D-073 list the fallback hierarchy (L1 same ally ADC + enemy support … L5 champion overall) without stating explicitly whether L1–L4 filter the profile's games by the candidate champion. Reading them as context-only would make the profile win rate identical for every candidate until L5, which cannot rank champions — the personalized list would be meaningless.
+- Decision (implementation assumption, T-095): every level is scoped to games the profile played ON the candidate champion in the SUPPORT role (phase 1 in-scope games, §18.1); the levels widen the matchup context instead — L1 adds ally ADC + enemy support, L2 enemy support only, L3 enemy damage/archetype signature (`damageType:archetype` pairs from `champion-tags.json`, draft signature ⊆ game signature), L4 any context ("role overall"), L5 identical to L4 while only SUPPORT games are in scope (kept distinct for later phases). L3's subset rule (draft signature ⊆ game signature, non-empty draft signature) is likewise an implementation choice — exact tag-set equality was rejected as too brittle for partial drafts.
+- Alternatives: (a) context-only L1–L4 — rejected, no per-champion signal; (b) exact enemy tag-set equality for L3 — rejected, never matches partial drafts; (c) per-champion Jaccard threshold — rejected, an unmotivated constant.
+- Consequences: `personalize()` in `packages/engine/src/personalize.ts`; golden tests pin the arithmetic; revisit if a personalization backtest suggests different scoping.
+
 ### Template
 
 ```

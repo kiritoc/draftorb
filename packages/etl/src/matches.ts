@@ -5,10 +5,17 @@ import type { Role } from '@draftorb/shared';
 import { DEFAULT_CONFIG } from '@draftorb/engine';
 import { openDb, migrate } from './db';
 import { resolveDbPath } from './config/paths';
-import { createPatchIndexLookup, createPatchResolver } from './patches';
+import { ETL_CONFIG } from './config/etl-config';
+import {
+  createPatchIndexLookup,
+  createPatchResolver,
+  latestPatchIndex,
+  refreshPatches,
+} from './patches';
 import { UsageError } from './cli-args';
 import {
   clearIngestState,
+  clearPrunedTombstones,
   createRankLoader,
   cursorKey,
   listMatchIds,
@@ -43,6 +50,8 @@ export interface MatchIngestionOptions {
   /** Data Dragon `fetch` override for the `patches` refresh (tests). */
   patchesFetchFn?: typeof fetch;
   reset?: boolean;
+  /** Clear 'pruned' tombstones so pruned matches become fetchable again (D-044). */
+  resetTombstones?: boolean;
   onProgress?: (message: string) => void;
   myRole?: Role;
   minChampGames?: number;
@@ -95,6 +104,12 @@ export async function ingestMatches(
   try {
     migrate(db);
     if (options.reset) clearIngestState(db, platform);
+    if (options.resetTombstones) {
+      clearPrunedTombstones(db);
+      log(
+        'Warning: --reset-tombstones cleared pruned tombstones; pruned matches become fetchable again.',
+      );
+    }
 
     // --since-patch is a version label resolved to patch_index via `patches`
     // (D-043); the resolver refreshes the table from Data Dragon on a miss.
@@ -108,13 +123,50 @@ export async function ingestMatches(
       onWarn: (message) => log(`Warning: ${message}`),
     });
     const patchLookup = createPatchIndexLookup(db);
-    const sincePatchIndex =
+    const explicitSincePatchIndex =
       sincePatch === undefined ? undefined : await patchResolver.resolve(sincePatch);
-    if (sincePatch !== undefined && sincePatchIndex === undefined) {
+    if (sincePatch !== undefined && explicitSincePatchIndex === undefined) {
       throw new UsageError(
         `Unknown patch "${sincePatch}": not present in Data Dragon versions after refreshing the patches table.`,
       );
     }
+
+    // Default ingestion window (SPECS §13, D-044): patch_index >=
+    // latest - retentionPatches + 1, so ingestion never re-adds data the
+    // next prune would delete. When the table is still empty it is refreshed
+    // once so the bound reflects the real latest patch; on failure the run
+    // proceeds unbounded (same as before the window existed).
+    let latestIndex = latestPatchIndex(db);
+    if (latestIndex === null) {
+      try {
+        const refreshed = await refreshPatches(db, { fetchFn: options.patchesFetchFn });
+        if (refreshed.added > 0) {
+          log(
+            `Refreshed patches from Data Dragon: +${refreshed.added} (total ${refreshed.total}).`,
+          );
+        }
+        latestIndex = latestPatchIndex(db);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        log(`Warning: could not refresh patches from Data Dragon: ${message}`);
+      }
+    }
+    const retentionBound =
+      latestIndex === null ? undefined : Math.max(1, latestIndex - ETL_CONFIG.retentionPatches + 1);
+
+    if (
+      explicitSincePatchIndex !== undefined &&
+      retentionBound !== undefined &&
+      explicitSincePatchIndex < retentionBound &&
+      !options.resetTombstones
+    ) {
+      throw new UsageError(
+        `--since-patch "${sincePatch}" (patch_index ${explicitSincePatchIndex}) is below the ` +
+          `retention window (patch_index >= ${retentionBound}). ` +
+          'Pass --reset-tombstones to ingest it anyway.',
+      );
+    }
+    const sincePatchIndex = explicitSincePatchIndex ?? retentionBound;
 
     const allPlayers = db
       .prepare(

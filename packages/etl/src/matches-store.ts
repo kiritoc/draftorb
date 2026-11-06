@@ -11,7 +11,7 @@ import { lookupPatchIndex } from './patches';
 
 export const MATCH_IDS_PAGE_SIZE = 100;
 
-export type RejectReason = 'queue' | 'short' | 'patch' | 'invalid';
+export type RejectReason = 'queue' | 'short' | 'patch' | 'invalid' | 'pruned';
 export type MatchOutcome = 'stored' | 'duplicate' | 'filtered' | 'invalid';
 
 export interface RejectRow {
@@ -98,7 +98,9 @@ export function writeCursor(db: Database.Database, key: string, cursor: PlayerCu
  * (re-)evaluated. A 'patch' reject is dropped when the run's window includes
  * the match's actual patch, or when no lower bound is set. The comparison is
  * on `patch_index` (D-043); a reject whose label cannot be resolved keeps its
- * rejection (conservative: it cannot be proven in-window).
+ * rejection (conservative: it cannot be proven in-window). A 'pruned'
+ * tombstone (D-044) is permanent: it is never deleted or re-evaluated,
+ * whatever `--since-patch` says; only `--reset-tombstones` clears it.
  */
 export function findRejection(
   db: Database.Database,
@@ -109,6 +111,7 @@ export function findRejection(
     .prepare('SELECT reason, patch FROM match_rejects WHERE match_id = ?')
     .get(matchId) as RejectRow | undefined;
   if (!row) return null;
+  if (row.reason === 'pruned') return row;
   if (row.reason === 'patch') {
     const rejectIndex = row.patch === null ? undefined : lookupPatchIndex(db, row.patch);
     if (
@@ -207,10 +210,19 @@ export function windowWidened(
   return previousIndex !== undefined && (nextIndex === undefined || nextIndex < previousIndex);
 }
 
-/** Wipe a platform's cursors and every shared rejection (`--reset`). */
+/**
+ * Wipe a platform's cursors and the re-evaluable rejections (`--reset`,
+ * D-018). 'pruned' tombstones survive: they are permanent retention markers
+ * (D-044) cleared only by `clearPrunedTombstones` (`--reset-tombstones`).
+ */
 export function clearIngestState(db: Database.Database, platform: string): void {
   db.prepare("DELETE FROM ingest_state WHERE key LIKE 'match-ingest:' || ? || ':%'").run(platform);
-  db.prepare('DELETE FROM match_rejects').run();
+  db.prepare("DELETE FROM match_rejects WHERE reason != 'pruned'").run();
+}
+
+/** Delete every 'pruned' tombstone (`--reset-tombstones`, D-044). */
+export function clearPrunedTombstones(db: Database.Database): void {
+  db.prepare("DELETE FROM match_rejects WHERE reason = 'pruned'").run();
 }
 
 export interface MatchEvaluation {

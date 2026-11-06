@@ -3,21 +3,21 @@
 ## Current status
 
 - Phase: 1 (Support / Diamond)
-- Current milestone: M3 Web MVP implementation complete (T-030..T-035 DONE); the backtest harness (T-027.a) remains under review because D-023 paired-bootstrap validation is not implemented. T-019.b (patch index) is in REVIEW; T-019.c..f remain TODO.
-- Last updated: 2026-11-05 by Devin (T-019.b patch index implemented, REVIEW)
+- Current milestone: M3 Web MVP implementation complete (T-030..T-035 DONE); the backtest harness (T-027.a) remains under review because D-023 paired-bootstrap validation is not implemented. T-019.b (patch index) and T-019.c (retention prune) are in REVIEW; T-019.d..f remain TODO.
+- Last updated: 2026-11-06 by Devin (T-019.c retention prune implemented, REVIEW)
 
 ## Epic status
 
-| Epic           | Status      | Notes                                                                                                                                                       |
-| -------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b DONE                                                                                                                             |
-| E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e, T-014, T-015, T-015.b, T-016, T-017, T-018, T-019 DONE; T-019.b REVIEW; T-019.c..f TODO |
-| E2 Engine      | IN PROGRESS | T-020..T-025 DONE; T-026, T-027.b TODO; T-027.a REVIEW                                                                                                      |
-| E3 Web MVP     | DONE        | T-030..T-035 complete; recommendation flow, Support pool, regression coverage, deploy assets and visible unvalidated-model state                            |
-| E4 Runes       | NOT STARTED |                                                                                                                                                             |
-| E5 Items       | NOT STARTED |                                                                                                                                                             |
-| E6 Live        | NOT STARTED |                                                                                                                                                             |
-| E7 Vision      | NOT STARTED |                                                                                                                                                             |
+| Epic           | Status      | Notes                                                                                                                                                                |
+| -------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b DONE                                                                                                                                      |
+| E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e, T-014, T-015, T-015.b, T-016, T-017, T-018, T-019 DONE; T-019.b, T-019.c REVIEW; T-019.d..f TODO |
+| E2 Engine      | IN PROGRESS | T-020..T-025 DONE; T-026, T-027.b TODO; T-027.a REVIEW                                                                                                               |
+| E3 Web MVP     | DONE        | T-030..T-035 complete; recommendation flow, Support pool, regression coverage, deploy assets and visible unvalidated-model state                                     |
+| E4 Runes       | NOT STARTED |                                                                                                                                                                      |
+| E5 Items       | NOT STARTED |                                                                                                                                                                      |
+| E6 Live        | NOT STARTED |                                                                                                                                                                      |
+| E7 Vision      | NOT STARTED |                                                                                                                                                                      |
 
 ## Data collection status
 
@@ -29,7 +29,7 @@
 ## Next recommended ticket
 
 T-023 is **DONE** (Role-generic recommendation engine with explanations, layered shrinkage scoring, pool contract D-024, composition needs, golden test runner and golden fixtures including non-support TOP 1v1 lane group). The Web MVP implementation is complete; its model remains visibly unvalidated until D-023's paired-bootstrap gate is implemented and passed.
-Next ETL ticket: **T-019.c** (`pnpm etl prune`, `pruned` tombstones, default ingestion window bound — SPECS §13/D-044) once T-019.b is accepted. Next validation work: complete D-023 and revisit T-027.a before claiming model validation.
+Next ETL ticket: **T-019.d** (CommunityDragon change scores + real-JSON fixtures — SPECS §15/D-046) once T-019.b and T-019.c are accepted. Next validation work: complete D-023 and revisit T-027.a before claiming model validation.
 
 Session entries before 2026-10-29 live in [PROGRESS_ARCHIVE.md](./PROGRESS_ARCHIVE.md).
 
@@ -40,6 +40,20 @@ Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-0
 - T-019.d verification: please compare the champion and item lists in the 2026-11-04 "T-019.d verification step" entry below with the official 16.21 and 16.22 patch notes (misses and false positives).
 
 ## Session log (newest first)
+
+### 2026-11-06 — Devin — T-019.c retention prune + `pruned` tombstones + default ingestion window (REVIEW)
+
+- Done:
+  - Migration `013_match_rejects_pruned.sql`: rebuilt `match_rejects` so its CHECK accepts `reason='pruned'` (the CHECK from 002 cannot be altered); existing reject rows preserved.
+  - New `pnpm etl prune [--keep-patches N] [--dry-run]` (`commands/prune.ts` + `prune.ts`): N defaults to `ETL_CONFIG.retentionPatches` = 20 (new `config/etl-config.ts`, the ETL config home for D-044/D-045/D-047 camelCase names). One transaction upserts a `pruned` tombstone (actual `patch` label, `checked_at`) and deletes each match with `patch_index <= latest - N` (cascade removes `participants`/`item_events`). Idempotent; `--dry-run` counts only; matches whose patch label is absent from `patches` are kept and reported as skipped.
+  - `matches-store.ts`: `RejectReason` gains `'pruned'`; `findRejection` returns `pruned` rows unconditionally (never deleted/re-evaluated, whatever `--since-patch`); `clearIngestState` (`--reset`) now keeps `pruned`; new `clearPrunedTombstones` (`--reset-tombstones`).
+  - `matches` command: new `--reset-tombstones` flag (help warns pruned matches become fetchable again). Default ingestion window `patch_index >= latest - retentionPatches + 1` applied when `--since-patch` is absent; the `patches` table is refreshed once when still empty so the bound is real (failure -> warn + unbounded, same as before). Explicit `--since-patch` below the bound is a `UsageError` unless `--reset-tombstones`.
+  - Docs: SPECS §13 marked live, SETUP command list, DATA_MODEL `match_rejects` reason list/DDL.
+- Files touched: `packages/etl/migrations/013_match_rejects_pruned.sql` (new), `packages/etl/src/config/etl-config.ts` (new), `packages/etl/src/{prune.ts,prune.test.ts}` (new), `packages/etl/src/commands/{prune.ts,matches.ts}`, `packages/etl/src/{matches.ts,matches.test.ts,matches-store.ts,patches.ts,cli.ts,index.ts,db/migrate.test.ts}`, `docs/{SETUP,DATA_MODEL,SPECS,TICKETS,PROGRESS,BUGS}.md`.
+- Tests: `pnpm check` green (81 files, 904 tests). New coverage: prune cutoff/cascade/tombstone, idempotence, dry-run, manual smaller `--keep-patches`, empty `patches` table, `--reset` keeps `pruned`, `--reset-tombstones` resurrects, widened `--since-patch` does not resurrect, below-bound `--since-patch` usage error, migration 013 preserves rejects and accepts `pruned`.
+- State left: REVIEW. Behavioral changes to verify: (1) `matches` without `--since-patch` now applies the retention bound (with the current ~4-patch test fixtures the bound clamps to 1 = no-op; on the real DB it binds once `patches` is populated); (2) `--reset` no longer clears `pruned` tombstones; (3) `pnpm etl prune` deletes data — run `--dry-run` first. The real `data/DraftOrb.sqlite` has an empty `patches` table until the next `matches`/`aggregate` run refreshes it, so `prune` currently reports "nothing to prune".
+- Next step: owner review; then T-019.d (blocked on T-019.b + T-019.c acceptance per ticket deps).
+- Pitfalls / notes for next AI: `seedPatches` renumbers contiguously from 1, so retention tests need >`retentionPatches` labels to get a real bound (25 labels -> bound `patch_index >= 6`). `pruneMatches` resolves `matches.patch` through `patches`; unresolvable labels are kept, never guessed. `ingestMatches` refreshes `patches` eagerly only when the table is completely empty. BUGS.md: no new bugs found.
 
 ### 2026-11-05 — Devin — T-019.b patch index table + `patch_index` switch (REVIEW)
 

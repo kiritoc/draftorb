@@ -237,6 +237,10 @@ describe('migration runner', () => {
         match_id, puuid, ts, item_id, type, team_gold_diff, kills_diff
       ) VALUES ('legacy-match', 'legacy-player', 1000, 3109, 'ITEM_PURCHASED', 0, 0)`,
     ).run();
+    db.prepare(
+      `INSERT INTO match_rejects (match_id, reason, patch, checked_at)
+       VALUES ('legacy-reject', 'patch', '16.20', 1)`,
+    ).run();
 
     expect(migrate(db)).toEqual([
       '004_role_generic_aggregates',
@@ -248,6 +252,7 @@ describe('migration runner', () => {
       '010_rune_ctx_context_level',
       '011_rune_ctx_rank_bucket',
       '012_patches',
+      '013_match_rejects_pruned',
     ]);
     expect(migrate(db)).toEqual([]);
 
@@ -281,6 +286,15 @@ describe('migration runner', () => {
       is_expert: null,
     });
     expect(event?.item_slot).toBeNull();
+    // Migration 013 rebuilt match_rejects: existing rows survive and the new
+    // CHECK accepts the 'pruned' reason (D-044).
+    expect(
+      db.prepare('SELECT reason FROM match_rejects WHERE match_id = ?').get('legacy-reject'),
+    ).toEqual({ reason: 'patch' });
+    db.prepare(
+      `INSERT INTO match_rejects (match_id, reason, patch, checked_at)
+       VALUES ('pruned-reject', 'pruned', '16.19', 1)`,
+    ).run();
     db.prepare(
       `INSERT INTO lane_vs (
         my_champion_id, my_role, opp1_id, opp2_id, rank_bucket, wins_w, games_w, games_w2
@@ -315,7 +329,7 @@ describe('migration runner', () => {
       ) VALUES (1, 'TOP', NULL, 10, 5, 'DIAMOND', 1, 1, 1)`,
     ).run();
     expect(db.prepare('SELECT COUNT(*) AS count FROM _migrations').get()).toMatchObject({
-      count: 12,
+      count: 13,
     });
     db.close();
   });
@@ -390,6 +404,7 @@ describe('migration runner', () => {
       '010_rune_ctx_context_level',
       '011_rune_ctx_rank_bucket',
       '012_patches',
+      '013_match_rejects_pruned',
     ]);
     expect(migrate(db)).toEqual([]);
 

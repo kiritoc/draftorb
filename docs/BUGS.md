@@ -716,3 +716,5 @@ No new bugs were identified during T-013 (match ingestion); rejected match ids a
 No new bugs were identified while revising T-013 patch-window and rank-known-count behavior.
 
 T-019 review follow-up found export regressions in paired-role serialization, rank-specific rune grouping, probability rounding, warnings, and post-publish backup cleanup; these are recorded as B-037 through B-042 below and fixed in this pass.
+
+No new bugs were identified during T-019.c (retention prune, `pruned` tombstones, default ingestion window).

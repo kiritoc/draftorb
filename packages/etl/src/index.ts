@@ -96,6 +96,7 @@ export {
   type ParticipantRow,
 } from './participants';
 export {
+  clearPrunedTombstones,
   comparePatches,
   createRankLoader,
   evaluateMatch,
@@ -120,6 +121,7 @@ export {
   createPatchResolver,
   ensurePatchesFresh,
   fetchPatchVersions,
+  latestPatchIndex,
   lookupPatchIndex,
   parsePatchLabel,
   parsePatchLabels,
@@ -155,6 +157,10 @@ export {
 } from './players';
 
 export { getMigrationStatus, migrate, openDb } from './db';
+
+export { ETL_CONFIG } from './config/etl-config';
+
+export { pruneMatches, type PruneOptions, type PruneResult } from './prune';
 
 export {
   formatEtlStatus,

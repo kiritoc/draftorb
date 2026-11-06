@@ -198,7 +198,7 @@ Non-support roles, accounts/login, pool sync across devices or auto-import of th
 
 ## 12-17. Storage, retention, weights, change scoring, breakpoints (target model)
 
-**Target model, implemented by T-019.b..T-019.f.** These sections describe the target storage and weighting model; they are normative once implemented and do not describe current code. §12 is live since T-019.b (migration `012_patches`; recency and `--since-patch` use `patch_index`). §13..§17 remain target until T-019.c..f land and T-027.a passes the D-023 gate; until then change weighting is off (`changeWeightEnabled = false`), no rows are soft-deleted, and `entity_change_scores`/`data_breakpoints` do not exist.
+**Target model, implemented by T-019.b..T-019.f.** These sections describe the target storage and weighting model; they are normative once implemented and do not describe current code. §12 is live since T-019.b (migration `012_patches`; recency and `--since-patch` use `patch_index`). §13 is live since T-019.c (migration `013_match_rejects_pruned`; `pnpm etl prune`, `pruned` tombstones, default ingestion window). §14..§17 remain target until T-019.d/T-019.f land and T-027.a passes the D-023 gate; until then change weighting is off (`changeWeightEnabled = false`) and `entity_change_scores`/`data_breakpoints` do not exist.
 
 ## 12. Patch index (D-043)
 

@@ -119,6 +119,13 @@ export function lookupPatchIndex(db: Database.Database, versionLabel: string): n
   return row?.patch_index;
 }
 
+/** Highest stored `patch_index` (`null` when the `patches` table is empty). */
+export function latestPatchIndex(db: Database.Database): number | null {
+  const row = db.prepare('SELECT MAX(patch_index) AS n FROM patches').get() as
+    { n: number | null } | undefined;
+  return row?.n ?? null;
+}
+
 export interface EnsurePatchesResult {
   /** 'current' = every label already known; 'refreshed' = new rows added; 'failed' = refresh errored. */
   status: 'current' | 'refreshed' | 'failed';

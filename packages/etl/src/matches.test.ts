@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { openDb, migrate } from './db';
+import { UsageError } from './cli-args';
 import { ingestMatches } from './matches';
+import { pruneMatches } from './prune';
+import { seedPatches } from './patches.test-helpers';
 import { comparePatches, cursorKey, patchFromGameVersion, windowWidened } from './matches-store';
 import {
   makeMatch,
@@ -657,6 +660,163 @@ describe('match ingestion', () => {
         patchesFetchFn: versionsFetch as unknown as typeof fetch,
       }),
     ).rejects.toThrow('Unknown patch "16.99"');
+    db.close();
+  });
+
+  it('keeps pruned tombstones on --reset while clearing other rejects (D-044)', async () => {
+    const db = openDb(':memory:');
+    migrate(db);
+    seedMatchPatches(db);
+    seedPlayer(db, 'p-alpha', 6.5);
+    db.prepare(
+      `INSERT INTO match_rejects (match_id, reason, patch, checked_at)
+       VALUES ('EUW1_P', 'pruned', '16.19', 1)`,
+    ).run();
+    db.prepare(
+      `INSERT INTO match_rejects (match_id, reason, patch, checked_at)
+       VALUES ('EUW1_Q', 'queue', NULL, 1)`,
+    ).run();
+
+    const client = mockClient(
+      { 'p-alpha': ['EUW1_P', 'EUW1_Q'] },
+      { EUW1_Q: makeMatch('EUW1_Q', { gameDuration: 600 }) },
+    );
+    const result = await ingestMatches({ platform: PLATFORM, db, client, reset: true });
+
+    // EUW1_P stays tombstoned (never fetched); EUW1_Q is re-evaluated and
+    // rejected again as 'short' now that --reset cleared the old reject.
+    expect(client.getMatch).toHaveBeenCalledTimes(1);
+    expect(client.getMatch).toHaveBeenCalledWith('euw1', 'EUW1_Q');
+    expect(result.filtered).toBe(2);
+    const rejects = db
+      .prepare('SELECT match_id, reason FROM match_rejects ORDER BY match_id')
+      .all() as { match_id: string; reason: string }[];
+    expect(rejects).toEqual([
+      { match_id: 'EUW1_P', reason: 'pruned' },
+      { match_id: 'EUW1_Q', reason: 'short' },
+    ]);
+    db.close();
+  });
+
+  it('clears pruned tombstones with resetTombstones so matches are fetchable again', async () => {
+    const db = openDb(':memory:');
+    migrate(db);
+    seedMatchPatches(db);
+    seedPlayer(db, 'p-alpha', 6.5);
+    db.prepare(
+      `INSERT INTO match_rejects (match_id, reason, patch, checked_at)
+       VALUES ('EUW1_P', 'pruned', '16.21', 1)`,
+    ).run();
+
+    const client = mockClient({ 'p-alpha': ['EUW1_P'] }, { EUW1_P: makeMatch('EUW1_P') });
+    const result = await ingestMatches({
+      platform: PLATFORM,
+      db,
+      client,
+      resetTombstones: true,
+    });
+
+    expect(client.getMatch).toHaveBeenCalledWith('euw1', 'EUW1_P');
+    expect(result.stored).toBe(1);
+    expect(
+      db.prepare('SELECT COUNT(*) AS n FROM match_rejects').get() as { n: number },
+    ).toMatchObject({ n: 0 });
+    db.close();
+  });
+
+  it('rejects --since-patch below the retention window unless resetTombstones is set', async () => {
+    const db = openDb(':memory:');
+    migrate(db);
+    // 25 patches -> default bound is patch_index >= 6 ('16.6').
+    seedPatches(
+      db,
+      Array.from({ length: 25 }, (_, i) => `16.${i + 1}`),
+    );
+    seedPlayer(db, 'p-alpha', 6.5);
+    const client = mockClient({ 'p-alpha': [] }, {});
+
+    await expect(
+      ingestMatches({ platform: PLATFORM, sincePatch: '16.5', db, client }),
+    ).rejects.toThrow(UsageError);
+    await expect(
+      ingestMatches({ platform: PLATFORM, sincePatch: '16.5', db, client }),
+    ).rejects.toThrow(/retention window/);
+
+    const result = await ingestMatches({
+      platform: PLATFORM,
+      sincePatch: '16.5',
+      db,
+      client,
+      resetTombstones: true,
+    });
+    expect(result.sincePatch).toBe('16.5');
+    db.close();
+  });
+
+  it('does not resurrect pruned matches when --since-patch widens the window', async () => {
+    const db = openDb(':memory:');
+    migrate(db);
+    seedPatches(
+      db,
+      Array.from({ length: 25 }, (_, i) => `16.${i + 1}`),
+    );
+    seedPlayer(db, 'p-alpha', 6.5);
+    db.prepare(
+      `INSERT INTO matches (
+        match_id, platform, patch, queue_id, duration, created_at, avg_rank_score, rank_known_count
+      ) VALUES ('EUW1_P', 'euw1', '16.20', 420, 1800, 1, 6.5, 1)`,
+    ).run();
+
+    // Manual cut keeping 5 patches: cutoff 20 prunes '16.20' (index 20).
+    const pruned = pruneMatches(db, { keepPatches: 5 });
+    expect(pruned.matchesPruned).toBe(1);
+
+    const client = mockClient(
+      { 'p-alpha': ['EUW1_P'] },
+      { EUW1_P: makeMatch('EUW1_P', { gameVersion: '16.20.1.1' }) },
+    );
+    // '16.10' (index 10) is inside the default bound (>= 6) and its window
+    // includes the pruned patch: the permanent tombstone still wins.
+    const result = await ingestMatches({
+      platform: PLATFORM,
+      sincePatch: '16.10',
+      db,
+      client,
+    });
+
+    expect(client.getMatch).not.toHaveBeenCalled();
+    expect(result.stored).toBe(0);
+    expect(result.filtered).toBe(1);
+    expect(
+      db.prepare('SELECT reason FROM match_rejects WHERE match_id = ?').get('EUW1_P'),
+    ).toMatchObject({ reason: 'pruned' });
+    db.close();
+  });
+
+  it('keeps matches pruned by a manual smaller cut on the next default ingestion', async () => {
+    const db = openDb(':memory:');
+    migrate(db);
+    seedPatches(
+      db,
+      Array.from({ length: 25 }, (_, i) => `16.${i + 1}`),
+    );
+    seedPlayer(db, 'p-alpha', 6.5);
+    db.prepare(
+      `INSERT INTO matches (
+        match_id, platform, patch, queue_id, duration, created_at, avg_rank_score, rank_known_count
+      ) VALUES ('EUW1_P', 'euw1', '16.20', 420, 1800, 1, 6.5, 1)`,
+    ).run();
+    pruneMatches(db, { keepPatches: 5 });
+
+    const client = mockClient(
+      { 'p-alpha': ['EUW1_P'] },
+      { EUW1_P: makeMatch('EUW1_P', { gameVersion: '16.20.1.1' }) },
+    );
+    const result = await ingestMatches({ platform: PLATFORM, db, client });
+
+    expect(client.getMatch).not.toHaveBeenCalled();
+    expect(result.stored).toBe(0);
+    expect(result.filtered).toBe(1);
     db.close();
   });
 });

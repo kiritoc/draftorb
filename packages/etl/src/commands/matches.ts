@@ -21,12 +21,13 @@ async function runMatches(args: string[]): Promise<void> {
         queue: { type: 'string' },
         'min-duration': { type: 'string' },
         reset: { type: 'boolean', default: false },
+        'reset-tombstones': { type: 'boolean', default: false },
       },
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     throw new UsageError(
-      `${message}\nUsage: etl matches [platform] [--since-patch=16.19] [--per-player=20] [--limit=N] [--queue=420] [--min-duration=900] [--reset]`,
+      `${message}\nUsage: etl matches [platform] [--since-patch=16.19] [--per-player=20] [--limit=N] [--queue=420] [--min-duration=900] [--reset] [--reset-tombstones]`,
     );
   }
   const { values, positionals } = parsed;
@@ -61,6 +62,7 @@ async function runMatches(args: string[]): Promise<void> {
     '--min-duration',
   );
   const resetValue = values.reset === true;
+  const resetTombstonesValue = values['reset-tombstones'] === true;
 
   log.info(
     `Ingesting ranked matches for platform "${platform}"` +
@@ -77,6 +79,7 @@ async function runMatches(args: string[]): Promise<void> {
       queueId,
       minDurationSeconds,
       reset: resetValue,
+      resetTombstones: resetTombstonesValue,
       db,
       onProgress: (message) => log.info(message),
     });
@@ -94,7 +97,9 @@ async function runMatches(args: string[]): Promise<void> {
 export const matchesCommand: Command = {
   name: 'matches',
   usage:
-    'matches [platform] [--since-patch=16.19] [--per-player=20] [--limit=N] [--queue=420] [--min-duration=900] [--reset]',
-  description: 'Ingest ranked solo matches for discovered players (resumable, Ctrl+C safe)',
+    'matches [platform] [--since-patch=16.19] [--per-player=20] [--limit=N] [--queue=420] [--min-duration=900] [--reset] [--reset-tombstones]',
+  description:
+    'Ingest ranked solo matches for discovered players (resumable, Ctrl+C safe). ' +
+    '--reset-tombstones clears pruned tombstones: pruned matches become fetchable again',
   run: runMatches,
 };

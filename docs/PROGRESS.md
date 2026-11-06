@@ -3,8 +3,8 @@
 ## Current status
 
 - Phase: 1 (Support / Diamond)
-- Current milestone: M3 Web MVP implementation complete (T-030..T-035 DONE); the backtest harness (T-027.a) remains under review because D-023 paired-bootstrap validation is not implemented. T-019.b (patch index, now incl. D-055), T-019.c (retention prune) and T-026 (golden suite, 23 scenarios) are in REVIEW; T-019.d..f and T-027.b remain TODO. T-040 (engine rune recommender, SPECS §8.1) is in REVIEW with D-059 PROPOSED. E8 Personalization replanned (docs only): pipeline-fed configured profile on static GitHub Pages — tickets T-090..T-098 TODO, decisions D-067..D-075 PROPOSED; earlier per-user plan cancelled (T-080..T-086 CANCELLED, D-061..D-066 SUPERSEDED).
-- Last updated: 2026-11-06 by Devin (planning session: pipeline-fed personalized profile designed, docs only — D-067..D-075 PROPOSED, T-090..T-098 TODO, T-080..T-086 CANCELLED, D-061..D-066 SUPERSEDED)
+- Current milestone: M3 Web MVP implementation complete (T-030..T-035 DONE); the backtest harness (T-027.a) remains under review because D-023 paired-bootstrap validation is not implemented. T-019.b (patch index, now incl. D-055), T-019.c (retention prune) and T-026 (golden suite, 23 scenarios) are in REVIEW; T-019.d..f and T-027.b remain TODO. T-040 (engine rune recommender, SPECS §8.1) is in REVIEW with D-059 PROPOSED. E8 Personalization implemented through T-096: T-090..T-096 DONE (profile config/schemas, `profile-sync` ETL + scheduled workflow + secret-leak gate, web profile loader, favorites, engine `personalize`, personalized list UI); T-097 engine half DONE (`recommendProfileRunes`/`recommendProfileSpells`) with the UI half blocked on T-041 (no runes screen exists); T-098 stays TODO (T-052/T-054/T-056 missing). Decisions D-067..D-077 PROPOSED; earlier per-user plan cancelled (T-080..T-086 CANCELLED, D-061..D-066 SUPERSEDED).
+- Last updated: 2026-11-07 by Devin (implemented personalization epic T-090..T-096 + T-097 engine half; two review passes, fixes folded in; B-064 closed)
 
 ## Epic status
 
@@ -18,7 +18,7 @@
 | E5 Items           | NOT STARTED |                                                                                                                                                                      |
 | E6 Live            | NOT STARTED |                                                                                                                                                                      |
 | E7 Vision          | NOT STARTED |                                                                                                                                                                      |
-| E8 Personalization | IN PROGRESS | Replanned 2026-11-06: pipeline-fed configured profile, static-only (D-067..D-075 PROPOSED); T-090..T-098 TODO, T-080..T-086 CANCELLED                                |
+| E8 Personalization | IN PROGRESS | Replanned 2026-11-06: pipeline-fed configured profile, static-only (D-067..D-077 PROPOSED); T-090..T-096 DONE, T-097 engine-only, T-098 blocked, T-080..T-086 CANCELLED |
 
 ## Data collection status
 
@@ -38,7 +38,7 @@ Session entries before 2026-10-29 live in [PROGRESS_ARCHIVE.md](./PROGRESS_ARCHI
 
 ## Open questions for the owner
 
-Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-050 and D-051 ACCEPTED; D-044 ACCEPTED with 20 patches; D-046 ACCEPTED with CommunityDragon as the source. Owner decisions 2026-11-05: D-053 and D-054 ACCEPTED. PROPOSED and awaiting owner review: D-052 (pick-rate export semantics for `blindSafety`, added with the B-026 fix), D-056, D-058, D-059, D-060, and the pipeline-fed personalization set D-067..D-075 (replanned 2026-11-06, see session log; supersedes D-061..D-066).
+Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-050 and D-051 ACCEPTED; D-044 ACCEPTED with 20 patches; D-046 ACCEPTED with CommunityDragon as the source. Owner decisions 2026-11-05: D-053 and D-054 ACCEPTED. PROPOSED and awaiting owner review: D-052 (pick-rate export semantics for `blindSafety`, added with the B-026 fix), D-056, D-058, D-059, D-060, and the pipeline-fed personalization set D-067..D-077 (implemented 2026-11-07, see session log; supersedes D-061..D-066).
 
 Open questions recorded by the personalization replanning session (all PROPOSED in D-067..D-075):
 
@@ -53,6 +53,24 @@ Open questions recorded by the personalization replanning session (all PROPOSED 
 - T-019.d verification: please compare the champion and item lists in the 2026-11-04 "T-019.d verification step" entry below with the official 16.21 and 16.22 patch notes (misses and false positives).
 
 ## Session log (newest first)
+
+### 2026-11-07 — Devin — Personalization epic T-090..T-097 implemented
+
+- Done:
+  - **T-090** (`269d48b`): `data/profiles.config.json` (KiriToc#Toc EUW1), shared zod schemas for config/export/index, schema-version constants, `data/users/` gitignore (B-064 FIXED), `.env.example` notes.
+  - **T-091** (`30362bd`): migration `015_profiles.sql`; account-v1/match-v5/timeline/mastery-top Riot client + schema additions; pure `profile-games.ts` extraction; `profile-export.ts` (anonymized whitelist export, favorites per D-074, atomic-ish per-file write); `profile-sync.ts` resumable cursor sync (180-day/500-game caps, failure keeps previous export + rows); `pnpm etl profile-sync [id] [--publish]`.
+  - **T-092** (`6f28889`): `etl.yml` scheduled `profile-sync --publish` step (non-fatal, previous exports kept); `scripts/check-secrets.mjs` RGAPI-/key-value scan wired into CI + deploy.
+  - **T-093** (`a011a6b`): `apps/web/src/data/profile.ts` loader + profile label in the draft screen.
+  - **T-094** (`5bea98c`): `pool/favorites.ts` import + `include`/`only`/`hide` mode applied to all lists (display-only).
+  - **T-095** (`a71544a`): pure `personalize()` — recency weights, shrinkage, L1..L5 fallback, trust blend, insufficient-data entries (D-076 PROPOSED for level scoping).
+  - **T-096** (`fe3ab01`): `PersonalizedList` UI (profile label title, WR/n_eff/level/+d badges, 5-by-5 pagination).
+  - **T-097 engine** (`c8897c4`): `recommendProfileRunes`/`recommendProfileSpells` (D-077 PROPOSED). UI half blocked on T-041 — no runes screen exists.
+- Review findings fixed in place (second commit): secret-check test file tripped its own RGAPI- scan (split the planted literal); personalized list missed the user-pick exclusion (new `computePersonalizedEntries` + regression test); `profiles.synced_at` was stamped before Riot fetches so a failed sync re-exported stale rows under a fresh timestamp (now stamped on success only + regression test); auth errors abort without writing exports (test added); index `file` constrained to a plain filename.
+- Files touched: see commits `269d48b..HEAD` + review-fix commit; docs: TICKETS (T-090..T-096 DONE), BUGS (B-064 FIXED), DECISIONS (D-076, D-077 PROPOSED), SETUP, .env.example, workflows.
+- Tests: `pnpm check` green — 94 files / 1071 tests; `pnpm --filter @draftorb/web build` green; `node scripts/check-secrets.mjs` passes on the real tree and dist.
+- State left: DONE for T-090..T-096; T-097 partially (engine only, UI needs T-041); T-098 TODO (blocked by T-052/T-054/T-056).
+- Next step: owner review of D-067..D-077; T-041 (runes UI) unblocks the T-097 UI half; real `profile-sync --publish` run needs `RIOT_API_KEY` (first export lands in the next scheduled ETL run).
+- Pitfalls / notes for next AI: profile exports are NOT yet in `data/public/profiles/` — the web personalization UI stays dormant until the scheduled workflow publishes the first export. `profile-games` stores `match_id` internally only; never export it. `recommendProfileRunes/Spells` reuse `PersonalizeContext` — build it via `personalizeContext(draftInput, data)`.
 
 ### 2026-11-06 — Devin — Personalized profile feature replanned for static GitHub Pages (DOCS ONLY)
 

@@ -6,7 +6,6 @@ Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATI
 
 | ID    | Sev | Area | Title                                                     | Status | Found by/date    | Ticket |
 | ----- | --- | ---- | --------------------------------------------------------- | ------ | ---------------- | ------ |
-| B-064 | S3  | docs | `.gitignore` does not cover the legacy `data/users/` path | OPEN   | Devin/2026-11-06 | T-090  |
 
 ## Duplicate bug IDs (not renumbered)
 
@@ -31,7 +30,9 @@ Review notes that predate the bug log live in [Review history](#review-history) 
 - Fix (commit/ticket):
 ```
 
-### B-064 — `.gitignore` does not cover the legacy `data/users/` path — OPEN
+## Fixed
+
+### B-064 — `.gitignore` does not cover the legacy `data/users/` path — FIXED
 
 - Severity / Area: S3 / docs (git hygiene)
 - Steps to reproduce: the superseded D-063 plan stored synced user profiles in `data/users/<puuid>.json` "gitignored by default", but `.gitignore` only covers `data/raw/` and `*.sqlite*` — `data/users/` was never ignored.
@@ -39,10 +40,8 @@ Review notes that predate the bug log live in [Review history](#review-history) 
 - Environment (OS, Node version, patch): repo root, 2026-11-06.
 - Logs / screenshot: `git check-ignore data/users/x.json` returns nothing.
 - Suspected cause: D-063 documented the ignore rule but no ticket added the `.gitignore` entry before the plan was superseded (D-067..D-075).
-- Fix (commit/ticket): T-090 adds `data/users/` to `.gitignore` and updates `.env.example` comments. Under the new plan profiles export to `data/public/profiles/` (intentionally committed, anonymized per D-069), so the legacy path should never exist — the ignore entry is defense in depth.
+- Fix (commit/ticket): T-090 (`269d48b`) adds `data/users/` to `.gitignore` and updates `.env.example` comments. Under the new plan profiles export to `data/public/profiles/` (intentionally committed, anonymized per D-069), so the legacy path should never exist — the ignore entry is defense in depth.
 - Note: security audit 2026-11-06 found NO real secrets or personal data in committed files — only placeholders (`.env.example`, `RGAPI-xxxx...`) and test fixtures (`RGAPI-test-api-key-12345`, UUID-shaped redaction fixtures).
-
-## Fixed
 
 ### B-063 — Merged rune pages overstated sample sizes (`n_eff` summed per row instead of recomputed) — FIXED
 

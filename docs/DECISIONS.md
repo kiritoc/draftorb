@@ -767,6 +767,18 @@ Owner decision 2026-11-05.
 - Alternatives: (a) context-only L1–L4 — rejected, no per-champion signal; (b) exact enemy tag-set equality for L3 — rejected, never matches partial drafts; (c) per-champion Jaccard threshold — rejected, an unmotivated constant.
 - Consequences: `personalize()` in `packages/engine/src/personalize.ts`; golden tests pin the arithmetic; revisit if a personalization backtest suggests different scoping.
 
+### D-077 — "Profile's best" runes/spells: page identity, pair normalization, shrinkage prior — PROPOSED
+
+- Context: SPECS §18.5 asks for the profile's rune pages and summoner-spell pairs per champion "with the same fallback/shrinkage rules" as D-073, but does not define what counts as one "page" or "pair", nor which prior the shrinkage uses.
+- Decision (implementation assumption, T-097 engine half):
+  1. **Rune page identity** = `(keystoneId, primaryStyleId, subStyleId)`; minor rune picks (`perkIds`) and stat shards do not split pages — they ride along on the first-seen game's payload for display.
+  2. **Summoner spells** are an unordered pair normalized to `[min(id), max(id)]` so Flash+Heal and Heal+Flash aggregate together.
+  3. **Fallback levels** reuse the D-073/D-076 champion-scoped L1..L5 hierarchy verbatim (same ally ADC + enemy support → enemy support → enemy signature → champion overall), applied per setup instead of per champion.
+  4. **Shrinkage prior** is the profile's recency-weighted win rate on that champion (all in-scope games on the champion), not the profile global `p_profile` — a rune page is judged against the champion's own baseline.
+  5. **Minimum sample** = 5 effective games (`DEFAULT_MIN_SETUP_GAMES`, D-075) at the matched level; below that the pick reports `insufficientData` with `nEff`, never a rate.
+- Alternatives: (a) shrink toward `p_profile` — rejected, too coarse for per-champion setups; (b) include minor rune picks in page identity — rejected, fragments tiny samples; (c) ordered spell pairs — rejected, double-counts the same setup.
+- Consequences: `recommendProfileRunes`/`recommendProfileSpells` in `packages/engine/src/profile-setup.ts`; golden tests pin the arithmetic. The two-column UI waits on T-041 (no runes screen exists yet).
+
 ### Template
 
 ```

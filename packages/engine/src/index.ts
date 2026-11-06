@@ -13,3 +13,4 @@ export * from './roles.js';
 export * from './roles-types.js';
 export * from './comp.js';
 export * from './recommend.js';
+export * from './runes.js';

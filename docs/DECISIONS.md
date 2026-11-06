@@ -574,6 +574,20 @@ Owner decision 2026-11-05.
 - Alternatives: (a) a new reject reason + migration — rejected, the label-carrying `invalid` row already identifies the retriable case; (b) revisiting completed cursors on every catalog refresh — rejected, far broader than the rare Data Dragon lag; (c) keeping `invalid` fully permanent per D-017 — rejected, it makes the lag case unrecoverable without a manual `--reset`.
 - Consequences: matches rejected during a catalog lag self-heal on a later run once `versions.json` catches up (the rejected match's `gameCreation` never advanced `lastGameCreation`, so incremental listing still returns its id); the "`invalid` is permanent" wording in D-017/SPECS §13 now has this one exception.
 
+### D-059 — Rune recommender interpretation details (SPECS §8.1) — PROPOSED
+
+- Context: T-040 implements the engine side of SPECS §8.1, which leaves several mechanics unspecified: which champions count as "context slots" under partial drafts, what "the same page's win rate in the next broader context" means when the page is absent there, how pages are identified across contexts, and what the adaptation hint contains.
+- Decision (assumptions, PROPOSED):
+  1. Context slots are the lane-group champions whose role was resolved by §4 inference (fixed or inferred), sorted by descending lane-phase `influence` with the spec tie-breaks (ally before enemy, then role order TOP, JUNGLE, MID, ADC, SUPPORT), capped at `contextSlots`. Prefix keys are emitted for n = selected count down to 1 in the exact `lane:`/`damagemix:`/`global` `context_key` format the aggregator writes. A partial-draft key can only match export data when the known champions coincide with an aggregation prefix; otherwise it misses and back-off continues — it can never produce a wrong match.
+  2. Page identity across contexts = all exported page fields (`primaryStyleId`, `subStyleId`, `keystoneId`, `selectedPerkIds`, `statShardIds`); rows describing the same displayed page are merged (weighted counts summed, pick shares added, `players` maxed).
+  3. Shrinkage: each page's win rate at a context is shrunk toward the same page's shrunk estimate at the nearest broader context where it has data (recursive, D-021 style); when the page is absent from every broader context, the prior is the pooled (all-pages) estimate of the immediate next broader context; the broadest level shrinks toward 0.5. Prior strength `kRune` = 40 equivalent games (prior, tunable via `RuneConfig`).
+  4. A page is scored once, at the most specific context of the chain where it appears; ranking is by that shrunk win rate, tie-break by that context's `pickShare`, then by page key for determinism. `lowData` uses `config.minGames` on the scoring context's `n_eff`; low-data pages are flagged, never dropped.
+  5. The enemy damage mix is computed over every enemy board champion (role inference not required), with the same rules as the ETL aggregator (untagged/`NONE` ignored, `MIXED` counts for both, none tagged -> `mixed`).
+  6. The adaptation hint reports the `statShardIds` of the most-picked page (by `gamesW`) inside the `damagemix:<mix>` context matching the enemy team; no hint when that context or its shards are absent. The engine does not interpret shard semantics (no armor/MR mapping exists in the data).
+  7. Output contract: `RuneRecommendationResult` (`RUNE_RESULT_SCHEMA_VERSION` = 1) with `pages` (top `topPages`, default 3), `adaptationHints`, `damageMix` and `dataAvailable` (false when no export context matches the user's rank bucket).
+- Alternatives: (a) shrink toward the broader context's raw `winsW/gamesW` — rejected, a 2-game broader sample would dominate the prior; (b) prior = 0.5 whenever the page is missing in the next broader level — rejected, the pooled context estimate is strictly more informative; (c) emitting lane keys for arbitrary known subsets — rejected, the aggregator only writes influence-order prefixes, so non-prefix keys can never match.
+- Consequences: T-041 (runes UI) consumes `RuneRecommendationResult` as-is; T-027.b calibrates `kRune`/`topPages` through the D-023 gate.
+
 ### Template
 
 ```

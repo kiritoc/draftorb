@@ -25,6 +25,14 @@ export const MANIFEST_SCHEMA_VERSION = 3;
  */
 export const DRAFT_RESULT_SCHEMA_VERSION = 1;
 
+/**
+ * Version of the engine rune-recommendation output contract (SPECS §8.1).
+ * Bumped on every breaking change so consumers fail loudly instead of
+ * misreading fields.
+ * v1: initial `RuneRecommendationResult` (T-040).
+ */
+export const RUNE_RESULT_SCHEMA_VERSION = 1;
+
 export const roleSchema = z.enum(['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT']);
 export type Role = z.infer<typeof roleSchema>;
 

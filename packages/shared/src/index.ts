@@ -11,6 +11,7 @@ export {
   SHARED_VERSION,
   MANIFEST_SCHEMA_VERSION,
   DRAFT_RESULT_SCHEMA_VERSION,
+  RUNE_RESULT_SCHEMA_VERSION,
 } from './schemas/core.js';
 export { RUNE_CONTEXT_LEVELS } from './rune-context.js';
 
@@ -168,6 +169,11 @@ export {
   runeContextPageSchema,
   runeContextEntrySchema,
   runeExportSchema,
+  runeRecommendDataSchema,
+  enemyDamageMixSchema,
+  runePagePickSchema,
+  runeAdaptationHintSchema,
+  runeRecommendationResultSchema,
 } from './schemas/runes.js';
 export type {
   RunePerk,
@@ -177,4 +183,9 @@ export type {
   RuneContextPage,
   RuneContextEntry,
   RuneExport,
+  RuneRecommendData,
+  EnemyDamageMix,
+  RunePagePick,
+  RuneAdaptationHint,
+  RuneRecommendationResult,
 } from './schemas/runes.js';

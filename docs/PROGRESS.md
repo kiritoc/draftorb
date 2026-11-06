@@ -3,8 +3,8 @@
 ## Current status
 
 - Phase: 1 (Support / Diamond)
-- Current milestone: M3 Web MVP implementation complete (T-030..T-035 DONE); the backtest harness (T-027.a) remains under review because D-023 paired-bootstrap validation is not implemented. T-019.b (patch index, now incl. D-055), T-019.c (retention prune) and T-026 (golden suite, 23 scenarios) are in REVIEW; T-019.d..f and T-027.b remain TODO.
-- Last updated: 2026-11-06 by Devin (PR #49 review fixes: tombstone/reset ordering, retriable unknown-label invalid rejects, full relist on --reset-tombstones; D-058 PROPOSED)
+- Current milestone: M3 Web MVP implementation complete (T-030..T-035 DONE); the backtest harness (T-027.a) remains under review because D-023 paired-bootstrap validation is not implemented. T-019.b (patch index, now incl. D-055), T-019.c (retention prune) and T-026 (golden suite, 23 scenarios) are in REVIEW; T-019.d..f and T-027.b remain TODO. T-040 (engine rune recommender, SPECS §8.1) is in REVIEW with D-059 PROPOSED.
+- Last updated: 2026-11-06 by Devin (T-040 rune recommender: `recommendRunes` + `RuneRecommendationResult` contract, 15 tests; D-059 PROPOSED)
 
 ## Epic status
 
@@ -14,7 +14,7 @@
 | E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e, T-014, T-015, T-015.b, T-016, T-017, T-018, T-019 DONE; T-019.b, T-019.c REVIEW; T-019.d..f TODO |
 | E2 Engine      | IN PROGRESS | T-020..T-025 DONE; T-026 REVIEW; T-027.b TODO; T-027.a REVIEW                                                                                                        |
 | E3 Web MVP     | DONE        | T-030..T-035 complete; recommendation flow, Support pool, regression coverage, deploy assets and visible unvalidated-model state                                     |
-| E4 Runes       | NOT STARTED |                                                                                                                                                                      |
+| E4 Runes       | IN PROGRESS | T-040 REVIEW; T-041, T-042 TODO                                                                                                                                      |
 | E5 Items       | NOT STARTED |                                                                                                                                                                      |
 | E6 Live        | NOT STARTED |                                                                                                                                                                      |
 | E7 Vision      | NOT STARTED |                                                                                                                                                                      |
@@ -31,7 +31,7 @@
 ## Next recommended ticket
 
 T-023 is **DONE** (Role-generic recommendation engine with explanations, layered shrinkage scoring, pool contract D-024, composition needs, golden test runner and golden fixtures including non-support TOP 1v1 lane group). The Web MVP implementation is complete; its model remains visibly unvalidated until D-023's paired-bootstrap gate is implemented and passed.
-Next ETL ticket: **T-019.d** (CommunityDragon change scores + real-JSON fixtures — SPECS §15/D-046) once T-019.b and T-019.c are accepted. Next validation work: complete D-023 and revisit T-027.a before claiming model validation.
+Next ETL ticket: **T-019.d** (CommunityDragon change scores + real-JSON fixtures — SPECS §15/D-046) once T-019.b and T-019.c are accepted. Next web ticket: **T-041** (runes UI) once T-040 is accepted. Next validation work: complete D-023 and revisit T-027.a before claiming model validation.
 
 Session entries before 2026-10-29 live in [PROGRESS_ARCHIVE.md](./PROGRESS_ARCHIVE.md).
 
@@ -42,6 +42,19 @@ Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-0
 - T-019.d verification: please compare the champion and item lists in the 2026-11-04 "T-019.d verification step" entry below with the official 16.21 and 16.22 patch notes (misses and false positives).
 
 ## Session log (newest first)
+
+### 2026-11-06 — Devin — T-040 rune recommender in engine (REVIEW, D-059 PROPOSED)
+
+- Done:
+  - Shared: `RUNE_RESULT_SCHEMA_VERSION` = 1 (core.ts); new schemas in `schemas/runes.ts` — `runeRecommendDataSchema` (`roleProb` + `tags`), `enemyDamageMixSchema`, `runePagePickSchema` (page ids + `winRate`/`nEff`/`players`/`pickShare`/`lowData`/scoring `contextKey`+`contextLevel`), `runeAdaptationHintSchema` (`statShardsVsDamageMix`), `runeRecommendationResultSchema` (`pages`, `adaptationHints`, `damageMix`, `dataAvailable`).
+  - Engine: `recommendRunes(input, championId, runeExport, data, config?, runeConfig?)` in `src/runes.ts` + context helpers in `src/runes-context.ts`; `RuneConfig` (`kRune` = 40 eq. games prior, `topPages` = 3, `laneGroups`) in `config.ts`. Reproduces the aggregator's `lane:`/`damagemix:`/`global` keys from the draft via §4 role inference + lane-phase influence ordering (prefix back-off); pages scored by recursive shrinkage toward the same page's estimate in the next broader context (pooled-context prior when the page is absent everywhere broader, 0.5 at the broadest level); top pages ranked by shrunk win rate, tie-break `pickShare`, then page key; `lowData` = scoring-context `n_eff < minGames`.
+  - Interpretation details (partial-draft key matching, page identity, shrinkage priors, damage mix over all enemy board champions, shard hint = most-picked `statShardIds` in the matching `damagemix:` context) logged as D-059 PROPOSED.
+  - Tests: `packages/engine/test/runes.test.ts`, 16 cases — lane/damagemix/global chain, exact shrinkage arithmetic, partial lane knowledge prefix matching, TOP 1v1 key, missing export/bucket, topPages + pickShare tie-break, lowData, shard hint, duplicate-page merge, determinism, custom page count, shared-schema validation.
+- Files touched: `packages/shared/src/{index.ts,schemas/core.ts,schemas/runes.ts}`, `packages/engine/src/{config.ts,index.ts,runes.ts,runes-context.ts}`, `packages/engine/test/runes.test.ts`, `docs/{DECISIONS,TICKETS,PROGRESS}.md`.
+- Tests: `pnpm check` green (baseline was green before starting).
+- State left: REVIEW pending owner review (D-059 PROPOSED). Web wiring is T-041.
+- Next step: owner reviews T-040/D-059; then T-041 (runes UI) or T-019.d once T-019.b/T-019.c are accepted.
+- Pitfalls / notes for next AI: `recommendRunes` takes the already-picked `championId` and the parsed per-champion `RuneExport` — the engine never reads files; the caller (web, T-041) loads `roles/<userRole>/runes/<championId>.json`. Page `contextKey`/`contextLevel` report the most specific context the page was scored in. `dataAvailable: false` means show a no-data state, not an error.
 
 ### 2026-11-06 — Devin — PR #49 review fixes (matches ingestion, D-058 PROPOSED)
 

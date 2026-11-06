@@ -245,6 +245,30 @@ export const DEFAULT_RECOMMEND_CONFIG: RecommendConfig = Object.freeze({
   comp: DEFAULT_COMP_CONFIG,
 });
 
+// --- Rune recommendation config (SPECS §8.1) ---
+
+/**
+ * Rune-recommender config (SPECS §8.1). Injected into `recommendRunes` so the
+ * T-027.b backtest can tune the shrinkage prior and page count.
+ */
+export interface RuneConfig {
+  /**
+   * Prior strength (equivalent games) used when shrinking a page's win rate
+   * toward the same page's estimate in the next broader context. Prior.
+   */
+  readonly kRune: number;
+  /** Number of top pages returned (SPECS §8.1: top 3). */
+  readonly topPages: number;
+  /** Lane groups per role (SPECS §8.1 context slots, D-021). */
+  readonly laneGroups: Readonly<Record<Role, LaneGroup>>;
+}
+
+export const DEFAULT_RUNE_CONFIG: RuneConfig = Object.freeze({
+  kRune: 40,
+  topPages: 3,
+  laneGroups: DEFAULT_LANE_GROUPS,
+});
+
 // --- Influence lookup ---
 
 export interface InfluenceOpts {

@@ -64,7 +64,7 @@ Format: `ID | Title | Deps | Status | Acceptance`. Status: TODO, DOING, REVIEW, 
 
 ## E4 Runes
 
-- **T-040 | Rune recommender in engine (M)** | T-018,T-023 | TODO | SPECS §8.1.
+- **T-040 | Rune recommender in engine (M)** | T-018,T-023 | REVIEW | SPECS §8.1. DONE pending review: `recommendRunes` (engine `runes.ts`/`runes-context.ts`) reproduces the aggregator's `lane:`/`damagemix:`/`global` context keys from the draft (lane-phase influence ordering, prefix back-off), scores pages by recursively shrunk win rate toward broader contexts (prior `kRune` = 40 eq. games, `RuneConfig`), returns top `topPages` (3) with `nEff`/`players`/`pickShare`/`lowData`/scoring `contextKey`, plus a `statShardsVsDamageMix` adaptation hint; output contract `RuneRecommendationResult` (`RUNE_RESULT_SCHEMA_VERSION` = 1) in shared. Interpretation details logged as D-059 PROPOSED.
 - **T-041 | Runes UI (M)** | T-040,T-032 | TODO | Rune page display (icons), adaptation hints.
 - **T-042 | Gameplan notes (S)** | T-032 | TODO | Markdown per champion displayed after pick.
 

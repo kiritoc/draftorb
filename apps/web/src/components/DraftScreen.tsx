@@ -17,6 +17,7 @@ import {
   type DraftInput,
   type InsufficientDataEntry,
   type PoolUnavailableEntry,
+  type ProfileExport,
   type Rank,
   rankSchema,
   type RecommendData,
@@ -32,15 +33,24 @@ import {
   loadManifest,
 } from '../data/loader.js';
 import { loadChampionIconVersion } from '../data/champion-icons.js';
+import { loadProfile } from '../data/profile.js';
 import { createRecommendData } from '../data/recommend-data.js';
 import { excludePick, excludedRanks } from '../data/exclude-pick.js';
+import { computePersonalizedEntries } from '../personalized.js';
 import { championsForSlot } from '../champion-availability.js';
 import { recommendationPageSize } from '../config.js';
 import { strings } from '../strings.js';
 import { DraftSlot, type DraftSlotState } from './DraftSlot.js';
 import { RecommendationsList } from './RecommendationsList.js';
+import { PersonalizedList } from './PersonalizedList.js';
 import { PoolEditor } from './PoolEditor.js';
 import { filterPoolByCatalogue, readPool, savePool } from '../pool/storage.js';
+import {
+  applyFavoritesMode,
+  FAVORITES_MODES,
+  importFavoritesIntoPool,
+  type FavoritesMode,
+} from '../pool/favorites.js';
 import { buildPoolUnavailableItems } from '../pool/unavailable.js';
 
 const USER_ROLE: Role = 'SUPPORT';
@@ -64,6 +74,7 @@ export function DraftScreen() {
   const [error, setError] = useState<string | null>(null);
   const [recommendationError, setRecommendationError] = useState<string | null>(null);
   const [pool, setPool] = useState<ChampionPool | null>(null);
+  const [profile, setProfile] = useState<ProfileExport | null>(null);
   const [poolStorageIssue, setPoolStorageIssue] = useState<'corrupt' | 'unavailable' | null>(null);
   const [poolDropped, setPoolDropped] = useState<number[]>([]);
   const [user, setUser] = useState<DraftSlotState>({ championId: null });
@@ -77,6 +88,8 @@ export function DraftScreen() {
   const [userRank, setUserRank] = useState<Rank>(DEFAULT_RANK);
   const [poolEditorOpen, setPoolEditorOpen] = useState(false);
   const [hideMyPool, setHideMyPool] = useState(false);
+  const [favoritesMode, setFavoritesMode] = useState<FavoritesMode>('include');
+  const [favoritesNotice, setFavoritesNotice] = useState<string | null>(null);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [poolRecommendations, setPoolRecommendations] = useState<Recommendation[]>([]);
 
@@ -99,9 +112,10 @@ export function DraftScreen() {
           );
         }
         const loadedChampions = await loadChampions(latest.patch);
-        const [loadedFiles, tags] = await Promise.all([
+        const [loadedFiles, tags, loadedProfile] = await Promise.all([
           loadExportFiles(manifest),
           loadChampionTags(),
+          loadProfile(),
         ]);
         const loadedPool = readPool();
         if (cancelled) {
@@ -109,6 +123,7 @@ export function DraftScreen() {
         }
         setPatch(latest.patch);
         setChampions(loadedChampions);
+        setProfile(loadedProfile);
         setData(createRecommendData(loadedFiles.files, loadedChampions, tags));
         const { pool: filteredPool, dropped } = filterPoolByCatalogue(
           loadedPool.pool ?? { version: 1, pools: {} },
@@ -134,6 +149,7 @@ export function DraftScreen() {
 
   const poolChampionIds = useMemo(() => pool?.pools[USER_ROLE] ?? [], [pool]);
   const poolSet = useMemo(() => new Set(poolChampionIds), [poolChampionIds]);
+  const favoriteIds = useMemo(() => new Set(profile?.favorites.combined ?? []), [profile]);
 
   const draftInput: DraftInput = useMemo(
     () => ({
@@ -210,19 +226,71 @@ export function DraftScreen() {
   const poolSize = poolChampionIds.length;
   // The user's own pick is already taken: never suggest it again, and close
   // the rank gaps it leaves in both lists.
-  const removedRanks = excludedRanks(user.championId, recommendations, poolRecommendations);
-  const overallRecommendations = excludePick(recommendations, user.championId, removedRanks).filter(
-    (r) => !hideMyPool || !poolSet.has(r.championId),
+  const removedRanks = useMemo(
+    () => excludedRanks(user.championId, recommendations, poolRecommendations),
+    [user.championId, recommendations, poolRecommendations],
   );
-  const visiblePoolRecommendations = excludePick(
-    poolRecommendations,
-    user.championId,
-    removedRanks,
+  const overallRecommendations = applyFavoritesMode(
+    excludePick(recommendations, user.championId, removedRanks).filter(
+      (r) => !hideMyPool || !poolSet.has(r.championId),
+    ),
+    favoritesMode,
+    favoriteIds,
   );
+  const visiblePoolRecommendations = applyFavoritesMode(
+    excludePick(poolRecommendations, user.championId, removedRanks),
+    favoritesMode,
+    favoriteIds,
+  );
+
+  // Personalized list (T-096): engine output for the configured profile.
+  // `score(c)` and the other lists are untouched (D-072 invariant).
+  const personalizedEntries = useMemo(() => {
+    if (profile === null || data === null || recommendations.length === 0) {
+      return [];
+    }
+    return computePersonalizedEntries(
+      recommendations,
+      profile,
+      draftInput,
+      data,
+      user.championId,
+      removedRanks,
+      Date.now(),
+    );
+  }, [recommendations, profile, data, draftInput, user.championId, removedRanks]);
+  const visiblePersonalized = applyFavoritesMode(personalizedEntries, favoritesMode, favoriteIds);
+  const personalizedResetKey = useMemo(
+    () => ({ draft: draftInput, profileId: profile?.id ?? null }),
+    [draftInput, profile],
+  );
+
+  const importFavorites = useCallback(() => {
+    if (profile === null) {
+      return;
+    }
+    const result = importFavoritesIntoPool(pool, profile.favorites.combined);
+    const { pool: filteredPool, dropped } = filterPoolByCatalogue(
+      result.pool,
+      champions.map((champion) => champion.id),
+    );
+    setPool(filteredPool);
+    setPoolDropped(dropped);
+    setPoolStorageIssue(savePool(filteredPool) ? null : 'unavailable');
+    setFavoritesNotice(
+      result.added.length === 0 && result.skipped === 0
+        ? strings.favoritesNoNew
+        : strings.favoritesImported(result.added.length, result.skipped),
+    );
+  }, [profile, pool, champions]);
   const poolUnavailableItems = useMemo(
     () =>
-      buildPoolUnavailableItems(poolUnavailable, insufficientData, user.championId ?? undefined),
-    [poolUnavailable, insufficientData, user.championId],
+      applyFavoritesMode(
+        buildPoolUnavailableItems(poolUnavailable, insufficientData, user.championId ?? undefined),
+        favoritesMode,
+        favoriteIds,
+      ),
+    [poolUnavailable, insufficientData, user.championId, favoritesMode, favoriteIds],
   );
 
   if (error) {
@@ -250,6 +318,15 @@ export function DraftScreen() {
                   {strings.championsLabel}: {champions.length}
                   {' · '}
                   {strings.poolLabel}: {poolSize}
+                </p>
+              )}
+              {profile !== null && (
+                <p className="text-sm text-emerald-300/90">
+                  {strings.profileLabel(
+                    profile.label,
+                    `${profile.riotId.gameName}#${profile.riotId.tagLine}`,
+                    profile.riotId.platform,
+                  )}
                 </p>
               )}
             </div>
@@ -282,6 +359,15 @@ export function DraftScreen() {
                   ))}
                 </select>
               </div>
+              {profile !== null && (
+                <button
+                  type="button"
+                  onClick={importFavorites}
+                  className="px-3 py-1.5 text-sm bg-emerald-900/40 hover:bg-emerald-900/60 text-emerald-200 rounded border border-emerald-700/50"
+                >
+                  {strings.importFavorites}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setPoolEditorOpen(true)}
@@ -346,7 +432,21 @@ export function DraftScreen() {
               champions={champions}
               pageSize={recommendationPageSize}
               resetKey={draftInput}
+              poolIds={poolSet}
+              favoriteIds={favoritesMode === 'include' ? favoriteIds : undefined}
               unavailable={poolUnavailableItems}
+            />
+          </div>
+        )}
+
+        {profile !== null && visiblePersonalized.length > 0 && (
+          <div className="mb-4">
+            <PersonalizedList
+              title={profile.label}
+              entries={visiblePersonalized}
+              champions={champions}
+              pageSize={recommendationPageSize}
+              resetKey={personalizedResetKey}
             />
           </div>
         )}
@@ -382,7 +482,32 @@ export function DraftScreen() {
           </div>
         )}
 
-        <div className="flex items-center justify-end gap-3 mb-2">
+        {favoritesNotice !== null && (
+          <div
+            role="status"
+            className="mb-4 p-3 rounded bg-emerald-900/20 border border-emerald-600/30 text-sm text-emerald-300"
+          >
+            {favoritesNotice}
+          </div>
+        )}
+
+        <div className="flex items-center justify-end gap-4 mb-2">
+          {profile !== null && (
+            <label className="flex items-center gap-1.5 text-xs text-gray-400">
+              {strings.favoritesModeLabel}
+              <select
+                value={favoritesMode}
+                onChange={(event) => setFavoritesMode(event.target.value as FavoritesMode)}
+                className="px-2 py-1 bg-gray-800 border border-gray-600 rounded text-gray-200 focus:outline-none focus:border-indigo-400"
+              >
+                {FAVORITES_MODES.map((mode) => (
+                  <option key={mode} value={mode}>
+                    {strings.favoritesModeOption(mode)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <label className="flex items-center gap-1.5 text-xs text-gray-400 cursor-pointer select-none">
             <input
               type="checkbox"
@@ -399,6 +524,7 @@ export function DraftScreen() {
           pageSize={recommendationPageSize}
           resetKey={draftInput}
           poolIds={poolSet}
+          favoriteIds={favoritesMode === 'include' ? favoriteIds : undefined}
         />
         {recommendationError !== null && (
           <p role="alert" className="mt-3 text-sm text-red-400">

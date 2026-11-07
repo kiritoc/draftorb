@@ -6,6 +6,8 @@ export const strings = {
   patchLabel: 'Patch',
   championsLabel: 'Champions',
   poolLabel: 'Pool',
+  profileLabel: (label: string, riotId: string, platform: string): string =>
+    `Profile: ${label} — ${riotId} (${platform})`,
   rolesLabel: 'Roles',
   loading: 'Loading data…',
   loadFailed: (error: string): string => `Failed to load data: ${error}`,
@@ -50,6 +52,18 @@ export const strings = {
   win: 'win',
   inPool: (rank: number): string => `In your pool · #${rank}`,
   inPoolTag: 'In your pool',
+  favoriteBadge: 'Profile favorite',
+  importFavorites: 'Import favorites into pool',
+  favoritesModeLabel: 'Favorites',
+  favoritesModeOption: (mode: string): string =>
+    mode === 'include' ? 'All (badge)' : mode === 'only' ? 'Favorites only' : 'Hide favorites',
+  favoritesImported: (added: number, skipped: number): string =>
+    skipped > 0
+      ? `Imported ${added} favorite(s) into your pool — pool is full, ${skipped} not added.`
+      : `Imported ${added} favorite(s) into your pool.`,
+  favoritesNoNew: 'All profile favorites are already in your pool.',
+  personalizedBadge: (wrPct: number, games: number, level: number, deltaPp: number): string =>
+    `${wrPct}% over ${games} games vs this setup (L${level}, ${deltaPp >= 0 ? '+' : '−'}${Math.abs(deltaPp)} vs meta)`,
   counter: 'Counter',
   strongCounter: 'Strong counter',
   weakCounter: 'Weak counter',

@@ -22,13 +22,14 @@ pnpm dev
 
 1. Sign in at https://developer.riotgames.com, copy the Development API Key (expires every 24h) or your Personal key (no expiry — recommended).
 2. Paste into `.env`. With a dev key, re-paste daily.
+3. **Changing keys?** PUUIDs are encrypted per API key — run `pnpm etl rekey` (try `--dry-run` first) before the next `matches` run, then re-run `pnpm etl players` to repopulate pending players (B-062/D-060).
 
 ## Scheduled CI refresh (D-057)
 
 `.github/workflows/etl.yml` runs the pipeline every 12h (and on demand via _Actions → ETL refresh → Run workflow_):
 
 1. Restores `data/DraftOrb.sqlite` from the orphan branch `etl-db` (single gzipped file `DraftOrb.sqlite.gz`, ~58 MB, force-pushed/amended each run — the job refuses to run if the branch is missing, so an empty DB can never overwrite good state).
-2. `migrate` → `check-key` → `static` → `matches euw1 --refresh` → `matches euw1 --limit 100` (bounded pending-player ingest) → `prune` → `aggregate` → `derive-roles` → `export` → `status`.
+2. `migrate` → `check-key` → `static` → `matches euw1 --refresh` → `matches euw1 --limit 100` (bounded pending-player ingest) → `profile-sync --publish` (configured profiles only, non-fatal) → `prune` → `aggregate` → `derive-roles` → `export` → `status`.
 3. Checkpoints WAL + VACUUMs the DB, pushes the new state to `etl-db`, and commits changed `data/public/**` to `main`. Because `GITHUB_TOKEN` pushes do not trigger `push`-event workflows, the job then dispatches `deploy.yml` explicitly (`gh workflow run`).
 
 Setup: add the **personal** Riot key as repo secret `RIOT_API_KEY` (Settings → Secrets and variables → Actions). `GITHUB_TOKEN` needs `contents: write` + `actions: write` (already granted by the workflow's `permissions` block).
@@ -42,6 +43,17 @@ gzip -9 -c data/DraftOrb.sqlite > DraftOrb.sqlite.gz
 ```
 
 Tuning: change the cron or the `--limit 100` pending-player cap in the workflow file; ingestion is resumable via cursors, so smaller caps just spread the work over more runs. Watch the gzipped size — GitHub rejects files >100 MB, so if `DraftOrb.sqlite.gz` approaches that, reduce `--per-player`/retention or move the state to external storage (see D-057).
+
+## Profile sync (D-067..D-071)
+
+Personalization is fed by configured profiles declared in `data/profiles.config.json` (committed, no secrets). Default and only entry: `KiriToc#Toc` on `EUW1`. Only configured profiles are ever synced — visitors cannot add any, and adding another person's profile requires their consent.
+
+- Local: `pnpm etl profile-sync [profileId] [--publish]` uses `RIOT_API_KEY` from `.env` (same key as the other ETL commands; see "Riot key" above — a dev key expires every 24 h and cannot drive the schedule, use the personal key).
+- CI: `etl.yml` runs `profile-sync` for every configured profile on each scheduled run and on `workflow_dispatch`, using the `RIOT_API_KEY` GitHub Actions secret. Profile tables live in the same `etl-db` state branch as the rest of the database.
+- Exports land in `data/public/profiles/` (`<id>.json` + `index.json`), anonymized per D-069; without `--publish` a local run keeps them out of the deployed tree.
+- GitHub Pages: the site is already deployed by `deploy.yml`; no extra Pages configuration is needed for profiles — they are plain static JSON under `data/public/`.
+- Key rotation: if `RIOT_API_KEY` ever changes, stored profile puuids are encrypted per key like match puuids (B-062/D-060) — re-resolve/re-key before the next sync (procedure in D-071, implementation detail in T-091).
+- Secret-leak check (T-092): `node scripts/check-secrets.mjs` scans committed files (`git ls-files`) and `apps/web/dist` for `RGAPI-` tokens and the literal `RIOT_API_KEY` value (when set). It runs in CI (`ci.yml` lint job) and as a gate in `deploy.yml` before the Pages artifact is uploaded; it reports file + needle name only, never the secret. Run it locally any time with `node scripts/check-secrets.mjs`.
 
 ## ETL commands
 
@@ -61,6 +73,7 @@ pnpm etl status [platform]     # counts and progress
 pnpm etl aggregate [patch]     # compute every aggregated table (role probabilities, baselines, pair and lane tables, rune contexts; T-015..T-018)
 pnpm etl export [patch] [--region=<platform>]  # write versioned JSON and manifest for a patch (T-019)
 pnpm etl derive-roles [patch]  # rewrite champions.json.roles from observed roles (T-015.b); run after `matches`, and re-run after every `static`
+pnpm etl rekey [platform]      # rewrite stored PUUIDs to the current API key (after an RIOT_API_KEY change; --dry-run, --limit=N)
 ```
 
 Database commands (`aggregate`, `derive-roles`, `export`, `status`, `matches`, `players`, `migrate`) resolve the SQLite path the same way (`DRAFTORB_DB_PATH` env or repo default). `aggregate` and `derive-roles` refuse to run on a database with pending migrations — run `pnpm etl migrate` first.
@@ -69,11 +82,12 @@ Planned (target state, see TICKETS.md):
 
 ```
 pnpm etl backtest              # offline validation (T-027.a, T-027.b)
+pnpm etl profile-sync [id]     # sync configured profiles -> SQLite -> data/public/profiles/ (T-091, D-068)
 ```
 
 ## Troubleshooting
 
 - `better-sqlite3` install or load fails -> use Node 22 (prebuilt binaries; `better-sqlite3` 13.x requires Node >=22 and segfaults on Node 20, B-015); log anything new in BUGS.md.
-- 401/403 from Riot -> key expired.
+- 401/403 from Riot -> key expired. `400 Exception decrypting <puuid>` -> the key changed since the DB was built; run `pnpm etl rekey` (B-062/D-060).
 - 429 -> normal, the client waits for `Retry-After` and retries (up to 5 times).
 - PowerShell script policy errors -> use `pnpm` commands only, avoid `.ps1` scripts.

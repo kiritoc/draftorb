@@ -32,6 +32,36 @@ Review notes that predate the bug log live in [Review history](#review-history) 
 
 ## Fixed
 
+### B-064 — `.gitignore` does not cover the legacy `data/users/` path — FIXED
+
+- Severity / Area: S3 / docs (git hygiene)
+- Steps to reproduce: the superseded D-063 plan stored synced user profiles in `data/users/<puuid>.json` "gitignored by default", but `.gitignore` only covers `data/raw/` and `*.sqlite*` — `data/users/` was never ignored.
+- Expected / Actual: expected personal profile exports to be uncommittable; actual a `data/users/` directory would be tracked by git.
+- Environment (OS, Node version, patch): repo root, 2026-11-06.
+- Logs / screenshot: `git check-ignore data/users/x.json` returns nothing.
+- Suspected cause: D-063 documented the ignore rule but no ticket added the `.gitignore` entry before the plan was superseded (D-067..D-075).
+- Fix (commit/ticket): T-090 (`269d48b`) adds `data/users/` to `.gitignore` and updates `.env.example` comments. Under the new plan profiles export to `data/public/profiles/` (intentionally committed, anonymized per D-069), so the legacy path should never exist — the ignore entry is defense in depth.
+- Note: security audit 2026-11-06 found NO real secrets or personal data in committed files — only placeholders (`.env.example`, `RGAPI-xxxx...`) and test fixtures (`RGAPI-test-api-key-12345`, UUID-shaped redaction fixtures).
+
+### B-063 — Merged rune pages overstated sample sizes (`n_eff` summed per row instead of recomputed) — FIXED
+
+- Severity / Area: S2 / engine (runes, T-040)
+- Steps to reproduce: an exported rune context contains two rows with identical exported page fields (same primary/sub style, keystone, perks, shards) but different perk hashes and different game weights — e.g. ten weight-1 games plus ten weight-0.1 games for the same displayed page.
+- Expected / Actual: expected the merged page's `n_eff` to be recomputed from combined weights, `(Σw)² / Σw² = 11² / 10.1 ≈ 11.98`; actual `aggregateContextPages` summed each row's individual equivalent counts (`toEquivalentCounts` per row), reporting `n_eff` 20 — enough to clear the 15/25-game low-data threshold and shift page rankings. The same inflation fed `totalGamesE`/`totalWinsE`, the context prior in `recommendRunes`.
+- Environment (OS, Node version, patch): reported 2026-11-06 against `packages/engine/src/runes-context.ts`.
+- Suspected cause: `aggregateContextPages` called `toEquivalentCounts` per row and added the results, but `n_eff` is nonlinear in the weights — it must be computed once on the merged `winsW`/`gamesW`/`gamesW2`.
+- Fix (commit/ticket): `aggregateContextPages` now accumulates `winsW`, `gamesW`, `gamesW2` per page key first, then calls `toEquivalentCounts` once per merged page; context totals are summed from those merged counts. Regression test: duplicate pages with unequal game weights assert `n_eff ≈ 11.98` and `lowData` true.
+
+### B-062 — All stored PUUIDs undecryptable after `RIOT_API_KEY` change (`400 Exception decrypting`) — FIXED
+
+- Severity / Area: S1 / etl (ops)
+- Steps to reproduce: swap `.env`/`RIOT_API_KEY` to a different Riot key, then run `pnpm etl matches euw1 --refresh` (or any by-puuid call).
+- Expected / Actual: expected match listing to work; actual every by-puuid endpoint returns `400 Bad Request - Exception decrypting <puuid>` for all ~3k stored puuids, while league entries by rank and fresh puuids work.
+- Environment (OS, Node version, patch): GitHub Actions `etl.yml` run + local repro, 2026-11-06.
+- Logs / screenshot: `[ETL] Fatal error: Riot API request failed with status 400 ... "Exception decrypting -x2yA_sa…"`.
+- Suspected cause: Riot encrypts PUUIDs per API key (DevRel: developer-relations#759, #471, #20). Puuids stored under the previous key cannot be decrypted by the new key; match IDs are unaffected.
+- Fix (commit/ticket): new `pnpm etl rekey` command (`packages/etl/src/rekey.ts`) re-fetches every stored match by match ID and rewrites `participants`, `item_events`, `players` and `match-ingest:` cursors to the current key's puuids (old->new pairing via team/champion/KDA fingerprint). Pending owner run on `data/DraftOrb.sqlite` + `etl-db` reseed. See D-060.
+
 ### B-061 — `docs/PROMPTS.md` fails `pnpm format:check` on a clean checkout — FIXED
 
 - Severity / Area: S4 / docs

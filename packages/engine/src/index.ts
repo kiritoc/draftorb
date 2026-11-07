@@ -13,3 +13,6 @@ export * from './roles.js';
 export * from './roles-types.js';
 export * from './comp.js';
 export * from './recommend.js';
+export * from './personalize.js';
+export * from './profile-setup.js';
+export * from './runes.js';

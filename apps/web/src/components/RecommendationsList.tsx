@@ -34,6 +34,9 @@ export interface RecommendationsListProps {
   /** Champion ids belonging to the user's pool, used to tag cards "In your
    *  pool" in lists whose entries do not carry `poolRank` (SPECS §7.1). */
   poolIds?: ReadonlySet<number>;
+  /** Profile favorite champion ids — tags cards with the star badge. Only
+   *  passed in `include` favorites mode (SPECS §18.4). */
+  favoriteIds?: ReadonlySet<number>;
   /** Pool champions without a score, rendered after the ranked entries with a
    *  "Not recommended" badge (SPECS §7.1). */
   unavailable?: readonly PoolUnavailableItem[];
@@ -50,6 +53,7 @@ export function RecommendationsList({
   pageSize = recommendationPageSize,
   resetKey,
   poolIds,
+  favoriteIds,
   unavailable,
 }: RecommendationsListProps) {
   const entries = useMemo<RecommendationListEntry[]>(
@@ -91,6 +95,7 @@ export function RecommendationsList({
                   recommendation={entry.recommendation}
                   champions={champions}
                   inPool={poolIds?.has(entry.recommendation.championId) ?? false}
+                  favorite={favoriteIds?.has(entry.recommendation.championId) ?? false}
                 />
               ) : (
                 <UnavailableChampionCard

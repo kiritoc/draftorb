@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "profiles": [
+    {
+      "id": "kiritoctoc-euw1",
+      "riotId": { "gameName": "KiriToc", "tagLine": "Toc" },
+      "platform": "EUW1",
+      "label": "KiriToc's picks",
+      "options": {}
+    }
+  ]
+}

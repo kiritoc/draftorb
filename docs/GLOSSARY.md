@@ -36,3 +36,10 @@
 - **Overall list**: the complete ranking of all scored candidates (`DraftResult.recommendations`), always shown.
 - **Pool list**: the pool champions of the overall ranking (`poolRecommendations`), shown above the overall list when the pool is non-empty.
 - **recommendationPageSize**: number of items shown first and added by each "Show more" click (default 5, UI config).
+- **Profile**: a configured League account whose match history is synced by the pipeline (`data/profiles.config.json` -> `pnpm etl profile-sync`) and exported as anonymized static JSON under `data/public/profiles/` (D-068/D-069). Only configured profiles exist; visitors cannot add any.
+- **Profile win rate**: the profile's own recency-weighted win rate on a champion in a given context, shrunk toward the profile's global win rate (D-073).
+- **Shrinkage (profile)**: `p = (wins_w + K_SHRINK * p_profile) / (games_w + K_SHRINK)`, `K_SHRINK = 15`, pulling small samples toward the profile's own global rate.
+- **Trust**: `n_eff * levelFactor / (n_eff * levelFactor + K_TRUST)` (`K_TRUST = 20`), how much the personalized score blends profile vs meta evidence (D-073).
+- **Favorites**: champions derived at export — top 15 by recency-weighted Support games (90 days) union top 5 by mastery — importable into the visitor's browser pool, with the `include`/`only`/`hide` display modes (D-074).
+- **Personalized list**: the profile-labeled recommendation list (e.g. "KiriToc's picks") produced by `personalize`, beside "Best overall" and "From your pool"; never changes `score(c)` and is never called "For you" (D-072).
+- **Pipeline**: the scheduled GitHub Actions ETL (`etl.yml`) that restores the `etl-db` SQLite state, refreshes matches and configured profiles, re-aggregates and commits `data/public` exports which `deploy.yml` ships to GitHub Pages (D-057/D-070).

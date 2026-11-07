@@ -35,7 +35,7 @@ export class InvalidMatchParticipantsError extends Error {
   }
 }
 
-const ROLE_BY_TEAM_POSITION: Readonly<Record<string, Role>> = {
+export const ROLE_BY_TEAM_POSITION: Readonly<Record<string, Role>> = {
   TOP: 'TOP',
   JUNGLE: 'JUNGLE',
   MIDDLE: 'MID',

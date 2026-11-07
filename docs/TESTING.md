@@ -22,6 +22,7 @@
 - Web pagination: page boundaries, exhaustion hides the button, reset on draft change, two lists independent.
 - Rank switch Emerald vs Diamond changes ordering only through data weights.
 - Same input twice -> identical output (determinism).
+- Personalization (T-095..T-098, D-072..D-075): small profile sample shrinks toward the profile's global win rate (`K_SHRINK`); recency weighting halves an old game's weight after `HALF_LIFE_DAYS`; fallback level selection picks the first level with `n_eff >= MIN_GAMES`; trust blend lets a high-trust profile pick outrank the meta #1 in the profile-labeled list while "Best overall" stays identical with and without a profile (property test); favorites `include`/`only`/`hide` modes filter or flag without touching scores; insufficient-data entries carry `n_eff` and no percentage; `personalize` is deterministic.
 
 ## Property checks
 
@@ -49,4 +50,6 @@
 - Change-score fixtures on toy data (with shown arithmetic) AND real JSON fixtures: trimmed CommunityDragon files of two consecutive real patches under `packages/etl/test/fixtures` (D-046, SPECS §15).
 - `pruned` tombstone is permanent: `--reset` keeps `pruned` rows; a widened `--since-patch` does not resurrect them; `--reset-tombstones` does; `--since-patch` below the retention bound without `--reset-tombstones` is a usage error.
 - Rune `reset` zeroes only `rune_ctx` rows whose page contains that rune while `baseline` is identical; global breakpoint lowers every aggregate table.
+- `profile-sync` (T-091): re-run is idempotent and fetches only matches newer than the profile cursor; export validates against the shared schema; the anonymization whitelist is enforced — the exported JSON contains no other players' names, Riot IDs, puuids or match ids (fixture test with foreign identifiers present in `profile_games`); the 180-day/`profileMaxGames` cap is enforced; favorites arithmetic (top 15 recency-weighted in 90 days union top 5 mastery) is tested; mocked-HTTP tests cover account-v1/match-v5/champion-mastery-v4/timeline incl. 429/401/schema errors; a failed Riot call keeps the previous export and stored rows.
+- Secret-leak check (T-092): a planted `RGAPI-` string (and the configured key value) in committed files or in `apps/web/dist` fails the check; the real tree and build output pass; the check never prints the secret itself.
 - One failing insert per CHECK of both new tables (`data_breakpoints`, `entity_change_scores`) plus the duplicate-breakpoint test (NULL `scope_id` included).

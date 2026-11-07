@@ -3,21 +3,22 @@
 ## Current status
 
 - Phase: 1 (Support / Diamond)
-- Current milestone: M3 Web MVP implementation complete (T-030..T-035 DONE); the backtest harness (T-027.a) remains under review because D-023 paired-bootstrap validation is not implemented. T-019.b (patch index, now incl. D-055), T-019.c (retention prune) and T-026 (golden suite, 23 scenarios) are in REVIEW; T-019.d..f and T-027.b remain TODO.
-- Last updated: 2026-11-06 by Devin (PR #49 review fixes: tombstone/reset ordering, retriable unknown-label invalid rejects, full relist on --reset-tombstones; D-058 PROPOSED)
+- Current milestone: M3 Web MVP implementation complete (T-030..T-035 DONE); the backtest harness (T-027.a) remains under review because D-023 paired-bootstrap validation is not implemented. T-019.b (patch index, now incl. D-055), T-019.c (retention prune) and T-026 (golden suite, 23 scenarios) are in REVIEW; T-019.d..f and T-027.b remain TODO. T-040 (engine rune recommender, SPECS §8.1) is in REVIEW with D-059 PROPOSED. E8 Personalization implemented through T-096: T-090..T-096 DONE (profile config/schemas, `profile-sync` ETL + scheduled workflow + secret-leak gate, web profile loader, favorites, engine `personalize`, personalized list UI); T-097 engine half DONE (`recommendProfileRunes`/`recommendProfileSpells`) with the UI half blocked on T-041 (no runes screen exists); T-098 stays TODO (T-052/T-054/T-056 missing). Decisions D-067..D-077 PROPOSED; earlier per-user plan cancelled (T-080..T-086 CANCELLED, D-061..D-066 SUPERSEDED).
+- Last updated: 2026-11-07 by Devin (implemented personalization epic T-090..T-096 + T-097 engine half; two review passes, fixes folded in; B-064 closed)
 
 ## Epic status
 
-| Epic           | Status      | Notes                                                                                                                                                                |
-| -------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| E0 Foundations | IN PROGRESS | T-001..T-005 DONE; T-002.b DONE                                                                                                                                      |
-| E1 ETL         | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e, T-014, T-015, T-015.b, T-016, T-017, T-018, T-019 DONE; T-019.b, T-019.c REVIEW; T-019.d..f TODO |
-| E2 Engine      | IN PROGRESS | T-020..T-025 DONE; T-026 REVIEW; T-027.b TODO; T-027.a REVIEW                                                                                                        |
-| E3 Web MVP     | DONE        | T-030..T-035 complete; recommendation flow, Support pool, regression coverage, deploy assets and visible unvalidated-model state                                     |
-| E4 Runes       | NOT STARTED |                                                                                                                                                                      |
-| E5 Items       | NOT STARTED |                                                                                                                                                                      |
-| E6 Live        | NOT STARTED |                                                                                                                                                                      |
-| E7 Vision      | NOT STARTED |                                                                                                                                                                      |
+| Epic               | Status      | Notes                                                                                                                                                                   |
+| ------------------ | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| E0 Foundations     | IN PROGRESS | T-001..T-005 DONE; T-002.b DONE                                                                                                                                         |
+| E1 ETL             | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e, T-014, T-015, T-015.b, T-016, T-017, T-018, T-019 DONE; T-019.b, T-019.c REVIEW; T-019.d..f TODO    |
+| E2 Engine          | IN PROGRESS | T-020..T-025 DONE; T-026 REVIEW; T-027.b TODO; T-027.a REVIEW                                                                                                           |
+| E3 Web MVP         | DONE        | T-030..T-035 complete; recommendation flow, Support pool, regression coverage, deploy assets and visible unvalidated-model state                                        |
+| E4 Runes           | IN PROGRESS | T-040 REVIEW; T-041, T-042 TODO                                                                                                                                         |
+| E5 Items           | NOT STARTED |                                                                                                                                                                         |
+| E6 Live            | NOT STARTED |                                                                                                                                                                         |
+| E7 Vision          | NOT STARTED |                                                                                                                                                                         |
+| E8 Personalization | IN PROGRESS | Replanned 2026-11-06: pipeline-fed configured profile, static-only (D-067..D-077 PROPOSED); T-090..T-096 DONE, T-097 engine-only, T-098 blocked, T-080..T-086 CANCELLED |
 
 ## Data collection status
 
@@ -31,17 +32,112 @@
 ## Next recommended ticket
 
 T-023 is **DONE** (Role-generic recommendation engine with explanations, layered shrinkage scoring, pool contract D-024, composition needs, golden test runner and golden fixtures including non-support TOP 1v1 lane group). The Web MVP implementation is complete; its model remains visibly unvalidated until D-023's paired-bootstrap gate is implemented and passed.
-Next ETL ticket: **T-019.d** (CommunityDragon change scores + real-JSON fixtures — SPECS §15/D-046) once T-019.b and T-019.c are accepted. Next validation work: complete D-023 and revisit T-027.a before claiming model validation.
+Next ETL ticket: **T-019.d** (CommunityDragon change scores + real-JSON fixtures — SPECS §15/D-046) once T-019.b and T-019.c are accepted. Next web ticket: **T-041** (runes UI) once T-040 is accepted. Next validation work: complete D-023 and revisit T-027.a before claiming model validation.
 
 Session entries before 2026-10-29 live in [PROGRESS_ARCHIVE.md](./PROGRESS_ARCHIVE.md).
 
 ## Open questions for the owner
 
-Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-050 and D-051 ACCEPTED; D-044 ACCEPTED with 20 patches; D-046 ACCEPTED with CommunityDragon as the source. Owner decisions 2026-11-05: D-053 and D-054 ACCEPTED. PROPOSED and awaiting owner review: D-052 (pick-rate export semantics for `blindSafety`, added with the B-026 fix).
+Owner decisions 2026-11-04: D-034, D-035, D-043, D-045, D-047, D-048, D-049, D-050 and D-051 ACCEPTED; D-044 ACCEPTED with 20 patches; D-046 ACCEPTED with CommunityDragon as the source. Owner decisions 2026-11-05: D-053 and D-054 ACCEPTED. PROPOSED and awaiting owner review: D-052 (pick-rate export semantics for `blindSafety`, added with the B-026 fix), D-056, D-058, D-059, D-060, and the pipeline-fed personalization set D-067..D-077 (implemented 2026-11-07, see session log; supersedes D-061..D-066).
+
+Open questions recorded by the personalization replanning session (all PROPOSED in D-067..D-075):
+
+- D-071: does Riot require a **production key** once the site is public? Personal key (no expiry) is used today; dev-portal terms to verify — marked "to verify" in RIOT_API.md.
+- D-071: profile puuids are encrypted per API key like match puuids (B-062/D-060); `etl rekey` covers `participants`/`players` — whether `profile_games`/`profile_mastery` need an equivalent re-key step is an implementation detail for T-091 (assumption: re-resolve Riot ID -> puuid each run and re-key by match id).
+- D-068: timeline fetch per synced game (~1 extra request/game) for the item build order — keep it or final items only? (carried over from the cancelled plan).
+- D-068: queue 420 (ranked solo/duo) only for profile stats, consistent with main ingestion — or all queues?
+- D-073: personalization constants (`HALF_LIFE_DAYS` 60, `K_SHRINK` 15, `MIN_GAMES` 3, `K_TRUST` 20, `levelFactor`) are priors; there is no backtest for personalization yet — acceptable until one exists?
+- D-069: size cap `profileMaxGames` = 500 / last 180 days — confirm acceptable JSON size once real data exists.
+- T-098: personal items need `GameState` (T-052+) and enough per-context profile games; exact open questions are in SPECS §18.6.
 
 - T-019.d verification: please compare the champion and item lists in the 2026-11-04 "T-019.d verification step" entry below with the official 16.21 and 16.22 patch notes (misses and false positives).
 
 ## Session log (newest first)
+
+### 2026-11-07 — Devin — Personalization epic T-090..T-097 implemented
+
+- Done:
+  - **T-090** (`269d48b`): `data/profiles.config.json` (KiriToc#Toc EUW1), shared zod schemas for config/export/index, schema-version constants, `data/users/` gitignore (B-064 FIXED), `.env.example` notes.
+  - **T-091** (`30362bd`): migration `015_profiles.sql`; account-v1/match-v5/timeline/mastery-top Riot client + schema additions; pure `profile-games.ts` extraction; `profile-export.ts` (anonymized whitelist export, favorites per D-074, atomic-ish per-file write); `profile-sync.ts` resumable cursor sync (180-day/500-game caps, failure keeps previous export + rows); `pnpm etl profile-sync [id] [--publish]`.
+  - **T-092** (`6f28889`): `etl.yml` scheduled `profile-sync --publish` step (non-fatal, previous exports kept); `scripts/check-secrets.mjs` RGAPI-/key-value scan wired into CI + deploy.
+  - **T-093** (`a011a6b`): `apps/web/src/data/profile.ts` loader + profile label in the draft screen.
+  - **T-094** (`5bea98c`): `pool/favorites.ts` import + `include`/`only`/`hide` mode applied to all lists (display-only).
+  - **T-095** (`a71544a`): pure `personalize()` — recency weights, shrinkage, L1..L5 fallback, trust blend, insufficient-data entries (D-076 PROPOSED for level scoping).
+  - **T-096** (`fe3ab01`): `PersonalizedList` UI (profile label title, WR/n_eff/level/+d badges, 5-by-5 pagination).
+  - **T-097 engine** (`c8897c4`): `recommendProfileRunes`/`recommendProfileSpells` (D-077 PROPOSED). UI half blocked on T-041 — no runes screen exists.
+- Review findings fixed in place (second commit): secret-check test file tripped its own RGAPI- scan (split the planted literal); personalized list missed the user-pick exclusion (new `computePersonalizedEntries` + regression test); `profiles.synced_at` was stamped before Riot fetches so a failed sync re-exported stale rows under a fresh timestamp (now stamped on success only + regression test); auth errors abort without writing exports (test added); index `file` constrained to a plain filename.
+- Files touched: see commits `269d48b..HEAD` + review-fix commit; docs: TICKETS (T-090..T-096 DONE), BUGS (B-064 FIXED), DECISIONS (D-076, D-077 PROPOSED), SETUP, .env.example, workflows.
+- Tests: `pnpm check` green — 94 files / 1071 tests; `pnpm --filter @draftorb/web build` green; `node scripts/check-secrets.mjs` passes on the real tree and dist.
+- State left: DONE for T-090..T-096; T-097 partially (engine only, UI needs T-041); T-098 TODO (blocked by T-052/T-054/T-056).
+- Next step: owner review of D-067..D-077; T-041 (runes UI) unblocks the T-097 UI half; real `profile-sync --publish` run needs `RIOT_API_KEY` (first export lands in the next scheduled ETL run).
+- Pitfalls / notes for next AI: profile exports are NOT yet in `data/public/profiles/` — the web personalization UI stays dormant until the scheduled workflow publishes the first export. `profile-games` stores `match_id` internally only; never export it. `recommendProfileRunes/Spells` reuse `PersonalizeContext` — build it via `personalizeContext(draftInput, data)`.
+
+### 2026-11-06 — Devin — Personalized profile feature replanned for static GitHub Pages (DOCS ONLY)
+
+- Done:
+  - Planning session for the owner's "pipeline-fed personalized profile" feature. No code written; only `docs/` touched.
+  - Reconciliation: the earlier personalization plan (per-user `user-sync`, gitignored exports with `--publish`, "For you" list) assumed per-visitor profiles. The deployment target is GitHub Pages (static only), so the model changed to a pipeline-synced **configured** profile. D-061..D-066 marked SUPERSEDED; T-080..T-086 marked CANCELLED.
+  - `DECISIONS.md`: D-067..D-075 PROPOSED — static-only delivery, no login/server/sessions (rejected alternatives recorded: login page, Riot key as password, server-side sessions, encrypted data + password gate); declarative `data/profiles.config.json` + `pnpm etl profile-sync`; anonymized public export with caps and a build-time `RGAPI-` leak check; sync folded into `etl.yml` reusing the `etl-db` state branch; Riot key handling/expiry (personal key today, production key "to verify"); profile-labeled list never "For you"; statistical method carried over (half-life 60d, `K_SHRINK` 15, `MIN_GAMES` 3, fallback L1..L5, `K_TRUST` 20, rank-normalized meta); favorites top-15-recency ∪ top-5-mastery with `include`/`only`/`hide`; minimum sample sizes.
+  - `TICKETS.md`: T-080..T-086 CANCELLED; new T-090..T-098 TODO in dependency order (config+schemas -> profile-sync ETL -> workflow+secret check -> web loader -> favorites UI -> engine personalize -> personalized list UI -> runes/spells -> items last). Status legend gained `CANCELLED`.
+  - `SPECS.md`: §7.1 and §18 rewritten for the configured-profile model; `score(c)` unchanged (D-024/D-072).
+  - `DATA_MODEL.md`: `profiles`/`profile_games`/`profile_mastery` tables (renamed from the cancelled `user_*` plan) + `data/public/profiles/` export format with anonymization rules and caps.
+  - `ARCHITECTURE.md`: pipeline flow diagram (Secrets -> Action -> ETL -> SQLite -> JSON -> Pages -> browser; browser-local pool). `TESTING.md`: golden cases updated + anonymization/secret-scan cases. `RIOT_API.md`: profile endpoints under `profile-sync`, scheduled-run budget, key-expiry/production-key notes. `SETUP.md`: profile sync section (config, secrets, Pages). `GLOSSARY.md`: profile/pipeline terms updated. `BUGS.md`: B-064 OPEN — `.gitignore` never covered the legacy `data/users/` path (fixed by T-090); audit found no real secrets committed.
+- Files touched: `docs/{DECISIONS,TICKETS,SPECS,DATA_MODEL,ARCHITECTURE,TESTING,RIOT_API,SETUP,GLOSSARY,BUGS,PROGRESS}.md` only.
+- Tests: docs-only session; `pnpm check` formatting verified for the edited markdown.
+- State left: planning complete, awaiting owner review of D-067..D-075. Next ticket when approved: **T-090** (profile config + shared schemas).
+- Next step: owner reviews D-067..D-075 and answers the open questions in PROGRESS.md; then T-090 can start. T-040 (runes) still needs review before T-097 can build on it.
+- Pitfalls / notes for next AI: personalization NEVER changes `score(c)` — it is a separate `personalize(...)` output (D-072, D-024 invariant); the personalized list is labeled with the profile label, never "For you"; only configured profiles in `data/profiles.config.json` are synced — visitors cannot add any; profile exports are anonymized (no foreign names/Riot IDs/puuids/match ids, D-069); engine stays pure — `personalize` receives the profile as a plain object and the reference time as an argument (no `Date.now()`).
+
+### 2026-11-06 — Devin — Personalized recommendations feature planned (DOCS ONLY, SUPERSEDED)
+
+- Done:
+  - Planning session for the owner's personalized-recommendations request (Riot ID profile, favorites, personal win rates for champions/runes/summoner spells/items). No code written; only `docs/` touched.
+  - `DECISIONS.md`: D-061..D-066 PROPOSED — "For you" third list with `score(c)` unchanged (D-024 invariant); profiles via `etl user-sync` exported to JSON (web never calls Riot); gitignored-by-default storage with explicit `--publish`; statistical method (half-life 60d, `K_SHRINK` 15, fallback hierarchy L1..L5, `K_TRUST` 20, rank-normalized meta blend); favorites definition (top 15 recency + top 5 mastery, `include`/`only`/`hide`); minimum sample sizes / insufficient-data rules. No new dependencies.
+  - `TICKETS.md`: new epic **E8 Personalization**, T-080..T-086 TODO in dependency order (user-sync ETL -> profile loader/selector -> favorites -> engine `personalize` -> "For you" UI -> personal runes/spells -> personal items last).
+  - `SPECS.md`: §7.1 updated for the third list; new §18 (profile, personal WR algorithm, "For you" UI, favorites, runes/spells, items open questions).
+  - `DATA_MODEL.md`: `user_profiles`/`user_games`/`user_mastery` tables + `data/users/<puuid>.json` export format and published `index.json`.
+  - `TESTING.md`: personalization golden cases + `user-sync` idempotence/schema tests. `RIOT_API.md`: account-v1/match-v5/champion-mastery-v4 endpoints, routing, rate-limit notes. `GLOSSARY.md`: profile, personal win rate, shrinkage, trust, favorites, "For you".
+- Files touched: `docs/{DECISIONS,TICKETS,SPECS,DATA_MODEL,TESTING,RIOT_API,GLOSSARY,PROGRESS}.md` only.
+- Tests: docs-only session; `pnpm check` formatting verified for the edited markdown.
+- State left: planning complete, awaiting owner review of D-061..D-066. Next ticket when approved: **T-080** (`user-sync` ETL).
+- Next step: owner reviews D-061..D-066 and answers the open questions in PROGRESS.md; then T-080 can start. T-040 (runes) still needs review before T-085 can build on it.
+- Pitfalls / notes for next AI: personalization NEVER changes `score(c)` — it is a separate `personalize(...)` output (D-061); user exports are gitignored unless `--publish` (D-063); engine stays pure — `personalize` receives the profile as a plain object and the "now" timestamp as an argument (no `Date.now()`).
+
+### 2026-11-06 — Devin — B-063 merged rune pages overstated `n_eff` (FIXED)
+
+- Done:
+  - `aggregateContextPages` (`packages/engine/src/runes-context.ts`) merged duplicate displayed pages by summing each row's `toEquivalentCounts` output, inflating `n_eff`/`gamesE`/`winsE` and the context totals (`totalGamesE`/`totalWinsE`, the prior in `recommendRunes`) whenever duplicate rows had different game weights. Now accumulates `winsW`/`gamesW`/`gamesW2` per page key and converts once per merged page.
+  - Regression test in `runes.test.ts`: duplicate page rows with unequal weights (ten weight-1 + ten weight-0.1 games) assert merged `n_eff ≈ 11.98` (not 20) and `lowData` true.
+- Files touched: `packages/engine/src/runes-context.ts`, `packages/engine/test/runes.test.ts`, `docs/{BUGS,PROGRESS}.md`.
+- Tests: `pnpm check` green (83 files, 1001 tests).
+- State left: DONE.
+- Next step: none — feeds T-041 (runes UI) once T-040 is accepted.
+- Pitfalls / notes for next AI: `n_eff` is nonlinear — never sum per-row equivalent counts across a merge; accumulate raw `winsW`/`gamesW`/`gamesW2` and call `toEquivalentCounts` once.
+
+### 2026-11-06 — Devin — B-062 `400 Exception decrypting` on refresh; `etl rekey` command (FIXED pending owner run, D-060 PROPOSED)
+
+- Done:
+  - Diagnosed the failed `matches euw1 --refresh` (CI + local): not a code bug — Riot encrypts PUUIDs per API key, so every puuid stored under the previous `RIOT_API_KEY` returns `400 Exception decrypting` under the current one. Verified: league entries by rank work, fresh puuids work, all ~3k stored puuids fail; a re-fetched match returns entirely different participant puuids for the same players. Match IDs are unaffected.
+  - New `pnpm etl rekey [platform] [--dry-run] [--limit=N]` (`packages/etl/src/rekey.ts` + `commands/rekey.ts`): re-fetches every stored match by ID, pairs stored participants with fresh ones via a team/champion/KDA fingerprint, and rewrites `participants`, `item_events`, `players` and `match-ingest:` cursors in one transaction. Conflicting mappings abort; failed matches are reported and re-runnable (idempotent); stale unmapped players/cursors are dropped (`etl players` re-creates pending players). 7 tests in `rekey.test.ts`.
+  - Docs: BUGS.md B-062, DECISIONS.md D-060 PROPOSED, RIOT_API.md (per-key puuid note), SETUP.md (key-change step + command + troubleshooting).
+- Files touched: `packages/etl/src/{rekey.ts,rekey.test.ts,cli.ts,commands/rekey.ts}`, `docs/{BUGS,DECISIONS,RIOT_API,SETUP,PROGRESS}.md`.
+- Tests: `pnpm check` green (83 files, 1000 tests).
+- State left: DONE — rekey executed on the local DB 2026-11-06 (~70 min, 3,597 matches, 0 failures): 35,970 participant rows + 2,492 players + 250 cursors rewritten, 502 stale players dropped; `etl players euw1 --reset` rediscovered 850 players under the new key (3,016 players total); `etl-db` reseeded twice (rekeyed DB, then post-rediscovery DB — 42 MB gz). Verified a stored puuid resolves via league-v4. Next scheduled `etl.yml` run should pass `matches --refresh` again.
+- Next step: owner reviews D-060; optionally trigger `etl.yml` manually to confirm end-to-end.
+- Pitfalls / notes for next AI: never assume stored puuids survive an API key change — `400 Exception decrypting` always means key/puuid mismatch, not a malformed URL. `etl rekey` costs ~1 match-detail call per stored match (~3.6k calls).
+
+### 2026-11-06 — Devin — T-040 rune recommender in engine (REVIEW, D-059 PROPOSED)
+
+- Done:
+  - Shared: `RUNE_RESULT_SCHEMA_VERSION` = 1 (core.ts); new schemas in `schemas/runes.ts` — `runeRecommendDataSchema` (`roleProb` + `tags`), `enemyDamageMixSchema`, `runePagePickSchema` (page ids + `winRate`/`nEff`/`players`/`pickShare`/`lowData`/scoring `contextKey`+`contextLevel`), `runeAdaptationHintSchema` (`statShardsVsDamageMix`), `runeRecommendationResultSchema` (`pages`, `adaptationHints`, `damageMix`, `dataAvailable`).
+  - Engine: `recommendRunes(input, championId, runeExport, data, config?, runeConfig?)` in `src/runes.ts` + context helpers in `src/runes-context.ts`; `RuneConfig` (`kRune` = 40 eq. games prior, `topPages` = 3, `laneGroups`) in `config.ts`. Reproduces the aggregator's `lane:`/`damagemix:`/`global` keys from the draft via §4 role inference + lane-phase influence ordering (prefix back-off); pages scored by recursive shrinkage toward the same page's estimate in the next broader context (pooled-context prior when the page is absent everywhere broader, 0.5 at the broadest level); top pages ranked by shrunk win rate, tie-break `pickShare`, then page key; `lowData` = scoring-context `n_eff < minGames`.
+  - Interpretation details (partial-draft key matching, page identity, shrinkage priors, damage mix over all enemy board champions, shard hint = most-picked `statShardIds` in the matching `damagemix:` context) logged as D-059 PROPOSED.
+  - Tests: `packages/engine/test/runes.test.ts`, 16 cases — lane/damagemix/global chain, exact shrinkage arithmetic, partial lane knowledge prefix matching, TOP 1v1 key, missing export/bucket, topPages + pickShare tie-break, lowData, shard hint, duplicate-page merge, determinism, custom page count, shared-schema validation.
+- Files touched: `packages/shared/src/{index.ts,schemas/core.ts,schemas/runes.ts}`, `packages/engine/src/{config.ts,index.ts,runes.ts,runes-context.ts}`, `packages/engine/test/runes.test.ts`, `docs/{DECISIONS,TICKETS,PROGRESS}.md`.
+- Tests: `pnpm check` green (baseline was green before starting).
+- State left: REVIEW pending owner review (D-059 PROPOSED). Web wiring is T-041.
+- Next step: owner reviews T-040/D-059; then T-041 (runes UI) or T-019.d once T-019.b/T-019.c are accepted.
+- Pitfalls / notes for next AI: `recommendRunes` takes the already-picked `championId` and the parsed per-champion `RuneExport` — the engine never reads files; the caller (web, T-041) loads `roles/<userRole>/runes/<championId>.json`. Page `contextKey`/`contextLevel` report the most specific context the page was scored in. `dataAvailable: false` means show a no-data state, not an error.
 
 ### 2026-11-06 — Devin — PR #49 review fixes (matches ingestion, D-058 PROPOSED)
 

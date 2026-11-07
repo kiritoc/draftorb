@@ -25,6 +25,34 @@ export const MANIFEST_SCHEMA_VERSION = 3;
  */
 export const DRAFT_RESULT_SCHEMA_VERSION = 1;
 
+/**
+ * Version of the engine rune-recommendation output contract (SPECS §8.1).
+ * Bumped on every breaking change so consumers fail loudly instead of
+ * misreading fields.
+ * v1: initial `RuneRecommendationResult` (T-040).
+ */
+export const RUNE_RESULT_SCHEMA_VERSION = 1;
+
+/**
+ * Version of `data/profiles.config.json` (D-068). Bumped on every breaking
+ * change to the committed profile configuration format.
+ */
+export const PROFILE_CONFIG_SCHEMA_VERSION = 1;
+
+/**
+ * Version of the exported profile JSON under `data/public/profiles/`
+ * (`<id>.json` and `index.json`, D-069). Bumped on every breaking change.
+ */
+export const PROFILE_EXPORT_SCHEMA_VERSION = 1;
+
+/**
+ * Version of the engine personalization output contract (`PersonalizedResult`,
+ * SPECS §18.2). Bumped on every breaking change so consumers fail loudly
+ * instead of misreading fields.
+ * v1: initial `personalize` output (T-095).
+ */
+export const PERSONAL_RESULT_SCHEMA_VERSION = 1;
+
 export const roleSchema = z.enum(['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT']);
 export type Role = z.infer<typeof roleSchema>;
 

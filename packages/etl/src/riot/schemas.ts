@@ -112,6 +112,8 @@ export const riotParticipantDtoSchema = z
     item4: z.number().int().default(0),
     item5: z.number().int().default(0),
     item6: z.number().int().default(0),
+    spell1Id: z.number().int().optional(),
+    spell2Id: z.number().int().optional(),
     perks: riotPerksDtoSchema.optional(),
   })
   .passthrough();
@@ -159,3 +161,50 @@ export const riotChampionMasterySchema = z
   })
   .passthrough();
 export type RiotChampionMastery = z.infer<typeof riotChampionMasterySchema>;
+
+export const riotChampionMasteryListSchema = z.array(riotChampionMasterySchema);
+export type RiotChampionMasteryList = z.infer<typeof riotChampionMasteryListSchema>;
+
+/** account-v1 `accounts/by-riot-id/{gameName}/{tagLine}` (T-091). */
+export const riotAccountSchema = z
+  .object({
+    puuid: z.string().min(1),
+    gameName: z.string().optional(),
+    tagLine: z.string().optional(),
+  })
+  .passthrough();
+export type RiotAccount = z.infer<typeof riotAccountSchema>;
+
+/**
+ * match-v5 timeline payload, narrowed to what profile item build orders need
+ * (T-091): `ITEM_PURCHASED` events carry `participantId` + `itemId` +
+ * `timestamp`. Everything else stays passthrough for forward compatibility.
+ */
+export const riotMatchTimelineEventSchema = z
+  .object({
+    timestamp: z.number(),
+    type: z.string(),
+    participantId: z.number().int().optional(),
+    itemId: z.number().int().optional(),
+  })
+  .passthrough();
+export type RiotMatchTimelineEvent = z.infer<typeof riotMatchTimelineEventSchema>;
+
+export const riotMatchTimelineFrameSchema = z
+  .object({
+    events: z.array(riotMatchTimelineEventSchema),
+  })
+  .passthrough();
+export type RiotMatchTimelineFrame = z.infer<typeof riotMatchTimelineFrameSchema>;
+
+export const riotMatchTimelineSchema = z
+  .object({
+    info: z
+      .object({
+        gameId: z.number().optional(),
+        frames: z.array(riotMatchTimelineFrameSchema),
+      })
+      .passthrough(),
+  })
+  .passthrough();
+export type RiotMatchTimeline = z.infer<typeof riotMatchTimelineSchema>;

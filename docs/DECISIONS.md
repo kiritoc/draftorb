@@ -574,6 +574,211 @@ Owner decision 2026-11-05.
 - Alternatives: (a) a new reject reason + migration — rejected, the label-carrying `invalid` row already identifies the retriable case; (b) revisiting completed cursors on every catalog refresh — rejected, far broader than the rare Data Dragon lag; (c) keeping `invalid` fully permanent per D-017 — rejected, it makes the lag case unrecoverable without a manual `--reset`.
 - Consequences: matches rejected during a catalog lag self-heal on a later run once `versions.json` catches up (the rejected match's `gameCreation` never advanced `lastGameCreation`, so incremental listing still returns its id); the "`invalid` is permanent" wording in D-017/SPECS §13 now has this one exception.
 
+### D-059 — Rune recommender interpretation details (SPECS §8.1) — PROPOSED
+
+- Context: T-040 implements the engine side of SPECS §8.1, which leaves several mechanics unspecified: which champions count as "context slots" under partial drafts, what "the same page's win rate in the next broader context" means when the page is absent there, how pages are identified across contexts, and what the adaptation hint contains.
+- Decision (assumptions, PROPOSED):
+  1. Context slots are the lane-group champions whose role was resolved by §4 inference (fixed or inferred), sorted by descending lane-phase `influence` with the spec tie-breaks (ally before enemy, then role order TOP, JUNGLE, MID, ADC, SUPPORT), capped at `contextSlots`. Prefix keys are emitted for n = selected count down to 1 in the exact `lane:`/`damagemix:`/`global` `context_key` format the aggregator writes. A partial-draft key can only match export data when the known champions coincide with an aggregation prefix; otherwise it misses and back-off continues — it can never produce a wrong match.
+  2. Page identity across contexts = all exported page fields (`primaryStyleId`, `subStyleId`, `keystoneId`, `selectedPerkIds`, `statShardIds`); rows describing the same displayed page are merged (weighted counts summed, pick shares added, `players` maxed).
+  3. Shrinkage: each page's win rate at a context is shrunk toward the same page's shrunk estimate at the nearest broader context where it has data (recursive, D-021 style); when the page is absent from every broader context, the prior is the pooled (all-pages) estimate of the immediate next broader context; the broadest level shrinks toward 0.5. Prior strength `kRune` = 40 equivalent games (prior, tunable via `RuneConfig`).
+  4. A page is scored once, at the most specific context of the chain where it appears; ranking is by that shrunk win rate, tie-break by that context's `pickShare`, then by page key for determinism. `lowData` uses `config.minGames` on the scoring context's `n_eff`; low-data pages are flagged, never dropped.
+  5. The enemy damage mix is computed over every enemy board champion (role inference not required), with the same rules as the ETL aggregator (untagged/`NONE` ignored, `MIXED` counts for both, none tagged -> `mixed`).
+  6. The adaptation hint reports the `statShardIds` of the most-picked page (by `gamesW`) inside the `damagemix:<mix>` context matching the enemy team; no hint when that context or its shards are absent. The engine does not interpret shard semantics (no armor/MR mapping exists in the data).
+  7. Output contract: `RuneRecommendationResult` (`RUNE_RESULT_SCHEMA_VERSION` = 1) with `pages` (top `topPages`, default 3), `adaptationHints`, `damageMix` and `dataAvailable` (false when no export context matches the user's rank bucket).
+- Alternatives: (a) shrink toward the broader context's raw `winsW/gamesW` — rejected, a 2-game broader sample would dominate the prior; (b) prior = 0.5 whenever the page is missing in the next broader level — rejected, the pooled context estimate is strictly more informative; (c) emitting lane keys for arbitrary known subsets — rejected, the aggregator only writes influence-order prefixes, so non-prefix keys can never match.
+- Consequences: T-041 (runes UI) consumes `RuneRecommendationResult` as-is; T-027.b calibrates `kRune`/`topPages` through the D-023 gate.
+
+### D-060 — PUUIDs are encrypted per API key; `etl rekey` rewrites them on key change — PROPOSED
+
+- Context: B-062 — after `RIOT_API_KEY` changed (dev key -> personal key), every stored puuid returned `400 Exception decrypting` on all by-puuid endpoints while match IDs kept working. Riot encrypts PUUIDs (and account ids) per key holder (DevRel issues #759, #471, #20), so puuids collected under one key are unusable under another.
+- Decision: new `pnpm etl rekey [platform] [--dry-run] [--limit=N]` command. It re-fetches every row of `matches` by match ID (key-independent) under the current key and pairs each stored `participants` row with the fresh payload via a stat fingerprint (team id, champion id, kills, deaths, assists — verified unique per match). The resulting old->new puuid map is applied in one transaction to `participants`, `item_events`, `players` (rename, or merge+delete when the new puuid already exists) and `match-ingest:` cursors in `ingest_state` (rename; drop cursors/players rows whose puuid no scanned match references — they are undecryptable anyway and `etl players` re-creates pending players). Conflicting mappings abort the run before any write; failed match fetches are skipped and reported (re-run is idempotent). Dry run reports the mapping size without writing.
+- Alternatives: (a) wipe puuid-bearing tables and re-ingest everything — rejected, loses ~3.6k stored matches' participant stats and all ingest cursors for no benefit since match IDs survive; (b) re-run `etl players` and treat new puuids as new players — rejected, splits `champion_games`/`is_expert` per (puuid, champion) across the old/new puuid of the same account and orphaned cursors; (c) verify each unmapped players row with a by-puuid call — rejected, ~2.6k extra calls for rows that are stale by construction.
+- Consequences: after any `RIOT_API_KEY` change, run `pnpm etl rekey` (dry-run first) before `matches`; cost ~1 match-detail call per stored match (~3.6k calls, ~1-2 h on the personal key's 100 req/2 min). Players rows not referenced by any match are deleted and must be re-discovered via `pnpm etl players`. Ops note for the CI state branch: run rekey on the `etl-db` database (or reseed `etl-db` from a rekeyed local DB) — the scheduled workflow itself is unchanged.
+
+### D-061 — Personalization is a third list ("For you"); `score(c)` stays unchanged — SUPERSEDED by D-072
+
+- Context: owner request — the user's own match history should personalize recommendations (champions, runes, summoner spells, items) while the objective "best" lists stay visible. D-024 already established that preference data (the pool) never changes `score(c)`; personal statistics are another preference signal and must obey the same invariant.
+- Decision:
+  1. The recommendation screen shows three lists: **Best overall** (`recommendations`, always), **From your pool** (`poolRecommendations`, when the pool is non-empty) and **For you** (`personalRecommendations`, when a user profile is loaded). "For you" is a separate engine output produced by a new pure function `personalize(...)`; it receives the unchanged recommendation list, a `UserProfile` data object and the draft context, and never mutates `score(c)`, reasons, ranks or pool fields.
+  2. Phase 1 scope: personalization applies to `myRole = SUPPORT` games only; profile games in other roles are ignored by the engine (stored anyway for later phases).
+  3. Sparse data (golden rule 8): a "For you" entry without enough personal games is labeled "insufficient data" with its effective sample size; it never gets a fabricated percentage.
+  4. `DraftResult` gains an optional `personalRecommendations` field. Whether this bumps `DRAFT_RESULT_SCHEMA_VERSION` is decided in the implementing ticket (additive optional field, likely stays v1 like D-054).
+- Alternatives: (a) fold personal win rate into `score(c)` — rejected, breaks the D-024 invariant, the D-023 backtest comparability and the explanations contract; (b) replace "Best overall" with the personalized list — rejected, the owner explicitly wants both; (c) merge personalization into the pool mechanism — rejected, the pool is user-curated champions, personalization is statistical and applies to all candidates.
+- Consequences: engine gains a pure `personalize` function and a `PersonalConfig` in `config.ts`; shared gains the `UserProfile`/result schemas (T-080/T-083); SPECS §7.1/§18 and DATA_MODEL are updated. If rejected: the feature reduces to favorites + pool import (D-065) only.
+
+### D-062 — User profiles are produced by an ETL command and exported as JSON; the web app never calls Riot — SUPERSEDED by D-067, D-068
+
+- Context: golden rules 1, 3 and 5 plus D-002 (static site, no backend) and D-006 (no runtime services): the browser cannot hold the Riot API key, so personal match data must be fetched offline and shipped as data files, exactly like the aggregate exports.
+- Decision:
+  1. New ETL command `pnpm etl user-sync "<gameName>#<tagLine>" --platform EUW1` resolves the Riot ID to a puuid (account-v1, `europe` regional routing for EUW), fetches ranked solo/duo matches (match-v5, queue 420) incrementally — only matches newer than the profile's stored cursor — plus champion mastery (champion-mastery-v4, platform routing). Per game it stores champion, role, ally ADC, enemy support/ADC, enemy team champions, rune page (keystone + full page), items (final and, when the timeline is fetched, build order), summoner spells, win/loss and timestamp (DATA_MODEL.md).
+  2. A second step of the same command (or `pnpm etl user-export`) writes one JSON file per profile (`data/users/<puuid>.json`) validated by a zod schema in `packages/shared`, plus recomputes favorites (D-065). The web app only loads these files; the engine receives the profile as a plain data object (golden rule 3).
+  3. New SQLite tables `user_profiles`, `user_games`, `user_mastery` (DATA_MODEL.md); resumable like `matches` (D-018 pattern: a per-profile `last_game_creation` cursor).
+  4. No new dependencies: `fetch`, `better-sqlite3` and zod are already used.
+- Assumptions (PROPOSED, open for owner): (a) queue 420 only, consistent with the main ingestion; other queues are a later option; (b) the match timeline is fetched for synced matches to get the item build order (~1 extra request per game — acceptable for a manual command, flagged as an open question in PROGRESS.md); (c) mastery uses `champion-masteries/by-puuid/{puuid}/top?count=200`.
+- Alternatives: (a) browser-side fetch with a user-supplied key — rejected, puts a secret in the browser and burns the personal key's rate limit; (b) LCU/Live Client API for own stats — deferred to E6/E7 and only covers the current game, not history; (c) third-party stats sites — forbidden (golden rule 1).
+- Consequences: new shared schemas, new ETL tables/command, new RIOT_API.md endpoints; rate-limit cost is manual and bounded (~2-3 requests per game). The profile selector can only list profiles that were synced — adding a Riot ID requires running `user-sync` (documented limitation).
+
+### D-063 — Privacy and storage of exported user data — SUPERSEDED by D-069
+
+- Context: a profile JSON contains one person's match history (personal data). `data/public/**` is committed and deployed to the static site; `data/` raw/sqlite paths are gitignored.
+- Decision:
+  1. `data/users/` is **gitignored by default**: synced profiles stay on the owner's machine and are never committed by accident (`.gitignore` gains the entry).
+  2. Publishing is explicit: `user-sync`/`user-export` accepts `--publish`, which copies the chosen profile JSON into `data/public/users/<puuid>.json` and regenerates `data/public/users/index.json` (`{ schemaVersion, profiles: [{ puuid, riotId, gameCount, syncedAt, file }] }`). Only profiles the owner deliberately publishes are deployed.
+  3. The default profile is `KiriToc#Toc` on EUW1 (owner request); the selector lists whatever `index.json` contains.
+- Alternatives: (a) commit all user exports — rejected, personal data in git history and repo bloat; (b) never publish, load profiles via a file picker — deferred as a possible later UX (avoids publishing entirely but complicates the selector); (c) encrypt profiles — rejected, the engine needs plaintext stats and the threat model is a public static file anyway.
+- Consequences: the feature works locally out of the box; deploying it for other users requires the owner to publish their own profile. `DATA_MODEL.md` documents both locations.
+
+### D-064 — Personal statistics: recency weighting, Bayesian shrinkage, fallback hierarchy, trust blend — SUPERSEDED by D-073
+
+- Context: the "For you" list must surface champions the user is personally good with without inventing numbers on tiny samples. The method mirrors the repo's existing conventions (`n_eff`, shrinkage, back-off) but on the user's own games.
+- Decision (all constants are priors in engine config, tunable later):
+  1. **Recency weight** per user game: `w = 0.5^(age_days / HALF_LIFE_DAYS)`, `HALF_LIFE_DAYS = 60`. `age_days` comes from the game timestamp vs the profile's `syncedAt`/export time passed into `personalize` (the engine stays pure — no `Date.now()`).
+  2. **Effective sample**: `n_eff = (sum w)^2 / sum w^2`, same convention as SPECS §3.
+  3. **Personal win rate** at a context level: `p = (wins_w + K_SHRINK * p_global) / (games_w + K_SHRINK)`, `K_SHRINK = 15`, where `p_global` is the user's own recency-weighted win rate over all in-scope games (Support, phase 1). Small samples shrink toward the user's global rate, not the population's.
+  4. **Fallback hierarchy** — use the first level with `n_eff >= MIN_GAMES` (`MIN_GAMES = 3`): L1 same ally ADC + same enemy support; L2 same enemy support; L3 enemy composition tags (hand-written `champion-tags.json` damage/archetype match); L4 role overall (all the user's Support games); L5 champion overall (all the user's games on that champion). A `levelFactor` (L1..L5 = 1.0, 0.9, 0.8, 0.7, 0.6) down-weights broader levels inside the trust formula.
+  5. **Trust blend**: `trust = (n_eff * levelFactor) / (n_eff * levelFactor + K_TRUST)`, `K_TRUST = 20`. `metaNorm(c)` is rank-normalized over the complete overall list: `1 - (rank - 1) / (N - 1)` for N > 1 (1 for N = 1) — chosen because `score(c) = sigmoid(x)` clusters near 0.5 and its absolute scale is uncalibrated, while rank position is stable. `personalScore(c)` = the shrunk personal win rate (fraction). `personalizedScore(c) = (1 - trust) * metaNorm(c) + trust * personalScore(c)`. "For you" sorts by `personalizedScore` desc, tie-break overall `rank`.
+  6. **Reason badge** per entry: personal WR %, effective games at the matched level, the fallback level used, and `+d vs meta` where `d = round(100 * (p - score(c)))` percentage points against the champion's unchanged meta `score(c)`.
+- Alternatives: (a) min-max normalize `score(c)` — rejected, sensitive to outlier candidates; (b) fixed trust regardless of sample — rejected, a 1-game fluke would dominate; (c) shrink toward the population win rate — rejected, the point is the user's own skill; (d) log-odds blending — rejected, the personal term is a rate estimate, not a matchup logit term.
+- Consequences: new pure engine module + `PersonalConfig`; golden tests pin the arithmetic (TESTING.md); constants are priors pending a personalization backtest (open question, PROGRESS.md).
+
+### D-065 — Favorites definition and include/only/hide semantics — SUPERSEDED by D-074
+
+- Context: owner request — favorites can feed the champion pool and be filtered/shown in recommendations, without ever touching `score(c)` (D-024 invariant).
+- Decision:
+  1. **Definition (computed at export time)**: top `favRecencyCount = 15` champions by recency-weighted game count over the user's Support games in the last 90 days, UNION top `favMasteryCount = 5` champions by champion-mastery points. Stored in the profile JSON as `favorites` (combined, deduplicated list plus the two sources).
+  2. **Pool import**: the web app offers "Import favorites into pool" which appends missing favorites to the SUPPORT pool (respecting `poolMaxSize` and the existing storage validation). Import is explicit — favorites are never silently added.
+  3. **Mode toggle** `favoritesMode`: `include` (default — favorites get a star badge, nothing else changes), `only` (only favorites appear in the recommendation lists), `hide` (favorites are removed from the lists). Modes filter/flag the displayed entries of the engine's complete output; they never change `score(c)`, reasons or ranks, and apply to "For you" the same way.
+- Alternatives: (a) auto-sync favorites into the pool — rejected, the pool is the user's explicit choice (D-024); (b) per-champion favorite flags in pool storage — deferred, the derived list covers the request; (c) favorites as an engine input — rejected, filtering is presentation, scoring is untouched.
+- Consequences: profile JSON carries `favorites`; web gains the toggle and import action (T-082); SPECS §2.1/§7.1/§18 updated.
+
+### D-066 — Minimum sample sizes and "insufficient data" behavior — SUPERSEDED by D-075
+
+- Context: golden rule 8 — never invent data. Personal statistics are thinner than aggregate data, so thresholds and labeling must be explicit.
+- Decision:
+  1. "For you" entries need `n_eff >= MIN_GAMES` (3, D-064) at the matched fallback level to show a percentage; below that the entry shows "insufficient data" with its `n_eff` (and level reached), never a number.
+  2. Personal runes and summoner spells: "Your best" needs >= 5 games on the champion+setup before showing a rate; below that it shows insufficient data (SPECS §18).
+  3. Champions failing the engine baseline gate stay in `insufficientData` as today; personalization does not rescale them.
+  4. The insufficient-data state is part of the output contract (sample size always visible), not a UI-only hiding.
+- Alternatives: (a) hide insufficient entries — rejected, hides information the user needs; (b) lower thresholds — rejected until real profile volumes are known; revisit with data.
+- Consequences: shared result schemas carry the insufficient-data fields; UI renders badges per SPECS §18.
+
+### D-067 — Personalization ships as static data only: no login, no server, no sessions — PROPOSED
+
+- Context: the deployment target is GitHub Pages, which serves only static files. An earlier planning pass assumed per-user profiles synced on demand (`user-sync`, D-062) with a possible selector; the owner has now fixed the model: the app is public, there is NO login and NO server, and only the pipeline ever talks to Riot. This supersedes the delivery side of D-062 and the storage side of D-063 (both marked SUPERSEDED).
+- Decision:
+  1. Visitors never write to any database and never call Riot. All profile data is produced by the GitHub pipeline (D-068/D-070) and exported as static JSON under `data/public/`, exactly like the aggregate exports (D-002).
+  2. The Riot key exists only in GitHub Secrets (pipeline) and the local `.env` (development). It never appears in committed files or in the built site; a build-time check enforces this (D-069).
+  3. Rejected alternatives (recorded so they are not re-proposed): a login page (impossible on static hosting without a backend); the Riot key as a password (puts a secret in the browser, burns the key's rate limit, violates golden rule 5); server-side sessions or a hosted API (violates golden rules 1 and 2 — no paid hosting, no backend); encrypted profile data behind a password gate (the engine needs plaintext stats and the threat model is a public static file anyway — same reasoning as D-063).
+- Alternatives: any server-backed personalization — rejected, contradicts the deployment target and the free-only rule.
+- Consequences: personalization is limited to data the pipeline can precompute for configured profiles; there is no per-visitor personalization beyond browser-local state (the pool and favorites toggle, D-074).
+
+### D-068 — Profile configuration is declarative and committed; only configured profiles are synced — PROPOSED
+
+- Context: with no login (D-067) the set of personalized profiles must be fixed in the repository. The owner wants `KiriToc#Toc` on `EUW1` as the default and only entry for now, but the structure must allow adding more configured profiles later without code changes. Visitors can never add a profile.
+- Decision:
+  1. A committed, secret-free config file `data/profiles.config.json` lists profiles: `{ schemaVersion, profiles: [{ id, riotId: { gameName, tagLine }, platform, label, options }] }`. Default and only entry: `KiriToc#Toc`, `EUW1`, label shown in the UI (e.g. "KiriToc's picks"). `id` is a stable slug used for the export file name.
+  2. New ETL command `pnpm etl profile-sync [profileId] [--publish]` reads the config, resolves each configured profile's puuid (account-v1, regional routing `europe` for EUW1), fetches ranked solo/duo matches (match-v5, queue 420) incrementally via a per-profile cursor (D-018 pattern), plus champion mastery (champion-mastery-v4), stores them in SQLite (DATA_MODEL.md) and exports the anonymized JSON (D-069). `--publish` writes into `data/public/profiles/`; without it the export stays local/gitignored for development.
+  3. Adding a profile = adding a config entry and running `profile-sync` (locally or via `workflow_dispatch`). Adding a profile of another person requires that person's consent — noted in the config file docs and SETUP.md.
+- Alternatives: (a) visitors type a Riot ID in the UI — rejected, would need a backend/key in the browser; (b) sync every configured profile on every run vs on demand — decided in D-070; (c) environment variables for the profile list — rejected, the config must be reviewable in git and diffable.
+- Consequences: new shared zod schemas for the config and the export; new ETL tables/command; `data/profiles.config.json` is committed and validated like the manual tag files.
+
+### D-069 — Profile exports are public, minimal and anonymized; a build check blocks key leaks — PROPOSED
+
+- Context: the profile owner (the repository owner) accepts publishing their own stats. But `profile_games` rows sit next to other players' data, and a careless export could leak other Riot IDs, puuids or match ids, or the API key itself.
+- Decision:
+  1. Export only minimal aggregated or per-game fields: champion ids, role, ally ADC and enemy ADC/support champion ids, enemy team champion ids, rune page ids, summoner spell ids, item ids in build order, win/loss, timestamp (day precision is enough). NEVER export other players' names, Riot IDs or puuids, and no match ids (they can identify other participants).
+  2. The profile owner's own identifiers may appear only in the profile label/riotId block of the config-driven index, which is the owner's explicit choice; the consent rule of D-068 applies to any additional profile.
+  3. Size cap: export at most the last 180 days and at most `profileMaxGames` (default 500, config) games per profile; favorites and all statistics are computed over the exported set so the JSON stays bounded (target well under the 5 MB per-file budget of SPECS §10).
+  4. A build-time check fails if `RGAPI-` or the configured key value appears in committed files or in the built site output (`apps/web/dist`); documented in TESTING.md and enforced by a ticket (T-092). The check scans for the pattern, not the secret itself.
+- Alternatives: (a) export full match rows — rejected, leaks foreign identifiers and bloats the file; (b) no cap — rejected, unbounded growth as the profile ages; (c) rely on code review for key leaks — rejected, a single accident publishes the key permanently in git history.
+- Consequences: the exported JSON is safe to commit under `data/public/profiles/`; the anonymization whitelist lives next to the export code and is covered by tests (TESTING.md).
+
+### D-070 — Profile sync runs inside the existing scheduled pipeline and reuses the `etl-db` state branch — PROPOSED
+
+- Context: the profile tables live in the same SQLite database the scheduled ETL already persists on the orphan branch `etl-db` (D-057). A separate workflow would duplicate the restore/upload machinery; folding `profile-sync` into `etl.yml` reuses it.
+- Decision:
+  1. `etl.yml` gains a `profile-sync` step (all configured profiles) after `matches --limit 100` and before `prune`/`aggregate`/`export`, so profile games are stored, pruned by the same retention rules where applicable and exported in the same run. `workflow_dispatch` allows a manual sync. Only configured profiles are ever synced — there is no visitor-facing trigger.
+  2. Persistence: the same `etl-db` gzip state branch (D-057) — no new storage mechanism. The alternative of committing only the exported profile JSON and re-fetching history every run was rejected: it would re-download the profile's entire match history each run (~2-3 requests per game) and lose the incremental cursor. `actions/cache` and artifacts remain rejected for the same reasons as D-057.
+  3. Safety: the job already has `concurrency.group: etl-refresh` with `cancel-in-progress: false`, `permissions: contents: write + actions: write`, the `main`-only guard, `if: always()` state upload and non-fatal publish steps (D-057/D-058). `profile-sync` inherits all of them; a failed Riot call must not wipe existing data — a failed sync keeps the previously exported JSON and the stored rows (export is skipped or the step fails before `data/public` changes; the state branch still saves partial progress via cursors).
+  4. Rate limits: profile sync adds ~2-3 requests per new game plus 1 account-v1 and 1 mastery call per profile per run — negligible next to the ~250-player match refresh at 100 req/2 min (RIOT_API.md). Details and the "to verify" items are in RIOT_API.md.
+- Alternatives: (a) a dedicated `profile-sync.yml` workflow — rejected, duplicates state handling and could race `etl.yml` on the same DB branch; (b) `actions/cache` for profile state — rejected per D-057; (c) sync on every push to `data/profiles.config.json` only — rejected, staleness between pushes.
+- Consequences: one cron cadence refreshes both datasets; the state branch grows slightly (profile tables are small: hundreds of games vs ~3.6k matches).
+
+### D-071 — Riot key for the pipeline: GitHub Secrets + local `.env`; expiry and rotation rules — PROPOSED
+
+- Context: golden rule 5 — no secrets in git. Development keys expire every 24 h, which would silently break a scheduled pipeline; the owner already holds a personal key (no expiry, limits verified 2026-11-06: 20 req/s, 100 req/2 min — RIOT_API.md) stored as the `RIOT_API_KEY` Actions secret.
+- Decision:
+  1. `profile-sync` reads `RIOT_API_KEY` from the environment exactly like the other ETL commands; in CI it comes from GitHub Secrets, locally from `.env`. `.env.example` documents this (ticket item).
+  2. The scheduled pipeline requires a key that does not expire daily: the personal key (current) or a production key if Riot requires one for a public site — **to verify** with Riot's dev portal terms (RIOT_API.md marks it unverified; do not invent policy).
+  3. If the key ever changes, stored profile puuids are subject to the same per-key encryption as match puuids (B-062/D-060): `pnpm etl rekey` covers `participants`/`players`; the profile tables need the same treatment — recorded as an open question/ticket note (assumption: `profile-sync` re-resolves the Riot ID to a puuid each run and re-keys `profile_games`/`profile_mastery` by match id + champion, mirroring `rekey`; to be confirmed at implementation).
+  4. Manual rotation procedure (documented in SETUP.md): update the GitHub secret and `.env`, run `check-key`, run `rekey`/profile re-key if puuids fail, then let the next scheduled run resume.
+- Alternatives: a second dedicated secret for profiles — rejected, one key per project is simpler and the rate budget is shared anyway; committing the key — forbidden (golden rule 5).
+- Consequences: SETUP.md gains a "Profile sync" section; the 24 h dev-key expiry is a documented non-option for scheduling.
+
+### D-072 — The personalized list is labeled with the profile label, never "For you" — PROPOSED
+
+- Context: D-061 introduced a third list named "For you" fed by a `UserProfile` the visitor supposedly owns. Under D-067/D-068 the data belongs to a configured profile (`KiriToc#Toc`), not the visitor; "For you" would be misleading.
+- Decision:
+  1. The recommendation screen shows the personalized list beside "Best overall" and "From your pool", labeled with the profile's label from the config — e.g. **"KiriToc's picks"** (format `<gameName>'s picks`, with the platform shown once, e.g. "(EUW)"). It is never called "For you" and never implies the visitor's own stats.
+  2. `score(c)` stays unchanged: the personalized list is a separate engine output (`personalize(...)`, D-073), exactly like the pool never changes scores (D-024 invariant, reaffirmed). `recommendations` and `poolRecommendations` are untouched.
+  3. With no profile exported (fresh clone, sync never run) the list is absent and the UI shows nothing — no empty-state noise for visitors.
+  4. If several configured profiles are ever exported, a simple selector among them is enough (future, not a ticket now).
+- Alternatives: (a) keep "For you" — rejected, factually wrong for visitors; (b) a neutral name like "Personalized" — rejected, hides whose stats drive it; (c) merging the personalized entries into "Best overall" — rejected, breaks the D-024 separation and the objective-vs-personal distinction.
+- Consequences: D-061 is superseded; SPECS §7.1/§18 and GLOSSARY use the profile label; UI strings stay centralized.
+
+### D-073 — Profile statistics: recency weighting, shrinkage, fallback hierarchy, trust blend — PROPOSED
+
+- Context: same statistical need as D-064, but the subject is the configured profile's Support games (phase 1), not "the user's" games. Constants are priors in engine config, tunable later; there is still no personalization backtest (open question).
+- Decision (carried over from D-064 with profile semantics):
+  1. **Recency weight** per profile game: `w = 0.5^(age_days / HALF_LIFE_DAYS)`, `HALF_LIFE_DAYS = 60`. `age_days` = game timestamp vs the export's reference time passed into `personalize` as an argument (engine stays pure — no `Date.now()`, golden rule 3).
+  2. **Effective sample**: `n_eff = (sum w)^2 / sum w^2` (SPECS §3 convention).
+  3. **Profile win rate** at a context level: `p = (wins_w + K_SHRINK * p_profile) / (games_w + K_SHRINK)`, `K_SHRINK = 15`, where `p_profile` is the profile's recency-weighted win rate over all in-scope games (Support games, phase 1). Small samples shrink toward the profile's own global rate.
+  4. **Fallback hierarchy** — first level with `n_eff >= MIN_GAMES` (`MIN_GAMES = 3`): L1 same ally ADC + same enemy support; L2 same enemy support; L3 enemy composition tags (hand-written `champion-tags.json`); L4 role overall (all the profile's Support games); L5 champion overall (all the profile's games on that champion). `levelFactor` = 1.0/0.9/0.8/0.7/0.6 for L1..L5. The same hierarchy drives the profile's win rate "in the current matchup/setup" shown next to the objective list.
+  5. **Trust blend**: `trust = (n_eff * levelFactor) / (n_eff * levelFactor + K_TRUST)`, `K_TRUST = 20`. `metaNorm(c)` is rank-normalized over the complete overall list: `1 - (rank - 1) / (N - 1)` for N > 1 (1 for N = 1) — `score(c) = sigmoid(x)` clusters near 0.5 and its absolute scale is uncalibrated, while rank position is stable (SPECS §5). `personalScore(c)` = the shrunk profile win rate (fraction). `personalizedScore(c) = (1 - trust) * metaNorm(c) + trust * personalScore(c)`. The personalized list sorts by `personalizedScore` desc, tie-break overall `rank`.
+  6. **Reason badge** per entry: profile WR %, effective games at the matched level, the fallback level used, and `+d vs meta` = `round(100 * (p - score(c)))` pp against the champion's unchanged meta `score(c)`.
+- Alternatives: (same as D-064, still rejected) min-max normalize `score(c)`; fixed trust; shrink toward the population win rate; log-odds blending.
+- Consequences: new pure engine module + `PersonalConfig`; golden tests pin the arithmetic (TESTING.md); constants are priors pending a personalization backtest.
+
+### D-074 — Favorites are computed by the pipeline; visitors import them into their browser pool — PROPOSED
+
+- Context: the owner wants favorites derived from the profile's real history, importable into each visitor's own pool, plus a display toggle — all without touching `score(c)` (D-024 invariant).
+- Decision:
+  1. **Definition (computed at export time)**: top `favRecencyCount = 15` champions by recency-weighted game count over the profile's Support games in the last 90 days, UNION top `favMasteryCount = 5` champions by champion-mastery points. Stored in the profile JSON as `favorites` (combined deduplicated list plus the two sources).
+  2. **Pool import**: the web app offers "Import favorites into pool" which appends missing favorites to the visitor's SUPPORT pool (respecting `poolMaxSize` and the existing storage validation, D-024). Import is explicit — favorites are never silently added.
+  3. **Mode toggle** `favoritesMode`: `include` (default — favorites get a star badge, nothing else changes), `only` (only favorites appear in the recommendation lists), `hide` (favorites are removed from the lists). Modes filter/flag the displayed entries of the engine's complete output; they never change `score(c)`, reasons or ranks, and apply to the personalized list the same way.
+- Alternatives: (a) auto-sync favorites into the pool — rejected, the pool is the visitor's explicit choice (D-024); (b) per-champion favorite flags in pool storage — deferred; (c) favorites as an engine input — rejected, filtering is presentation.
+- Consequences: profile JSON carries `favorites`; web gains the toggle and import action; SPECS §2.1/§7.1/§18 updated.
+
+### D-075 — Minimum sample sizes and "insufficient data" for profile statistics — PROPOSED
+
+- Context: golden rule 8 — never invent data. Profile statistics are thinner than aggregate data, so thresholds and labeling must be explicit (carries D-066 forward).
+- Decision:
+  1. Personalized-list entries need `n_eff >= MIN_GAMES` (3, D-073) at the matched fallback level to show a percentage; below that the entry shows "insufficient data" with its `n_eff` (and level reached), never a number.
+  2. Personal runes and summoner spells: "Profile's best" needs >= 5 games on the champion+setup before showing a rate; below that it shows insufficient data (SPECS §18).
+  3. Champions failing the engine baseline gate stay in `insufficientData` as today; personalization does not rescale them.
+  4. The insufficient-data state is part of the output contract (sample size always visible), not a UI-only hiding.
+- Alternatives: (a) hide insufficient entries — rejected; (b) lower thresholds — rejected until real profile volumes are known; revisit with data.
+- Consequences: shared result schemas carry the insufficient-data fields; UI renders badges per SPECS §18.
+
+### D-076 — Personalize fallback levels are champion-scoped at every level — PROPOSED
+
+- Context: SPECS §18.2 / D-073 list the fallback hierarchy (L1 same ally ADC + enemy support … L5 champion overall) without stating explicitly whether L1–L4 filter the profile's games by the candidate champion. Reading them as context-only would make the profile win rate identical for every candidate until L5, which cannot rank champions — the personalized list would be meaningless.
+- Decision (implementation assumption, T-095): every level is scoped to games the profile played ON the candidate champion in the SUPPORT role (phase 1 in-scope games, §18.1); the levels widen the matchup context instead — L1 adds ally ADC + enemy support, L2 enemy support only, L3 enemy damage/archetype signature (`damageType:archetype` pairs from `champion-tags.json`, draft signature ⊆ game signature), L4 any context ("role overall"), L5 identical to L4 while only SUPPORT games are in scope (kept distinct for later phases). L3's subset rule (draft signature ⊆ game signature, non-empty draft signature) is likewise an implementation choice — exact tag-set equality was rejected as too brittle for partial drafts.
+- Alternatives: (a) context-only L1–L4 — rejected, no per-champion signal; (b) exact enemy tag-set equality for L3 — rejected, never matches partial drafts; (c) per-champion Jaccard threshold — rejected, an unmotivated constant.
+- Consequences: `personalize()` in `packages/engine/src/personalize.ts`; golden tests pin the arithmetic; revisit if a personalization backtest suggests different scoping.
+
+### D-077 — "Profile's best" runes/spells: page identity, pair normalization, shrinkage prior — PROPOSED
+
+- Context: SPECS §18.5 asks for the profile's rune pages and summoner-spell pairs per champion "with the same fallback/shrinkage rules" as D-073, but does not define what counts as one "page" or "pair", nor which prior the shrinkage uses.
+- Decision (implementation assumption, T-097 engine half):
+  1. **Rune page identity** = `(keystoneId, primaryStyleId, subStyleId)`; minor rune picks (`perkIds`) and stat shards do not split pages — they ride along on the first-seen game's payload for display.
+  2. **Summoner spells** are an unordered pair normalized to `[min(id), max(id)]` so Flash+Heal and Heal+Flash aggregate together.
+  3. **Fallback levels** reuse the D-073/D-076 champion-scoped L1..L5 hierarchy verbatim (same ally ADC + enemy support → enemy support → enemy signature → champion overall), applied per setup instead of per champion.
+  4. **Shrinkage prior** is the profile's recency-weighted win rate on that champion (all in-scope games on the champion), not the profile global `p_profile` — a rune page is judged against the champion's own baseline.
+  5. **Minimum sample** = 5 effective games (`DEFAULT_MIN_SETUP_GAMES`, D-075) at the matched level; below that the pick reports `insufficientData` with `nEff`, never a rate.
+- Alternatives: (a) shrink toward `p_profile` — rejected, too coarse for per-champion setups; (b) include minor rune picks in page identity — rejected, fragments tiny samples; (c) ordered spell pairs — rejected, double-counts the same setup.
+- Consequences: `recommendProfileRunes`/`recommendProfileSpells` in `packages/engine/src/profile-setup.ts`; golden tests pin the arithmetic. The two-column UI waits on T-041 (no runes screen exists yet).
+
 ### Template
 
 ```

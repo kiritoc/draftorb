@@ -13,6 +13,8 @@ export default tseslint.config(
             'vitest.config.ts',
             'apps/web/postcss.config.mjs',
             'apps/web/scripts/copy-public-data.mjs',
+            'scripts/check-secrets.mjs',
+            'scripts/check-secrets.test.ts',
           ],
         },
         tsconfigRootDir: import.meta.dirname,
@@ -235,6 +237,24 @@ export default tseslint.config(
     files: ['packages/shared/**/*.test.ts'],
     rules: {
       'no-restricted-imports': 'off',
+    },
+  },
+  {
+    // Plain Node scripts are not covered by the TS project service globals.
+    files: ['scripts/**/*.mjs', 'apps/web/scripts/**/*.mjs'],
+    languageOptions: {
+      globals: {
+        process: 'readonly',
+        console: 'readonly',
+        Buffer: 'readonly',
+        URL: 'readonly',
+        URLSearchParams: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
+        fetch: 'readonly',
+      },
     },
   },
   {

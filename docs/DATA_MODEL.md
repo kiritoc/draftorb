@@ -84,6 +84,48 @@ CREATE TABLE data_breakpoints (
 );
 -- PLANNED (T-019.e, D-047): not migrated yet.
 CREATE UNIQUE INDEX idx_data_breakpoints_unique ON data_breakpoints(scope_type, COALESCE(scope_id, -1), from_patch_index, source);
+
+-- PLANNED (T-091, D-068/D-069): match history of each configured profile
+-- (data/profiles.config.json). Only configured profiles are ever synced.
+CREATE TABLE profiles (
+  id TEXT PRIMARY KEY,               -- stable slug from profiles.config.json, used in the export file name
+  puuid TEXT NOT NULL,
+  game_name TEXT NOT NULL,
+  tag_line TEXT NOT NULL,
+  platform TEXT NOT NULL,            -- e.g. EUW1
+  region TEXT NOT NULL,              -- match-v5 regional routing (europe for EUW)
+  synced_at INTEGER NOT NULL,
+  last_game_creation INTEGER         -- incremental cursor: only newer matches are fetched (D-018 pattern)
+);
+CREATE TABLE profile_games (
+  profile_id TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  match_id TEXT NOT NULL,            -- internal only: NEVER exported (can identify other participants)
+  created_at INTEGER NOT NULL,       -- gameCreation, unix seconds
+  champion_id INTEGER NOT NULL,
+  role TEXT NOT NULL,                -- same role mapping as participants.role
+  win INTEGER NOT NULL CHECK (win IN (0, 1)),
+  ally_adc_id INTEGER,
+  enemy_support_id INTEGER,
+  enemy_adc_id INTEGER,
+  enemy_champions_json TEXT NOT NULL,  -- enemy team champion ids (JSON array)
+  keystone INTEGER,
+  primary_style INTEGER,
+  sub_style INTEGER,
+  perks_json TEXT,                   -- full rune page + stat shards
+  items_json TEXT NOT NULL,          -- final items
+  items_ordered_json TEXT,           -- build order from the match timeline; NULL when no timeline was fetched
+  summoner1_id INTEGER NOT NULL,     -- match-v5 spell1Id
+  summoner2_id INTEGER NOT NULL,     -- match-v5 spell2Id
+  PRIMARY KEY (profile_id, match_id)
+);
+CREATE TABLE profile_mastery (
+  profile_id TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  champion_id INTEGER NOT NULL,
+  mastery_points INTEGER NOT NULL,
+  mastery_level INTEGER,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (profile_id, champion_id)
+);
 ```
 
 Notes: match ingestion persists the match row and its 10 participant rows in one transaction. A match is accepted only when each of two teams has exactly one participant in each role; invalid layouts are rejected and have no stored participants. `rank_score` = coarse tier/division score at collection time (approximation, documented in RIOT_API.md). Exact rank ordering uses the stored `tier`, `division`, and `lp` fields separately. The score uses the D-016 tier base and division bonus formula; it excludes LP and is distinct from the SPECS §3 weighting buckets. Store only needed fields. `match_rejects` records match ids already evaluated and rejected (wrong queue, too short, off-patch window, invalid payload, unknown patch label) so shared matches are not re-fetched per player; a `patch` reject keeps the match's actual patch label and is deleted and re-evaluated once a run's `--since-patch` window (compared on `patch_index`, D-043) includes it (D-017). An `invalid` reject caused by a patch label absent from `patches` also stores that label in `patch` for diagnosis. `reason` is `queue|short|patch|invalid|pruned` (D-044): `pruned` is written by `pnpm etl prune` (reason for deletion = retention, actual `patch`, `checked_at`) and is permanent: `findRejection` never deletes or re-evaluates it, whatever `--since-patch` says. `--reset` clears every reason except `pruned`; only `--reset-tombstones` clears `pruned`, after which pruned matches become fetchable again.
@@ -141,6 +183,79 @@ Manual files (committed, hand-written, zod-validated): `data/manual/champion-tag
 `schemaVersion` is bumped once for this role-keyed layout, and again whenever a JSON format changes; the web app checks it and shows a clear error on mismatch. The exporter warns if an explicit patch differs from the latest stored patch or if data spans multiple platforms; `region` labels the manifest and does not filter aggregate data.
 
 Core scoring and engine contracts are unchanged (SPECS §14, D-045). The exported JSON format changes described above do not alter `n_eff` thresholds or D-021..D-027 semantics.
+
+## Configured profiles (T-090/T-091, D-068/D-069)
+
+Profiles are declared in the committed `data/profiles.config.json` (no secrets):
+
+```json
+{
+  "schemaVersion": 1,
+  "profiles": [
+    {
+      "id": "kiritoctoc-euw1",
+      "riotId": { "gameName": "KiriToc", "tagLine": "Toc" },
+      "platform": "EUW1",
+      "label": "KiriToc's picks",
+      "options": {}
+    }
+  ]
+}
+```
+
+Only configured profiles are ever synced (visitors cannot add any; adding another person's profile requires their consent). Synced by `pnpm etl profile-sync` (locally or inside `etl.yml`, D-070); stored in `profiles`/`profile_games`/`profile_mastery` above and exported as public static JSON.
+
+### Exported JSON (`data/public/profiles/`)
+
+```
+profiles/index.json                  // { schemaVersion, profiles: [{ id, riotId, platform, label, syncedAt, gameCount, file }] }
+profiles/<id>.json                   // one file per configured profile
+```
+
+`profiles/<id>.json` example (anonymized — D-069):
+
+```json
+{
+  "schemaVersion": 1,
+  "id": "kiritoctoc-euw1",
+  "riotId": { "gameName": "KiriToc", "tagLine": "Toc", "platform": "EUW1" },
+  "label": "KiriToc's picks",
+  "syncedAt": 1730000000,
+  "gameCount": 412,
+  "favorites": {
+    "combined": [23, 143],
+    "recency": [23, 143],
+    "mastery": [999]
+  },
+  "games": [
+    {
+      "createdAtDay": 19877,
+      "championId": 23,
+      "role": "SUPPORT",
+      "win": true,
+      "allyAdcId": 67,
+      "enemySupportId": 143,
+      "enemyAdcId": 202,
+      "enemyChampionIds": [143, 202, 35, 121, 7],
+      "runes": {
+        "keystoneId": 8112,
+        "primaryStyleId": 7200,
+        "subStyleId": 7300,
+        "perkIds": [9111, 9104, 8005],
+        "statShardIds": [5008, 5008, 5007]
+      },
+      "items": [2055, 3865],
+      "itemsOrdered": [3858, 2055, 3865],
+      "summonerSpells": [4, 7]
+    }
+  ],
+  "mastery": [{ "championId": 23, "points": 152345, "level": 7 }]
+}
+```
+
+Anonymization rules (D-069, enforced by the exporter and covered by tests): export ONLY champion ids, role, ally ADC and enemy ADC/support champion ids, enemy team champion ids, rune page ids, summoner spell ids, item ids in build order, win/loss and the game day (`createdAtDay` = unix days). NEVER export other players' names, Riot IDs or puuids, and no match ids. The profile owner's own Riot ID appears only in the `riotId`/`label` block — the owner's explicit, documented choice.
+
+Caps: at most the last 180 days and at most `profileMaxGames` (default 500, ETL config) games per profile; `favorites` and all statistics are computed over the exported set. All files are validated by shared zod schemas before writing; the web app validates again on load. `favorites` follows D-074 (top 15 by recency-weighted Support games in the last 90 days union top 5 by mastery). `itemsOrdered` is `null` when the match timeline was not fetched.
 
 ## Browser storage (apps/web, not exported, D-024)
 

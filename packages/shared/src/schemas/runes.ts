@@ -12,7 +12,14 @@
 
 import { z } from 'zod';
 
-import { championIdSchema, rankBucketSchema, roleSchema } from './core.js';
+import {
+  RUNE_RESULT_SCHEMA_VERSION,
+  championIdSchema,
+  rankBucketSchema,
+  roleSchema,
+} from './core.js';
+import { championRoleProbabilitiesSchema } from './champions.js';
+import { championTagsMapSchema } from './tags.js';
 
 export const runePerkSchema = z
   .object({
@@ -98,3 +105,71 @@ export const runeExportSchema = z
   })
   .strict();
 export type RuneExport = z.infer<typeof runeExportSchema>;
+
+// --- Rune recommendation schemas (SPECS §8.1, engine output T-040) ---
+
+/** Data the rune recommender needs beyond the per-champion rune export. */
+export const runeRecommendDataSchema = z
+  .object({
+    /** championId -> { role: prob } (same table as `RecommendData.roleProb`). */
+    roleProb: championRoleProbabilitiesSchema,
+    /** Champion tags, used for the enemy damage mix. */
+    tags: championTagsMapSchema,
+  })
+  .strict();
+export type RuneRecommendData = z.infer<typeof runeRecommendDataSchema>;
+
+/** Enemy-team damage mix buckets (`damagemix:<mix>` context keys, D-021). */
+export const enemyDamageMixSchema = z.enum(['AD', 'AP', 'mixed']);
+export type EnemyDamageMix = z.infer<typeof enemyDamageMixSchema>;
+
+/**
+ * One recommended rune page. `winRate` is the shrunk estimate (SPECS §8.1) and
+ * `nEff`/`players` are the effective sample size and distinct expert count of
+ * the most specific context the page was scored in — a win rate is never
+ * reported without its sample size.
+ */
+export const runePagePickSchema = z
+  .object({
+    primaryStyleId: z.number().int().positive(),
+    subStyleId: z.number().int().positive(),
+    keystoneId: z.number().int().positive(),
+    selectedPerkIds: z.array(z.number().int().positive()),
+    statShardIds: z.array(z.number().int().positive()).optional(),
+    winRate: z.number().min(0).max(1),
+    nEff: z.number().nonnegative(),
+    players: z.number().int().nonnegative().optional(),
+    pickShare: z.number().min(0).max(1),
+    lowData: z.boolean(),
+    /** Most specific back-off context the page was scored in. */
+    contextKey: z.string().min(1),
+    contextLevel: z.number().int().nonnegative(),
+  })
+  .strict();
+export type RunePagePick = z.infer<typeof runePagePickSchema>;
+
+/** Adaptation hint: stat shards favored against the enemy damage mix. */
+export const runeAdaptationHintSchema = z
+  .object({
+    code: z.literal('statShardsVsDamageMix'),
+    damageMix: enemyDamageMixSchema,
+    statShardIds: z.array(z.number().int().positive()),
+  })
+  .strict();
+export type RuneAdaptationHint = z.infer<typeof runeAdaptationHintSchema>;
+
+export const runeRecommendationResultSchema = z
+  .object({
+    schemaVersion: z.literal(RUNE_RESULT_SCHEMA_VERSION),
+    championId: championIdSchema,
+    myRole: roleSchema,
+    /** Enemy-team damage mix used for the `damagemix:` context and hints. */
+    damageMix: enemyDamageMixSchema,
+    /** Top pages by shrunk win rate (at most the configured page count). */
+    pages: z.array(runePagePickSchema),
+    adaptationHints: z.array(runeAdaptationHintSchema),
+    /** False when no rune export (or no context for the rank bucket) exists. */
+    dataAvailable: z.boolean(),
+  })
+  .strict();
+export type RuneRecommendationResult = z.infer<typeof runeRecommendationResultSchema>;

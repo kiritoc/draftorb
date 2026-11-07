@@ -18,5 +18,9 @@ dist/
 **/data/**/*.sqlite*
 data/raw/
 
+# Per-user profile exports stay local unless `pnpm etl profile-sync --publish`
+# writes the anonymized public copy under data/public/profiles/ (D-069).
+data/users/
+
 # Backtest reports are regenerated locally (T-027.a)
 data/public/backtest-*.json

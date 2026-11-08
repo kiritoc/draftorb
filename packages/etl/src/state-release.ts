@@ -2,7 +2,7 @@
  * @draftorb/etl — State release helpers for `pnpm etl pull` (T-108, D-078/D-079).
  *
  * The scheduled ETL publishes its SQLite database and the `data/public`
- * exports as assets of `state-<UTC yyyymmddThhmmZ>` releases in a private
+ * exports as assets of `state-<UTC yyyymmddThhmm[ss]Z>` releases in a private
  * GitHub repo (default `draftorb-state`). `pull` downloads the newest such
  * release with the `gh` CLI — no new dependency, no token handling of its
  * own (gh uses the user's own auth).
@@ -12,19 +12,36 @@ import { execFileSync } from 'node:child_process';
 
 import { CliError, UsageError } from './cli-args';
 
-export const STATE_RELEASE_TAG_PATTERN = /^state-\d{8}T\d{4}Z$/;
+export const STATE_RELEASE_TAG_PATTERN = /^state-\d{8}T\d{4,6}Z$/;
 export const EXPORTS_ASSET_NAME = 'public-exports.tar.gz';
 export const DB_ASSET_NAME = 'DraftOrb.sqlite.gz';
 export const DEFAULT_STATE_REPO_NAME = 'draftorb-state';
 export const STATE_REPO_ENV = 'DRAFTORB_STATE_REPO';
 
 /**
- * Picks the newest `state-<UTC yyyymmddThhmmZ>` tag from a release tag list.
- * The fixed-width timestamp makes lexicographic order chronological; other
- * `state-*` tags are ignored.
+ * Chronological sort key for `state-YYYYMMDDTHHMM[SS]Z` tags. Seconds are
+ * optional (a manually seeded tag may carry them); a missing pair sorts as
+ * :00 — plain string order would misorder mixed widths ("T112306Z" < "T1123Z"
+ * lexicographically, but 11:23:06 is later than 11:23:00).
+ */
+function stateTagSortKey(tag: string): string {
+  return tag.slice(6, 14) + tag.slice(15, -1).padEnd(6, '0');
+}
+
+function compareStateTags(a: string, b: string): number {
+  const ka = stateTagSortKey(a);
+  const kb = stateTagSortKey(b);
+  return ka < kb ? -1 : ka > kb ? 1 : 0;
+}
+
+/**
+ * Picks the newest `state-<UTC yyyymmddThhmm[ss]Z>` tag from a release tag
+ * list, ordered chronologically. Other `state-*` tags are ignored.
  */
 export function pickNewestStateTag(tags: readonly string[]): string | null {
-  const stateTags = tags.filter((tag) => STATE_RELEASE_TAG_PATTERN.test(tag)).sort();
+  const stateTags = tags
+    .filter((tag) => STATE_RELEASE_TAG_PATTERN.test(tag))
+    .sort(compareStateTags);
   return stateTags.length > 0 ? (stateTags[stateTags.length - 1] ?? null) : null;
 }
 
@@ -48,7 +65,7 @@ export function pickNewestStateTagWithAssets(
         STATE_RELEASE_TAG_PATTERN.test(release.tag) && release.assets.includes(requiredAsset),
     )
     .map((release) => release.tag)
-    .sort();
+    .sort(compareStateTags);
   return tags.length > 0 ? (tags[tags.length - 1] ?? null) : null;
 }
 

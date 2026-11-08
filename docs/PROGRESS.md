@@ -4,7 +4,7 @@
 
 - Phase: 1 (Support / Diamond)
 - Current milestone: M3 Web MVP implementation complete (T-030..T-035 DONE); the backtest harness (T-027.a) remains under review because D-023 paired-bootstrap validation is not implemented. T-019.b (patch index, now incl. D-055), T-019.c (retention prune) and T-026 (golden suite, 23 scenarios) are in REVIEW; T-019.d..f and T-027.b remain TODO. T-040 (engine rune recommender, SPECS §8.1) is in REVIEW (D-059 accepted 2026-11-08). E8 Personalization implemented through T-096: T-090..T-096 DONE (profile config/schemas, `profile-sync` ETL + scheduled workflow + secret-leak gate, web profile loader, favorites, engine `personalize`, personalized list UI); T-097 engine half DONE (`recommendProfileRunes`/`recommendProfileSpells`) with the UI half blocked on T-041 (no runes screen exists); T-098 stays TODO (T-052/T-054/T-056 missing). Decisions D-052..D-080 are ACCEPTED as of 2026-11-08 (D-061..D-066 SUPERSEDED by D-067..D-077; parts of D-057/D-067/D-069/D-070/D-073 superseded by D-076..D-080); earlier per-user plan cancelled (T-080..T-086 CANCELLED). Docs updated 2026-11-08 for the accepted decisions. Migration to the private state repo + local-only app implemented on branch `feat/state-release-migration` (T-106..T-112 done, T-113 proposal-only; T-099..T-105 remain owner actions) — pending merge and the owner verification runs.
-- Last updated: 2026-11-08 by Devin (clean-checkout CI fix on `feat/state-release-migration`: champion fixtures replace `data/public` reads in tests, published-export check moved to `pnpm etl validate-export` in `etl.yml`, new warning-only `pnpm etl check-tags` drift check — T-114 DONE)
+- Last updated: 2026-11-08 by Devin (state-tag seconds fix: `state-*` tag regex widened to accept optional seconds in `etl.yml` and `state-release.ts`, chronological sort normalized for mixed widths, SETUP.md notes seconds are accepted — branch `fix/state-tag-seconds`)
 
 ## Epic status
 
@@ -53,6 +53,20 @@ Open questions that remain after the 2026-11-08 acceptance:
 - T-019.d verification: please compare the champion and item lists in the 2026-11-04 "T-019.d verification step" entry below with the official 16.21 and 16.22 patch notes (misses and false positives).
 
 ## Session log (newest first)
+
+### 2026-11-08 — Devin — Accept `state-*` tags with seconds (seeded release fix)
+
+- Done:
+  - The seeded first state release is tagged `state-20261108T112306Z` (seconds included) but both `etl.yml` jq selectors and `STATE_RELEASE_TAG_PATTERN` in `packages/etl/src/state-release.ts` required exactly 4 time digits, so the first scheduled run failed with "No state-* release found" and `pnpm etl pull` could not see the release either.
+  - `.github/workflows/etl.yml`: regex widened to `^state-[0-9]{8}T[0-9]{4,6}Z$` in "Fetch database state" and "Prune old state releases"; plain `sort` replaced by `sort_by` on a normalized key (`date` + `HHMMSS` with missing seconds padded to `00`) because lexicographic order misorders mixed widths ("T112306Z" sorts before "T1123Z" though 11:23:06 > 11:23:00).
+  - `packages/etl/src/state-release.ts`: same regex widening; `pickNewestStateTag`/`pickNewestStateTagWithAssets` now sort via `stateTagSortKey`/`compareStateTags` for the same reason; `pull.ts` usage string and module docs updated to `thhmm[ss]`.
+  - `pull.test.ts`: new test covering seconds tags and mixed-width chronological order.
+  - `docs/SETUP.md`: seeding instructions note the workflow also accepts tags with seconds (the `gh release create` example already used `%H%MZ`).
+- Files touched: `.github/workflows/etl.yml`, `packages/etl/src/{state-release.ts,commands/pull.ts,pull.test.ts}`, `docs/{SETUP,PROGRESS}.md`.
+- Tests: `pnpm typecheck` clean; `pnpm lint` 0 errors (77 pre-existing warnings); `pnpm format:check` clean; `pnpm test` 95 files / 1107 tests pass; actionlint (docker `rhysd/actionlint`) 0 errors on `etl.yml` + `ci.yml`; jq selection logic verified locally against a mixed valid/invalid tag list.
+- State left: branch `fix/state-tag-seconds` ready for PR. Owner action unchanged: the seeded release keeps its tag; next `workflow_dispatch` should now find it.
+- Next step: owner merges, then runs T-103 (two verified dispatches).
+- Pitfalls / notes for next AI: tag format is now `state-YYYYMMDDTHHMMZ` or `state-YYYYMMDDTHHMMSSZ`; anything else (e.g. missing trailing `Z`, 5-digit time) is ignored by both the workflow and `etl pull`. The draftorb-state repo README still documents `%H%M%S` seeding — out of scope here, flagged to the owner.
 
 ### 2026-11-08 — Devin — T-052, T-019.e, T-053, T-041 (branch `feat/game-state-threat-score`)
 

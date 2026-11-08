@@ -50,7 +50,7 @@ tar -czf public-exports.tar.gz -C data public
 gh release create state-$(date -u +%Y%m%dT%H%MZ) DraftOrb.sqlite.gz public-exports.tar.gz --repo <owner>/draftorb-state
 ```
 
-(Adjust `tar`/`gzip`/`date` for your platform — Git Bash or WSL on Windows.) Then verify: download the release assets again and check the gzip integrity and that `public-exports.tar.gz` extracts the expected `data/public` tree.
+(Adjust `tar`/`gzip`/`date` for your platform — Git Bash or WSL on Windows.) The workflow's tag filter also accepts manually created tags that include seconds (`%H%M%S`, e.g. `state-20261108T112306Z`). Then verify: download the release assets again and check the gzip integrity and that `public-exports.tar.gz` extracts the expected `data/public` tree.
 
 ## Scheduled ETL workflow (D-057, D-078, D-079)
 

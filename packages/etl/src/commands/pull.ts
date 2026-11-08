@@ -20,7 +20,7 @@ import {
 import { extractTarGz } from '../tar-extract';
 import { log, type Command } from './shared';
 
-const USAGE = 'pull [--repo=owner/name] [--tag=state-YYYYMMDDTHHMMZ] [--db] [--dir=path]';
+const USAGE = 'pull [--repo=owner/name] [--tag=state-YYYYMMDDTHHMM[SS]Z] [--db] [--dir=path]';
 
 export interface PullOptions {
   repo?: string;

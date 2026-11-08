@@ -19,7 +19,9 @@ function entry(over: Partial<PersonalizedEntry> = {}): PersonalizedEntry {
     profileWinRate: 0.68,
     nEff: 11,
     fallbackLevel: 2,
-    deltaVsMetaPp: 7,
+    deltaVsBaselinePp: 7,
+    baselineWinRate: 0.61,
+    baselineBucket: 'DIAMOND',
     insufficientData: false,
     ...over,
   };
@@ -38,7 +40,7 @@ describe('PersonalizedList', () => {
     expect(markup).toContain('KiriToc&#x27;s picks');
     expect(markup).toContain('TestChamp');
     expect(markup).toContain('68% over 11 games vs this setup');
-    expect(markup).toContain('+7 vs meta');
+    expect(markup).toContain('+7 pp vs Diamond avg');
     expect(markup).not.toContain('For you');
   });
 
@@ -52,7 +54,9 @@ describe('PersonalizedList', () => {
             profileWinRate: null,
             nEff: 1.4,
             fallbackLevel: null,
-            deltaVsMetaPp: null,
+            deltaVsBaselinePp: null,
+            baselineWinRate: null,
+            baselineBucket: null,
           }),
         ],
         champions,

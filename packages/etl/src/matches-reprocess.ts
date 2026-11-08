@@ -53,13 +53,15 @@ export async function reprocessUnenrichedMatches(
   let reprocessed = 0;
   let skipped = 0;
 
-  for (const { matchId, platform } of pending) {
+  // Match IDs and puuids are never logged: workflow logs are public (D-078).
+  for (const [index, { matchId, platform }] of pending.entries()) {
+    const tag = `[${index + 1}/${pending.length}]`;
     const participants = db
       .prepare('SELECT * FROM participants WHERE match_id = ?')
       .all(matchId) as ParticipantRow[];
 
     if (participants.length < MATCH_PARTICIPANT_COUNT) {
-      log(`Reprocess: skipping ${matchId} — incomplete participants (${participants.length})`);
+      log(`Reprocess ${tag}: skipping match — incomplete participants (${participants.length})`);
       skipped += 1;
       continue;
     }
@@ -70,7 +72,7 @@ export async function reprocessUnenrichedMatches(
       participants.find((p) => p.rank_score !== null);
 
     if (!seed || seed.rank_score === null) {
-      log(`Reprocess: skipping ${matchId} — no ranked participant to use as seed`);
+      log(`Reprocess ${tag}: skipping match — no ranked participant to use as seed`);
       skipped += 1;
       continue;
     }
@@ -89,15 +91,13 @@ export async function reprocessUnenrichedMatches(
       const summary = await enrichParticipants(matchId, participants, enrichmentOpts);
       if (summary.failures === 0) {
         db.prepare('UPDATE matches SET enriched = 1 WHERE match_id = ?').run(matchId);
-        log(
-          `Reprocessed ${matchId}: ranks=${summary.ranksFetched} mastery=${summary.masteryFetched}`,
-        );
+        log(`Reprocessed ${tag}: ranks=${summary.ranksFetched} mastery=${summary.masteryFetched}`);
       } else {
-        log(`Reprocessed ${matchId}: ${summary.failures} failure(s), left unenriched for retry`);
+        log(`Reprocessed ${tag}: ${summary.failures} failure(s), left unenriched for retry`);
       }
       reprocessed += 1;
     } catch (err) {
-      log(`Reprocess: enrichment error for ${matchId}: ${String(err)}`);
+      log(`Reprocess ${tag}: enrichment error: ${String(err)}`);
       skipped += 1;
     }
   }

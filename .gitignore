@@ -19,8 +19,11 @@ dist/
 data/raw/
 
 # Per-user profile exports stay local unless `pnpm etl profile-sync --publish`
-# writes the anonymized public copy under data/public/profiles/ (D-069).
+# writes the anonymized copy under data/public/profiles/ (D-069).
 data/users/
 
-# Backtest reports are regenerated locally (T-027.a)
-data/public/backtest-*.json
+# Generated ETL exports are distributed via the state release's
+# public-exports.tar.gz asset and `pnpm etl pull` (D-078/D-079); they are
+# never committed (this also covers data/public/backtest-*.json and
+# data/public/profiles/).
+data/public/

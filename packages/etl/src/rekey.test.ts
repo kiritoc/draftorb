@@ -245,4 +245,50 @@ describe('rekeyPuuids', () => {
     expect(puuids).toEqual(new Set(newIds));
     db.close();
   });
+
+  // T-111 / D-060+D-071: profile tables need no rekey. profile_games and
+  // profile_mastery carry no puuid (keyed by profile_id), and profiles.puuid
+  // is re-resolved from the configured Riot ID on every profile-sync run —
+  // so a restored state DB is repaired by the normal pipeline, not by rekey.
+  it('leaves profile tables untouched (they hold no match puuids)', async () => {
+    const db = openDb(':memory:');
+    migrate(db);
+    const match = makeMatch('EUW1_1');
+    const newIds = newPuuidsFor(match, 'new');
+    const fresh = makeMatch('EUW1_1', {
+      participants: match.info.participants.map((_, i) => ({ puuid: newIds[i] })),
+    });
+    const stored = storedRowsFor(match, []);
+    insertStoredMatch(db, 'EUW1_1', stored, rolesFor(match));
+
+    db.prepare(
+      `INSERT INTO profiles (id, puuid, game_name, tag_line, platform, region, synced_at)
+       VALUES ('test-profile', 'profile-puuid-OLD', 'Test', 'TAG', 'EUW1', 'europe', 0)`,
+    ).run();
+    db.prepare(
+      `INSERT INTO profile_games (
+         profile_id, match_id, created_at, champion_id, role, win,
+         enemy_champions_json, items_json, summoner1_id, summoner2_id
+       ) VALUES ('test-profile', 'EUW1_999', 1760000000000, 1, 'SUPPORT', 1,
+                 '[]', '[]', 4, 7)`,
+    ).run();
+    db.prepare(
+      `INSERT INTO profile_mastery (profile_id, champion_id, mastery_points, mastery_level, updated_at)
+       VALUES ('test-profile', 1, 100, 3, 0)`,
+    ).run();
+
+    await rekeyPuuids(db, mockClient({ EUW1_1: fresh }), { log: () => undefined });
+
+    const profile = db.prepare('SELECT puuid FROM profiles WHERE id = ?').get('test-profile') as {
+      puuid: string;
+    };
+    expect(profile.puuid).toBe('profile-puuid-OLD'); // self-heals via profile-sync
+    expect((db.prepare('SELECT COUNT(*) AS n FROM profile_games').get() as { n: number }).n).toBe(
+      1,
+    );
+    expect((db.prepare('SELECT COUNT(*) AS n FROM profile_mastery').get() as { n: number }).n).toBe(
+      1,
+    );
+    db.close();
+  });
 });

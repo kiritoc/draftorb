@@ -10,14 +10,19 @@
  * No DOM, no Node APIs, no network, no file I/O, no randomness.
  */
 
-import type {
-  DraftInput,
-  ProfileExport,
-  ProfileGame,
-  Recommendation,
-  RecommendData,
+import {
+  PERSONAL_RESULT_SCHEMA_VERSION,
+  type DraftInput,
+  type ProfileExport,
+  type ProfileGame,
+  type RankBucket,
+  type Recommendation,
+  type RecommendData,
 } from '@draftorb/shared';
 
+import { DEFAULT_CONFIG, rankToBucket } from './config.js';
+import { baselineGate, baselinePrior } from './levels.js';
+import { indexBaselines } from './recommend-indexes.js';
 import { resolveKnownSlots } from './recommend-slots.js';
 
 const DAY_MS = 86_400_000;
@@ -34,6 +39,14 @@ export interface PersonalizeConfig {
   readonly kTrust: number;
   /** Per-level trust factors for L1..L5 (D-073). */
   readonly levelFactors: readonly number[];
+  /**
+   * n_eff gate for the champion's baseline row (D-080); defaults to the
+   * recommendation layer's `minGames` so "fails the baseline gate" means
+   * the same thing in both outputs.
+   */
+  readonly baselineMinGames?: number;
+  /** Prior strength `k0` for the baseline win rate `w0` (D-080, SPECS §5). */
+  readonly baselineK0?: number;
 }
 
 export const DEFAULT_PERSONALIZE_CONFIG: PersonalizeConfig = Object.freeze({
@@ -52,6 +65,8 @@ export interface PersonalizeContext {
   readonly enemySupportId: number | null;
   /** `damageType:archetype` signature of the known enemy champions (L3). */
   readonly enemySignature: ReadonlySet<string>;
+  /** Rank bucket of `userRank` — the bucket baseline rows are read for (D-080). */
+  readonly rankBucket: RankBucket;
 }
 
 /** Fallback levels, L1 (most specific) to L5 (champion overall). */
@@ -73,13 +88,22 @@ export interface PersonalizedEntry {
   readonly nEff: number;
   /** Level that supplied the estimate; null when insufficient. */
   readonly fallbackLevel: FallbackLevel | null;
-  /** `round(100 * (p - metaScore))` percentage points vs the meta score. */
-  readonly deltaVsMetaPp: number | null;
+  /**
+   * `round(100 * (p - w0))` percentage points vs the champion's baseline win
+   * rate `w0` for `baselineBucket` (D-080); null when the baseline row has
+   * no weighted evidence or fails the baseline gate.
+   */
+  readonly deltaVsBaselinePp: number | null;
+  /** Baseline win rate `w0` (fraction) for `baselineBucket`; null when omitted. */
+  readonly baselineWinRate: number | null;
+  /** Rank bucket the baseline was read for; null when `baselineWinRate` is. */
+  readonly baselineBucket: RankBucket | null;
   /** True when no fallback level reached `minGames` (D-075). */
   readonly insufficientData: boolean;
 }
 
 export interface PersonalizeResult {
+  readonly schemaVersion: typeof PERSONAL_RESULT_SCHEMA_VERSION;
   readonly entries: readonly PersonalizedEntry[];
 }
 
@@ -107,7 +131,12 @@ export function personalizeContext(input: DraftInput, data: RecommendData): Pers
       enemySignature.add(`${tags.damageType}:${tags.archetype}`);
     }
   }
-  return { allyAdcId, enemySupportId, enemySignature };
+  return {
+    allyAdcId,
+    enemySupportId,
+    enemySignature,
+    rankBucket: rankToBucket(input.userRank),
+  };
 }
 
 function gameSignature(
@@ -217,6 +246,11 @@ export function personalize(
   const nowDays = nowMs / DAY_MS;
   const signatureCache = new Map<number, string>();
   const tags = data.tags;
+  // D-080: baseline rows for the selected rank bucket, gated exactly like the
+  // recommendation layer (n_eff >= baselineMinGames, gamesE > 0).
+  const baselineIdx = indexBaselines(data.baselines, context.rankBucket);
+  const baselineMinGames = config.baselineMinGames ?? DEFAULT_CONFIG.minGames;
+  const baselineK0 = config.baselineK0 ?? DEFAULT_CONFIG.k0;
 
   // In-scope games: Support games only in phase 1 (SPECS §18.1).
   const weighted: WeightedGame[] = [];
@@ -271,7 +305,9 @@ export function personalize(
         profileWinRate: null,
         nEff: bestNEff,
         fallbackLevel: null,
-        deltaVsMetaPp: null,
+        deltaVsBaselinePp: null,
+        baselineWinRate: null,
+        baselineBucket: null,
         insufficientData: true,
       };
     }
@@ -280,6 +316,16 @@ export function personalize(
     const levelFactor = config.levelFactors[matchedLevel - 1] ?? 0.6;
     const trust = (matched.nEff * levelFactor) / (matched.nEff * levelFactor + config.kTrust);
     const personalizedScore = (1 - trust) * metaNorm + trust * p;
+
+    // D-080 badge baseline: w0 is the champion's evidence-backed baseline win
+    // rate for the selected bucket — the same p0 the insufficient-data
+    // entries expose. Omitted (never a prior-only 50%) when the row is
+    // missing, has no weighted evidence or fails the baseline gate.
+    const baseRow = baselineIdx.get(rec.championId);
+    const baselineWinRate =
+      baseRow !== undefined && baseRow.gamesE > 0 && baselineGate(baseRow.nE, baselineMinGames)
+        ? baselinePrior(baseRow.winsE, baseRow.gamesE, baselineK0)
+        : null;
     return {
       championId: rec.championId,
       rank: 0,
@@ -289,7 +335,9 @@ export function personalize(
       profileWinRate: p,
       nEff: matched.nEff,
       fallbackLevel: matchedLevel,
-      deltaVsMetaPp: Math.round(100 * (p - rec.score)),
+      deltaVsBaselinePp: baselineWinRate === null ? null : Math.round(100 * (p - baselineWinRate)),
+      baselineWinRate,
+      baselineBucket: baselineWinRate === null ? null : context.rankBucket,
       insufficientData: false,
     };
   });
@@ -304,6 +352,7 @@ export function personalize(
           : -1) || a.overallRank - b.overallRank,
   );
   return {
+    schemaVersion: PERSONAL_RESULT_SCHEMA_VERSION,
     entries: sorted.map((entry, index) => ({ ...entry, rank: index + 1 })),
   };
 }

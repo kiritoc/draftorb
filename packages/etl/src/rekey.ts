@@ -169,7 +169,10 @@ export async function rekeyPuuids(
       const pairs = planMatchPairs(stored, match.info.participants);
       if (pairs === null) {
         stats.matchesFailed += 1;
-        log(`Rekey: skipping ${row.match_id} — participant set does not match stored rows`);
+        // Match IDs and puuids are never logged: workflow logs are public.
+        log(
+          `Rekey: skipping match ${processed}/${targets.length} — participant set does not match stored rows`,
+        );
         continue;
       }
       stats.matchesScanned += 1;
@@ -177,9 +180,7 @@ export async function rekeyPuuids(
       for (const pair of pairs) {
         const existing = mapping.get(pair.oldPuuid);
         if (existing !== undefined && existing !== pair.newPuuid) {
-          conflicts.push(
-            `${pair.oldPuuid} -> ${existing} and -> ${pair.newPuuid} (match ${row.match_id})`,
-          );
+          conflicts.push(`conflicting mapping at match ordinal ${processed}`);
         } else {
           mapping.set(pair.oldPuuid, pair.newPuuid);
         }
@@ -187,7 +188,7 @@ export async function rekeyPuuids(
     } catch (error) {
       stats.matchesFailed += 1;
       log(
-        `Rekey: match ${row.match_id} fetch failed: ${error instanceof Error ? error.message : String(error)}`,
+        `Rekey: match ${processed}/${targets.length} fetch failed: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }

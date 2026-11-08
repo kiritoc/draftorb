@@ -3,14 +3,15 @@
  *
  * Renders the engine's `PersonalizeResult` entries for the configured
  * profile: same 5-by-5 "Show more" pagination and reset behavior as the
- * other lists, profile-WR / n_eff / fallback-level / +d-vs-meta badges,
+ * other lists, profile-WR / n_eff / fallback-level / +pp-vs-bucket badges
+ * (D-080),
  * and an insufficient-data state that shows the sample size instead of a
  * percentage (D-075). Only rendered when a profile export is loaded.
  */
 
 import { useEffect, useMemo, useReducer } from 'react';
 
-import type { Champion } from '@draftorb/shared';
+import type { Champion, RankBucket } from '@draftorb/shared';
 import type { PersonalizedEntry } from '@draftorb/engine';
 import { recommendationPageSize } from '../config.js';
 import { paginate } from '../pagination.js';
@@ -32,6 +33,17 @@ const FALLBACK_LEVEL_LABEL: Record<number, string> = {
   3: 'L3 · similar enemy comp',
   4: 'L4 · champion overall (role)',
   5: 'L5 · champion overall',
+};
+
+const BUCKET_LABEL: Record<RankBucket, string> = {
+  IRON: 'Iron',
+  BRONZE: 'Bronze',
+  SILVER: 'Silver',
+  GOLD: 'Gold',
+  PLATINUM: 'Platinum',
+  EMERALD: 'Emerald',
+  DIAMOND: 'Diamond',
+  MASTER_PLUS: 'Master+',
 };
 
 function championName(champions: Champion[], id: number): string {
@@ -77,7 +89,8 @@ function PersonalizedCard({
               Math.round(entry.profileWinRate * 100),
               Math.round(entry.nEff),
               entry.fallbackLevel ?? 0,
-              entry.deltaVsMetaPp ?? 0,
+              entry.deltaVsBaselinePp,
+              entry.baselineBucket === null ? null : BUCKET_LABEL[entry.baselineBucket],
             )}
           </span>
         </div>

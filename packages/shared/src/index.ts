@@ -80,6 +80,9 @@ export type { CompNeedCategory, WarningCode } from './schemas/codes.js';
 export { recommendDataSchema } from './schemas/recommend-data.js';
 export type { RecommendData } from './schemas/recommend-data.js';
 
+export { personalizedEntrySchema, personalizedResultSchema } from './schemas/personalized.js';
+export type { PersonalizedEntry, PersonalizedResult } from './schemas/personalized.js';
+
 export { playerStateSchema, gameStateSchema } from './schemas/game.js';
 export type { PlayerState, GameState } from './schemas/game.js';
 

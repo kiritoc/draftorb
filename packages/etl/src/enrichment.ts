@@ -145,7 +145,9 @@ async function enrichBotLaneRanks(
       }
     } catch (err) {
       result.failures += 1;
-      onProgress?.(`rank fetch failed for ${participant.puuid.slice(0, 8)}…: ${String(err)}`);
+      onProgress?.(
+        `rank fetch failed (role ${participant.role}, champion ${participant.champion_id}): ${String(err)}`,
+      );
     }
   }
 
@@ -204,7 +206,7 @@ async function enrichMasteryForParticipants(
         } catch (err) {
           result.failures += 1;
           onProgress?.(
-            `mastery fetch failed for ${participant.puuid.slice(0, 8)}… champion ${participant.champion_id}: ${String(err)}`,
+            `mastery fetch failed for champion ${participant.champion_id}: ${String(err)}`,
           );
         }
       }

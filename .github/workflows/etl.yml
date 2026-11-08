@@ -1,14 +1,23 @@
 name: ETL refresh
 
-# Scheduled data pipeline (D-057): restores the SQLite state from the orphan
-# branch `etl-db`, refreshes matches, re-aggregates and re-exports
-# data/public, then force-pushes the amended single-commit state branch,
-# commits the refreshed exports to main and dispatches deploy.yml
-# (GITHUB_TOKEN pushes do not trigger push-event workflows).
+# Scheduled data pipeline (D-057, D-078, D-079): downloads the newest `state-*`
+# release from the private state repo (default `draftorb-state`, override with
+# the STATE_REPO repository variable), restores the SQLite database, refreshes
+# matches and configured profiles, re-aggregates and re-exports data/public,
+# then publishes a new `state-*` release with `DraftOrb.sqlite.gz` (always,
+# partial progress included) and `public-exports.tar.gz` (only on success).
 #
-# Secrets: RIOT_API_KEY (personal key, repo Settings -> Secrets -> Actions).
-# The state branch is required: the job refuses to run without it so an empty
-# database can never overwrite good state.
+# The app is local-only: nothing is committed to main and no deploy workflow
+# exists. Exports reach the app via `pnpm etl pull`.
+#
+# Secrets: RIOT_API_KEY (Riot key) and STATE_REPO_TOKEN (fine-grained PAT with
+# Contents read/write on the state repo only — GITHUB_TOKEN cannot reach it).
+# The newest state release is required: the job refuses to run without one so
+# an empty database can never overwrite good state.
+#
+# Log hygiene (D-078 point 9): this repo is public, so workflow logs are
+# public. ETL output must never contain other players' Riot IDs, puuids or
+# match ids, nor the profile owner's raw game data.
 
 on:
   schedule:
@@ -16,37 +25,35 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write # push exports to main + force-push the etl-db state branch
-  actions: write # gh workflow run deploy.yml: GITHUB_TOKEN pushes do not
-  # trigger push-event workflows, so Deploy must be dispatched explicitly
+  contents: read # checkout only; the state repo is reached via STATE_REPO_TOKEN
 
 concurrency:
   group: etl-refresh
   cancel-in-progress: false
 
 env:
-  DB_BRANCH: etl-db
+  # Repository variable STATE_REPO may hold a bare repo name (resolved under
+  # this repository's owner in the fetch step) or a full owner/name slug —
+  # default draftorb-state (D-078).
+  STATE_REPO: ${{ vars.STATE_REPO || 'draftorb-state' }}
   DB_FILE: DraftOrb.sqlite.gz
-  DB_PATH: ${{ github.workspace }}/data/DraftOrb.sqlite
-  BOT_NAME: github-actions[bot]
-  BOT_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+  DRAFTORB_DB_PATH: ${{ github.workspace }}/data/DraftOrb.sqlite
+  EXPORTS_FILE: public-exports.tar.gz
 
 jobs:
   refresh:
     runs-on: ubuntu-latest
     timeout-minutes: 300
     steps:
-      # The pipeline mutates the shared etl-db state and publishes exports to
-      # the dispatched ref; deploy.yml always builds main, so a manual run on
-      # another branch would report success while the site stays stale.
+      # The pipeline mutates the shared state released from this workflow; a
+      # manual run on another branch would publish state the owner did not
+      # ask for (D-058 guard, kept per D-079).
       - name: Restrict to main
         if: github.ref_name != 'main'
         run: |
           echo "::error::ETL refresh only runs on the main branch (dispatched ref: ${{ github.ref_name }})"
           exit 1
       - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0 # full history: the publish step rebases onto origin/main
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
@@ -54,23 +61,48 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
 
-      # $RUNNER_TEMP persists across steps of this job: the clone is reused by
-      # the upload step at the end.
+      # Restore the newest state-* release. Fails early when the token is
+      # missing/rejected or when no release exists (D-078 points 2 and 5).
       - name: Fetch database state
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STATE_REPO_TOKEN: ${{ secrets.STATE_REPO_TOKEN }}
         run: |
-          set -e
-          STATE="$RUNNER_TEMP/dbstate"
-          REMOTE="https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
-          if ! git ls-remote --exit-code --heads "$REMOTE" "$DB_BRANCH" >/dev/null; then
-            echo "::error::State branch '$DB_BRANCH' not found; refusing to start from an empty database"
+          set -euo pipefail
+          STATE_DIR="$RUNNER_TEMP/state"
+          mkdir -p "$STATE_DIR" "$(dirname "$DRAFTORB_DB_PATH")"
+          # Bare repo name -> same owner as this repository; a full
+          # owner/name slug is used as-is. Persisted for later steps.
+          if [[ "$STATE_REPO" == */* ]]; then
+            RESOLVED_REPO="$STATE_REPO"
+          else
+            RESOLVED_REPO="${{ github.repository_owner }}/$STATE_REPO"
+          fi
+          echo "STATE_REPO=$RESOLVED_REPO" >> "$GITHUB_ENV"
+          STATE_REPO="$RESOLVED_REPO"
+          if [ -z "${STATE_REPO_TOKEN:-}" ]; then
+            echo "::error::Secret STATE_REPO_TOKEN is not set (fine-grained PAT with Contents read/write on $STATE_REPO — see SETUP.md)"
             exit 1
           fi
-          git clone --depth 1 --branch "$DB_BRANCH" "$REMOTE" "$STATE"
-          mkdir -p "$(dirname "$DB_PATH")"
-          gunzip -c "$STATE/$DB_FILE" > "$DB_PATH"
-          echo "Database restored from $DB_BRANCH"
+          export GH_TOKEN="$STATE_REPO_TOKEN"
+          if ! gh api "repos/$STATE_REPO" --jq .full_name >/dev/null 2>"$STATE_DIR/repo.err"; then
+            echo "::error::Cannot access state repo '$STATE_REPO': the STATE_REPO_TOKEN is missing, expired or lacks Contents read/write on that repo. $(tr '\n' ' ' < "$STATE_DIR/repo.err")"
+            exit 1
+          fi
+          # state-<UTC yyyymmddThhmmZ> tags sort chronologically.
+          TAG=$(gh release list --repo "$STATE_REPO" --limit 100 --json tagName \
+            | jq -r '[.[].tagName | select(test("^state-[0-9]{8}T[0-9]{4}Z$"))] | sort | last // ""')
+          if [ -z "$TAG" ]; then
+            echo "::error::No state-* release found in '$STATE_REPO'; seed the first release manually (SETUP.md > Seeding the first state release)"
+            exit 1
+          fi
+          echo "Restoring database from release $TAG"
+          if ! gh release download "$TAG" --repo "$STATE_REPO" \
+            --pattern "$DB_FILE" --dir "$STATE_DIR" --clobber; then
+            echo "::error::Could not download $DB_FILE from release $TAG in '$STATE_REPO'"
+            exit 1
+          fi
+          gunzip -c "$STATE_DIR/$DB_FILE" > "$DRAFTORB_DB_PATH"
+          echo "Database restored from $TAG"
 
       - name: Apply pending migrations
         run: pnpm etl migrate
@@ -113,81 +145,102 @@ jobs:
 
       # always(): partial progress (cursors, stored matches) must be saved even
       # when a pipeline step failed — ingestion is resumable from the cursors.
-      - name: Compact and compress database
+      # Order per D-078: wal_checkpoint(TRUNCATE) -> integrity_check must be
+      # "ok" (otherwise nothing is uploaded) -> VACUUM -> gzip.
+      - name: Compact and check database
         if: always()
         run: |
-          if [ ! -f "$DB_PATH" ]; then
+          set -e
+          if [ ! -f "$DRAFTORB_DB_PATH" ]; then
             echo "No database file; nothing to save"
             exit 0
           fi
           cd packages/etl
           node -e '
             const Database = require("better-sqlite3");
-            const db = new Database(process.env.DB_PATH);
+            const db = new Database(process.env.DRAFTORB_DB_PATH);
             db.pragma("busy_timeout = 30000");
             db.pragma("wal_checkpoint(TRUNCATE)");
+            const rows = db.pragma("integrity_check");
+            const ok = rows.length === 1 && rows[0].integrity_check === "ok";
+            if (!ok) {
+              console.error("PRAGMA integrity_check failed:", JSON.stringify(rows));
+              process.exit(3);
+            }
             db.exec("VACUUM");
             db.close();
           '
-          gzip -9 -n -c "$DB_PATH" > "$RUNNER_TEMP/$DB_FILE"
+          gzip -9 -n -c "$DRAFTORB_DB_PATH" > "$RUNNER_TEMP/$DB_FILE"
 
-      - name: Upload database state
+      # The DB asset is uploaded even when the pipeline failed (if: always())
+      # so partial progress is never lost; the exports asset below is
+      # success-only (D-078 point 3).
+      - name: Upload database state release
+        id: upload
         if: always()
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STATE_REPO_TOKEN: ${{ secrets.STATE_REPO_TOKEN }}
         run: |
-          set -e
-          if [ ! -f "$RUNNER_TEMP/$DB_FILE" ]; then
+          set -euo pipefail
+          DB_GZ="$RUNNER_TEMP/$DB_FILE"
+          if [ ! -f "$DB_GZ" ]; then
             echo "No compressed database; skipping state upload"
             exit 0
           fi
-          STATE="$RUNNER_TEMP/dbstate"
-          if [ ! -d "$STATE/.git" ]; then
-            echo "::warning::State clone missing; cannot upload database state"
-            exit 0
+          if [ -z "${STATE_REPO_TOKEN:-}" ]; then
+            echo "::error::Secret STATE_REPO_TOKEN is not set; cannot upload $DB_FILE"
+            exit 1
           fi
-          cp "$RUNNER_TEMP/$DB_FILE" "$STATE/$DB_FILE"
-          cd "$STATE"
-          git status --porcelain -- "$DB_FILE" | grep -q . || {
-            echo "Database unchanged; nothing to push"
-            exit 0
-          }
-          git config user.name "$BOT_NAME"
-          git config user.email "$BOT_EMAIL"
-          git add "$DB_FILE"
-          # Single-commit history: amend keeps the state branch at ~58 MB.
-          git commit --amend --no-edit -q
-          if git push --force-with-lease origin "HEAD:$DB_BRANCH"; then
-            echo "Database state pushed to $DB_BRANCH"
+          export GH_TOKEN="$STATE_REPO_TOKEN"
+          TAG="state-$(date -u +%Y%m%dT%H%MZ)"
+          if gh release view "$TAG" --repo "$STATE_REPO" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$DB_GZ" --repo "$STATE_REPO" --clobber
           else
-            echo "::warning::State push rejected; the next run retries from the previous state"
+            gh release create "$TAG" "$DB_GZ" --repo "$STATE_REPO" \
+              --title "ETL state $TAG" \
+              --notes "Automated ETL state snapshot (D-078)."
           fi
+          echo "Published $TAG with $DB_FILE"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "uploaded=true" >> "$GITHUB_OUTPUT"
 
-      - name: Publish refreshed exports
-        id: publish
-        run: |
-          git add data/public
-          if git diff --cached --quiet; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "No data/public changes to publish"
-            exit 0
-          fi
-          git -c user.name="$BOT_NAME" -c user.email="$BOT_EMAIL" \
-            commit -qm "data: refresh ETL export ($(date -u +%Y-%m-%dT%H:%MZ))"
-          # Publish problems must not fail the run: the DB state is already
-          # saved and the next run re-exports anyway.
-          git pull --rebase origin "${{ github.ref_name }}" || \
-            echo "::warning::Rebase failed; push may be rejected"
-          if git push origin "HEAD:${{ github.ref_name }}"; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::warning::Push rejected; exports will be retried on the next run"
-          fi
+      # Exports are packed and uploaded only when the whole pipeline succeeded
+      # (implicit success()): a failed run keeps the previous exports.
+      - name: Scan exports for leaked secrets
+        run: node scripts/check-secrets.mjs --dist off
 
-      # GITHUB_TOKEN pushes do not trigger push-event workflows, so Deploy is
-      # dispatched explicitly (workflow_dispatch is the allowed exception).
-      - name: Trigger deploy
-        if: steps.publish.outputs.changed == 'true'
+      - name: Pack public exports
+        run: tar -czf "$RUNNER_TEMP/$EXPORTS_FILE" -C data public
+
+      - name: Upload exports asset
+        if: success() && steps.upload.outputs.uploaded == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh workflow run deploy.yml --repo "${{ github.repository }}" --ref main
+          STATE_REPO_TOKEN: ${{ secrets.STATE_REPO_TOKEN }}
+        run: |
+          set -euo pipefail
+          export GH_TOKEN="$STATE_REPO_TOKEN"
+          gh release upload "${{ steps.upload.outputs.tag }}" \
+            "$RUNNER_TEMP/$EXPORTS_FILE" --repo "$STATE_REPO" --clobber
+          echo "Attached $EXPORTS_FILE to ${{ steps.upload.outputs.tag }}"
+
+      # Retention (D-078 point 4): keep the newest 7 state-* releases, delete
+      # older ones including their tags — only after a fully successful run
+      # (a failed run's DB-only release must not evict releases that still
+      # carry the exports asset `pnpm etl pull` needs).
+      - name: Prune old state releases
+        if: success() && steps.upload.outputs.uploaded == 'true'
+        env:
+          STATE_REPO_TOKEN: ${{ secrets.STATE_REPO_TOKEN }}
+        run: |
+          set -euo pipefail
+          export GH_TOKEN="$STATE_REPO_TOKEN"
+          OLD_TAGS=$(gh release list --repo "$STATE_REPO" --limit 100 --json tagName \
+            | jq -r '[.[].tagName | select(test("^state-[0-9]{8}T[0-9]{4}Z$"))] | sort | reverse | .[7:][]')
+          if [ -z "$OLD_TAGS" ]; then
+            echo "Nothing to prune (newest 7 state-* releases kept)"
+            exit 0
+          fi
+          for tag in $OLD_TAGS; do
+            echo "Deleting old state release $tag"
+            gh release delete "$tag" --repo "$STATE_REPO" --cleanup-tag --yes
+          done

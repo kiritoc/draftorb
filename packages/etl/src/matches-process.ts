@@ -88,12 +88,12 @@ async function tryEnrich(
       ctx.stmts.markEnriched.run(matchId);
     }
     ctx.onProgress?.(
-      `Enriched ${matchId}: ranks=${summary.ranksFetched} cached=${summary.ranksCached} ` +
+      `Enrichment done: ranks=${summary.ranksFetched} cached=${summary.ranksCached} ` +
         `mastery=${summary.masteryFetched} reused=${summary.masteryCached}` +
         (summary.failures > 0 ? ` failures=${summary.failures}` : ''),
     );
   } catch (err) {
-    ctx.onProgress?.(`enrichment failed for ${matchId}: ${String(err)}`);
+    ctx.onProgress?.(`enrichment failed: ${String(err)}`);
   }
 }
 

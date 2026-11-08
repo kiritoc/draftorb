@@ -10,9 +10,10 @@
  *   - the literal value of $RIOT_API_KEY when the variable is set.
  *
  * Scans `git ls-files` (committed files; falls back to a recursive walk when
- * the root is not a git checkout, e.g. tests) plus `apps/web/dist` when it
- * exists. Matches are reported as `path: <needle name>` — the secret value
- * itself is never printed.
+ * the root is not a git checkout, e.g. tests), `data/public` when it exists
+ * (gitignored generated exports, T-110/D-079 — packed into the state release)
+ * and `apps/web/dist` when it exists. Matches are reported as
+ * `path: <needle name>` — the secret value itself is never printed.
  *
  * Usage: node scripts/check-secrets.mjs [--root DIR] [--dist DIR|off]
  */
@@ -107,6 +108,15 @@ export function collectFiles(root, distDir) {
   } else {
     const walked = [];
     walkFiles(root, walked);
+    for (const file of walked) files.add(file);
+  }
+  // data/public is gitignored (D-079) so git ls-files never lists it; walk it
+  // explicitly so generated exports are scanned before they are packed into
+  // the state release (T-110). The Set dedupes the non-git fallback walk.
+  const publicDataDir = join(root, 'data', 'public');
+  if (existsSync(publicDataDir)) {
+    const walked = [];
+    walkFiles(publicDataDir, walked);
     for (const file of walked) files.add(file);
   }
   if (distDir !== null && existsSync(distDir)) {

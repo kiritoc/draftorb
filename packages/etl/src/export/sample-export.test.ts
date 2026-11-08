@@ -8,7 +8,8 @@
  * returns at least one "Best overall" recommendation per exported role.
  */
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 import { recommend } from '@draftorb/engine';
 import {
@@ -27,10 +28,15 @@ import {
   type RecommendData,
   type Role,
 } from '@draftorb/shared';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 const PUBLIC_DIR = new URL('../../../../data/public/', import.meta.url);
 const CHAMPION_TAGS_PATH = new URL('../../../../data/manual/champion-tags.json', import.meta.url);
+
+// data/public is gitignored (D-079) and populated by `pnpm etl pull` or a
+// local export: on a clean checkout (CI) there is nothing to validate, so the
+// suite skips instead of failing.
+const HAS_PUBLISHED_EXPORT = existsSync(fileURLToPath(new URL('latest.json', PUBLIC_DIR)));
 
 function readJson(url: URL): unknown {
   return JSON.parse(readFileSync(url, 'utf8')) as unknown;
@@ -82,13 +88,25 @@ function recommendDataForRole(
   };
 }
 
-describe('published sample export (data/public)', () => {
-  const { patch, roles, files } = loadPublishedExport();
-  const champions = championsMapSchema.parse(
-    readJson(new URL(`${patch}/champions.json`, PUBLIC_DIR)),
-  );
-  const championIds = Object.values(champions).map((champion) => champion.id);
-  const tags = championTagsMapSchema.parse(readJson(CHAMPION_TAGS_PATH));
+describe.skipIf(!HAS_PUBLISHED_EXPORT)('published sample export (data/public)', () => {
+  // Loaded lazily inside beforeAll: the suite is skipped on clean checkouts.
+  let patch = '';
+  let roles: readonly Role[] = [];
+  let files: Record<string, unknown> = {};
+  let championIds: readonly ChampionId[] = [];
+  let tags!: ReturnType<typeof championTagsMapSchema.parse>;
+
+  beforeAll(() => {
+    const loaded = loadPublishedExport();
+    patch = loaded.patch;
+    roles = loaded.roles;
+    files = loaded.files;
+    const champions = championsMapSchema.parse(
+      readJson(new URL(`${patch}/champions.json`, PUBLIC_DIR)),
+    );
+    championIds = Object.values(champions).map((champion) => champion.id);
+    tags = championTagsMapSchema.parse(readJson(CHAMPION_TAGS_PATH));
+  });
 
   it('lists at least one role', () => {
     expect(roles.length).toBeGreaterThan(0);

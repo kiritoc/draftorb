@@ -68,12 +68,14 @@ const EMPTY_CONTEXT: PersonalizeContext = {
   allyAdcId: null,
   enemySupportId: null,
   enemySignature: new Set(),
+  rankBucket: 'DIAMOND',
 };
 
 const L1_CONTEXT: PersonalizeContext = {
   allyAdcId: 10,
   enemySupportId: 200,
   enemySignature: new Set(),
+  rankBucket: 'DIAMOND',
 };
 
 const data: RecommendData = makeData({ champions: [1, 2, 3, 10, 200, 201, 30, 31, 32] });
@@ -88,7 +90,13 @@ describe('personalize: fallback levels and shrinkage', () => {
     expect(entry.nEff).toBeCloseTo(3, 5);
     // All wins, p shrunk toward p_profile=1.0 -> p = (3 + 15*1)/(3+15) = 1.
     expect(entry.profileWinRate).toBeCloseTo(1, 5);
-    expect(entry.deltaVsMetaPp).toBe(Math.round(100 * (1 - 0.55)));
+    // D-080 golden: makeBaselines row [1,'DIAMOND',30,50,0.1,50] gives
+    // nE = 50^2/0.1 = 25000, winsE = 30*25000/50 = 15000, gamesE = 25000,
+    // w0 = (15000 + 20*0.5)/(25000+20) = 15010/25020 ≈ 0.5997.
+    const w0 = 15010 / 25020;
+    expect(entry.baselineWinRate).toBeCloseTo(w0, 6);
+    expect(entry.baselineBucket).toBe('DIAMOND');
+    expect(entry.deltaVsBaselinePp).toBe(Math.round(100 * (1 - w0)));
   });
 
   it('falls back to L2 when only the enemy support matches', () => {
@@ -117,6 +125,7 @@ describe('personalize: fallback levels and shrinkage', () => {
       allyAdcId: null,
       enemySupportId: null,
       enemySignature: new Set(['AD:marksman']),
+      rankBucket: 'DIAMOND',
     };
     const result = personalize([rec(1, 1, 0.55)], makeProfile(games), context, tagData, NOW_MS);
     expect(result.entries[0]!.fallbackLevel).toBe(3);
@@ -173,7 +182,9 @@ describe('personalize: fallback levels and shrinkage', () => {
     const champ1 = result.entries.find((e) => e.championId === 1)!;
     expect(champ1.insufficientData).toBe(true);
     expect(champ1.profileWinRate).toBeNull();
-    expect(champ1.deltaVsMetaPp).toBeNull();
+    expect(champ1.deltaVsBaselinePp).toBeNull();
+    expect(champ1.baselineWinRate).toBeNull();
+    expect(champ1.baselineBucket).toBeNull();
     expect(champ1.nEff).toBeCloseTo(1, 5);
     expect(champ1.personalizedScore).toBe(1); // metaNorm for rank 1 of 2
     // Champ 2 has zero games -> also insufficient, n_eff 0.
@@ -247,6 +258,84 @@ describe('personalize: ordering, trust and purity', () => {
     expect(byChamp.get(1)!.personalizedScore).toBe(1);
     expect(byChamp.get(2)!.personalizedScore).toBeCloseTo(0.5, 5);
     expect(byChamp.get(3)!.personalizedScore).toBe(0);
+  });
+});
+
+describe('personalize: D-080 baseline badge', () => {
+  it('computes deltaVsBaselinePp against the selected bucket baseline (golden)', () => {
+    // Champ 1: 3 wins, 3 losses -> winsW=0... craft 2 wins 1 loss instead.
+    const games = [
+      makeGame({ championId: 1, win: true }),
+      makeGame({ championId: 1, win: true }),
+      makeGame({ championId: 1, win: false }),
+    ];
+    // pProfile = 2/3; p = (2 + 15*(2/3)) / (3 + 15) = 12/18 = 2/3.
+    const result = personalize([rec(1, 1, 0.55)], makeProfile(games), EMPTY_CONTEXT, data, NOW_MS);
+    const entry = result.entries[0]!;
+    expect(entry.profileWinRate).toBeCloseTo(2 / 3, 5);
+    // Baseline [1,'DIAMOND',30,50,0.1,50]: w0 = 15010/25020.
+    const w0 = 15010 / 25020;
+    expect(entry.baselineWinRate).toBeCloseTo(w0, 6);
+    expect(entry.baselineBucket).toBe('DIAMOND');
+    expect(entry.deltaVsBaselinePp).toBe(Math.round(100 * (2 / 3 - w0)));
+    expect(result.schemaVersion).toBe(2);
+  });
+
+  it('omits baseline fields when the champion has no baseline row', () => {
+    const noRows = makeData({ champions: [1, 2, 3], baselines: [] });
+    const games = [1, 2, 3].map(() => makeGame());
+    const result = personalize(
+      [rec(1, 1, 0.55)],
+      makeProfile(games),
+      EMPTY_CONTEXT,
+      noRows,
+      NOW_MS,
+    );
+    const entry = result.entries[0]!;
+    expect(entry.insufficientData).toBe(false);
+    expect(entry.baselineWinRate).toBeNull();
+    expect(entry.baselineBucket).toBeNull();
+    expect(entry.deltaVsBaselinePp).toBeNull();
+  });
+
+  it('omits baseline fields when the baseline row fails the gate', () => {
+    // nE = 1^2/1 = 1 < minGames(25) -> no badge baseline.
+    const weak = makeData({
+      champions: [1, 2, 3],
+      baselines: [[1, 'DIAMOND', 1, 1, 1, 1]],
+    });
+    const games = [1, 2, 3].map(() => makeGame());
+    const result = personalize([rec(1, 1, 0.55)], makeProfile(games), EMPTY_CONTEXT, weak, NOW_MS);
+    const entry = result.entries[0]!;
+    expect(entry.baselineWinRate).toBeNull();
+    expect(entry.deltaVsBaselinePp).toBeNull();
+  });
+
+  it('omits baseline fields when the row has no weighted evidence (gamesE = 0)', () => {
+    const empty = makeData({
+      champions: [1, 2, 3],
+      baselines: [[1, 'DIAMOND', 0, 0, 0, 0]],
+    });
+    const games = [1, 2, 3].map(() => makeGame());
+    const result = personalize([rec(1, 1, 0.55)], makeProfile(games), EMPTY_CONTEXT, empty, NOW_MS);
+    expect(result.entries[0]!.baselineWinRate).toBeNull();
+    expect(result.entries[0]!.deltaVsBaselinePp).toBeNull();
+  });
+
+  it('ignores baseline rows from other rank buckets', () => {
+    const otherBucket = makeData({
+      champions: [1, 2, 3],
+      baselines: [[1, 'IRON', 30, 50, 0.1, 50]],
+    });
+    const games = [1, 2, 3].map(() => makeGame());
+    const result = personalize(
+      [rec(1, 1, 0.55)],
+      makeProfile(games),
+      EMPTY_CONTEXT,
+      otherBucket,
+      NOW_MS,
+    );
+    expect(result.entries[0]!.baselineBucket).toBeNull();
   });
 });
 

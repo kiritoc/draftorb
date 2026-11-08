@@ -65,7 +65,7 @@ Format: `ID | Title | Deps | Status | Acceptance`. Status: TODO, DOING, REVIEW, 
 ## E4 Runes
 
 - **T-040 | Rune recommender in engine (M)** | T-018,T-023 | REVIEW | SPECS §8.1. DONE pending review: `recommendRunes` (engine `runes.ts`/`runes-context.ts`) reproduces the aggregator's `lane:`/`damagemix:`/`global` context keys from the draft (lane-phase influence ordering, prefix back-off), scores pages by recursively shrunk win rate toward broader contexts (prior `kRune` = 40 eq. games, `RuneConfig`), returns top `topPages` (3) with `nEff`/`players`/`pickShare`/`lowData`/scoring `contextKey`, plus a `statShardsVsDamageMix` adaptation hint; output contract `RuneRecommendationResult` (`RUNE_RESULT_SCHEMA_VERSION` = 1) in shared. Interpretation details logged as D-059 (accepted 2026-11-08).
-- **T-041 | Runes UI (M)** | T-040,T-032 | TODO | Rune page display (icons), adaptation hints.
+- **T-041 | Runes UI (M)** | T-040,T-032 | REVIEW | Rune page display (icons), adaptation hints. `RunesPanel` on DraftScreen after champion pick: lazy `roles/<ROLE>/runes/<id>.json` fetch (cached per champion), icon index from static `runes.json` over Data Dragon CDN, shrunk win rate always paired with n_eff, low-data badge, `statShardsVsDamageMix` hint. Stat shards are not in `runesReforged` so they render text-only (per D-081 assumption). No "Profile's best" column — that is T-097.
 - **T-042 | Gameplan notes (S)** | T-032 | TODO | Markdown per champion displayed after pick.
 
 ## E5 Items

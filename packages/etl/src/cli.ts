@@ -33,6 +33,7 @@ import { statusCommand } from './commands/status';
 import { rekeyCommand } from './commands/rekey';
 import { profileSyncCommand } from './commands/profile-sync';
 import { pullCommand } from './commands/pull';
+import { breakpointCommand } from './commands/breakpoint';
 import { log, type Command, findCommand, formatHelp, isHelpFlag } from './commands/shared';
 
 const COMMANDS: readonly Command[] = [
@@ -53,6 +54,7 @@ const COMMANDS: readonly Command[] = [
   rekeyCommand,
   profileSyncCommand,
   pullCommand,
+  breakpointCommand,
 ];
 
 async function main(argv: string[]): Promise<void> {

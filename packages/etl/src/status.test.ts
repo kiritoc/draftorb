@@ -39,6 +39,7 @@ describe('getEtlStatus and formatEtlStatus', () => {
       expect(status.participants).toBe(0);
       expect(status.cursors).toEqual([]);
       expect(status.rejects).toEqual([]);
+      expect(status.breakpointsReviewNeeded).toBe(0);
 
       const formatted = formatEtlStatus(status);
       expect(formatted).toContain(`${status.migrations.applied} applied, 0 pending`);
@@ -47,6 +48,7 @@ describe('getEtlStatus and formatEtlStatus', () => {
       expect(formatted).toContain('Participants: 0');
       expect(formatted).toContain('Match cursors: 0');
       expect(formatted).toContain('Rejects (global): 0');
+      expect(formatted).toContain('Breakpoints pending review: 0');
     } finally {
       db.close();
     }
@@ -139,6 +141,19 @@ describe('getEtlStatus and formatEtlStatus', () => {
          VALUES (?, ?, ?, ?)`,
       ).run('EUW1_REJECT_1', 'short', '14.5', 1000);
 
+      db.prepare(
+        `INSERT INTO data_breakpoints (
+          scope_type, scope_id, from_patch_index, mode, weight_factor,
+          status, source, reason, created_at
+        ) VALUES ('champion', 41, 3, 'downweight', 0.5, 'suggested', 'auto', 'test', 1000)`,
+      ).run();
+      db.prepare(
+        `INSERT INTO data_breakpoints (
+          scope_type, scope_id, from_patch_index, mode, weight_factor,
+          status, source, reason, created_at
+        ) VALUES ('global', NULL, 4, 'reset', NULL, 'active', 'manual', 'test', 1000)`,
+      ).run();
+
       const status = getEtlStatus(db);
 
       expect(status.players).toEqual([
@@ -152,6 +167,7 @@ describe('getEtlStatus and formatEtlStatus', () => {
       expect(status.participants).toBe(2);
       expect(status.cursors).toEqual([{ platform: 'euw1', done: 1, partial: 1 }]);
       expect(status.rejects).toEqual([{ reason: 'short', count: 1 }]);
+      expect(status.breakpointsReviewNeeded).toBe(1);
 
       const formatted = formatEtlStatus(status);
       expect(formatted).toContain('Players (2):');
@@ -165,6 +181,7 @@ describe('getEtlStatus and formatEtlStatus', () => {
       expect(formatted).toContain('euw1: 1 done, 1 partial');
       expect(formatted).toContain('Rejects (global, 1):');
       expect(formatted).toContain('short: 1');
+      expect(formatted).toContain('Breakpoints pending review: 1');
     } finally {
       db.close();
     }
@@ -243,6 +260,7 @@ describe('getEtlStatus and formatEtlStatus', () => {
       participants: 0,
       cursors: [],
       rejects: [],
+      breakpointsReviewNeeded: 0,
     };
 
     const formatted = formatEtlStatus(status);

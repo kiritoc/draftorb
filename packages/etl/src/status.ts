@@ -42,6 +42,8 @@ export interface EtlStatus {
   participants: number;
   cursors: PlatformCursorCount[];
   rejects: RejectReasonCount[];
+  /** Suggested data breakpoints awaiting review (SPECS §16). */
+  breakpointsReviewNeeded: number;
 }
 
 function tableExists(db: Database.Database, tableName: string): boolean {
@@ -203,7 +205,15 @@ export function getEtlStatus(db: Database.Database, platform?: Platform | string
       .all() as RejectReasonCount[];
   }
 
-  return { migrations, players, matches, participants, cursors, rejects };
+  let breakpointsReviewNeeded = 0;
+  if (tableExists(db, 'data_breakpoints')) {
+    const row = db
+      .prepare("SELECT COUNT(*) AS count FROM data_breakpoints WHERE status = 'suggested'")
+      .get() as { count: number } | undefined;
+    breakpointsReviewNeeded = Number(row?.count ?? 0);
+  }
+
+  return { migrations, players, matches, participants, cursors, rejects, breakpointsReviewNeeded };
 }
 
 /**
@@ -262,6 +272,8 @@ export function formatEtlStatus(status: EtlStatus): string {
       lines.push(`  ${r.reason}: ${r.count}`);
     }
   }
+
+  lines.push(`Breakpoints pending review: ${status.breakpointsReviewNeeded}`);
 
   return lines.join('\n');
 }

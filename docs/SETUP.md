@@ -116,7 +116,8 @@ pnpm etl check-key [platform]  # test the Riot API key (default: euw1)
 pnpm etl players [platform]    # discover players by tier (--tiers, --quota, --reset)
 pnpm etl matches [platform]    # ingest matches, resumable, Ctrl+C safe (--since-patch, --per-player, --limit, --queue, --min-duration, --reset, --reset-tombstones, --refresh)
 pnpm etl prune [--keep-patches=N] [--dry-run]  # delete matches older than the retention window and tombstone them as pruned (D-044; default keep: 20 patches)
-pnpm etl status [platform]     # counts and progress
+pnpm etl breakpoint <list|add|validate|reject>  # manage data breakpoints: manual add is active+manual, validate/reject move suggested->active/rejected (SPECS §16)
+pnpm etl status [platform]     # counts and progress (incl. breakpoints pending review)
 pnpm etl aggregate [patch]     # compute every aggregated table (role probabilities, baselines, pair and lane tables, rune contexts; T-015..T-018)
 pnpm etl export [patch] [--region=<platform>]  # write versioned JSON and manifest for a patch (T-019)
 pnpm etl derive-roles [patch]  # rewrite champions.json.roles from observed roles (T-015.b); run after `matches`, and re-run after every `static`

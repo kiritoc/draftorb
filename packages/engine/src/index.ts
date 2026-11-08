@@ -16,3 +16,4 @@ export * from './recommend.js';
 export * from './personalize.js';
 export * from './profile-setup.js';
 export * from './runes.js';
+export * from './threat.js';

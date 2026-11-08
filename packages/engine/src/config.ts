@@ -269,6 +269,55 @@ export const DEFAULT_RUNE_CONFIG: RuneConfig = Object.freeze({
   laneGroups: DEFAULT_LANE_GROUPS,
 });
 
+// --- Threat score config (SPECS §8.2 step 2, T-053) ---
+
+/**
+ * Threat-score config (SPECS §8.2.2):
+ * `threat = kdaWeight * (K + 0.5*A) / (D + 1)
+ *         + itemGoldWeight * itemGold / avgItemGold(time)
+ *         + scalingWeight * scalingFactor(champion)`
+ * `threatShare(e) = threat(e) / sum threat`. All values are priors until the
+ * D-023 backtest calibrates them.
+ */
+export interface ThreatConfig {
+  /** Weight of the KDA term `(K + 0.5*A) / (D + 1)`. */
+  readonly kdaWeight: number;
+  /** Weight of the item-gold term `itemGold / avgItemGold(time)`. */
+  readonly itemGoldWeight: number;
+  /** Weight of the champion `scalingFactor` term. */
+  readonly scalingWeight: number;
+  /**
+   * Piecewise-linear anchors `(timeSeconds, averageGoldInItems)` used for
+   * `avgItemGold(time)` — there is no stats source for the real curve, so
+   * this prior curve lives in config (D-081).
+   */
+  readonly avgItemGoldAnchors: ReadonlyArray<readonly [number, number]>;
+  /** Per-flag scaling factors; the champion factor is the max of its true flags. */
+  readonly scalingFactors: {
+    readonly early: number;
+    readonly mid: number;
+    readonly late: number;
+  };
+  /** Scaling factor for champions with no usable scaling tags. */
+  readonly scalingFactorNeutral: number;
+}
+
+export const DEFAULT_THREAT_CONFIG: ThreatConfig = Object.freeze({
+  kdaWeight: 1.0,
+  itemGoldWeight: 1.0,
+  scalingWeight: 1.0,
+  avgItemGoldAnchors: [
+    [0, 0],
+    [600, 3000],
+    [1200, 7000],
+    [1800, 11000],
+    [2400, 15000],
+    [3000, 19000],
+  ] as const,
+  scalingFactors: Object.freeze({ early: 0.4, mid: 0.7, late: 1.0 }),
+  scalingFactorNeutral: 0.6,
+});
+
 // --- Influence lookup ---
 
 export interface InfluenceOpts {

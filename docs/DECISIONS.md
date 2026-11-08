@@ -922,6 +922,17 @@ Owner decision 2026-11-07.
 
 Owner decision 2026-11-08.
 
+### D-081 — Threat score interpretations (item gold curve, scaling factor, share shape) — PROPOSED
+
+- Context: SPECS §8.2 step 2 defines `threat = a*(K+0.5*A)/(D+1) + b*itemGold/avgItemGold(time) + c*scalingFactor(champion)` but leaves three terms underspecified for T-053.
+- Decision (assumptions made while implementing T-053; simplest reading, pending owner review):
+  1. `itemGold(p)` = sum of `goldTotal` over the items catalog entries matching `PlayerState.items` ids; unknown ids contribute 0 (never invent gold).
+  2. `avgItemGold(time)` = piecewise-linear interpolation over `ThreatConfig.avgItemGoldAnchors` (seconds -> average gold invested in items), a prior curve in `engine/config.ts` since no statistics source exists; the item term is 0 when the interpolated average is <= 0 (e.g. `time = 0`), avoiding division by zero.
+  3. `scalingFactor(champion)` = max of the champion tag's true `scaling` flags weighted by `ThreatConfig.scalingFactors` (early 0.4 / mid 0.7 / late 1.0 priors); untagged champions or tags with no flag set get `scalingFactorNeutral` (0.6).
+  4. `computeThreatScores` takes the enemy `PlayerState[]` (order-aligned output — `PlayerState` carries no role/id, so role mapping is left to T-054) and returns `{ threats, shares }`; shares are all 0 when the total threat is not positive.
+- Alternatives: a real average-item-gold curve from match data (rejected for now — no such export exists; revisit with T-051/T-056 data); scaling factor from champion stats (champion catalog carries no stats — tags are the only champion metadata); per-enemy role-keyed shares now (rejected — would need role inference inside the threat module).
+- Consequences: all weights/anchors are priors calibrated only by the D-023 gate, like every other engine parameter. `mid`-phase `threatShares` consumers (T-054) must map the order-aligned shares onto roles themselves.
+
 ### Template
 
 ```

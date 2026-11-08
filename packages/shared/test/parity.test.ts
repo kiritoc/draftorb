@@ -374,6 +374,81 @@ describe('shared schema parity (D-011)', () => {
     expect(shared.profileIdSchema).toBeDefined();
   });
 
+  it('exports GameState/PlayerState schemas matching SPECS §8.2 (T-052)', () => {
+    expect(shared.playerStateSchema).toBeDefined();
+    expect(shared.gameStateSchema).toBeDefined();
+
+    const player = {
+      championId: 41,
+      kills: 3,
+      deaths: 1,
+      assists: 7,
+      cs: 42.5,
+      items: [3089, 2052],
+      level: 13,
+    };
+    const state = shared.gameStateSchema.safeParse({
+      time: 754.2,
+      me: player,
+      allies: [player, player, player, player],
+      enemies: [player, player, player, player, player],
+      goldDiff: 1234,
+      kills: 12,
+      towers: 4,
+      dragons: 2,
+    });
+    expect(state.success).toBe(true);
+
+    // Optional fields may be omitted; items default to an empty list.
+    const minimal = shared.gameStateSchema.safeParse({
+      time: 0,
+      me: { championId: 41, kills: 0, deaths: 0, assists: 0 },
+      allies: [],
+      enemies: [],
+    });
+    expect(minimal.success).toBe(true);
+    if (minimal.success) {
+      expect(minimal.data.me.items).toEqual([]);
+    }
+
+    // Team sizes are capped at 4 allies / 5 enemies (SPECS §8.2).
+    expect(
+      shared.gameStateSchema.safeParse({
+        time: 0,
+        me: { championId: 41, kills: 0, deaths: 0, assists: 0 },
+        allies: [player, player, player, player, player],
+        enemies: [],
+      }).success,
+    ).toBe(false);
+    expect(
+      shared.gameStateSchema.safeParse({
+        time: 0,
+        me: { championId: 41, kills: 0, deaths: 0, assists: 0 },
+        allies: [],
+        enemies: [player, player, player, player, player, player],
+      }).success,
+    ).toBe(false);
+
+    // Negative K/D/A and unknown keys are rejected (strict schema).
+    expect(
+      shared.playerStateSchema.safeParse({
+        championId: 41,
+        kills: -1,
+        deaths: 0,
+        assists: 0,
+      }).success,
+    ).toBe(false);
+    expect(
+      shared.playerStateSchema.safeParse({
+        championId: 41,
+        kills: 0,
+        deaths: 0,
+        assists: 0,
+        summonerSpells: [1, 2],
+      }).success,
+    ).toBe(false);
+  });
+
   it('exports zod for downstream re-use', () => {
     expect(shared.z).toBeDefined();
     expect(typeof shared.z.string).toBe('function');

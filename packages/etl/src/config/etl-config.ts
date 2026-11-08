@@ -14,6 +14,17 @@ export const ETL_CONFIG = Object.freeze({
   retentionPatches: 20,
 
   /**
+   * Change weighting (SPECS §14, D-045): OFF by default; enabled only after
+   * T-027.a passes the D-023 gate. Neutral weights (1.0) while disabled.
+   */
+  changeWeightEnabled: false,
+  /**
+   * Floor for combined change/breakpoint weights (SPECS §14/§16); `reset`
+   * breakpoints are 0 and bypass the floor. Prior until the D-023 gate.
+   */
+  minWeight: 0.05,
+
+  /**
    * Configured-profile sync/export knobs (T-091, D-069/D-074, SPECS §18).
    * All priors until real profile volumes are known.
    */

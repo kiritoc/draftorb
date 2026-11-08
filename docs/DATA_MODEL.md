@@ -53,7 +53,8 @@ CREATE TABLE patches (
   version_label TEXT NOT NULL UNIQUE   -- major.minor, identical to matches.patch
 );
 
--- PLANNED (T-019.d, D-046): not migrated yet.
+-- Migration 016 (T-019.e, D-046/D-047) created this table; rows are written
+-- by the `changes` command (T-019.d, not implemented yet).
 CREATE TABLE entity_change_scores (
   entity_type TEXT NOT NULL CHECK (entity_type IN ('champion','item','rune')),
   entity_id INTEGER NOT NULL,
@@ -64,7 +65,8 @@ CREATE TABLE entity_change_scores (
   PRIMARY KEY (entity_type, entity_id, patch_index)
 );
 
--- PLANNED (T-019.e, D-047): not migrated yet.
+-- Migration 016 (T-019.e, D-047) created this table; managed by the
+-- `breakpoint` command (manual rows) and by T-019.d (auto suggestions).
 CREATE TABLE data_breakpoints (
   id INTEGER PRIMARY KEY,
   scope_type TEXT NOT NULL CHECK (scope_type IN ('champion','item','rune','global')),
@@ -82,7 +84,6 @@ CREATE TABLE data_breakpoints (
     OR (mode = 'downweight' AND weight_factor IS NOT NULL AND weight_factor > 0 AND weight_factor <= 1)
   )
 );
--- PLANNED (T-019.e, D-047): not migrated yet.
 CREATE UNIQUE INDEX idx_data_breakpoints_unique ON data_breakpoints(scope_type, COALESCE(scope_id, -1), from_patch_index, source);
 
 -- PLANNED (T-091, D-068/D-069): match history of each configured profile

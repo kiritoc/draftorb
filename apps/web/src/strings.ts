@@ -117,6 +117,15 @@ export const strings = {
   unvalidatedTitle: 'Unvalidated model:',
   unvalidatedBody:
     'recommendations are not backed by a backtest report that passed the validation gate. Use at your own risk.',
+  runesTitle: (champion: string): string => `Runes — ${champion}`,
+  runesLoading: 'Loading runes…',
+  runesUnavailable: 'No rune data for this champion at your rank bucket.',
+  runeStats: (winRatePct: number, nEff: number, pickSharePct: number): string =>
+    `${winRatePct}% win rate · n_eff ${nEff} · ${pickSharePct}% pick share`,
+  runeHintVsDamageMix: (mix: 'AD' | 'AP' | 'mixed'): string =>
+    mix === 'mixed'
+      ? 'Enemy team deals mixed damage — favored stat shards:'
+      : `Enemy team is ${mix}-heavy — favored stat shards:`,
   legalDescription: 'DraftOrb — a free League of Legends draft and itemization assistant.',
   legalNotice: 'Not endorsed or sponsored by Riot Games.',
   legalDataSource:

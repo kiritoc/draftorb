@@ -9,7 +9,7 @@
  * "From your pool" list (T-032/T-033).
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   type Champion,
@@ -23,8 +23,10 @@ import {
   type RecommendData,
   type Recommendation,
   type Role,
+  type RuneExport,
+  type RuneRecommendationResult,
 } from '@draftorb/shared';
-import { recommend } from '@draftorb/engine';
+import { recommend, recommendRunes } from '@draftorb/engine';
 import {
   loadChampionTags,
   loadChampions,
@@ -34,6 +36,12 @@ import {
 } from '../data/loader.js';
 import { loadChampionIconVersion } from '../data/champion-icons.js';
 import { loadProfile } from '../data/profile.js';
+import {
+  buildRuneIconIndex,
+  loadRuneCatalog,
+  loadRuneExport,
+  type RuneIconInfo,
+} from '../data/runes.js';
 import { createRecommendData } from '../data/recommend-data.js';
 import { excludePick, excludedRanks } from '../data/exclude-pick.js';
 import { computePersonalizedEntries } from '../personalized.js';
@@ -43,6 +51,7 @@ import { strings } from '../strings.js';
 import { DraftSlot, type DraftSlotState } from './DraftSlot.js';
 import { RecommendationsList } from './RecommendationsList.js';
 import { PersonalizedList } from './PersonalizedList.js';
+import { RunesPanel } from './RunesPanel.js';
 import { PoolEditor } from './PoolEditor.js';
 import { filterPoolByCatalogue, readPool, savePool } from '../pool/storage.js';
 import {
@@ -92,6 +101,10 @@ export function DraftScreen() {
   const [favoritesNotice, setFavoritesNotice] = useState<string | null>(null);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [poolRecommendations, setPoolRecommendations] = useState<Recommendation[]>([]);
+  const [runeIcons, setRuneIcons] = useState<ReadonlyMap<number, RuneIconInfo> | null>(null);
+  const [runesResult, setRunesResult] = useState<RuneRecommendationResult | null>(null);
+  const [runesLoading, setRunesLoading] = useState(false);
+  const runeExportCache = useRef(new Map<number, Promise<RuneExport | null>>());
 
   useEffect(() => {
     let cancelled = false;
@@ -112,10 +125,11 @@ export function DraftScreen() {
           );
         }
         const loadedChampions = await loadChampions(latest.patch);
-        const [loadedFiles, tags, loadedProfile] = await Promise.all([
+        const [loadedFiles, tags, loadedProfile, runeTrees] = await Promise.all([
           loadExportFiles(manifest),
           loadChampionTags(),
           loadProfile(),
+          loadRuneCatalog(latest.patch),
         ]);
         const loadedPool = readPool();
         if (cancelled) {
@@ -125,6 +139,7 @@ export function DraftScreen() {
         setChampions(loadedChampions);
         setProfile(loadedProfile);
         setData(createRecommendData(loadedFiles.files, loadedChampions, tags));
+        setRuneIcons(buildRuneIconIndex(runeTrees));
         const { pool: filteredPool, dropped } = filterPoolByCatalogue(
           loadedPool.pool ?? { version: 1, pools: {} },
           loadedChampions.map((champion) => champion.id),
@@ -199,6 +214,45 @@ export function DraftScreen() {
 
   const [poolUnavailable, setPoolUnavailable] = useState<PoolUnavailableEntry[]>([]);
   const [insufficientData, setInsufficientData] = useState<InsufficientDataEntry[]>([]);
+
+  // Rune recommendations for the user's pick (T-041, SPECS §8.1): the export
+  // is fetched once per champion and cached; the engine recomputes on every
+  // draft change. `recommendRunes` failures degrade to no panel, never break
+  // the draft screen.
+  useEffect(() => {
+    if (data === null || patch === null || user.championId === null) {
+      setRunesResult(null);
+      setRunesLoading(false);
+      return;
+    }
+    const championId = user.championId;
+    let cancelled = false;
+    setRunesLoading(true);
+    let pending = runeExportCache.current.get(championId);
+    if (pending === undefined) {
+      pending = loadRuneExport(patch, USER_ROLE, championId);
+      runeExportCache.current.set(championId, pending);
+    }
+    void pending.then((runeExport) => {
+      if (cancelled) {
+        return;
+      }
+      try {
+        setRunesResult(
+          recommendRunes(draftInput, championId, runeExport ?? undefined, {
+            roleProb: data.roleProb,
+            tags: data.tags,
+          }),
+        );
+      } catch {
+        setRunesResult(null);
+      }
+      setRunesLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [data, patch, draftInput, user.championId]);
 
   const setUserSlot = useCallback((slot: DraftSlotState) => setUser(slot), []);
   const setAlly = useCallback((index: number, slot: DraftSlotState) => {
@@ -423,6 +477,24 @@ export function DraftScreen() {
             </div>
           </section>
         </div>
+
+        {user.championId !== null &&
+          (runesLoading ? (
+            <p className="mb-6 text-sm text-gray-500">{strings.runesLoading}</p>
+          ) : (
+            runesResult !== null &&
+            runeIcons !== null && (
+              <RunesPanel
+                result={runesResult}
+                championName={
+                  champions.find((c) => c.id === user.championId)?.name ??
+                  strings.championFallback(user.championId)
+                }
+                icons={runeIcons}
+                iconVersion={iconVersion}
+              />
+            )
+          ))}
 
         {poolSize > 0 && (
           <div className="mb-4">

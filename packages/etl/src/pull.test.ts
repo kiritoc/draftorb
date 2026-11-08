@@ -77,6 +77,18 @@ describe('pickNewestStateTag', () => {
     expect(pickNewestStateTag(['state-beta', 'state-2026'])).toBeNull();
     expect(pickNewestStateTag([])).toBeNull();
   });
+
+  it('accepts seconds in tags and orders mixed widths chronologically', () => {
+    const tags = [
+      'state-20261108T112306Z',
+      'state-20261108T1123Z',
+      'state-20261108T112359Z',
+      'state-20261108T1237',
+      'not-a-state-tag',
+    ];
+    // 11:23:00 < 11:23:06 < 11:23:59; the tag without a trailing Z is ignored.
+    expect(pickNewestStateTag(tags)).toBe('state-20261108T112359Z');
+  });
 });
 
 describe('pickNewestStateTagWithAssets', () => {

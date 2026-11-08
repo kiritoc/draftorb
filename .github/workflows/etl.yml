@@ -88,9 +88,12 @@ jobs:
             echo "::error::Cannot access state repo '$STATE_REPO': the STATE_REPO_TOKEN is missing, expired or lacks Contents read/write on that repo. $(tr '\n' ' ' < "$STATE_DIR/repo.err")"
             exit 1
           fi
-          # state-<UTC yyyymmddThhmmZ> tags sort chronologically.
+          # state-<UTC yyyymmddThhmmZ> tags sort chronologically; seconds are
+          # optional (a manually seeded tag may carry them), so sort by a
+          # normalized key — plain string sort misorders mixed widths.
           TAG=$(gh release list --repo "$STATE_REPO" --limit 100 --json tagName \
-            | jq -r '[.[].tagName | select(test("^state-[0-9]{8}T[0-9]{4}Z$"))] | sort | last // ""')
+            | jq -r '[.[].tagName | select(test("^state-[0-9]{8}T[0-9]{4,6}Z$"))]
+              | sort_by(.[6:14] + ((.[15:-1] + "000000")[0:6])) | last // ""')
           if [ -z "$TAG" ]; then
             echo "::error::No state-* release found in '$STATE_REPO'; seed the first release manually (SETUP.md > Seeding the first state release)"
             exit 1
@@ -245,7 +248,8 @@ jobs:
           set -euo pipefail
           export GH_TOKEN="$STATE_REPO_TOKEN"
           OLD_TAGS=$(gh release list --repo "$STATE_REPO" --limit 100 --json tagName \
-            | jq -r '[.[].tagName | select(test("^state-[0-9]{8}T[0-9]{4}Z$"))] | sort | reverse | .[7:][]')
+            | jq -r '[.[].tagName | select(test("^state-[0-9]{8}T[0-9]{4,6}Z$"))]
+              | sort_by(.[6:14] + ((.[15:-1] + "000000")[0:6])) | reverse | .[7:][]')
           if [ -z "$OLD_TAGS" ]; then
             echo "Nothing to prune (newest 7 state-* releases kept)"
             exit 0

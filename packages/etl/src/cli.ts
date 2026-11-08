@@ -19,6 +19,7 @@ import { CliError, EXIT, UsageError } from './cli-args';
 import { staticCommand } from './commands/static';
 import { backtestCommand } from './commands/backtest';
 import { validateTagsCommand } from './commands/validate-tags';
+import { checkTagsCommand } from './commands/check-tags';
 import { checkKeyCommand } from './commands/check-key';
 import { playersCommand } from './commands/players';
 import { matchesCommand } from './commands/matches';
@@ -27,15 +28,18 @@ import { migrateCommand } from './commands/migrate';
 import { aggregateCommand } from './commands/aggregate';
 import { deriveRolesCommand } from './commands/derive-roles';
 import { exportCommand } from './commands/export';
+import { validateExportCommand } from './commands/validate-export';
 import { statusCommand } from './commands/status';
 import { rekeyCommand } from './commands/rekey';
 import { profileSyncCommand } from './commands/profile-sync';
+import { pullCommand } from './commands/pull';
 import { log, type Command, findCommand, formatHelp, isHelpFlag } from './commands/shared';
 
 const COMMANDS: readonly Command[] = [
   staticCommand,
   backtestCommand,
   validateTagsCommand,
+  checkTagsCommand,
   checkKeyCommand,
   playersCommand,
   matchesCommand,
@@ -43,10 +47,12 @@ const COMMANDS: readonly Command[] = [
   migrateCommand,
   aggregateCommand,
   exportCommand,
+  validateExportCommand,
   deriveRolesCommand,
   statusCommand,
   rekeyCommand,
   profileSyncCommand,
+  pullCommand,
 ];
 
 async function main(argv: string[]): Promise<void> {

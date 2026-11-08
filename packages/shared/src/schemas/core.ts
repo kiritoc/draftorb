@@ -50,8 +50,10 @@ export const PROFILE_EXPORT_SCHEMA_VERSION = 1;
  * SPECS §18.2). Bumped on every breaking change so consumers fail loudly
  * instead of misreading fields.
  * v1: initial `personalize` output (T-095).
+ * v2: `deltaVsMetaPp` replaced by the D-080 rank-bucket baseline comparison
+ * (`deltaVsBaselinePp`, `baselineWinRate`, `baselineBucket`).
  */
-export const PERSONAL_RESULT_SCHEMA_VERSION = 1;
+export const PERSONAL_RESULT_SCHEMA_VERSION = 2;
 
 export const roleSchema = z.enum(['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT']);
 export type Role = z.infer<typeof roleSchema>;

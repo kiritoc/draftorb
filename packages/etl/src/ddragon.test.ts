@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { championsMapSchema, itemsMapSchema, runeTreesSchema } from '@draftorb/shared';
@@ -35,11 +36,16 @@ describe('ddragon ETL utilities', () => {
     expect(mapChampionTagsToRoles(['UnknownRole'])).toEqual(['MID']);
   });
 
+  // Committed copy of the exported patch 16.21 champion catalog (Data Dragon
+  // derived). data/public is gitignored (D-079): tests read the fixture, never
+  // the live export tree.
+  const CHAMPIONS_16_21_FIXTURE = fileURLToPath(
+    new URL('../test/fixtures/champions-16.21.json', import.meta.url),
+  );
+
   it('documents that the patch 16.21 champion role hint has no jungle entries', () => {
     const champions = championsMapSchema.parse(
-      JSON.parse(
-        readFileSync(new URL('../../../data/public/16.21/champions.json', import.meta.url), 'utf8'),
-      ) as unknown,
+      JSON.parse(readFileSync(CHAMPIONS_16_21_FIXTURE, 'utf8')) as unknown,
     );
     const entries = Object.values(champions);
 

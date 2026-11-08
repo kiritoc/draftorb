@@ -70,12 +70,14 @@ const EMPTY_CONTEXT: PersonalizeContext = {
   allyAdcId: null,
   enemySupportId: null,
   enemySignature: new Set(),
+  rankBucket: 'DIAMOND',
 };
 
 const L1_CONTEXT: PersonalizeContext = {
   allyAdcId: 10,
   enemySupportId: 200,
   enemySignature: new Set(),
+  rankBucket: 'DIAMOND',
 };
 
 const data: RecommendData = makeData({ champions: [1, 2, 10, 200, 201, 30, 31, 32] });

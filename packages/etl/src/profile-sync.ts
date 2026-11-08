@@ -304,8 +304,9 @@ export async function syncProfile(
     } catch (error) {
       if (error instanceof RiotAuthError) throw error;
       // Timeline is best-effort: the game is still stored with NULL order.
+      // Match IDs are never logged: workflow logs are public (D-078).
       log(
-        `timeline fetch failed for ${matchId}: ${error instanceof Error ? error.message : String(error)}`,
+        `timeline fetch failed for game ${i + 1}: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
 

@@ -62,8 +62,17 @@ export const strings = {
       ? `Imported ${added} favorite(s) into your pool — pool is full, ${skipped} not added.`
       : `Imported ${added} favorite(s) into your pool.`,
   favoritesNoNew: 'All profile favorites are already in your pool.',
-  personalizedBadge: (wrPct: number, games: number, level: number, deltaPp: number): string =>
-    `${wrPct}% over ${games} games vs this setup (L${level}, ${deltaPp >= 0 ? '+' : '−'}${Math.abs(deltaPp)} vs meta)`,
+  personalizedBadge: (
+    wrPct: number,
+    games: number,
+    level: number,
+    deltaPp: number | null,
+    bucketLabel: string | null,
+  ): string => {
+    const base = `${wrPct}% over ${games} games vs this setup (L${level}`;
+    if (deltaPp === null || bucketLabel === null) return `${base})`;
+    return `${base}, ${deltaPp >= 0 ? '+' : '−'}${Math.abs(deltaPp)} pp vs ${bucketLabel} avg)`;
+  },
   counter: 'Counter',
   strongCounter: 'Strong counter',
   weakCounter: 'Weak counter',

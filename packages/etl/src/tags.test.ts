@@ -4,10 +4,17 @@ import { describe, expect, it } from 'vitest';
 
 import type { ChampionsMap, ChampionTagsMap } from '@draftorb/shared';
 import {
+  championTagDrift,
   evaluateChampionTagsCoverage,
   formatCoverageReport,
   validateChampionTagsFile,
 } from './tags';
+
+// Committed copy of the latest exported champions catalog (Data Dragon derived,
+// kept whole — ~22 KB). data/public is gitignored (D-079), so tests must never
+// read it; `pnpm etl check-tags` drift-checks the live tags file against the
+// freshly fetched catalog instead.
+const CHAMPIONS_FIXTURE = path.resolve(__dirname, '../test/fixtures/champions.json');
 
 describe('champion tags coverage and validation', () => {
   const mockChampions: ChampionsMap = {
@@ -103,9 +110,12 @@ describe('champion tags coverage and validation', () => {
     expect(text).toContain('All required support champions are tagged!');
   });
 
-  it('validates the committed champion-tags.json against the real champions.json', async () => {
+  it('validates the committed champion-tags.json against the champions fixture', async () => {
     const repoRoot = path.resolve(__dirname, '../../..');
-    const result = await validateChampionTagsFile({ repoRoot });
+    const result = await validateChampionTagsFile({
+      championsFilePath: CHAMPIONS_FIXTURE,
+      repoRoot,
+    });
 
     expect(result.isValid).toBe(true);
     expect(result.errors).toEqual([]);
@@ -159,6 +169,7 @@ describe('champion tags coverage and validation', () => {
     await expect(
       validateChampionTagsFile({
         tagsFilePath: '/nonexistent/path/champion-tags.json',
+        championsFilePath: CHAMPIONS_FIXTURE,
       }),
     ).rejects.toThrow('Failed to read tags file');
 
@@ -179,6 +190,7 @@ describe('champion tags coverage and validation', () => {
       const repoRoot = path.resolve(__dirname, '../../..');
       const result = await validateChampionTagsFile({
         tagsFilePath: invalidPath,
+        championsFilePath: CHAMPIONS_FIXTURE,
         repoRoot,
       });
 
@@ -188,5 +200,30 @@ describe('champion tags coverage and validation', () => {
     } finally {
       await fs.unlink(invalidPath).catch(() => {});
     }
+  });
+
+  it('reports no drift when tags cover every support and only known champions', () => {
+    const drift = championTagDrift(mockTags, mockChampions);
+
+    // Jax is untagged but not a support: drift only tracks the support contract.
+    expect(drift).toEqual({ missingSupports: [], unknownTagIds: [] });
+  });
+
+  it('reports support champions missing tags and tag ids absent from the catalog', () => {
+    const annieTag = mockTags['1'];
+    if (!annieTag) {
+      throw new Error('Missing mock tag for Annie');
+    }
+    const { '12': _alistar, ...withoutAlistar } = mockTags;
+    const drift = championTagDrift(
+      {
+        ...withoutAlistar,
+        '999': { ...annieTag, championId: 999 },
+      },
+      mockChampions,
+    );
+
+    expect(drift.missingSupports).toEqual([{ id: 12, name: 'Alistar', roles: ['TOP', 'SUPPORT'] }]);
+    expect(drift.unknownTagIds).toEqual([999]);
   });
 });

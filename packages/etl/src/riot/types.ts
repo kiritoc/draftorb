@@ -29,9 +29,16 @@ function shortenPuuids(value: string): string {
   );
 }
 
+function redactMatchIds(value: string): string {
+  // Match IDs look like "EUW1_7123456789012345678" (platform prefix + digits)
+  // and appear in API URLs; they are as sensitive as puuids in public logs
+  // (D-078 point 9).
+  return value.replace(/[A-Z0-9]{2,5}_[0-9]{10,}/g, '[REDACTED]');
+}
+
 function redactSensitiveText(value: string): string {
-  // Redact API keys first, then shorten PUUIDs
-  return shortenPuuids(value.replace(/RGAPI-[A-Za-z0-9_-]+/g, '[REDACTED]'));
+  // Redact API keys first, then shorten PUUIDs, then match IDs
+  return redactMatchIds(shortenPuuids(value.replace(/RGAPI-[A-Za-z0-9_-]+/g, '[REDACTED]')));
 }
 
 function redactSensitiveValue(value: unknown): unknown {

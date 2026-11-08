@@ -258,9 +258,7 @@ export async function ingestMatches(
           playerResults.push(
             buildPlayerResult(player.puuid, 'failed', cursor?.snapshot.length ?? 0, ZERO_RUN),
           );
-          log(
-            `[${index + 1}/${players.length}] ${player.puuid.slice(0, 12)}… transient failure while listing match ids`,
-          );
+          log(`[${index + 1}/${players.length}] transient failure while listing match ids`);
           if (consecutiveFailed >= 3) {
             stoppedEarly = true;
             break;
@@ -318,9 +316,7 @@ export async function ingestMatches(
         playersFailed += 1;
         consecutiveFailed += 1;
         playerResults.push(buildPlayerResult(player.puuid, 'failed', cursor.snapshot.length, run));
-        log(
-          `[${index + 1}/${players.length}] ${player.puuid.slice(0, 12)}… transient failure (player failed)`,
-        );
+        log(`[${index + 1}/${players.length}] transient failure (player failed)`);
         if (consecutiveFailed >= 3) {
           stoppedEarly = true;
           break;
@@ -335,7 +331,7 @@ export async function ingestMatches(
 
       playerResults.push(buildPlayerResult(player.puuid, 'done', cursor.snapshot.length, run));
       log(
-        `[${index + 1}/${players.length}] ${player.puuid.slice(0, 12)}… ` +
+        `[${index + 1}/${players.length}] ` +
           `ids=${cursor.snapshot.length} stored=${run.stored} dup=${run.duplicates} ` +
           `filtered=${run.filtered} invalid=${run.invalid}`,
       );

@@ -90,6 +90,22 @@ describe('check-secrets', () => {
     expect(result.stdout).toContain('passed');
   });
 
+  it('scans gitignored data/public exports (T-110)', () => {
+    // Simulates a git checkout where generated exports are untracked: only
+    // data/public must still be scanned, other untracked files must not.
+    const root = tempDir();
+    spawnSync('git', ['init', '-q'], { cwd: root });
+    writeFileSync(join(root, '.gitignore'), 'data/public/\n');
+    mkdirSync(join(root, 'data', 'public'), { recursive: true });
+    writeFileSync(join(root, 'data', 'public', 'leak.json'), `{"k":"${PLANTED_KEY}"}`);
+    writeFileSync(join(root, 'untracked.txt'), `also ${PLANTED_KEY}`);
+    const result = runCheck(['--root', root, '--dist', 'off']);
+    expect(result.status).toBe(1);
+    expect(result.stderr.replace(/\\/g, '/')).toContain('data/public/leak.json');
+    expect(result.stderr).not.toContain('untracked.txt');
+    expect(result.stderr).not.toContain(PLANTED_KEY);
+  });
+
   it('module API returns findings without secret values', async () => {
     const root = tempDir();
     writeFileSync(join(root, 'a.txt'), PLANTED_KEY);

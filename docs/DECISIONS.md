@@ -874,6 +874,7 @@ Owner decision 2026-11-07.
 Owner decision 2026-11-08.
 
 ### D-078 — ETL state lives in release assets of a private GitHub repo — ACCEPTED
+
 - Context: D-057 stored the gzipped DB on the orphan branch etl-db of the PUBLIC repo, so every match row and participant puuid was downloadable by anyone, and the single amended commit with force-push left no rollback. Cloudflare R2 and Cloudflare Access were rejected because they require a payment method; the owner requires services without one.
 - Decision:
   1. A private repo (name configurable, default draftorb-state) with no workflows stores state. Each ETL run publishes a release tagged state-<UTC yyyymmddThhmmZ> with assets DraftOrb.sqlite.gz and public-exports.tar.gz (the contents of data/public).
@@ -893,6 +894,7 @@ Owner decision 2026-11-07.
 Owner decision 2026-11-08.
 
 ### D-079 — Local-only app: no hosting, no deploy workflow — ACCEPTED
+
 - Context: the owner wants the app private and only needs the database refreshed automatically. GitHub Pages on the free plan requires a public repo; Cloudflare Access requires payment details even on its free plan.
 - Decision:
   1. The app runs locally (dev server or local build). There is no hosting.
@@ -910,6 +912,7 @@ Owner decision 2026-11-07.
 Owner decision 2026-11-08.
 
 ### D-080 — Personalized-list badge compares against the rank-bucket baseline — ACCEPTED
+
 - Context: D-073's badge computed +d = round(100 * (p - score(c))) pp, which subtracts a champion's meta score from a win rate. D-073 itself says score(c) = sigmoid(x) is uncalibrated and clusters near 0.5, so the number was not meaningful.
 - Decision: d = round(100 * (p - w0)) pp, where p is the shrunk profile win rate at the matched fallback level and w0 is the champion's baseline win rate (the p0 fraction of SPECS §5) for the rank bucket selected in the app — the same value D-054 exposes as insufficientData.winRate. The delta is omitted when the baseline row has no weighted evidence (games_e = 0) or the champion fails the baseline gate; a prior-only 50% is never used. The label names the bucket, e.g. "+4 pp vs Diamond avg". score(c), the metaNorm rank normalization and the trust blend of D-073 are unchanged.
 - Alternatives: keep the score(c) delta (rejected, meaningless scale); drop the badge (rejected, it is useful context); compare against the profile owner's own bucket (rejected, the badge should answer "how does this profile do against typical players at the bucket the visitor selected").

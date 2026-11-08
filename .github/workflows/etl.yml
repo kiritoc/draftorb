@@ -115,6 +115,12 @@ jobs:
       - name: Import latest static data
         run: pnpm etl static
 
+      # Drift check (never fails): warns when champion-tags.json is missing
+      # tags for support champions or references champion ids the freshly
+      # fetched catalog no longer has.
+      - name: Check champion tags drift
+        run: pnpm etl check-tags
+
       - name: Refresh already-ingested players
         env:
           RIOT_API_KEY: ${{ secrets.RIOT_API_KEY }}
@@ -141,6 +147,10 @@ jobs:
           pnpm etl aggregate
           pnpm etl derive-roles
           pnpm etl export
+          # B-052 guard: a degenerate export (empty role lists) must not be
+          # published — failure here keeps the previous exports release while
+          # the database state above is still uploaded (if: always()).
+          pnpm etl validate-export
           pnpm etl status euw1 || echo "::warning::status command failed"
 
       # always(): partial progress (cursors, stored matches) must be saved even

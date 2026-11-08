@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -36,28 +36,22 @@ describe('ddragon ETL utilities', () => {
     expect(mapChampionTagsToRoles(['UnknownRole'])).toEqual(['MID']);
   });
 
-  // data/public is gitignored (D-079): skip on clean checkouts without exports.
-  const HAS_16_21_CHAMPIONS = existsSync(
-    fileURLToPath(new URL('../../../data/public/16.21/champions.json', import.meta.url)),
+  // Committed copy of the exported patch 16.21 champion catalog (Data Dragon
+  // derived). data/public is gitignored (D-079): tests read the fixture, never
+  // the live export tree.
+  const CHAMPIONS_16_21_FIXTURE = fileURLToPath(
+    new URL('../test/fixtures/champions-16.21.json', import.meta.url),
   );
 
-  it.runIf(HAS_16_21_CHAMPIONS)(
-    'documents that the patch 16.21 champion role hint has no jungle entries',
-    () => {
-      const champions = championsMapSchema.parse(
-        JSON.parse(
-          readFileSync(
-            new URL('../../../data/public/16.21/champions.json', import.meta.url),
-            'utf8',
-          ),
-        ) as unknown,
-      );
-      const entries = Object.values(champions);
+  it('documents that the patch 16.21 champion role hint has no jungle entries', () => {
+    const champions = championsMapSchema.parse(
+      JSON.parse(readFileSync(CHAMPIONS_16_21_FIXTURE, 'utf8')) as unknown,
+    );
+    const entries = Object.values(champions);
 
-      expect(entries).toHaveLength(173);
-      expect(entries.filter((champion) => champion.roles.includes('JUNGLE'))).toHaveLength(0);
-    },
-  );
+    expect(entries).toHaveLength(173);
+    expect(entries.filter((champion) => champion.roles.includes('JUNGLE'))).toHaveLength(0);
+  });
 
   it('transforms raw champion payloads and passes zod validation', () => {
     const raw = {

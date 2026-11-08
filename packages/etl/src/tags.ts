@@ -111,6 +111,34 @@ export function evaluateChampionTagsCoverage(
   };
 }
 
+export interface ChampionTagDrift {
+  /** SUPPORT-role champions in the catalog without a tag entry. */
+  missingSupports: ChampionCoverageItem[];
+  /** Tag entry championIds that no longer exist in the catalog. */
+  unknownTagIds: number[];
+}
+
+/**
+ * Pure drift check between the manual tag file and a champion catalog:
+ * support champions that lost (or never got) tags, and tag entries pointing
+ * at champions the catalog no longer contains (e.g. after a new patch).
+ */
+export function championTagDrift(tags: ChampionTagsMap, champions: ChampionsMap): ChampionTagDrift {
+  const championIds = new Set<number>();
+  const missingSupports: ChampionCoverageItem[] = [];
+  for (const champion of Object.values(champions)) {
+    championIds.add(champion.id);
+    if (champion.roles.includes('SUPPORT') && !(String(champion.id) in tags)) {
+      missingSupports.push({ id: champion.id, name: champion.name, roles: champion.roles });
+    }
+  }
+  const unknownTagIds = Object.values(tags)
+    .map((tag) => tag.championId)
+    .filter((id) => !championIds.has(id))
+    .sort((a, b) => a - b);
+  return { missingSupports, unknownTagIds };
+}
+
 /**
  * Formats a ChampionTagsCoverageReport into a readable multi-line summary string.
  */

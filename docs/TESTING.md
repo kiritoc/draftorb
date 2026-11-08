@@ -33,6 +33,7 @@
 
 - Every bug fix adds a regression test.
 - Never loosen a golden test to make it pass without a DECISIONS.md entry.
+- **Tests must not depend on gitignored data.** `data/public` (D-079) and `data/*.sqlite*` are absent on clean checkouts and CI runners: no test, script or build step may read them. Use committed fixtures (`packages/etl/test/fixtures/`, e.g. `champions.json`), generate data inside the test (temp dirs, seeded DBs), or move the check into the ETL run where the data exists. Checks that silently skip when exports are missing are not allowed — `pnpm etl validate-export` (B-052, runs in `etl.yml` after `export`) and `pnpm etl check-tags` (tags/catalog drift, warning-only) cover the real-data assertions.
 
 ## 6. Retention, weights, change scoring, breakpoints (ETL)
 

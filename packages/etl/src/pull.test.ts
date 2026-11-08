@@ -6,7 +6,7 @@
 
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -183,11 +183,13 @@ describe('parseTar', () => {
 });
 
 describe('resolveEntryTarget', () => {
-  const root = '/tmp/draftorb-target';
+  // Real temp dir: path.resolve/join behave identically on every OS, unlike a
+  // hardcoded POSIX '/tmp/...' string which gains a drive letter on Windows.
+  const root = join(tempDir(), 'draftorb-target');
 
   it('maps prefixed entries into the target', () => {
     expect(resolveEntryTarget(root, 'public', 'public/16.22/x.json')).toBe(
-      join(root, '16.22', 'x.json'),
+      resolve(root, '16.22', 'x.json'),
     );
   });
 
@@ -195,13 +197,37 @@ describe('resolveEntryTarget', () => {
     expect(resolveEntryTarget(root, 'public', 'other/x.json')).toBeNull();
     expect(resolveEntryTarget(root, 'public', 'public')).toBeNull();
     expect(resolveEntryTarget(root, 'public', '')).toBeNull();
+    expect(resolveEntryTarget(root, 'public', 'public/dir\\file.txt')).toBeNull();
   });
 
   it('rejects traversal and absolute paths', () => {
     expect(() => resolveEntryTarget(root, 'public', 'public/../evil')).toThrow(/Unsafe/);
     expect(() => resolveEntryTarget(root, 'public', 'public/a/../../evil')).toThrow(/Unsafe/);
     expect(() => resolveEntryTarget(root, 'public', 'public//x')).toThrow(/Unsafe/);
+    expect(() => resolveEntryTarget(root, 'public', 'public/./x')).toThrow(/Unsafe/);
+  });
+
+  it('rejects absolute entries', () => {
+    expect(() => resolveEntryTarget(root, 'public', '/etc/passwd')).toThrow(/Unsafe/);
+    expect(() => resolveEntryTarget(root, 'public', '/public/x.json')).toThrow(/Unsafe/);
+    expect(() => resolveEntryTarget(root, 'public', '\\server\\share\\x')).toThrow(/Unsafe/);
+  });
+
+  it('rejects drive-letter entries', () => {
     expect(() => resolveEntryTarget(root, 'public', 'public/C:/x')).toThrow(/Unsafe/);
+    expect(() => resolveEntryTarget(root, 'public', 'public/C:x')).toThrow(/Unsafe/);
+    expect(() => resolveEntryTarget(root, 'public', 'public/d:/deep/x.json')).toThrow(/Unsafe/);
+  });
+
+  it('rejects backslash traversal', () => {
+    expect(() => resolveEntryTarget(root, 'public', 'public/..\\..\\x')).toThrow(/Unsafe/);
+    expect(() => resolveEntryTarget(root, 'public', 'public/a\\..\\..\\evil')).toThrow(/Unsafe/);
+    expect(() => resolveEntryTarget(root, 'public', '..\\..\\escape')).toThrow(/Unsafe/);
+  });
+
+  it('rejects NUL bytes', () => {
+    expect(() => resolveEntryTarget(root, 'public', 'public/a\0b.json')).toThrow(/Unsafe/);
+    expect(() => resolveEntryTarget(root, 'public', 'public/\0')).toThrow(/Unsafe/);
   });
 });
 

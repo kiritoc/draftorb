@@ -6,8 +6,8 @@
  * Extraction is deliberately strict:
  *   - only regular files and directories are written (links/devices rejected),
  *     directory after the `public/` prefix is stripped — entries that would
- *     escape it (`..`, absolute paths, drive letters, backslashes) abort the
- *     whole extraction,
+ *     escape it (`..`, absolute paths, drive letters, backslash traversal,
+ *     NUL bytes) abort the whole extraction,
  *   - entries outside the expected prefix are skipped (e.g. pax headers).
  *
  * Uses `node:zlib` for gzip — no external `tar`/`gzip` binary required, so it
@@ -15,7 +15,7 @@
  */
 
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve, sep } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { gunzipSync } from 'node:zlib';
 
 const BLOCK_SIZE = 512;
@@ -116,27 +116,43 @@ export function resolveEntryTarget(
   rawName: string,
 ): string | null {
   const normalized = rawName.replace(/^\.\//, '');
-  if (normalized === '' || normalized.startsWith('/')) return null;
-  if (normalized.includes('\\') || normalized.includes('\0')) return null;
+  if (normalized === '') return null;
+  if (normalized.startsWith('/') || normalized.startsWith('\\')) {
+    throw new Error(`Unsafe tar entry name (absolute path): "${rawName}"`);
+  }
+  if (normalized.includes('\0')) {
+    throw new Error(`Unsafe tar entry name (NUL byte): "${rawName}"`);
+  }
+  if (normalized.includes('\\')) {
+    // Backslashes are not path separators inside tar names; on Windows they
+    // would be. Entries that merely contain one are skipped, but anything
+    // that looks like traversal through them is rejected outright.
+    const backslashSegments = normalized.split('\\');
+    if (backslashSegments.some((segment) => segment === '' || segment === '..')) {
+      throw new Error(`Unsafe tar entry name (backslash traversal): "${rawName}"`);
+    }
+    return null;
+  }
 
   const prefix = `${stripPrefix}/`;
   if (!normalized.startsWith(prefix)) return null;
-  const relative = normalized.slice(prefix.length);
-  if (relative === '') return null; // the prefix directory itself
+  const inner = normalized.slice(prefix.length);
+  if (inner === '') return null; // the prefix directory itself
 
-  const segments = relative.split('/');
+  const segments = inner.split('/');
   for (const segment of segments) {
     if (segment === '' || segment === '.' || segment === '..') {
       throw new Error(`Unsafe tar entry name: "${rawName}"`);
     }
-    if (/^[A-Za-z]:$/.test(segment)) {
-      throw new Error(`Unsafe tar entry name: "${rawName}"`);
+    if (/^[A-Za-z]:/.test(segment)) {
+      throw new Error(`Unsafe tar entry name (drive letter): "${rawName}"`);
     }
   }
 
   const root = resolve(targetDir);
   const target = resolve(join(root, ...segments));
-  if (target !== root && !target.startsWith(root + sep)) {
+  const escape = relative(root, target);
+  if (escape === '..' || escape.startsWith(`..${sep}`) || isAbsolute(escape)) {
     throw new Error(`Tar entry escapes the target directory: "${rawName}"`);
   }
   return target;

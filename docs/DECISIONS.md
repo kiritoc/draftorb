@@ -10,6 +10,8 @@ Single language for ETL, engine, web, desktop, vision (opencv.js/tesseract.js/on
 
 Free hosting, no maintenance. Engine runs client-side.
 
+Update (2026-11-07, D-079): there is no hosting any more (local only). The no-backend, static JSON design stands.
+
 ### D-003 — SQLite for ETL — ACCEPTED
 
 No server to install. `better-sqlite3`.
@@ -492,7 +494,7 @@ Owner decision 2026-11-04. Rationale: the user can fix the role of any champion 
 
 Owner decision 2026-11-04.
 
-### D-052 — Pick-rate export semantics for `blindSafety` — PROPOSED
+### D-052 — Pick-rate export semantics for `blindSafety` — ACCEPTED
 
 - Context: B-026. `blindSafety` needs `pickShare(e)` = the share of picks of champion `e` in an unseen enemy role, but no pick-rate export existed, so the engine approximated it with `roleProb[e][role]` (the share of `e`'s own games played in that role — a different quantity).
 - Decision:
@@ -504,6 +506,12 @@ Owner decision 2026-11-04.
   - Per-rank-bucket pick shares — rejected for now: `role_prob` carries no bucket dimension; would need a new aggregation.
   - Required `pickRate` field — rejected: already-published patch exports have no `pick-rate.json` and cannot be regenerated while the database is locked.
 - Consequences: `pnpm etl export` writes `pick-rate.json` (manifest `files`, no schemaVersion bump — additive file, loader treats it as optional). Engine behavior is unchanged until an export containing the file is loaded.
+
+Follow-up: retune blindOpponentMinShare (0.05) in T-027.a once real pick-rate data exists.
+
+Owner decision 2026-11-07.
+
+Owner decision 2026-11-08.
 
 ### D-053 — Champion avatars from the Data Dragon CDN — ACCEPTED
 
@@ -548,14 +556,18 @@ Owner decision 2026-11-05.
 - Alternatives: a `patch_index` column on `matches`/`match_rejects` (denormalized, needs backfill and rewrite on catalog changes — rejected, the lookup is cheap and labels are already stored); `currentPatchIndex` = max `patch_index` in `patches` (penalizes all games by a constant when a brand-new patch has no games yet — rejected, the stored-max matches prior semantics); FK `matches.patch REFERENCES patches(version_label)` (rejected, see 1); keeping `released_at` NULL forever (rejected — a permanently empty column is worse than none).
 - Consequences: read commands fetch only on a miss; recency follows real patch distance (gaps in collected data count); aggregates written before this change keep working (snapshot metadata is simply absent until the next `aggregate` + `export`).
 
-### D-056 — `matches --refresh`: ingestion scoped to already-ingested players — PROPOSED
+### D-056 — `matches --refresh`: ingestion scoped to already-ingested players — ACCEPTED
 
 - Context: `matches` orders pending (no/partial cursor) players before done players (D-018) so repeated `--limit` batches walk the whole discovered population. Once `players` has discovered more players than were ingested, there is no way to run a cheap "refresh the set we already collected" pass: a plain run walks all pending players first, and `--limit` can never reach the done players.
 - Decision: new boolean flag `--refresh` on `pnpm etl matches`. It restricts the player selection to puuids that already have an ingest cursor for the platform (any status, `partial` or `done`); ordering and `--limit` then apply within that subset. Done cursors keep the D-018 incremental listing (`startTime = lastGameCreation`), so a refresh costs ~1 match-list call per player plus any genuinely new games. `--refresh` combined with `--reset` is a usage error (reset clears the cursors the flag selects on).
 - Alternatives: (a) reorder done players first globally — rejected, it would starve pending ingestion; (b) a `--tier`/`--players-file` filter — rejected as more machinery than needed for the weekly-refresh use case; (c) selecting by stored `matches` instead of cursors — rejected, the cursor is the resume mechanism and a stored match without a cursor cannot happen.
 - Consequences: `pnpm etl matches euw1 --refresh` refreshes exactly the ingested set (e.g. the top-250 batch) without touching pending players; full-population ingestion remains the default no-flag behavior.
 
-### D-057 — Scheduled ETL refresh in GitHub Actions with DB state on an orphan branch — PROPOSED
+Owner decision 2026-11-07.
+
+Owner decision 2026-11-08.
+
+### D-057 — Scheduled ETL refresh in GitHub Actions with DB state on an orphan branch — ACCEPTED
 
 - Context: the owner obtained a Riot **personal key** (no expiry) and wants the pipeline to refresh the database every 12h, persist the ~265 MB SQLite between runs, and auto-publish `data/public` exports. Constraints: the DB is gitignored and >100 MB (GitHub's per-file limit) uncompressed; the deployed site serves only committed `data/public` JSON; ingestion must stay resumable and bounded under the 6h job limit.
 - Decision:
@@ -567,14 +579,26 @@ Owner decision 2026-11-05.
 - Alternatives: (a) `actions/cache` — rejected: cache entries can only be written from inside a workflow, so the existing local DB could never be seeded; eviction would force a multi-day rebuild. (b) GitHub artifacts — rejected: same seeding problem plus the ~500 MB free storage quota vs ~58-150 MB per run. (c) Cloudflare R2/B2 — viable and more durable, deferred: needs an external account and secrets; revisit if the gzipped DB approaches 100 MB. (d) Committing the DB to `main` — impossible (>100 MB/file). (e) `workflow_dispatch`-only — rejected, the owner wants automatic refresh.
 - Consequences: every run costs ~58 MB download + ~58 MB upload; pending-player ingest advances ~100 players/run (~2,648 pending → ~26 days to fill at current cadence); the state branch must never be deleted; if the gzipped DB nears 100 MB, reduce `--per-player`/retention or migrate to R2/B2.
 
-### D-058 — Retriable `invalid` rejects for unknown patch labels — PROPOSED
+Update (2026-11-07, D-078, D-079): points 1 and 2 (state on the orphan branch etl-db) are SUPERSEDED by D-078. The parts of point 4 about committing exports to main and dispatching deploy.yml are SUPERSEDED by D-079. Cadence, step order, concurrency group, if: always() state upload and the main-only guard stand.
+
+Owner decision 2026-11-07.
+
+Owner decision 2026-11-08.
+
+### D-058 — Retriable `invalid` rejects for unknown patch labels — ACCEPTED
 
 - Context: PR #49 review pointed out that a match rejected `invalid` only because its `major.minor` label was absent from `patches` (D-043/D-055, e.g. Riot returns a match from a patch Data Dragon has not published yet) stays rejected forever: `findRejection` only re-evaluates `patch` rejects, and D-017's update says `invalid` rejects are permanent until `--reset`. The spec does not distinguish label-unknown `invalid` rejects from genuinely broken payloads.
 - Decision (assumption, PROPOSED): `findRejection` treats an `invalid` reject that carries a patch label as retriable — it re-resolves the label through the run's patch resolver and drops the reject once the label is known, so the match is refetched and re-evaluated. `invalid` rejects without a label (schema/participant failures), `queue`, `short` and `pruned` rejects stay permanent as before. Related review fixes in the same change: `--reset`/`--reset-tombstones` now run only after `--since-patch` validation succeeds (a failed run no longer destroys cursors or tombstones); `--reset-tombstones` forces done cursors to relist in full AND uncapped so cleared tombstones' matches are actually reachable however old they are; `ingestMatches` reports `stoppedEarly` when the 3-consecutive-failure breaker trips and `etl matches` exits non-zero on it, so scheduled runs never publish a partial refresh (isolated transient failures still exit 0 — the breaker exists to tolerate them); the ETL workflow refuses to run on non-`main` refs so a manual dispatch cannot publish exports to a branch `deploy.yml` does not build.
 - Alternatives: (a) a new reject reason + migration — rejected, the label-carrying `invalid` row already identifies the retriable case; (b) revisiting completed cursors on every catalog refresh — rejected, far broader than the rare Data Dragon lag; (c) keeping `invalid` fully permanent per D-017 — rejected, it makes the lag case unrecoverable without a manual `--reset`.
 - Consequences: matches rejected during a catalog lag self-heal on a later run once `versions.json` catches up (the rejected match's `gameCreation` never advanced `lastGameCreation`, so incremental listing still returns its id); the "`invalid` is permanent" wording in D-017/SPECS §13 now has this one exception.
 
-### D-059 — Rune recommender interpretation details (SPECS §8.1) — PROPOSED
+Update (2026-11-07, D-079): deploy.yml is retired; the main-only guard stays.
+
+Owner decision 2026-11-07.
+
+Owner decision 2026-11-08.
+
+### D-059 — Rune recommender interpretation details (SPECS §8.1) — ACCEPTED
 
 - Context: T-040 implements the engine side of SPECS §8.1, which leaves several mechanics unspecified: which champions count as "context slots" under partial drafts, what "the same page's win rate in the next broader context" means when the page is absent there, how pages are identified across contexts, and what the adaptation hint contains.
 - Decision (assumptions, PROPOSED):
@@ -588,12 +612,24 @@ Owner decision 2026-11-05.
 - Alternatives: (a) shrink toward the broader context's raw `winsW/gamesW` — rejected, a 2-game broader sample would dominate the prior; (b) prior = 0.5 whenever the page is missing in the next broader level — rejected, the pooled context estimate is strictly more informative; (c) emitting lane keys for arbitrary known subsets — rejected, the aggregator only writes influence-order prefixes, so non-prefix keys can never match.
 - Consequences: T-041 (runes UI) consumes `RuneRecommendationResult` as-is; T-027.b calibrates `kRune`/`topPages` through the D-023 gate.
 
-### D-060 — PUUIDs are encrypted per API key; `etl rekey` rewrites them on key change — PROPOSED
+Note: kRune = 40 and topPages = 3 are priors; calibrated in T-027.b through the D-023 gate.
+
+Owner decision 2026-11-07.
+
+Owner decision 2026-11-08.
+
+### D-060 — PUUIDs are encrypted per API key; `etl rekey` rewrites them on key change — ACCEPTED
 
 - Context: B-062 — after `RIOT_API_KEY` changed (dev key -> personal key), every stored puuid returned `400 Exception decrypting` on all by-puuid endpoints while match IDs kept working. Riot encrypts PUUIDs (and account ids) per key holder (DevRel issues #759, #471, #20), so puuids collected under one key are unusable under another.
 - Decision: new `pnpm etl rekey [platform] [--dry-run] [--limit=N]` command. It re-fetches every row of `matches` by match ID (key-independent) under the current key and pairs each stored `participants` row with the fresh payload via a stat fingerprint (team id, champion id, kills, deaths, assists — verified unique per match). The resulting old->new puuid map is applied in one transaction to `participants`, `item_events`, `players` (rename, or merge+delete when the new puuid already exists) and `match-ingest:` cursors in `ingest_state` (rename; drop cursors/players rows whose puuid no scanned match references — they are undecryptable anyway and `etl players` re-creates pending players). Conflicting mappings abort the run before any write; failed match fetches are skipped and reported (re-run is idempotent). Dry run reports the mapping size without writing.
 - Alternatives: (a) wipe puuid-bearing tables and re-ingest everything — rejected, loses ~3.6k stored matches' participant stats and all ingest cursors for no benefit since match IDs survive; (b) re-run `etl players` and treat new puuids as new players — rejected, splits `champion_games`/`is_expert` per (puuid, champion) across the old/new puuid of the same account and orphaned cursors; (c) verify each unmapped players row with a by-puuid call — rejected, ~2.6k extra calls for rows that are stale by construction.
 - Consequences: after any `RIOT_API_KEY` change, run `pnpm etl rekey` (dry-run first) before `matches`; cost ~1 match-detail call per stored match (~3.6k calls, ~1-2 h on the personal key's 100 req/2 min). Players rows not referenced by any match are deleted and must be re-discovered via `pnpm etl players`. Ops note for the CI state branch: run rekey on the `etl-db` database (or reseed `etl-db` from a rekeyed local DB) — the scheduled workflow itself is unchanged.
+
+Note: back up the DB (or run on a copy) and use --dry-run first. After an API key change, also apply it to the latest state release (D-078).
+
+Owner decision 2026-11-07.
+
+Owner decision 2026-11-08.
 
 ### D-061 — Personalization is a third list ("For you"); `score(c)` stays unchanged — SUPERSEDED by D-072
 
@@ -662,7 +698,7 @@ Owner decision 2026-11-05.
 - Alternatives: (a) hide insufficient entries — rejected, hides information the user needs; (b) lower thresholds — rejected until real profile volumes are known; revisit with data.
 - Consequences: shared result schemas carry the insufficient-data fields; UI renders badges per SPECS §18.
 
-### D-067 — Personalization ships as static data only: no login, no server, no sessions — PROPOSED
+### D-067 — Personalization ships as static data only: no login, no server, no sessions — ACCEPTED
 
 - Context: the deployment target is GitHub Pages, which serves only static files. An earlier planning pass assumed per-user profiles synced on demand (`user-sync`, D-062) with a possible selector; the owner has now fixed the model: the app is public, there is NO login and NO server, and only the pipeline ever talks to Riot. This supersedes the delivery side of D-062 and the storage side of D-063 (both marked SUPERSEDED).
 - Decision:
@@ -672,7 +708,13 @@ Owner decision 2026-11-05.
 - Alternatives: any server-backed personalization — rejected, contradicts the deployment target and the free-only rule.
 - Consequences: personalization is limited to data the pipeline can precompute for configured profiles; there is no per-visitor personalization beyond browser-local state (the pool and favorites toggle, D-074).
 
-### D-068 — Profile configuration is declarative and committed; only configured profiles are synced — PROPOSED
+Update (2026-11-07, D-079): the premise 'the app is public' is SUPERSEDED; the app is local only. No login, no server, and the key living only in the pipeline stand.
+
+Owner decision 2026-11-07.
+
+Owner decision 2026-11-08.
+
+### D-068 — Profile configuration is declarative and committed; only configured profiles are synced — ACCEPTED
 
 - Context: with no login (D-067) the set of personalized profiles must be fixed in the repository. The owner wants `KiriToc#Toc` on `EUW1` as the default and only entry for now, but the structure must allow adding more configured profiles later without code changes. Visitors can never add a profile.
 - Decision:
@@ -682,7 +724,13 @@ Owner decision 2026-11-05.
 - Alternatives: (a) visitors type a Riot ID in the UI — rejected, would need a backend/key in the browser; (b) sync every configured profile on every run vs on demand — decided in D-070; (c) environment variables for the profile list — rejected, the config must be reviewable in git and diffable.
 - Consequences: new shared zod schemas for the config and the export; new ETL tables/command; `data/profiles.config.json` is committed and validated like the manual tag files.
 
-### D-069 — Profile exports are public, minimal and anonymized; a build check blocks key leaks — PROPOSED
+Update (2026-11-07, D-079): exports are no longer published. --publish writes to data/public/profiles/, which is gitignored; CI packs it into the state release (D-078).
+
+Owner decision 2026-11-07.
+
+Owner decision 2026-11-08.
+
+### D-069 — Profile exports are public, minimal and anonymized; a build check blocks key leaks — ACCEPTED
 
 - Context: the profile owner (the repository owner) accepts publishing their own stats. But `profile_games` rows sit next to other players' data, and a careless export could leak other Riot IDs, puuids or match ids, or the API key itself.
 - Decision:
@@ -693,7 +741,13 @@ Owner decision 2026-11-05.
 - Alternatives: (a) export full match rows — rejected, leaks foreign identifiers and bloats the file; (b) no cap — rejected, unbounded growth as the profile ages; (c) rely on code review for key leaks — rejected, a single accident publishes the key permanently in git history.
 - Consequences: the exported JSON is safe to commit under `data/public/profiles/`; the anonymization whitelist lives next to the export code and is covered by tests (TESTING.md).
 
-### D-070 — Profile sync runs inside the existing scheduled pipeline and reuses the `etl-db` state branch — PROPOSED
+Update (2026-11-07, D-079): exports are no longer public or committed. The anonymization whitelist and the key-leak build check stay as defense in depth; the check also scans data/public before it is packed into the release.
+
+Owner decision 2026-11-07.
+
+Owner decision 2026-11-08.
+
+### D-070 — Profile sync runs inside the existing scheduled pipeline and reuses the `etl-db` state branch — ACCEPTED
 
 - Context: the profile tables live in the same SQLite database the scheduled ETL already persists on the orphan branch `etl-db` (D-057). A separate workflow would duplicate the restore/upload machinery; folding `profile-sync` into `etl.yml` reuses it.
 - Decision:
@@ -704,7 +758,13 @@ Owner decision 2026-11-05.
 - Alternatives: (a) a dedicated `profile-sync.yml` workflow — rejected, duplicates state handling and could race `etl.yml` on the same DB branch; (b) `actions/cache` for profile state — rejected per D-057; (c) sync on every push to `data/profiles.config.json` only — rejected, staleness between pushes.
 - Consequences: one cron cadence refreshes both datasets; the state branch grows slightly (profile tables are small: hundreds of games vs ~3.6k matches).
 
-### D-071 — Riot key for the pipeline: GitHub Secrets + local `.env`; expiry and rotation rules — PROPOSED
+Update (2026-11-07, D-078): persistence moves from the etl-db branch to release assets of a private repo (D-078).
+
+Owner decision 2026-11-07.
+
+Owner decision 2026-11-08.
+
+### D-071 — Riot key for the pipeline: GitHub Secrets + local `.env`; expiry and rotation rules — ACCEPTED
 
 - Context: golden rule 5 — no secrets in git. Development keys expire every 24 h, which would silently break a scheduled pipeline; the owner already holds a personal key (no expiry, limits verified 2026-11-06: 20 req/s, 100 req/2 min — RIOT_API.md) stored as the `RIOT_API_KEY` Actions secret.
 - Decision:
@@ -715,7 +775,13 @@ Owner decision 2026-11-05.
 - Alternatives: a second dedicated secret for profiles — rejected, one key per project is simpler and the rate budget is shared anyway; committing the key — forbidden (golden rule 5).
 - Consequences: SETUP.md gains a "Profile sync" section; the 24 h dev-key expiry is a documented non-option for scheduling.
 
-### D-072 — The personalized list is labeled with the profile label, never "For you" — PROPOSED
+Note: the Riot terms for a personal key are still to verify. A private, local-only tool lowers the risk but does not remove the need to check.
+
+Owner decision 2026-11-07.
+
+Owner decision 2026-11-08.
+
+### D-072 — The personalized list is labeled with the profile label, never "For you" — ACCEPTED
 
 - Context: D-061 introduced a third list named "For you" fed by a `UserProfile` the visitor supposedly owns. Under D-067/D-068 the data belongs to a configured profile (`KiriToc#Toc`), not the visitor; "For you" would be misleading.
 - Decision:
@@ -726,7 +792,11 @@ Owner decision 2026-11-05.
 - Alternatives: (a) keep "For you" — rejected, factually wrong for visitors; (b) a neutral name like "Personalized" — rejected, hides whose stats drive it; (c) merging the personalized entries into "Best overall" — rejected, breaks the D-024 separation and the objective-vs-personal distinction.
 - Consequences: D-061 is superseded; SPECS §7.1/§18 and GLOSSARY use the profile label; UI strings stay centralized.
 
-### D-073 — Profile statistics: recency weighting, shrinkage, fallback hierarchy, trust blend — PROPOSED
+Owner decision 2026-11-07.
+
+Owner decision 2026-11-08.
+
+### D-073 — Profile statistics: recency weighting, shrinkage, fallback hierarchy, trust blend — ACCEPTED
 
 - Context: same statistical need as D-064, but the subject is the configured profile's Support games (phase 1), not "the user's" games. Constants are priors in engine config, tunable later; there is still no personalization backtest (open question).
 - Decision (carried over from D-064 with profile semantics):
@@ -739,7 +809,13 @@ Owner decision 2026-11-05.
 - Alternatives: (same as D-064, still rejected) min-max normalize `score(c)`; fixed trust; shrink toward the population win rate; log-odds blending.
 - Consequences: new pure engine module + `PersonalConfig`; golden tests pin the arithmetic (TESTING.md); constants are priors pending a personalization backtest.
 
-### D-074 — Favorites are computed by the pipeline; visitors import them into their browser pool — PROPOSED
+Update (2026-11-07, D-080): the 'Reason badge ... +d vs meta' clause is SUPERSEDED by D-080. See also D-076 for the champion-scoped levels.
+
+Owner decision 2026-11-07.
+
+Owner decision 2026-11-08.
+
+### D-074 — Favorites are computed by the pipeline; visitors import them into their browser pool — ACCEPTED
 
 - Context: the owner wants favorites derived from the profile's real history, importable into each visitor's own pool, plus a display toggle — all without touching `score(c)` (D-024 invariant).
 - Decision:
@@ -749,7 +825,11 @@ Owner decision 2026-11-05.
 - Alternatives: (a) auto-sync favorites into the pool — rejected, the pool is the visitor's explicit choice (D-024); (b) per-champion favorite flags in pool storage — deferred; (c) favorites as an engine input — rejected, filtering is presentation.
 - Consequences: profile JSON carries `favorites`; web gains the toggle and import action; SPECS §2.1/§7.1/§18 updated.
 
-### D-075 — Minimum sample sizes and "insufficient data" for profile statistics — PROPOSED
+Owner decision 2026-11-07.
+
+Owner decision 2026-11-08.
+
+### D-075 — Minimum sample sizes and "insufficient data" for profile statistics — ACCEPTED
 
 - Context: golden rule 8 — never invent data. Profile statistics are thinner than aggregate data, so thresholds and labeling must be explicit (carries D-066 forward).
 - Decision:
@@ -760,14 +840,24 @@ Owner decision 2026-11-05.
 - Alternatives: (a) hide insufficient entries — rejected; (b) lower thresholds — rejected until real profile volumes are known; revisit with data.
 - Consequences: shared result schemas carry the insufficient-data fields; UI renders badges per SPECS §18.
 
-### D-076 — Personalize fallback levels are champion-scoped at every level — PROPOSED
+Owner decision 2026-11-07.
+
+Owner decision 2026-11-08.
+
+### D-076 — Personalize fallback levels are champion-scoped at every level — ACCEPTED
 
 - Context: SPECS §18.2 / D-073 list the fallback hierarchy (L1 same ally ADC + enemy support … L5 champion overall) without stating explicitly whether L1–L4 filter the profile's games by the candidate champion. Reading them as context-only would make the profile win rate identical for every candidate until L5, which cannot rank champions — the personalized list would be meaningless.
 - Decision (implementation assumption, T-095): every level is scoped to games the profile played ON the candidate champion in the SUPPORT role (phase 1 in-scope games, §18.1); the levels widen the matchup context instead — L1 adds ally ADC + enemy support, L2 enemy support only, L3 enemy damage/archetype signature (`damageType:archetype` pairs from `champion-tags.json`, draft signature ⊆ game signature), L4 any context ("role overall"), L5 identical to L4 while only SUPPORT games are in scope (kept distinct for later phases). L3's subset rule (draft signature ⊆ game signature, non-empty draft signature) is likewise an implementation choice — exact tag-set equality was rejected as too brittle for partial drafts.
 - Alternatives: (a) context-only L1–L4 — rejected, no per-champion signal; (b) exact enemy tag-set equality for L3 — rejected, never matches partial drafts; (c) per-champion Jaccard threshold — rejected, an unmotivated constant.
 - Consequences: `personalize()` in `packages/engine/src/personalize.ts`; golden tests pin the arithmetic; revisit if a personalization backtest suggests different scoping.
 
-### D-077 — "Profile's best" runes/spells: page identity, pair normalization, shrinkage prior — PROPOSED
+Note: this decision clarifies D-073 — every fallback level is champion-scoped, so D-073's L4 'all the profile's Support games' means the candidate champion in any context.
+
+Owner decision 2026-11-07.
+
+Owner decision 2026-11-08.
+
+### D-077 — "Profile's best" runes/spells: page identity, pair normalization, shrinkage prior — ACCEPTED
 
 - Context: SPECS §18.5 asks for the profile's rune pages and summoner-spell pairs per champion "with the same fallback/shrinkage rules" as D-073, but does not define what counts as one "page" or "pair", nor which prior the shrinkage uses.
 - Decision (implementation assumption, T-097 engine half):
@@ -778,6 +868,56 @@ Owner decision 2026-11-05.
   5. **Minimum sample** = 5 effective games (`DEFAULT_MIN_SETUP_GAMES`, D-075) at the matched level; below that the pick reports `insufficientData` with `nEff`, never a rate.
 - Alternatives: (a) shrink toward `p_profile` — rejected, too coarse for per-champion setups; (b) include minor rune picks in page identity — rejected, fragments tiny samples; (c) ordered spell pairs — rejected, double-counts the same setup.
 - Consequences: `recommendProfileRunes`/`recommendProfileSpells` in `packages/engine/src/profile-setup.ts`; golden tests pin the arithmetic. The two-column UI waits on T-041 (no runes screen exists yet).
+
+Owner decision 2026-11-07.
+
+Owner decision 2026-11-08.
+
+### D-078 — ETL state lives in release assets of a private GitHub repo — ACCEPTED
+- Context: D-057 stored the gzipped DB on the orphan branch etl-db of the PUBLIC repo, so every match row and participant puuid was downloadable by anyone, and the single amended commit with force-push left no rollback. Cloudflare R2 and Cloudflare Access were rejected because they require a payment method; the owner requires services without one.
+- Decision:
+  1. A private repo (name configurable, default draftorb-state) with no workflows stores state. Each ETL run publishes a release tagged state-<UTC yyyymmddThhmmZ> with assets DraftOrb.sqlite.gz and public-exports.tar.gz (the contents of data/public).
+  2. A run starts by downloading the newest state-* release. If none exists the run fails (D-057 point 2 stands, so an empty DB can never overwrite good state). The first release is created manually from the local DB with the gh CLI; the procedure goes in SETUP.md.
+  3. At the end of a run (if: always() for the DB asset): PRAGMA wal_checkpoint(TRUNCATE), then PRAGMA integrity_check must return ok, otherwise nothing is uploaded; then VACUUM, gzip, upload. The exports asset is uploaded only when the pipeline succeeded (D-058 exit-code semantics).
+  4. Retention: keep the newest 7 state-* releases and delete older ones (tags included) only after a successful upload.
+  5. Auth: a fine-grained personal access token limited to that one repo (contents read/write), stored as the Actions secret STATE_REPO_TOKEN. GITHUB_TOKEN cannot reach another repo. Tokens expire (at most one year): the expiry date is recorded in SETUP.md and the workflow fails early with a clear message if the token is rejected.
+  6. The concurrency group etl-refresh (D-070) stays.
+  7. Tooling: the gh CLI (to verify: preinstalled on GitHub-hosted Ubuntu runners). No new package dependency.
+  8. Migration: after two consecutive successful runs on the new flow, the etl-db branch is deleted from the public repo. Whether GitHub keeps serving the old commits by SHA for some time is to verify; if that matters, the owner asks GitHub support to purge them.
+  9. Public logs: the main repo is public, so workflow logs are public and secret masking does not cover other players' data. The ETL must never print other players' Riot IDs, puuids or match ids, nor the profile owner's raw game data, to the workflow log.
+- Alternatives: Cloudflare R2 (free tier needs payment details on activation); Backblaze B2 (sources conflict on card requirement, free egress capped at 3x stored data); Storj (free tier is a 30-day trial only); orphan branch in a private repo (100 MB per-file git limit, history growth, force-push); actions/cache and artifacts (rejected in D-057); Hugging Face (free private storage is limited).
+- Consequences: the DB is no longer publicly downloadable. About 58 MB down and up per run; 7 copies are about 400 MB plus exports. Per-asset size limit (2 GB) and absence of a total cap are from memory and to verify. The token must be rotated before it expires. If the state repo is deleted, state is lost, so the owner keeps a local copy. Supersedes D-057 points 1-2 and D-070's persistence choice.
+
+Owner decision 2026-11-07.
+
+Owner decision 2026-11-08.
+
+### D-079 — Local-only app: no hosting, no deploy workflow — ACCEPTED
+- Context: the owner wants the app private and only needs the database refreshed automatically. GitHub Pages on the free plan requires a public repo; Cloudflare Access requires payment details even on its free plan.
+- Decision:
+  1. The app runs locally (dev server or local build). There is no hosting.
+  2. The scheduled pipeline no longer commits data/public to main and no longer dispatches deploy.yml. deploy.yml is removed, actions: write is dropped from the workflow permissions, and data/public (including data/public/profiles) is gitignored.
+  3. CI packs the exports into the public-exports.tar.gz release asset (D-078).
+  4. New command pnpm etl pull downloads the newest state release and extracts the exports into data/public (uses the gh CLI, no new dependency; downloading the DB asset as well is an implementation option decided in its ticket).
+  5. D-067 (no login, no server, key only in the pipeline) stands; only its "public app" premise is superseded. D-069's anonymization and key-leak check stay as defense in depth.
+  6. The main repo stays public (code and docs only); only the state repo (D-078) is private.
+- Alternatives: Cloudflare Pages + Access (payment method required); Cloudflare Pages with a small custom auth function (works without a card per owner research but adds server-side code, in tension with D-002; kept as a future option if remote access is ever needed); client-side encrypted profile on public hosting (rejected for the same reasons as D-067); Netlify/Vercel password protection (free status not verified).
+- Added alternative (2026-11-08): making the main repo private (rejected: the ETL refresh takes about 1 hour per run, and the free monthly Actions minutes of a private repo — about 2,000, to verify — would not cover two runs a day, roughly 3,600 minutes; public repos run Actions for free).
+- Consequences: only the owner can use the app, after running pnpm etl pull. Because exports are no longer committed to main, GitHub may disable scheduled workflows in a public repo after 60 days without repo activity (to verify): the owner sets a reminder or the workflow gets a keepalive. Data committed earlier under data/public stays in git history; the owner reviews "git log -- data/public". Supersedes the commit-exports and deploy-dispatch parts of D-057 point 4.
+
+Owner decision 2026-11-07.
+
+Owner decision 2026-11-08.
+
+### D-080 — Personalized-list badge compares against the rank-bucket baseline — ACCEPTED
+- Context: D-073's badge computed +d = round(100 * (p - score(c))) pp, which subtracts a champion's meta score from a win rate. D-073 itself says score(c) = sigmoid(x) is uncalibrated and clusters near 0.5, so the number was not meaningful.
+- Decision: d = round(100 * (p - w0)) pp, where p is the shrunk profile win rate at the matched fallback level and w0 is the champion's baseline win rate (the p0 fraction of SPECS §5) for the rank bucket selected in the app — the same value D-054 exposes as insufficientData.winRate. The delta is omitted when the baseline row has no weighted evidence (games_e = 0) or the champion fails the baseline gate; a prior-only 50% is never used. The label names the bucket, e.g. "+4 pp vs Diamond avg". score(c), the metaNorm rank normalization and the trust blend of D-073 are unchanged.
+- Alternatives: keep the score(c) delta (rejected, meaningless scale); drop the badge (rejected, it is useful context); compare against the profile owner's own bucket (rejected, the badge should answer "how does this profile do against typical players at the bucket the visitor selected").
+- Consequences: personalized entries carry an optional baseline win rate and bucket (additive optional field, schema version decision left to the implementing ticket, as in D-054). Limitation: the profile's games may have been played at ranks other than the selected bucket. Supersedes only the "+d vs meta" clause of D-073.
+
+Owner decision 2026-11-07.
+
+Owner decision 2026-11-08.
 
 ### Template
 

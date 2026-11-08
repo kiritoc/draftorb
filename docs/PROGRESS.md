@@ -54,6 +54,17 @@ Open questions that remain after the 2026-11-08 acceptance:
 
 ## Session log (newest first)
 
+### 2026-11-08 — Devin — T-052, T-019.e, T-053 (branch `feat/game-state-threat-score`)
+
+- Done:
+  - **T-052** (`368fca7`): GameState model — `playerStateSchema`/`gameStateSchema` already shipped in T-002.b and match SPECS §8.2 field-for-field; added the missing D-011 parity coverage in `packages/shared/test/parity.test.ts` (full/optional parse, 4-ally/5-enemy caps, strict rejection). Status REVIEW.
+  - **T-019.e** (`14b3c5d`): migration `016_breakpoints_change_scores` creates `entity_change_scores` + `data_breakpoints` verbatim from DATA_MODEL §5.4 (all CHECKs, `idx_data_breakpoints_unique` with `COALESCE(scope_id,-1)`). New `packages/etl/src/breakpoints.ts` (list/add/validate/reject, `breakpointAppliesToPatch`, `combineBreakpointWeight` — reset dominates, factors multiply floored at `ETL_CONFIG.minWeight`), `ETL_CONFIG` gained `changeWeightEnabled:false` + `minWeight:0.05` (D-045 names, unused until T-019.f), CLI `pnpm etl breakpoint list|add|validate|reject`, `pnpm etl status` prints "Breakpoints pending review: N". Tests: one failing insert per CHECK on both tables, NULL scope_id uniqueness, lifecycle transitions, combination rule, patch applicability, CLI usage errors. Caveat: aggregation does not read breakpoints yet (T-019.f); `entity_change_scores` stays empty until T-019.d.
+  - **T-053**: `packages/engine/src/threat.ts` — `computeThreatScores(enemies, timeSeconds, items, tags, config?)` returns order-aligned `{ threats, shares }` per SPECS §8.2.2; `avgItemGold`/`scalingFactor` helpers; `ThreatConfig`/`DEFAULT_THREAT_CONFIG` in config.ts; exported from index. Underspecified terms fixed as **D-081 (PROPOSED)**: itemGold = catalog `goldTotal` sum; avgItemGold = piecewise-linear prior anchors; scalingFactor = max true `scaling` tag flag else neutral 0.6. 9 tests: fed/not-fed, KDA damping, time-normalized item gold, late>early, untagged neutral, zero shares, determinism.
+- Files touched: `packages/shared/test/parity.test.ts`, `packages/etl/migrations/016_*.sql`, `packages/etl/src/{breakpoints*,cli.ts,status*,config/etl-config.ts,commands/breakpoint*,db/migrate.test.ts}`, `packages/engine/src/{threat.ts,config.ts,index.ts}`, `packages/engine/test/threat.test.ts`, `docs/{TICKETS,PROGRESS,SPECS,DATA_MODEL,DECISIONS,SETUP}.md`.
+- Tests: `pnpm check` green — 99 files / 1141 tests, 0 lint errors (77 pre-existing warnings).
+- State left: branch `feat/game-state-threat-score`, 3 commits, all tickets REVIEW (awaiting owner). Next tickets: T-019.d (needs T-019.e accepted), T-019.f (change-weight integration, gated on T-027.a/D-023), T-054 (item recommender v1, needs T-050+T-053), T-041 (runes UI).
+- Pitfalls / notes for next AI: `seedPatches` numbers patch_index contiguously from 1 (fixture labels `16.20..16.22` -> indices 1..3, NOT 20..22). `pnpm check` enforces prettier — run `pnpm prettier --write` on new files before the gate. Breakpoint transitions are `suggested`-only per SPECS §16 lifecycle; manual `add` rows are `active` and cannot be validated/rejected (no delete command exists — spec has none).
+
 ### 2026-11-08 — Devin — State-release migration implemented (T-106..T-112, branch `feat/state-release-migration`)
 
 - Done:

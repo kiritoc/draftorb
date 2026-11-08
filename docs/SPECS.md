@@ -186,7 +186,7 @@ Order of preference:
 ## 10. Non-functional
 
 - Engine call < 50 ms for a full draft on a mid laptop.
-- Static hosting, JSON data files < 5 MB each (gzip), lazy loaded.
+- Local static app, no hosting (D-079); JSON data files < 5 MB each (gzip), lazy loaded.
 - Works offline after first load (nice-to-have).
 - Accessible UI, keyboard champion search; the pool editor and the "Show more" buttons are keyboard accessible.
 - The pool stays in the browser (never sent anywhere).
@@ -317,14 +317,14 @@ Only edge cases not owned by sections 12-16; all other rules reference those sec
 - Entity renamed / ID changed between patches: new `entity_id` = new row; cross-patch comparison uses `entity_id`, so renamed entities are separate rows. Champions are keyed by numeric id from CommunityDragon `champion-summary.json` (alias such as `monkeyking` only builds the file path).
 - Item passives: numeric values come from the item `DataValues` in `items.cdtb.bin.json`; description HTML is never parsed.
 
-## 18. Personalization (D-067..D-075)
+## 18. Personalization (D-067..D-080)
 
-Personal recommendations use a **configured profile's** match history, synced by the pipeline and shipped as static JSON — visitors never call Riot and there is no login or server (D-002, D-067). `score(c)` and every existing list are **unchanged** by personalization (D-072, same invariant as D-024).
+Personal recommendations use a **configured profile's** match history, synced by the pipeline and shipped as static JSON — the app is local-only and never calls Riot; there is no login or server (D-002, D-067, D-079). `score(c)` and every existing list are **unchanged** by personalization (D-072, same invariant as D-024).
 
 ### 18.1 Profile
 
 - Declared in the committed `data/profiles.config.json` (D-068): `{ id, riotId: { gameName, tagLine }, platform, label, options }`. Default and only entry: `KiriToc#Toc`, `EUW1`. Only configured profiles are ever synced — visitors cannot add one; adding another person's profile requires their consent.
-- Synced by `pnpm etl profile-sync` inside the scheduled `etl.yml` run (D-070): account-v1 resolves the Riot ID to a puuid (`europe` routing for EUW1), match-v5 fetches ranked solo/duo games (queue 420) incrementally (per-profile `last_game_creation` cursor, D-018 pattern), champion-mastery-v4 provides mastery. Stored in `profiles`/`profile_games`/`profile_mastery` (DATA_MODEL.md) and exported as `data/public/profiles/<id>.json` + `index.json`, anonymized per D-069 (no foreign names/Riot IDs/puuids/match ids; last 180 days, max `profileMaxGames` = 500).
+- Synced by `pnpm etl profile-sync` inside the scheduled `etl.yml` run (D-070): account-v1 resolves the Riot ID to a puuid (`europe` routing for EUW1), match-v5 fetches ranked solo/duo games (queue 420) incrementally (per-profile `last_game_creation` cursor, D-018 pattern), champion-mastery-v4 provides mastery. Stored in `profiles`/`profile_games`/`profile_mastery` (DATA_MODEL.md) and exported as `data/public/profiles/<id>.json` + `index.json`, anonymized per D-069 (no foreign names/Riot IDs/puuids/match ids; last 180 days, max `profileMaxGames` = 500). `data/public` is gitignored and local-only (D-079): the exports are packed into the `public-exports.tar.gz` asset of the newest `state-*` release in the private state repo (D-078) and reach the app via `pnpm etl pull`.
 - The web app loads the exported JSON statically and displays the profile label (e.g. "Profile: KiriToc#Toc (EUW)"); the personalized list is labeled "<gameName>'s picks" — never "For you" (D-072). No profile selector UI for now; a selector among exported profiles is future work.
 - Phase 1 uses Support games only; other roles are stored but ignored by the engine.
 
@@ -334,11 +334,11 @@ For candidate `c` in the current draft, over the profile's in-scope games:
 
 - Recency weight `w = 0.5^(age_days / 60)` per game (`HALF_LIFE_DAYS = 60`); `n_eff = (sum w)^2 / sum w^2`.
 - Profile win rate at a context level: `p = (wins_w + K_SHRINK * p_profile) / (games_w + K_SHRINK)`, `K_SHRINK = 15`, `p_profile` = the profile's recency-weighted win rate over all in-scope games.
-- Fallback hierarchy — first level with `n_eff >= MIN_GAMES` (`MIN_GAMES` = 3): L1 same ally ADC + same enemy support; L2 same enemy support; L3 enemy composition tags (`champion-tags.json`); L4 role overall; L5 champion overall. `levelFactor` = 1.0/0.9/0.8/0.7/0.6 for L1..L5. The same hierarchy gives the profile's win rate "in the current matchup/setup".
+- Fallback hierarchy — first level with `n_eff >= MIN_GAMES` (`MIN_GAMES` = 3). Every level is scoped to games the profile played ON the candidate champion in the SUPPORT role; the levels widen the matchup context instead (D-076): L1 same ally ADC + same enemy support; L2 same enemy support; L3 enemy composition signature (`champion-tags.json` `damageType:archetype` pairs, draft signature ⊆ game signature); L4 any context ("role overall"); L5 champion overall (identical to L4 while only SUPPORT games are in scope, kept distinct for later phases). `levelFactor` = 1.0/0.9/0.8/0.7/0.6 for L1..L5. The same hierarchy gives the profile's win rate "in the current matchup/setup".
 - Trust: `trust = (n_eff * levelFactor) / (n_eff * levelFactor + K_TRUST)`, `K_TRUST` = 20.
 - Meta normalization: `metaNorm(c) = 1 - (rank - 1) / (N - 1)` over the complete overall list (N > 1; 1 when N = 1) — `score(c) = sigmoid(x)` is uncalibrated in absolute terms, rank position is stable.
 - `personalizedScore(c) = (1 - trust) * metaNorm(c) + trust * p`. The personalized list sorts desc, tie-break overall `rank`. Entries with `n_eff < MIN_GAMES` at every level show "insufficient data" with `n_eff` (D-075), never a number.
-- Reason badge per entry: shrunk profile WR %, effective games, fallback level, and `+d vs meta` = `round(100 * (p - score(c)))` pp against the unchanged meta score.
+- Reason badge per entry: shrunk profile WR %, effective games, fallback level, and the delta vs the rank-bucket baseline `d = round(100 * (p - w0))` pp, where `w0` is the champion's baseline win rate (`p0` fraction of §5) for the rank bucket selected in the app — the same value `insufficientData.winRate` exposes (D-054). The delta is omitted when the baseline row has no weighted evidence (`games_e = 0`) or the champion fails the baseline gate; a prior-only 50% is never used. The label names the bucket, e.g. "+4 pp vs Diamond avg" (D-080).
 
 ### 18.3 Personalized list UI
 
@@ -352,8 +352,8 @@ For candidate `c` in the current draft, over the profile's in-scope games:
 
 ### 18.5 Runes and summoner spells
 
-- Runes screen: two columns — "Profile's best" (shrunk profile WR of the profile's rune pages for that champion, matched per draft context when possible, same fallback/shrinkage rules) and "Top players" (existing `recommendRunes` output); a marker highlights entries that differ. Fewer than 5 games on a setup -> "Profile's best" shows insufficient data.
-- Summoner spells: same two-column layout from `profile_games` spell ids (profile WR per spell pair vs the champion's global recommendation).
+- Runes screen: two columns — "Profile's best" (shrunk profile WR of the profile's rune pages for that champion, matched per draft context when possible) and "Top players" (existing `recommendRunes` output); a marker highlights entries that differ. Page identity = `(keystoneId, primaryStyleId, subStyleId)` — minor rune picks and stat shards do not split pages; summoner spells are an unordered pair normalized to `[min(id), max(id)]`; the fallback/shrinkage levels are the champion-scoped L1..L5 of §18.2 applied per setup, with the shrinkage prior = the profile's recency-weighted win rate on that champion; fewer than 5 effective games (`DEFAULT_MIN_SETUP_GAMES`) on a setup -> "Profile's best" shows insufficient data with `nEff`, never a rate (D-077/D-075).
+- Summoner spells: same two-column layout from `profile_games` spell ids (profile WR per normalized spell pair vs the champion's global recommendation).
 
 ### 18.6 Items (last)
 

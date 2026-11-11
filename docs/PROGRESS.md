@@ -3,22 +3,22 @@
 ## Current status
 
 - Phase: 1 (Support / Diamond)
-- Current milestone: M3 Web MVP implementation complete (T-030..T-035 DONE); the backtest harness (T-027.a) remains under review because D-023 paired-bootstrap validation is not implemented. T-019.b (patch index, now incl. D-055), T-019.c (retention prune) and T-026 (golden suite, 23 scenarios) are in REVIEW; T-019.d..f and T-027.b remain TODO. T-040 (engine rune recommender, SPECS §8.1) is in REVIEW (D-059 accepted 2026-11-08). E8 Personalization implemented through T-096: T-090..T-096 DONE (profile config/schemas, `profile-sync` ETL + scheduled workflow + secret-leak gate, web profile loader, favorites, engine `personalize`, personalized list UI); T-097 engine half DONE (`recommendProfileRunes`/`recommendProfileSpells`) with the UI half blocked on T-041 (no runes screen exists); T-098 stays TODO (T-052/T-054/T-056 missing). Decisions D-052..D-080 are ACCEPTED as of 2026-11-08 (D-061..D-066 SUPERSEDED by D-067..D-077; parts of D-057/D-067/D-069/D-070/D-073 superseded by D-076..D-080); earlier per-user plan cancelled (T-080..T-086 CANCELLED). Docs updated 2026-11-08 for the accepted decisions. Migration to the private state repo + local-only app merged on `main` (PR #53, T-106..T-112 done; T-113 proposal-only; T-099..T-105 remain owner actions). `feat/game-state-threat-score` (PR #54: T-052, T-019.e, T-053, T-041) and `fix/state-tag-seconds` (PR #55) also merged; their tickets remain REVIEW pending owner acceptance.
-- Last updated: 2026-11-11 by Devin (post-merge repo check: `feat/state-release-migration`, `fix/state-tag-seconds` and `feat/game-state-threat-score` confirmed merged into main; fixed two `etl pull` bugs — B-065/B-066 — and restored `data/public` via `pnpm etl pull`)
+- Current milestone: M3 Web MVP implementation complete (T-030..T-035 DONE). All REVIEW tickets accepted DONE on 2026-11-11: T-019.b (patch index, incl. D-055), T-019.c (retention prune), T-019.e (breakpoints/change-scores DDL + CLI), T-026 (golden suite, 23 scenarios), T-027.a (draft backtest — report still `unvalidated` until the D-023 paired-bootstrap gate is implemented), T-040 (engine rune recommender, D-059), T-041 (runes UI), T-052 (GameState), T-053 (threat score), T-106/T-108/T-111 (state-release migration). T-019.d..f and T-027.b remain TODO. T-097 engine half DONE (`recommendProfileRunes`/`recommendProfileSpells`); its UI half is now unblocked (T-040/T-041 DONE — `RunesPanel` exists). T-098 stays TODO (T-054/T-056 missing). Decisions D-052..D-080 are ACCEPTED as of 2026-11-08 (D-061..D-066 SUPERSEDED by D-067..D-077; parts of D-057/D-067/D-069/D-070/D-073 superseded by D-076..D-080); earlier per-user plan cancelled (T-080..T-086 CANCELLED). Docs updated 2026-11-08 for the accepted decisions. Migration to the private state repo + local-only app merged on `main` (PR #53, T-106..T-112 done; T-113 proposal-only; T-099..T-105 remain owner actions). `feat/game-state-threat-score` (PR #54: T-052, T-019.e, T-053, T-041) and `fix/state-tag-seconds` (PR #55) also merged; all merged tickets accepted DONE by the owner on 2026-11-11.
+- Last updated: 2026-11-11 by Devin (owner accepted all REVIEW tickets → DONE: T-019.b/c/e, T-026, T-027.a, T-040, T-041, T-052, T-053, T-106, T-108, T-111; pull fixes committed on `fix/etl-pull-state-release`)
 
 ## Epic status
 
-| Epic               | Status      | Notes                                                                                                                                                                                                        |
-| ------------------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| E0 Foundations     | IN PROGRESS | T-001..T-005 DONE; T-002.b DONE                                                                                                                                                                              |
-| E1 ETL             | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e, T-014, T-015, T-015.b, T-016, T-017, T-018, T-019 DONE; T-019.b, T-019.c REVIEW; T-019.d..f TODO                                         |
-| E2 Engine          | IN PROGRESS | T-020..T-025 DONE; T-026 REVIEW; T-027.b TODO; T-027.a REVIEW                                                                                                                                                |
-| E3 Web MVP         | DONE        | T-030..T-035 complete; recommendation flow, Support pool, regression coverage, deploy assets and visible unvalidated-model state                                                                             |
-| E4 Runes           | IN PROGRESS | T-040 REVIEW; T-041 REVIEW (branch `feat/game-state-threat-score`); T-042 TODO                                                                                                                               |
-| E5 Items           | NOT STARTED |                                                                                                                                                                                                              |
-| E6 Live            | NOT STARTED |                                                                                                                                                                                                              |
-| E7 Vision          | NOT STARTED |                                                                                                                                                                                                              |
-| E8 Personalization | IN PROGRESS | Replanned 2026-11-06: pipeline-fed configured profile, static-only (D-067..D-080 ACCEPTED 2026-11-08; app local-only per D-079); T-090..T-096 DONE, T-097 engine-only, T-098 blocked, T-080..T-086 CANCELLED |
+| Epic               | Status      | Notes                                                                                                                                                                                                                                                     |
+| ------------------ | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| E0 Foundations     | IN PROGRESS | T-001..T-005 DONE; T-002.b DONE                                                                                                                                                                                                                           |
+| E1 ETL             | IN PROGRESS | T-010..T-013, T-011.b, T-011.c, T-013.b, T-013.c, T-013.d, T-013.e, T-014, T-015, T-015.b, T-016, T-017, T-018, T-019, T-019.b, T-019.c, T-019.e DONE; T-019.d, T-019.f TODO                                                                              |
+| E2 Engine          | IN PROGRESS | T-020..T-025, T-026, T-027.a DONE; T-027.b TODO                                                                                                                                                                                                           |
+| E3 Web MVP         | DONE        | T-030..T-035 complete; recommendation flow, Support pool, regression coverage, deploy assets and visible unvalidated-model state                                                                                                                          |
+| E4 Runes           | IN PROGRESS | T-040, T-041 DONE; T-042 TODO                                                                                                                                                                                                                             |
+| E5 Items           | NOT STARTED |                                                                                                                                                                                                                                                           |
+| E6 Live            | NOT STARTED |                                                                                                                                                                                                                                                           |
+| E7 Vision          | NOT STARTED |                                                                                                                                                                                                                                                           |
+| E8 Personalization | IN PROGRESS | Replanned 2026-11-06: pipeline-fed configured profile, static-only (D-067..D-080 ACCEPTED 2026-11-08; app local-only per D-079); T-090..T-096 DONE, T-097 engine done + UI unblocked (T-041 merged), T-098 blocked on T-054/T-056, T-080..T-086 CANCELLED |
 
 ## Data collection status
 
@@ -32,7 +32,7 @@
 ## Next recommended ticket
 
 T-023 is **DONE** (Role-generic recommendation engine with explanations, layered shrinkage scoring, pool contract D-024, composition needs, golden test runner and golden fixtures including non-support TOP 1v1 lane group). The Web MVP implementation is complete; its model remains visibly unvalidated until D-023's paired-bootstrap gate is implemented and passed.
-Next ETL ticket: **T-019.d** (CommunityDragon change scores + real-JSON fixtures — SPECS §15/D-046) once T-019.b and T-019.c are accepted. Next web ticket: **T-041 done (REVIEW)** — next is T-042 or the T-097 UI half. Next validation work: complete D-023 and revisit T-027.a before claiming model validation.
+Next ETL ticket: **T-019.d** (CommunityDragon change scores + real-JSON fixtures — SPECS §15/D-046); deps T-019.b/T-019.e now DONE, remaining gate is the owner patch-note verification (PROGRESS open questions). Next web ticket: **T-042** (gameplan notes) or the **T-097 UI half** (unblocked: `RunesPanel` merged). E5 kickoff: **T-050** (item tags) then **T-051** (timeline + item builds — unblocks T-027.b/T-056). Next validation work: complete D-023 and revisit T-027.a before claiming model validation.
 
 Session entries before 2026-10-29 live in [PROGRESS_ARCHIVE.md](./PROGRESS_ARCHIVE.md).
 
@@ -48,7 +48,7 @@ Open questions that remain after the 2026-11-08 acceptance:
 - D-073: personalization constants (`HALF_LIFE_DAYS` 60, `K_SHRINK` 15, `MIN_GAMES` 3, `K_TRUST` 20, `levelFactor`) are priors; there is no backtest for personalization yet — acceptable until one exists?
 - D-069: size cap `profileMaxGames` = 500 / last 180 days — confirm acceptable JSON size once real data exists.
 - Resolved by implementation (kept for the record): D-068 timeline fetch per synced game — implemented (`items_ordered_json` from match-v5 timeline); queue 420 only for profile stats — implemented.
-- T-098: personal items need `GameState` (T-052+) and enough per-context profile games; exact open questions are in SPECS §18.6.
+- T-098: personal items need the item recommender chain (T-054/T-056; GameState T-052 is DONE) and enough per-context profile games; exact open questions are in SPECS §18.6.
 
 - T-019.d verification: please compare the champion and item lists in the 2026-11-04 "T-019.d verification step" entry below with the official 16.21 and 16.22 patch notes (misses and false positives).
 
@@ -61,9 +61,16 @@ Open questions that remain after the 2026-11-08 acceptance:
   - `data/public` was empty after the migration (now gitignored, D-079): `pnpm etl pull` initially failed twice — B-065 (`gh release list --json` has no `assets` field → switched `listStateReleases` to `gh api repos/<repo>/releases --method GET -f per_page=N`, drafts filtered) and B-066 (tar directory entries ending in `/` rejected as unsafe → `resolveEntryTarget` strips trailing slashes; regression test added). Pull then succeeded: 68 files extracted from `state-20261111T0957Z` into `data/public` (incl. `latest.json` → patch 16.22 and `profiles/`).
 - Files touched: `packages/etl/src/{state-release.ts,tar-extract.ts,pull.test.ts}`, `docs/{BUGS,PROGRESS}.md`.
 - Tests: `pnpm vitest run packages/etl/src/pull.test.ts` 26/26 pass; full `pnpm check` re-run pending commit.
-- State left: fixes uncommitted on `main` working tree at check time.
-- Next step: owner reviews/commits the pull fixes; T-019.d still waits on T-019.b/T-019.c/T-019.e acceptance.
+- State left: fixes committed on branch `fix/etl-pull-state-release` (`df40cc8`), pending PR/merge.
+- Next step: owner merges the pull-fix branch; T-019.d unblocked (deps DONE) pending the owner patch-note verification.
 - Pitfalls / notes for next AI: `gh api` defaults to POST when `-f`/`-F` is passed — always pass `--method GET` for reads. `gh release list --json` fields are limited (no `assets`); use `gh release view --json assets` or the REST API. Real `tar -czf` archives emit directory entries with trailing `/` — the extractor must tolerate them.
+
+### 2026-11-11 — Devin — Owner acceptance: all REVIEW tickets marked DONE
+
+- Done: owner confirmed the merged branches; all 12 REVIEW tickets flipped to DONE in `docs/TICKETS.md` — T-019.b, T-019.c, T-019.e, T-026, T-027.a, T-040, T-041, T-052, T-053, T-106, T-108, T-111. PROGRESS epic table, current status, next-ticket section and open questions updated to match.
+- Newly unblocked TODO tickets: T-019.d (still gated on the owner patch-note verification for SPECS §15 step 1), T-042, T-050, T-051, T-054 (needs T-050), T-097 UI half (T-040/T-041 DONE), T-113 (owner decision on the 60-day rule).
+- Still blocked: T-019.f (D-023 paired-bootstrap gate on T-027.a), T-027.b (needs T-051), T-056 (needs T-027.b+T-054), T-098 (needs T-054+T-056).
+- State left: docs-only change on branch `fix/etl-pull-state-release`.
 
 ### 2026-11-08 — Devin — Accept `state-*` tags with seconds (seeded release fix)
 

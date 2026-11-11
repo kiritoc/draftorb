@@ -115,7 +115,9 @@ export function resolveEntryTarget(
   stripPrefix: string,
   rawName: string,
 ): string | null {
-  const normalized = rawName.replace(/^\.\//, '');
+  // Directory entries conventionally end with '/' (e.g. 'public/profiles/');
+  // strip trailing slashes so they resolve like any other entry.
+  const normalized = rawName.replace(/^\.\//, '').replace(/\/+$/, '');
   if (normalized === '') return null;
   if (normalized.startsWith('/') || normalized.startsWith('\\')) {
     throw new Error(`Unsafe tar entry name (absolute path): "${rawName}"`);

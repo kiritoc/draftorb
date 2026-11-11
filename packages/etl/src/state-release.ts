@@ -159,19 +159,23 @@ export function listReleaseTags(repo: string, limit = 100): string[] {
 
 /** Lists releases (tag + asset names) of a repo via the gh CLI. */
 export function listStateReleases(repo: string, limit = 100): StateReleaseSummary[] {
+  // `gh release list --json` has no `assets` field; the REST endpoint returns
+  // asset names inline in a single call.
   const out = runGh([
-    'release',
-    'list',
-    '--repo',
-    repo,
-    '--limit',
-    String(limit),
-    '--json',
-    'tagName,assets',
+    'api',
+    `repos/${repo}/releases`,
+    '--method',
+    'GET',
+    '-f',
+    `per_page=${limit}`,
   ]);
-  const parsed = JSON.parse(out) as Array<{ tagName?: unknown; assets?: unknown }>;
+  const parsed = JSON.parse(out) as Array<{
+    tag_name?: unknown;
+    draft?: unknown;
+    assets?: unknown;
+  }>;
   return parsed.flatMap((release) => {
-    if (typeof release.tagName !== 'string') return [];
+    if (release.draft === true || typeof release.tag_name !== 'string') return [];
     const assets = Array.isArray(release.assets)
       ? release.assets.flatMap((asset) => {
           const name =
@@ -181,7 +185,7 @@ export function listStateReleases(repo: string, limit = 100): StateReleaseSummar
           return typeof name === 'string' ? [name] : [];
         })
       : [];
-    return [{ tag: release.tagName, assets }];
+    return [{ tag: release.tag_name, assets }];
   });
 }
 

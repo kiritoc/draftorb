@@ -249,6 +249,7 @@ describe('extractTarGz', () => {
     const written = extractTarGz(
       gz([
         { name: 'public/', type: '5' },
+        { name: 'public/profiles/', type: '5' },
         { name: 'public/16.22/baseline.json', body: '[[1]]' },
         { name: 'public/profiles/index.json', body: '{}' },
         { name: 'pax_global_header', body: 'x' },

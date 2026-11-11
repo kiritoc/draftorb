@@ -32,6 +32,26 @@ Review notes that predate the bug log live in [Review history](#review-history) 
 
 ## Fixed
 
+### B-066 — `etl pull` aborted on tar directory entries ending with `/` — FIXED
+
+- Severity / Area: S2 / etl (`pnpm etl pull`, T-108)
+- Steps to reproduce: run `pnpm etl pull` against a real `public-exports.tar.gz` produced by `tar -czf` (as `.github/workflows/etl.yml` does).
+- Expected / Actual: expected directory entries like `public/profiles/` to extract cleanly; actual `resolveEntryTarget` split the inner name on `/` and rejected the empty trailing segment as unsafe (`Unsafe tar entry name: "public/profiles/"`), so pull always failed on archives containing explicit directory entries.
+- Environment (OS, Node version, patch): macOS, Node 22, gh 2.103.3, state release `state-20261111T0957Z`.
+- Logs / screenshot: `[ETL] Fatal error: Unsafe tar entry name: "public/profiles/"`.
+- Suspected cause: unit tests only covered the `public/` root entry (inner name empty → skipped); nested directory entries with a trailing slash were never exercised.
+- Fix (commit/ticket): `resolveEntryTarget` strips trailing slashes during normalization; regression coverage adds a `public/profiles/` type-`5` entry to the `extractTarGz` test.
+
+### B-065 — `etl pull` release listing used a `gh release list --json` field that does not exist — FIXED
+
+- Severity / Area: S2 / etl (`pnpm etl pull`, T-108)
+- Steps to reproduce: run `pnpm etl pull` on a machine with the gh CLI authenticated.
+- Expected / Actual: expected the newest `state-*` release carrying `public-exports.tar.gz` to be selected; actual `listStateReleases` called `gh release list --json tagName,assets`, and `assets` is not a valid field for `release list` (only for `release view`), so every pull failed with `gh CLI call failed ... Unknown JSON field: "assets"`.
+- Environment (OS, Node version, patch): macOS, gh 2.103.3.
+- Logs / screenshot: `Unknown JSON field: "assets"` / `Available fields: createdAt, isDraft, isImmutable, isLatest, isPrerelease, name, publishedAt, tagName`.
+- Suspected cause: `listStateReleases` assumed `release list` exposes asset names; it does not. Never exercised end-to-end locally before merge.
+- Fix (commit/ticket): `listStateReleases` now calls `gh api repos/<repo>/releases --method GET -f per_page=<limit>` (one call, assets inline, drafts filtered out). Note `gh api` defaults to POST when `-f` is passed — `--method GET` is required.
+
 ### B-064 — `.gitignore` does not cover the legacy `data/users/` path — FIXED
 
 - Severity / Area: S3 / docs (git hygiene)

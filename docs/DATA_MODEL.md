@@ -30,9 +30,9 @@ CREATE TABLE participants (
 );
 CREATE TABLE item_events (    -- from timelines (epic E5)
   match_id TEXT NOT NULL REFERENCES matches(match_id) ON DELETE CASCADE,
-  puuid TEXT NOT NULL, ts INTEGER NOT NULL, item_id INTEGER NOT NULL, type TEXT NOT NULL,
-  team_gold_diff INTEGER NOT NULL, kills_diff INTEGER NOT NULL,
-  item_slot INTEGER,          -- 0 = starting purchase (before the first completed item and game time < 90 s), k >= 1 = k-th completed item, NULL for components/consumables bought later (D-022)
+  puuid TEXT NOT NULL, ts INTEGER NOT NULL, item_id INTEGER NOT NULL, type TEXT NOT NULL,  -- ts = raw timeline ms; type = 'purchase' | 'sold'
+  team_gold_diff INTEGER NOT NULL, kills_diff INTEGER NOT NULL,   -- purchaser team minus enemy team at ts
+  item_slot INTEGER,          -- 0 = starting purchase (before the first completed item and game time < 90 s), k >= 1 = k-th completed item, NULL for components/consumables bought later (D-022, D-082)
   PRIMARY KEY (match_id, puuid, ts, item_id, type)
 );
 CREATE TABLE ingest_state (key TEXT PRIMARY KEY, value TEXT);  -- cursors for resumability
@@ -146,7 +146,7 @@ Rank buckets: every `rank_bucket` column and every exported `bucket` field uses 
 - `lane_vs(my_champion_id, my_role, opp1_id, opp2_id, rank_bucket, wins_w, games_w, games_w2)` (D-021; `opp*_id` = enemy lane-group champions in `laneGroup(my_role).enemies` order — SUPPORT: `[SUPPORT, ADC]`, ADC: `[ADC, SUPPORT]` — and `lane_full.partner_id` = `laneGroup(my_role).allies[0]`; the engine looks rows up in this order, so T-017 must export it; `opp2_id` NULL for 1v1 lane groups). SQLite PRIMARY KEY treats NULLs as distinct; uniqueness is enforced by the unique expression index `idx_lane_vs_unique` (migration 005) on `COALESCE(opp2_id, -1)`, so two rows with the same key and a NULL `opp2_id` conflict (-1 is never a valid champion id).
 - `lane_full(my_champion_id, my_role, partner_id, opp1_id, opp2_id, rank_bucket, wins_w, games_w, games_w2)` (D-021; `partner_id` = ally lane partner, NULL for 1v1 lane groups (TOP, MID, JUNGLE)). Uniqueness is enforced by the unique expression index `idx_lane_full_unique` (migration 005) on `COALESCE(partner_id, -1)` and `COALESCE(opp2_id, -1)`, with the same NULL handling.
 - `rune_ctx(champion_id, my_role, rank_bucket, context_key, context_level, perks_hash, perks_json, wins_w, games_w, games_w2, players)` (`context_key` = D-021 back-off level, SPECS §8.1; `context_level` = back-off hierarchy: lane contexts increment as slots drop (3-slot=1, 2-slot=2, 1-slot=3), damage mix=4, global=5; `rank_bucket` = user rank bucket, weighted by `expertWeight` (games below the bucket excluded, above boosted up to `wMax`, migration 011); experts = in-window `champion_games >= minChampGames` or `mastery_points >= minMasteryPoints`)
-- `item_build(champion_id, my_role, slot_idx, time_bucket, state_bucket, profile_key, lane_key, item_id, wins_w, games_w, games_w2)` (D-022; `slot_idx` = `item_events.item_slot`, 0 = starting items; `lane_key` empty outside the `lane` phase)
+- `item_build(champion_id, my_role, slot_idx, time_bucket, state_bucket, profile_key, lane_key, item_id, wins_w, games_w, games_w2)` (D-022; `slot_idx` = `item_events.item_slot`, 0 = starting items; `time_bucket` = 5-min purchase bucket `"<start>-<end>"` minutes; `state_bucket` = `ahead|even|behind` from the per-purchase team gold/kill diff (`ItemContextConfig` thresholds, D-082); `profile_key` = threat-weighted enemy damage mix `AD|AP|mixed`; `lane_key` = `lane:` + influence-sorted lane-context slots joined by `|`, empty string outside the `lane` phase — `''` maps to an absent `laneKey` in exports)
 
 Adding a role means data only: no schema or code change. Migration 004 (T-011.b) creates these tables.
 

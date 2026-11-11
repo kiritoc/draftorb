@@ -17,3 +17,4 @@ export * from './personalize.js';
 export * from './profile-setup.js';
 export * from './runes.js';
 export * from './threat.js';
+export * from './item-context.js';

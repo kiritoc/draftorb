@@ -19,7 +19,7 @@
 | ------------------ | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | --------- |
 | 0 Audit & baseline | done             | `docs/RIOT_API.md`, `docs/reports/model-review-baseline.md`                                                                                | pending   |
 | 1 Engine fixes     | done (flags off) | `pairMainEffectAdjust` (D-088) + `--pair-adjust` backtest gate, `tune-priors` (D-090), `blendMode='logit'` (D-089); 532 engine tests green | `746c9a5` |
-| 2 Data scaling     | partial          | `matches --call-budget/--time-budget`, `docs/proposed-etl-schedule.md` (schedule NOT applied)                                             | `b8c6e86` |
+| 2 Data scaling     | partial          | `matches --call-budget/--time-budget`, `docs/proposed-etl-schedule.md` (schedule NOT applied)                                              | `b8c6e86` |
 | 3 Joint model      | not started      | `packages/engine/src/joint/`, `etl fit-model`                                                                                              | –         |
 | 4 Drafting UI      | not started      | experimental views                                                                                                                         | –         |
 | 5 Items engine     | not started      | `items/analytic.ts`, `recommendItems`                                                                                                      | –         |
@@ -34,13 +34,13 @@ baseline-only 0.6946 on holdout patch 16.22.
 
 ## 4. Gates and how to enable
 
-| Flag                   | Gate                                  | Verdict                  | validationStatus | Enable change                                                   |
-| ---------------------- | ------------------------------------- | ------------------------ | ---------------- | --------------------------------------------------------------- |
-| `pairMainEffectAdjust` | backtest old vs new (`--pair-adjust`) | running                  | unvalidated      | set `pairMainEffectAdjust: true` in engine config               |
-| `blendMode='logit'`    | personalization ordering review       | implemented, unvalidated | n/a              | pass `blendMode:'logit'` in PersonalizeConfig                   |
+| Flag                   | Gate                                  | Verdict                                                                     | validationStatus | Enable change                                                   |
+| ---------------------- | ------------------------------------- | --------------------------------------------------------------------------- | ---------------- | --------------------------------------------------------------- |
+| `pairMainEffectAdjust` | backtest old vs new (`--pair-adjust`) | running                                                                     | unvalidated      | set `pairMainEffectAdjust: true` in engine config               |
+| `blendMode='logit'`    | personalization ordering review       | implemented, unvalidated                                                    | n/a              | pass `blendMode:'logit'` in PersonalizeConfig                   |
 | tuned priors           | `tune-priors` report review           | SUPPORT done: k0=40/k=160 → 0.6951 vs 0.6981 (in-sample; needs 2nd holdout) | unvalidated      | adopt winning k0/k/kLane into DEFAULT_CONFIG after owner review |
-| joint model            | D-023-extended holdout gate           | not run                  | unvalidated      | load joint export files + flag                                  |
-| items layers           | ranking-accuracy bootstrap            | not run                  | unvalidated      | per-layer flags                                                 |
+| joint model            | D-023-extended holdout gate           | not run                                                                     | unvalidated      | load joint export files + flag                                  |
+| items layers           | ranking-accuracy bootstrap            | not run                                                                     | unvalidated      | per-layer flags                                                 |
 
 ## 5. ADRs proposed
 

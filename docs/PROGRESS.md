@@ -56,7 +56,7 @@ Open questions that remain after the 2026-11-08 acceptance:
 
 ### 2026-11-12 — Devin — Owner decisions: Riot registration verified + local-first ETL (D-091)
 
-- Phase 3 started: `packages/engine/src/joint/` + `pnpm etl fit-model` implemented and measured. Result: joint model does NOT beat champion pick-frequency prior on masked-draft pick prediction (top1 0.0427 vs 0.0650, bootstrap 95% CI [-0.0247,-0.0183]); pick-prior hybrid = prior. `validationStatus` stays `unvalidated` (D-092); export written for inspection only.
+- Phase 3: `packages/engine/src/joint/` + `pnpm etl fit-model` implemented. BOTH gates failed honestly: (a) pick prediction — joint top1 0.0427 vs pick-frequency prior 0.0650; (b) win probability — joint log-loss 0.6929 vs side-only 0.6924, bootstrap CI [-0.00002,+0.00149] includes 0 (D-092a). No skill beyond team side at ~10k train matches; `validationStatus` stays `unvalidated`; export written for inspection only. External review corrections applied (2 GiB asset limit, lock-file note, B-068).
 - Phase 2 extractors DONE: `lane-snapshots` (migration 019, minutes 5/10/15/20/25) + `participant_challenges` (migration 020, raw challenges JSON; ingestion writes it for new matches, `etl backfill-challenges` backfills stored ones with `--call-budget`/`--limit`; NULL rows mark checked-unavailable).
 - Phase 2 extractor: `lane-snapshots` (migration 019) records per-participant level/gold/XP/CS/position at minutes 5/10/15/20/25 from timeline participantFrames; resumable via `extractor_runs` like the other extractors.
 - `pnpm etl publish` implemented (T-128): pure-Node tar.gz writer + gh release publisher with `--db`/`--vacuum`/`--keep`; exports every run, DB backup periodic.

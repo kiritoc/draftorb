@@ -66,11 +66,12 @@ async function runFitModel(args: string[]): Promise<void> {
     `Done: ${v.trainMatches} train / ${v.evalMatches} eval matches, ` +
       `${v.evalParticipants} masked picks. Export: ${result.exportPath}`,
   );
-  const ci = v.bootstrap.hybridTop1DeltaCi95;
-  if (ci[1] <= 0) {
+  const wp = v.winProb['joint'];
+  const ci = v.winProbLogLossDeltaCi95;
+  if (wp === undefined || ci[1] >= 0) {
     throw new CliError(
-      `Joint model (+pick-prior hybrid) does not beat the champion-prior baseline ` +
-        `on ${v.evalPatch} (bootstrap 95% CI upper bound ${ci[1].toFixed(4)} <= 0). ` +
+      `Joint model does not beat the trivial win-probability baselines on ` +
+        `${v.evalPatch} (ΔlogLoss 95% CI upper bound ${(ci?.[1] ?? 0).toFixed(5)} >= 0). ` +
         `validationStatus stays "unvalidated".`,
     );
   }

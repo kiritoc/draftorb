@@ -1107,3 +1107,21 @@ post-hoc blend, or evaluate on win-probability metrics (the existing
 draft backtest) instead of pick prediction. Update:
 `packages/engine/src/joint/`, `packages/etl/src/joint-fit.ts`,
 `packages/etl/src/commands/fit-model.ts`.
+
+### D-092a — Win-probability gate verdict for the joint model — PROPOSED
+
+Follow-up measurement (same 16.22 holdout, per-participant masked drafts,
+P(team win) protocol matching `etl backtest draft`): joint model log-loss
+0.6929 / brier 0.2499 / accuracy 0.5088 vs constant 0.6931/0.5000 and
+side-only 0.6924/0.5199. Paired bootstrap ΔlogLoss vs the best trivial
+baseline: 95% CI [-0.00002, +0.00149] — includes 0 and the point estimate
+is worse than side-only. Ablations: noChampMain is the worst variant
+(0.6934), so champion mains carry what little signal exists; pair layers
+add nothing measurable. Verdict: at ~10k training matches the joint model
+has no win-prediction skill beyond team side — kill criteria from the
+external review are met for pairwise/interaction terms. `fit-model` now
+gates on this win-probability metric (not pick prediction) and keeps
+`validationStatus: "unvalidated"`. Options kept open: refit when the
+timeline/challenges backfill and more patches land, or restrict the model
+to champion main effects + pick prior. Update: `joint-fit.ts` winProb
+evaluation, `commands/fit-model.ts` gate.

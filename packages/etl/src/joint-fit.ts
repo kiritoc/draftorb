@@ -24,6 +24,7 @@ import type Database from 'better-sqlite3';
 import {
   candidateLogits,
   contextFeatures,
+  featuresLogit,
   fitJointModel,
   type JointLayer,
   type JointModelParams,
@@ -75,6 +76,9 @@ export interface JointValidationReport {
     jointTop1DeltaCi95: [number, number];
     hybridTop1DeltaCi95: [number, number];
   };
+  winProb: Record<string, WinProbMetrics>;
+  /** 95% CI of per-match mean log-loss delta: joint minus best trivial baseline. */
+  winProbLogLossDeltaCi95: [number, number];
   ablation: Record<string, { top1: number; top5: number; meanLogProb: number }>;
 }
 
@@ -369,6 +373,24 @@ function evaluateMaskedDrafts(
   return { joint, prior, hybrid, perMatchTop1, perMatchHybridTop1 };
 }
 
+/** Paired bootstrap CI of the mean per-match difference a - b (seeded). */
+function bootstrapMeanDiff(a: readonly number[], b: readonly number[]): [number, number] {
+  const rand = rng(0x5eed);
+  const diffs: number[] = [];
+  const n = Math.min(a.length, b.length);
+  const reps = 200;
+  for (let r = 0; r < reps; r += 1) {
+    let sum = 0;
+    for (let i = 0; i < n; i += 1) {
+      const idx = Math.floor(rand() * n);
+      sum += a[idx]! - b[idx]!;
+    }
+    diffs.push(sum / n);
+  }
+  diffs.sort((x, y) => x - y);
+  return [diffs[Math.floor(reps * 0.025)]!, diffs[Math.floor(reps * 0.975)]!];
+}
+
 function bootstrapTop1Delta(
   jointPerMatch: readonly number[],
   priorPerMatch: readonly number[],
@@ -405,6 +427,95 @@ function topChampionsByRole(
     out[role] = entries.slice(0, 15);
   }
   return out;
+}
+
+export interface WinProbMetrics {
+  logLoss: number;
+  brier: number;
+  accuracy: number;
+  count: number;
+}
+
+/**
+ * Win-probability evaluation on the same masked-draft protocol as
+ * `etl backtest draft`: for every stored participant the full draft is
+ * known (their own pick included), and the model predicts P(their team
+ * wins). Baselines: constant train win rate and per-team-id win rate
+ * (the "side" effect, since team_id is the match side).
+ */
+type WinProbModel = JointModelParams | 'constant' | 'side';
+
+function evaluateWinProb(
+  evalMatches: readonly MatchPlayers[],
+  models: Record<string, WinProbModel>,
+  trainWinRate: number,
+  sideRates: ReadonlyMap<number, number>,
+): { metrics: Record<string, WinProbMetrics>; perMatchLl: Record<string, number[]> } {
+  const acc: Record<string, { ll: number; br: number; correct: number; n: number }> = {};
+  const perMatchLl: Record<string, number[]> = {};
+  const names = Object.keys(models);
+  for (const name of names) {
+    acc[name] = { ll: 0, br: 0, correct: 0, n: 0 };
+    perMatchLl[name] = [];
+  }
+
+  for (const match of evalMatches) {
+    const teams = teamsOf(match);
+    if (teams === null) continue;
+    const allyTeamId = teams.ally[0]!.team_id;
+
+    // Cache per-perspective logits once per match (two sides only).
+    const logitBySide = new Map<string, number>();
+    for (const name of names) {
+      const model = models[name]!;
+      if (typeof model === 'string') continue;
+      for (const sideTeamId of [allyTeamId, teams.enemy[0]!.team_id]) {
+        const own = sideTeamId === allyTeamId ? teams.ally : teams.enemy;
+        const other = own === teams.ally ? teams.enemy : teams.ally;
+        logitBySide.set(
+          `${name}:${sideTeamId}`,
+          featuresLogit(model, contextFeatures(toSlots(own, 'ally'), toSlots(other, 'enemy'))),
+        );
+      }
+    }
+
+    for (const name of names) {
+      const model = models[name]!;
+      const a = acc[name]!;
+      let matchLl = 0;
+      for (const player of match.players) {
+        let p: number;
+        if (model === 'constant') {
+          p = trainWinRate;
+        } else if (model === 'side') {
+          p = sideRates.get(player.team_id) ?? trainWinRate;
+        } else {
+          const logit = logitBySide.get(`${name}:${player.team_id}`)!;
+          p = 1 / (1 + Math.exp(-logit));
+        }
+        const pc = Math.min(Math.max(p, 1e-6), 1 - 1e-6);
+        const ll = -(player.win * Math.log(pc) + (1 - player.win) * Math.log(1 - pc));
+        matchLl += ll;
+        a.ll += ll;
+        a.br += (p - player.win) ** 2;
+        if ((p >= 0.5 ? 1 : 0) === player.win) a.correct += 1;
+        a.n += 1;
+      }
+      perMatchLl[name]!.push(matchLl / match.players.length);
+    }
+  }
+
+  const metrics: Record<string, WinProbMetrics> = {};
+  for (const name of names) {
+    const a = acc[name]!;
+    metrics[name] = {
+      logLoss: a.ll / Math.max(1, a.n),
+      brier: a.br / Math.max(1, a.n),
+      accuracy: a.correct / Math.max(1, a.n),
+      count: a.n,
+    };
+  }
+  return { metrics, perMatchLl };
 }
 
 export async function runJointFit(options: JointFitOptions = {}): Promise<JointFitResult> {
@@ -464,6 +575,7 @@ export async function runJointFit(options: JointFitOptions = {}): Promise<JointF
       1,
     );
 
+    const ablatedParams: Record<string, JointModelParams> = {};
     for (const [name, drop] of [
       ['noAllyPairs', new Set<JointLayer>(['allyPair'])],
       ['noEnemyPairs', new Set<JointLayer>(['enemyPair', 'laneVs'])],
@@ -471,6 +583,7 @@ export async function runJointFit(options: JointFitOptions = {}): Promise<JointF
     ] as const) {
       const rows = trainingRows(limitedTrain, drop);
       const ablated = fitJointModel(rows, fitConfig);
+      ablatedParams[name] = ablated;
       const ev = evalAccFor(ablated);
       ablation[name] = {
         top1: finalizeEval(ev.joint).top1,
@@ -516,6 +629,51 @@ export async function runJointFit(options: JointFitOptions = {}): Promise<JointF
     const ci = bootstrapTop1Delta(jointEval.perMatchTop1, priorPerMatch);
     const hybridCi = bootstrapTop1Delta(jointEval.perMatchHybridTop1, priorPerMatch);
 
+    // Win-probability evaluation (the model's actual target): P(team win)
+    // per masked participant on the same holdout, vs trivial baselines.
+    let trainWins = 0;
+    let trainPlayerCount = 0;
+    const sideWins = new Map<number, { wins: number; games: number }>();
+    for (const match of limitedTrain) {
+      for (const player of match.players) {
+        trainWins += player.win;
+        trainPlayerCount += 1;
+        const entry = sideWins.get(player.team_id) ?? { wins: 0, games: 0 };
+        entry.wins += player.win;
+        entry.games += 1;
+        sideWins.set(player.team_id, entry);
+      }
+    }
+    const trainWinRate = trainPlayerCount > 0 ? trainWins / trainPlayerCount : 0.5;
+    const sideRates = new Map<number, number>();
+    for (const [teamId, entry] of sideWins) {
+      sideRates.set(teamId, entry.games > 0 ? entry.wins / entry.games : trainWinRate);
+    }
+    const winProbModels: Record<string, JointModelParams | 'constant' | 'side'> = {
+      constant: 'constant',
+      side: 'side',
+      joint: rollingParams,
+      noAllyPairs: ablatedParams['noAllyPairs'] ?? rollingParams,
+      noEnemyPairs: ablatedParams['noEnemyPairs'] ?? rollingParams,
+      noChampMain: ablatedParams['noChampMain'] ?? rollingParams,
+    };
+    const winProbEval = evaluateWinProb(evalMatches, winProbModels, trainWinRate, sideRates);
+    const bestTrivial =
+      winProbEval.metrics['constant']!.logLoss <= winProbEval.metrics['side']!.logLoss
+        ? 'constant'
+        : 'side';
+    const llCi = bootstrapMeanDiff(
+      winProbEval.perMatchLl['joint']!,
+      winProbEval.perMatchLl[bestTrivial]!,
+    );
+    log(
+      `Win-prob (${evalPatch}): joint logLoss=${winProbEval.metrics['joint']!.logLoss.toFixed(4)} ` +
+        `brier=${winProbEval.metrics['joint']!.brier.toFixed(4)} | ` +
+        `constant=${winProbEval.metrics['constant']!.logLoss.toFixed(4)} ` +
+        `side=${winProbEval.metrics['side']!.logLoss.toFixed(4)} ` +
+        `| ΔlogLoss vs ${bestTrivial} 95% CI [${llCi[0].toFixed(5)}, ${llCi[1].toFixed(5)}]`,
+    );
+
     const validation: JointValidationReport = {
       evalPatch,
       trainMatches: limitedTrain.length,
@@ -529,6 +687,8 @@ export async function runJointFit(options: JointFitOptions = {}): Promise<JointF
         jointTop1DeltaCi95: ci,
         hybridTop1DeltaCi95: hybridCi,
       },
+      winProb: winProbEval.metrics,
+      winProbLogLossDeltaCi95: llCi,
       ablation,
     };
 

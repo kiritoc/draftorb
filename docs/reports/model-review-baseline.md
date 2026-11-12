@@ -223,6 +223,22 @@ pair WR) − logit(p0_c)` subtracts only the candidate baseline. For a weak
 See `docs/TICKETS.md` — new section "Prompt-2 model upgrade" with tickets
 T-120..T-126 (one per phase) plus sub-items.
 
+## (j2) Phase 1 gate measurements (2026-11-12)
+
+- `backtest draft --pair-adjust` (D-088 on, all else default): log-loss
+  **0.696714** vs legacy **0.696726**; Brier 0.251746 vs 0.251745; SUPPORT
+  log-loss 0.69794 vs 0.69809. Delta ≈ +0.00001 log-loss — **no measurable
+  gain**. As predicted analytically, the adjustment is a near-constant shift
+  per slot (ranking essentially unchanged; only shrinkage nonlinearity moves
+  probabilities). Verdict: gate FAILS → `pairMainEffectAdjust` stays
+  `false`; the flag and `pairMainEffects` remain available for the Phase 3
+  joint model where interaction terms are fit jointly rather than demeaned.
+- `tune-priors --role=SUPPORT`: grid running at report time; early rows
+  (k0=10, k=20–40) show SUPPORT log-loss 0.6983–0.7011 vs the deployed
+  (20/40/40) 0.6981 — no dramatic prior win so far. Final JSON:
+  `/tmp/tune-priors-support.json` (session-local; rerun command documented
+  in SETUP pending Phase 7 docs).
+
 ## Assumptions made
 
 - Cell `n_eff` computed as `games_w²/games_w2` on the aggregate tables (the

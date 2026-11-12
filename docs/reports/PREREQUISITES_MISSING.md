@@ -24,21 +24,21 @@ the mandated Phase A STOP report and Phase B was not resumed.
 
 ## Artifact checklist (all ABSENT on main)
 
-| Required artifact | Status |
-| ----------------- | ------ |
-| `data/manual/item-classes.generated.json` pipeline + `pnpm etl classify-items` | MISSING |
-| `item_build.decision_kind` with `path` rows | MISSING (no `decision_kind` anywhere) |
-| `item_events` with `event_type` undo/sold/destroyed rows | MISSING (stores `type='purchase'|'sold'` only) |
-| `kill_events` table | MISSING |
-| `participant_starters` + `starterBundleKey()` | MISSING |
-| `item_state_scale` + `stateBucket()` `stateBucketMode` | MISSING |
-| `laneArchKey()` + extended back-off | MISSING |
-| `pnpm etl backfill-timelines` + `TimelineExtractor` registry | MISSING |
-| `netPurchasedItems()` / `ownedItemsAt()` | MISSING |
-| D-082 amendment ADRs (D-083+) | MISSING (last ADR is D-082) |
+| Required artifact                                                              | Status                                |
+| ------------------------------------------------------------------------------ | ------------------------------------- |
+| `data/manual/item-classes.generated.json` pipeline + `pnpm etl classify-items` | MISSING                               |
+| `item_build.decision_kind` with `path` rows                                    | MISSING (no `decision_kind` anywhere) |
+| `item_events` with `event_type` undo/sold/destroyed rows                       | MISSING (stores `type='purchase'      | 'sold'` only) |
+| `kill_events` table                                                            | MISSING                               |
+| `participant_starters` + `starterBundleKey()`                                  | MISSING                               |
+| `item_state_scale` + `stateBucket()` `stateBucketMode`                         | MISSING                               |
+| `laneArchKey()` + extended back-off                                            | MISSING                               |
+| `pnpm etl backfill-timelines` + `TimelineExtractor` registry                   | MISSING                               |
+| `netPurchasedItems()` / `ownedItemsAt()`                                       | MISSING                               |
+| D-082 amendment ADRs (D-083+)                                                  | MISSING (last ADR is D-082)           |
 
 Only file mentioning these names is `docs/reports/d082-audit.md` (the audit
-that *proposed* them).
+that _proposed_ them).
 
 ## Consequence
 

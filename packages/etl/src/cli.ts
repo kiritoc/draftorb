@@ -18,6 +18,7 @@ import { RiotAuthError } from './riot';
 import { CliError, EXIT, UsageError } from './cli-args';
 import { staticCommand } from './commands/static';
 import { backtestCommand } from './commands/backtest';
+import { tunePriorsCommand } from './commands/tune-priors';
 import { validateTagsCommand } from './commands/validate-tags';
 import { checkTagsCommand } from './commands/check-tags';
 import { checkKeyCommand } from './commands/check-key';
@@ -42,6 +43,7 @@ import { log, type Command, findCommand, formatHelp, isHelpFlag } from './comman
 const COMMANDS: readonly Command[] = [
   staticCommand,
   backtestCommand,
+  tunePriorsCommand,
   validateTagsCommand,
   checkTagsCommand,
   checkKeyCommand,

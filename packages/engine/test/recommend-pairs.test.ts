@@ -288,3 +288,44 @@ describe('recommend: ally role reservation (B-043)', () => {
     expect(rec?.score).not.toBe(noAlly?.score);
   });
 });
+
+describe('recommend: pairMainEffectAdjust (D-088)', () => {
+  it('shifts every scored candidate by the same slot main effect, keeping order', () => {
+    // All candidates beat enemy 200 more often than their 60% baseline ->
+    // the shared main effect is positive; adjustment removes it.
+    const enemyPairs = makeEnemyPairs([
+      { championId: 1, enemyId: 200, role: 'SUPPORT', winsW: 45, gamesW: 50, gamesW2: 0.1 },
+      { championId: 2, enemyId: 200, role: 'SUPPORT', winsW: 40, gamesW: 50, gamesW2: 0.1 },
+      { championId: 20, enemyId: 200, role: 'SUPPORT', winsW: 35, gamesW: 50, gamesW2: 0.1 },
+    ]);
+    const data = makeData({
+      champions: [1, 2, 20, 200],
+      enemyPairs,
+      roleProb: BOT_ROLE_PROB,
+    });
+    const input = makeInput({ enemies: [{ championId: 200, role: 'SUPPORT' }] });
+    const off = recommend(input, data);
+    const on = recommend(input, data, { ...DEFAULT_CONFIG, pairMainEffectAdjust: true });
+
+    expect(on.recommendations.map((r) => r.championId)).toEqual(
+      off.recommendations.map((r) => r.championId),
+    );
+    for (const rec of on.recommendations) {
+      const legacy = off.recommendations.find((r) => r.championId === rec.championId);
+      expect(rec.score).toBeLessThan(legacy?.score ?? 0);
+    }
+  });
+
+  it('is off by default (flag-off output unchanged)', () => {
+    const enemyPairs = makeEnemyPairs([
+      { championId: 1, enemyId: 200, role: 'SUPPORT', ...HIGH_GAMES, winsW: 10 },
+      { championId: 2, enemyId: 200, role: 'SUPPORT', ...HIGH_GAMES, winsW: 30 },
+    ]);
+    const data = makeData({ champions: [1, 2, 200], enemyPairs, roleProb: BOT_ROLE_PROB });
+    const input = makeInput({ enemies: [{ championId: 200, role: 'SUPPORT' }] });
+    const a = recommend(input, data);
+    const b = recommend(input, data, DEFAULT_CONFIG);
+    expect(a.recommendations).toEqual(b.recommendations);
+    expect(DEFAULT_CONFIG.pairMainEffectAdjust).toBe(false);
+  });
+});

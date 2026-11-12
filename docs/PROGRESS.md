@@ -4,7 +4,7 @@
 
 - Phase: 1 (Support / Diamond)
 - Current milestone: M3 Web MVP implementation complete (T-030..T-035 DONE). All REVIEW tickets accepted DONE on 2026-11-11: T-019.b (patch index, incl. D-055), T-019.c (retention prune), T-019.e (breakpoints/change-scores DDL + CLI), T-026 (golden suite, 23 scenarios), T-027.a (draft backtest — report still `unvalidated` until the D-023 paired-bootstrap gate is implemented), T-040 (engine rune recommender, D-059), T-041 (runes UI), T-052 (GameState), T-053 (threat score), T-106/T-108/T-111 (state-release migration). T-019.d..f and T-027.b remain TODO. T-097 engine half DONE (`recommendProfileRunes`/`recommendProfileSpells`); its UI half is now unblocked (T-040/T-041 DONE — `RunesPanel` exists). T-098 stays TODO (T-054/T-056 missing). Decisions D-052..D-080 are ACCEPTED as of 2026-11-08 (D-061..D-066 SUPERSEDED by D-067..D-077; parts of D-057/D-067/D-069/D-070/D-073 superseded by D-076..D-080); earlier per-user plan cancelled (T-080..T-086 CANCELLED). Docs updated 2026-11-08 for the accepted decisions. Migration to the private state repo + local-only app merged on `main` (PR #53, T-106..T-112 done; T-113 proposal-only; T-099..T-105 remain owner actions). `feat/game-state-threat-score` (PR #54: T-052, T-019.e, T-053, T-041) and `fix/state-tag-seconds` (PR #55) also merged; all merged tickets accepted DONE by the owner on 2026-11-11.
-- Last updated: 2026-11-12 by Devin (T-051 timeline ingestion + item builds → REVIEW on `t-051-timeline-item-builds`)
+- Last updated: 2026-11-12 by Devin (Prompt-2 model upgrade: Phase 0 audit + Phase 1 engine flags on `feat/joint-model-and-items-engine`, draft PR #60)
 
 ## Epic status
 
@@ -53,6 +53,12 @@ Open questions that remain after the 2026-11-08 acceptance:
 - T-019.d verification: please compare the champion and item lists in the 2026-11-04 "T-019.d verification step" entry below with the official 16.21 and 16.22 patch notes (misses and false positives).
 
 ## Session log (newest first)
+
+### 2026-11-12 — Devin — Prompt-2 model upgrade, Phase 0 + Phase 1 (branch `feat/joint-model-and-items-engine`, draft PR #60)
+
+- Phase 0 audit done: D-082 prerequisites verified on `main`; measured app rate limit 100/120s + 20/1s (0.833 req/s, shared with CI); cell n_eff distributions far sparser than assumed (pair median 2.3, lane ~1.0); backtest baseline log-loss 0.6967 vs baseline-only 0.6946; real payload checks confirm challenges lane fields + timeline frames; DB gzip ~475 MiB vs 512 MiB asset cap; repo confirmed PRIVATE. Full evidence: `docs/reports/model-review-baseline.md`; limits in `docs/RIOT_API.md`.
+- Phase 1 implemented behind flags (all default OFF): `pairMainEffectAdjust` (D-088, pair main-effect subtraction in `recommend`/`recommend-terms`), `PersonalizeConfig.blendMode='logit'` (D-089, log-odds personalization blend), `pnpm etl tune-priors` (D-090, k0/k/kLane grid on the holdout) and `backtest draft --pair-adjust` for the A/B gate. ADRs D-088..D-090 PROPOSED. Engine tests: 532 pass incl. golden suite (flag-off output unchanged).
+- Pending: pair-adjust backtest + SUPPORT tune-priors running; Phases 2–7 per TICKETS T-122..T-127.
 
 ### 2026-11-12 — Devin — T-051 Timeline ingestion + item builds (REVIEW)
 

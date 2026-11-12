@@ -44,6 +44,7 @@ import {
   blindOpponents,
   blindSafetyFromOpponents,
   hardCounterWarnings,
+  pairMainEffects,
   scorePairs,
 } from './recommend-terms.js';
 import { buildReasons, toRecommendation } from './recommend-reasons.js';
@@ -135,6 +136,23 @@ export function recommend(
     data.pickRate,
   );
 
+  // D-088: per-slot pair main effects are candidate-independent, so they are
+  // computed once per draft when the flag is enabled.
+  const knownSlots = [...allySlots, ...enemySlots];
+  const pairEffects = config.pairMainEffectAdjust
+    ? pairMainEffects(
+        candidateSet.candidates,
+        knownSlots,
+        allyPairIdx,
+        enemyPairIdx,
+        (c) => {
+          const row = baselineIdx.get(c);
+          return row ? baselinePrior(row.winsE, row.gamesE, config.k0) : 0.5;
+        },
+        config,
+      )
+    : undefined;
+
   // --- Score each candidate ---
   const scored: ScoredCandidate[] = [];
   const insufficientData: InsufficientDataEntry[] = [];
@@ -175,12 +193,13 @@ export function recommend(
     const pairInfo = scorePairs(
       c,
       myRole,
-      [...allySlots, ...enemySlots],
+      knownSlots,
       allyPairIdx,
       enemyPairIdx,
       p0,
       config,
       x,
+      pairEffects,
     );
     let logOdds = x + config.s * pairInfo.sum;
 

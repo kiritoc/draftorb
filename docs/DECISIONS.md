@@ -1018,3 +1018,41 @@ Phase A sparsity audit showed champion+slot cells are thin (median 2
 games); adding a rank dimension would fragment further. Decision: keep
 `item_build` rank-agnostic; revisit only if Prompt-2 backtests show rank
 interactions. No schema change.
+
+### D-088 — Pair main-effect adjustment (`pairMainEffectAdjust`) — PROPOSED
+
+Review finding F2: `pairTerm` shrinks the absolute matchup win rate toward
+the candidate baseline `p0_c`, so a weak (or strong) opponent contributes a
+term shared by every candidate — a constant log-odds shift that inflates
+absolute probabilities and slightly distorts calibration. When
+`pairMainEffectAdjust` is true, `recommend` computes each known slot's mean
+pair term over the candidate set (`pairMainEffects` in
+`recommend-terms.ts`) and subtracts it from scored rows only; missing and
+lowData rows keep 0, matching the mean interaction of the scored
+population. Default `false` in `DEFAULT_CONFIG`; enable only after the
+D-023 backtest gate shows improvement. Same treatment for the blind-safety
+and lane layers is deferred (lane cells are ~empty; blind is candidate-
+dependent through the opponent distribution). Update:
+`packages/engine/src/{config,recommend,recommend-terms}.ts`, tests in
+`recommend-terms.test.ts` / `recommend-pairs.test.ts`.
+
+### D-089 — Personalization blend in log-odds space (`blendMode`) — PROPOSED
+
+Review finding F5: `personalizedScore = (1-trust)*metaNorm + trust*p` mixed
+an ordinal rank-position value in [0,1] with a win probability. New
+`PersonalizeConfig.blendMode`: `'rankNorm'` (default, legacy D-073) or
+`'logit'`, which blends `logit(metaScore)` and `logit(p)` and maps back
+through `sigmoid`; insufficient-data entries use `metaScore` directly so
+all entries share probability units. Update:
+`packages/engine/src/personalize.ts`, tests in `personalize.test.ts`.
+
+### D-090 — `pnpm etl tune-priors` grid search — PROPOSED
+
+New ETL command grid-searches `k0`, `k`, `kLane` on the same frozen
+temporal holdout as `backtest draft`, reusing `buildEngineData` and
+`runBacktestDraft`. Default grid k0 {10,20,40} x k {20,40,80,160} x
+kLane {20,40,80}; `--role` restricts evaluation to one role's players.
+Results are in-sample for patch selection — confirm with
+`backtest draft` before changing `DEFAULT_CONFIG`. `s` and
+`pairMainEffectAdjust` are deliberately outside the grid. Update:
+`packages/etl/src/commands/{tune-priors,backtest}.ts`, `cli.ts`.

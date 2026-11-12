@@ -39,6 +39,46 @@ export interface PairScoreInfo {
   readonly deltas: PairDelta[];
 }
 
+/** Lookup key identifying one known slot for main-effect adjustment (D-088). */
+export function pairSlotKey(slot: KnownSlot): string {
+  return `${slot.side}:${slot.role}:${slot.championId}`;
+}
+
+/**
+ * Per-slot main effects (D-088, PROPOSED): for each known slot, the mean pair
+ * term over every candidate that has a scored (non-lowData) row against it.
+ * The pair tables measure an absolute matchup win rate; shrinking toward the
+ * candidate baseline leaves a component shared by all candidates when the
+ * opponent is weak or strong. Subtracting this mean turns the term into a
+ * candidate-relative interaction. Candidates without a scored row keep a 0
+ * contribution, matching the mean interaction of the scored population.
+ */
+export function pairMainEffects(
+  candidates: Iterable<ChampionId>,
+  slots: readonly KnownSlot[],
+  allyIdx: Map<string, DataRow>,
+  enemyIdx: Map<string, DataRow>,
+  p0For: (c: ChampionId) => number,
+  config: RankWeightingConfig,
+): Map<string, number> {
+  const effects = new Map<string, number>();
+  for (const slot of slots) {
+    const idx = slot.side === 'ally' ? allyIdx : enemyIdx;
+    let sum = 0;
+    let n = 0;
+    for (const c of candidates) {
+      const row = idx.get(makePairKey(c, slot.championId, slot.role));
+      if (!row) continue;
+      const result = scorePair(row.winsE, row.gamesE, p0For(c), config);
+      if (result.lowData) continue;
+      sum += result.term;
+      n += 1;
+    }
+    if (n > 0) effects.set(pairSlotKey(slot), sum / n);
+  }
+  return effects;
+}
+
 /**
  * Layer 1 (SPECS §5): sum of conf * influence * pairTerm over known slots,
  * processed by descending influence (ties by championId ascending).
@@ -53,6 +93,8 @@ export function scorePairs(
   config: RankWeightingConfig,
   /** Running log-odds before the pair layer; `recommend` passes its baseline `x`. */
   xStart: number = logit(p0, config.eps),
+  /** Per-slot main effects from `pairMainEffects` (D-088); undefined = legacy. */
+  mainEffects?: ReadonlyMap<string, number>,
 ): PairScoreInfo {
   const ordered = slots
     .map((slot) => ({
@@ -72,9 +114,13 @@ export function scorePairs(
     if (!row) continue;
 
     const result = scorePair(row.winsE, row.gamesE, p0, config);
-    const weightedTerm = config.s * slot.confidence * influence * result.term;
+    // D-088: remove the slot's shared main effect; lowData rows keep 0 so a
+    // missing matchup is never penalized for the population average.
+    const mean = mainEffects?.get(pairSlotKey(slot));
+    const term = mean !== undefined && !result.lowData ? result.term - mean : result.term;
+    const weightedTerm = config.s * slot.confidence * influence * term;
     const dPp = deltaPp(xRunning, weightedTerm);
-    sum += slot.confidence * influence * result.term;
+    sum += slot.confidence * influence * term;
     xRunning += weightedTerm;
 
     deltas.push({
@@ -83,7 +129,7 @@ export function scorePairs(
       championId: slot.championId,
       confidence: slot.confidence,
       influence,
-      term: result.term,
+      term,
       lowData: result.lowData,
       n: row.nE,
       deltaPp: dPp,

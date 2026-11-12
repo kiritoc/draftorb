@@ -13,7 +13,12 @@ import {
   type RecommendData,
 } from '@draftorb/shared';
 
-import { personalize, personalizeContext, type PersonalizeContext } from '../src/personalize.js';
+import {
+  DEFAULT_PERSONALIZE_CONFIG,
+  personalize,
+  personalizeContext,
+  type PersonalizeContext,
+} from '../src/personalize.js';
 import { makeChampionTags, makeData, makeInput, makeTag } from '../src/recommend-test-utils.js';
 
 const DAY_MS = 86_400_000;
@@ -363,5 +368,64 @@ describe('personalizeContext', () => {
     expect(context.allyAdcId).toBe(10);
     expect(context.enemySupportId).toBe(200);
     expect([...context.enemySignature].sort()).toEqual(['AP:mage', 'MIXED:tank']);
+  });
+});
+
+describe('personalize: logit blendMode (D-089)', () => {
+  it('blends metaScore and profile win rate in log-odds space', () => {
+    const games = [1, 2, 3].map(() => makeGame());
+    const cfg = {
+      ...DEFAULT_PERSONALIZE_CONFIG,
+      kTrust: 1e9, // trust ~ 0 -> personalizedScore ~= metaScore
+      blendMode: 'logit' as const,
+    };
+    const result = personalize(
+      [rec(1, 1, 0.55), rec(2, 2, 0.5)],
+      makeProfile(games),
+      EMPTY_CONTEXT,
+      data,
+      NOW_MS,
+      cfg,
+    );
+    const entry = result.entries.find((e) => e.championId === 1);
+    expect(entry?.insufficientData).toBe(false);
+    expect(entry?.personalizedScore).toBeCloseTo(0.55, 6);
+  });
+
+  it('keeps insufficient-data entries on the metaScore scale in logit mode', () => {
+    const cfg = { ...DEFAULT_PERSONALIZE_CONFIG, blendMode: 'logit' as const };
+    const result = personalize(
+      [rec(1, 1, 0.42)],
+      makeProfile([]),
+      EMPTY_CONTEXT,
+      data,
+      NOW_MS,
+      cfg,
+    );
+    const entry = result.entries[0]!;
+    expect(entry.insufficientData).toBe(true);
+    expect(entry.personalizedScore).toBe(0.42);
+  });
+
+  it('defaults to the legacy rankNorm blend', () => {
+    expect(DEFAULT_PERSONALIZE_CONFIG.blendMode).toBe('rankNorm');
+    const games = [1, 2, 3].map(() => makeGame());
+    const legacy = personalize(
+      [rec(1, 1, 0.55), rec(2, 2, 0.5)],
+      makeProfile(games),
+      EMPTY_CONTEXT,
+      data,
+      NOW_MS,
+    );
+    const cfg = { ...DEFAULT_PERSONALIZE_CONFIG, kTrust: 1e9 };
+    const explicit = personalize(
+      [rec(1, 1, 0.55), rec(2, 2, 0.5)],
+      makeProfile(games),
+      EMPTY_CONTEXT,
+      data,
+      NOW_MS,
+      cfg,
+    );
+    expect(legacy.entries).toEqual(explicit.entries);
   });
 });

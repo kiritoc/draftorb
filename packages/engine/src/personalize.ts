@@ -24,6 +24,7 @@ import { DEFAULT_CONFIG, rankToBucket } from './config.js';
 import { baselineGate, baselinePrior } from './levels.js';
 import { indexBaselines } from './recommend-indexes.js';
 import { resolveKnownSlots } from './recommend-slots.js';
+import { logit, sigmoid } from './weighting.js';
 
 const DAY_MS = 86_400_000;
 
@@ -47,6 +48,13 @@ export interface PersonalizeConfig {
   readonly baselineMinGames?: number;
   /** Prior strength `k0` for the baseline win rate `w0` (D-080, SPECS §5). */
   readonly baselineK0?: number;
+  /**
+   * D-089 (PROPOSED): 'rankNorm' keeps the legacy D-073 blend of the
+   * rank-position metaNorm with the profile win rate; 'logit' blends
+   * `logit(metaScore)` and `logit(p)` in log-odds space so both terms share
+   * probability units. Default 'rankNorm' until validated.
+   */
+  readonly blendMode?: 'rankNorm' | 'logit';
 }
 
 export const DEFAULT_PERSONALIZE_CONFIG: PersonalizeConfig = Object.freeze({
@@ -55,7 +63,11 @@ export const DEFAULT_PERSONALIZE_CONFIG: PersonalizeConfig = Object.freeze({
   minGames: 3,
   kTrust: 20,
   levelFactors: Object.freeze([1.0, 0.9, 0.8, 0.7, 0.6]),
+  blendMode: 'rankNorm',
 });
+
+/** Log-odds clamp for the D-089 blend (same scale as the engine `eps`). */
+const BLEND_EPS = 1e-4;
 
 /** Draft-side context the fallback levels match against (SPECS §18.2). */
 export interface PersonalizeContext {
@@ -301,7 +313,7 @@ export function personalize(
         rank: 0,
         overallRank: rec.rank,
         metaScore: rec.score,
-        personalizedScore: metaNorm,
+        personalizedScore: config.blendMode === 'logit' ? rec.score : metaNorm,
         profileWinRate: null,
         nEff: bestNEff,
         fallbackLevel: null,
@@ -315,7 +327,12 @@ export function personalize(
     const p = (matched.winsW + config.kShrink * pProfile) / (matched.gamesW + config.kShrink);
     const levelFactor = config.levelFactors[matchedLevel - 1] ?? 0.6;
     const trust = (matched.nEff * levelFactor) / (matched.nEff * levelFactor + config.kTrust);
-    const personalizedScore = (1 - trust) * metaNorm + trust * p;
+    // D-073 legacy blend mixes ordinal metaNorm with a probability; D-089
+    // blends both terms in log-odds space so the units match.
+    const personalizedScore =
+      config.blendMode === 'logit'
+        ? sigmoid((1 - trust) * logit(rec.score, BLEND_EPS) + trust * logit(p, BLEND_EPS))
+        : (1 - trust) * metaNorm + trust * p;
 
     // D-080 badge baseline: w0 is the champion's evidence-backed baseline win
     // rate for the selected bucket — the same p0 the insufficient-data

@@ -1056,3 +1056,21 @@ Results are in-sample for patch selection — confirm with
 `backtest draft` before changing `DEFAULT_CONFIG`. `s` and
 `pairMainEffectAdjust` are deliberately outside the grid. Update:
 `packages/etl/src/commands/{tune-priors,backtest}.ts`, `cli.ts`.
+
+### D-091 — Local-first ETL: schedule disabled, exports + periodic DB backups — ACCEPTED (owner, 2026-11-12)
+
+Owner decision: DraftOrb is registered on the Riot Developer Portal as a
+personal product (resolves the Phase 0 UNVERIFIED item). The scheduled
+`etl.yml` cron is removed; `workflow_dispatch` remains for manual runs only.
+Ingestion, aggregation and export now run locally as the primary path.
+Publishing to the private state repo keeps two tiers: small
+`public-exports.tar.gz` releases after each local pipeline run, and
+`DraftOrb.sqlite.gz` only as periodic backups (the gzipped DB is ~475 MiB,
+near the 512 MiB asset-budget cap, so it must not ship every run). Actions
+usage drops to ~0 min/month. Amends D-078/D-079 delivery flow: the pipeline
+steps are unchanged, only the trigger and publish cadence move to local.
+A dedicated `pnpm etl publish` command (exports tarball + optional DB
+backup asset, gh CLI, no new dependency) is ticketed as T-128; until it
+lands the runbook in `docs/proposed-etl-schedule.md` documents the manual
+`gh release` procedure. Update: `.github/workflows/etl.yml`,
+`docs/proposed-etl-schedule.md`, SETUP.md runbook section.

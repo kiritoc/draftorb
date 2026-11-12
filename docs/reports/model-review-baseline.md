@@ -131,7 +131,9 @@ amortized id-listing + amortized enrichment ≈ **2.1–2.3**.
   storing derived aggregates for personal use, or serving derived data in a
   local tool. General Policies require product registration/audit and forbid
   unfair-advantage tools and de-anonymization. Whether DraftOrb is registered
-  on the portal: **UNVERIFIED (owner action)**. The "reasonable request volume"
+  on the portal: **VERIFIED (owner, 2026-11-12): registered as a personal
+  product** — satisfies the General Policies registration requirement for
+  personal/private-community use. The "reasonable request volume"
   clause is a judgement call — see decision rule 5.2 outcome in the PR.
 
 ## (g) Storage

@@ -54,6 +54,11 @@ Open questions that remain after the 2026-11-08 acceptance:
 
 ## Session log (newest first)
 
+### 2026-11-12 — Devin — Owner decisions: Riot registration verified + local-first ETL (D-091)
+
+- Owner confirmed DraftOrb is registered on the Riot Developer Portal as a personal product (Phase 0 UNVERIFIED item resolved; docs updated).
+- `etl.yml` cron DISABLED — `workflow_dispatch` only; ingestion/aggregate/export now run locally. Publish model: small `public-exports.tar.gz` every run + `DraftOrb.sqlite.gz` periodic backups only (~475 MiB vs 512 MiB cap). Actions usage ~0 min/month. Runbook: `docs/proposed-etl-schedule.md`; local publisher ticketed T-128. Phase 2 partial: `matches --call-budget/--time-budget` shipped; tune-priors SUPPORT best k0=40/k=160 (0.6951 vs 0.6981, in-sample caveat).
+
 ### 2026-11-12 — Devin — Prompt-2 model upgrade, Phase 0 + Phase 1 (branch `feat/joint-model-and-items-engine`, draft PR #60)
 
 - Phase 0 audit done: D-082 prerequisites verified on `main`; measured app rate limit 100/120s + 20/1s (0.833 req/s, shared with CI); cell n_eff distributions far sparser than assumed (pair median 2.3, lane ~1.0); backtest baseline log-loss 0.6967 vs baseline-only 0.6946; real payload checks confirm challenges lane fields + timeline frames; DB gzip ~475 MiB vs 512 MiB asset cap; repo confirmed PRIVATE. Full evidence: `docs/reports/model-review-baseline.md`; limits in `docs/RIOT_API.md`.

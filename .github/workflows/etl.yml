@@ -1,6 +1,7 @@
 name: ETL refresh
 
-# Scheduled data pipeline (D-057, D-078, D-079): downloads the newest `state-*`
+# Manual-only data pipeline (D-091, was D-057/D-078/D-079 scheduled): downloads
+# the newest `state-*`
 # release from the private state repo (default `draftorb-state`, override with
 # the STATE_REPO repository variable), restores the SQLite database, refreshes
 # matches and configured profiles, re-aggregates and re-exports data/public,
@@ -19,9 +20,11 @@ name: ETL refresh
 # public. ETL output must never contain other players' Riot IDs, puuids or
 # match ids, nor the profile owner's raw game data.
 
+# Schedule DISABLED (owner decision 2026-11-12, D-091): ingestion runs locally
+# as the primary path and Actions usage is ~0 min/month. This workflow remains
+# for manual `workflow_dispatch` runs only — do not re-add a cron trigger
+# without a new owner decision.
 on:
-  schedule:
-    - cron: '37 */12 * * *' # every 12h, off-peak minute
   workflow_dispatch:
 
 permissions:

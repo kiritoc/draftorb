@@ -37,18 +37,18 @@ Header: "DEVELOPMENT KEY HAS ACCESS TO 58 METHODS" (standard label for a persona
 
 ### Methods this project uses
 
-| Method                              | Endpoint(s)                                                                                  | Method limit (portal, 2026-11-12) | Measured `X-Method-Rate-Limit` (2026-11-12) |
-| ----------------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------- | ------------------------------------------ |
-| match-v5                            | matches/{matchId}                                                                            | 2000 per 10 s                     | `2000:10`                                  |
-| match-v5                            | matches/by-puuid/{puuid}/ids                                                                 | 2000 per 10 s                     | `2000:10`                                  |
-| match-v5                            | matches/{matchId}/timeline                                                                   | 2000 per 10 s                     | `2000:10`                                  |
-| league-v4                           | entries/{queue}/{tier}/{division}, leagues by-queue                                          | 50 per 10 s (entries); 30/10s+500/10min (challenger/master/GM by-queue) | `20000:10,1200000:600` (STD — by-puuid) |
-| league-v4                           | entries/by-puuid/{puuid}                                                                     | STD                               | `20000:10,1200000:600`                     |
-| league-exp-v4                       | entries/{queue}/{tier}/{division}                                                            | 50 per 10 s                       | not used by the project                    |
-| summoner-v4                         | by-puuid                                                                                     | 1600 per 1 min                    | not used by the project                    |
-| account-v1                          | accounts/by-riot-id/{gameName}/{tagLine}                                                     | 1000 per 1 min (stricter of the two duplicated rows) | `1000:60`                    |
-| champion-mastery-v4                 | by-puuid top, by-puuid/by-champion                                                           | STD                               | `20000:10,1200000:600`                     |
-| spectator-v5                        | active-games/by-summoner                                                                     | 3000 per 10 s AND 180000 per 10 min | not used by the project                  |
+| Method              | Endpoint(s)                                         | Method limit (portal, 2026-11-12)                                       | Measured `X-Method-Rate-Limit` (2026-11-12) |
+| ------------------- | --------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------- |
+| match-v5            | matches/{matchId}                                   | 2000 per 10 s                                                           | `2000:10`                                   |
+| match-v5            | matches/by-puuid/{puuid}/ids                        | 2000 per 10 s                                                           | `2000:10`                                   |
+| match-v5            | matches/{matchId}/timeline                          | 2000 per 10 s                                                           | `2000:10`                                   |
+| league-v4           | entries/{queue}/{tier}/{division}, leagues by-queue | 50 per 10 s (entries); 30/10s+500/10min (challenger/master/GM by-queue) | `20000:10,1200000:600` (STD — by-puuid)     |
+| league-v4           | entries/by-puuid/{puuid}                            | STD                                                                     | `20000:10,1200000:600`                      |
+| league-exp-v4       | entries/{queue}/{tier}/{division}                   | 50 per 10 s                                                             | not used by the project                     |
+| summoner-v4         | by-puuid                                            | 1600 per 1 min                                                          | not used by the project                     |
+| account-v1          | accounts/by-riot-id/{gameName}/{tagLine}            | 1000 per 1 min (stricter of the two duplicated rows)                    | `1000:60`                                   |
+| champion-mastery-v4 | by-puuid top, by-puuid/by-champion                  | STD                                                                     | `20000:10,1200000:600`                      |
+| spectator-v5        | active-games/by-summoner                            | 3000 per 10 s AND 180000 per 10 min                                     | not used by the project                     |
 
 ## Effective limits
 

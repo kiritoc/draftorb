@@ -13,19 +13,19 @@ this run: ~8 (well under `localCallBudget`).
 Branch `feat/joint-model-and-items-engine` was created from `main` at
 `4df96c5` (merge of PR #59). Verified present:
 
-| Artifact | Status | Evidence |
-|---|---|---|
-| Item taxonomy pipeline | present | `packages/etl/src/item-classes.ts`, `commands/classify-items.ts`, `data/item-classes.generated.json` (859 items: 140 completed, 19 boots, 63 component, 11 starter, 5 quest_reward, 3 quest_line, 6 jungle_path, 14 consumable, 598 excluded) |
-| Item classes export | present | `data/public/16.22/item-classes.json` |
-| `item_build.decision_kind` with `path` rows | present | migration 018; DB: 18,445 `item` + 424 `path` rows |
-| `item_events` event types | present | 4,709,486 rows; `purchase`/`undo`/`sold`/`destroyed` |
-| `kill_events` | present | 604,535 rows |
-| `participant_starters` | present | 22,968 rows |
-| `item_state_scale` | present | 10 rows (per patch × 5-min bucket) |
-| `stateBucket()` with `stateBucketMode` | present | `packages/engine/src/item-context.ts` (`legacyAbsolute`/`timeNormalized`) |
-| `laneArchKey()` | present | `item-context.ts` |
-| `etl backfill-timelines` + extractor registry | present | `commands/backfill.ts`, `timeline-extractors.ts` (`item-events`, `kill-events`, `participant-ids`; 10,633 matches marked) |
-| `netPurchasedItems()`, `ownedItemsAt()` | present | `item-context.ts` |
+| Artifact                                      | Status  | Evidence                                                                                                                                                                                                                                      |
+| --------------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Item taxonomy pipeline                        | present | `packages/etl/src/item-classes.ts`, `commands/classify-items.ts`, `data/item-classes.generated.json` (859 items: 140 completed, 19 boots, 63 component, 11 starter, 5 quest_reward, 3 quest_line, 6 jungle_path, 14 consumable, 598 excluded) |
+| Item classes export                           | present | `data/public/16.22/item-classes.json`                                                                                                                                                                                                         |
+| `item_build.decision_kind` with `path` rows   | present | migration 018; DB: 18,445 `item` + 424 `path` rows                                                                                                                                                                                            |
+| `item_events` event types                     | present | 4,709,486 rows; `purchase`/`undo`/`sold`/`destroyed`                                                                                                                                                                                          |
+| `kill_events`                                 | present | 604,535 rows                                                                                                                                                                                                                                  |
+| `participant_starters`                        | present | 22,968 rows                                                                                                                                                                                                                                   |
+| `item_state_scale`                            | present | 10 rows (per patch × 5-min bucket)                                                                                                                                                                                                            |
+| `stateBucket()` with `stateBucketMode`        | present | `packages/engine/src/item-context.ts` (`legacyAbsolute`/`timeNormalized`)                                                                                                                                                                     |
+| `laneArchKey()`                               | present | `item-context.ts`                                                                                                                                                                                                                             |
+| `etl backfill-timelines` + extractor registry | present | `commands/backfill.ts`, `timeline-extractors.ts` (`item-events`, `kill-events`, `participant-ids`; 10,633 matches marked)                                                                                                                     |
+| `netPurchasedItems()`, `ownedItemsAt()`       | present | `item-context.ts`                                                                                                                                                                                                                             |
 
 **Prerequisites satisfied — no abort.**
 
@@ -43,20 +43,20 @@ Branch `feat/joint-model-and-items-engine` was created from `main` at
 
 `n_eff = games_w² / games_w2` per aggregate row.
 
-| Table | cells | min | p10 | p50 | p90 | max | % ≥ 25 (`minGames`) | % ≥ 10 (`exportMinGames`) | % ≥ 5 |
-|---|---|---|---|---|---|---|---|---|---|
-| pair_enemy | 22,417 | 1.0 | 1.0 | 2.3 | 25.6 | 307 | 10.3% | 21.8% | 32.9% |
-| pair_ally | 18,560 | 1.0 | 1.0 | 2.3 | 24.5 | 1,266 | 9.8% | 21.6% | 32.8% |
-| lane_vs | 23,102 | 1.0 | 1.0 | 1.0 | 3.6 | 103 | 0.25% | 1.7% | 5.8% |
-| lane_full | 41,954 | 1.0 | 1.0 | 1.0 | 1.0 | 36 | 0.01% | 0.06% | 0.4% |
+| Table      | cells  | min | p10 | p50 | p90  | max   | % ≥ 25 (`minGames`) | % ≥ 10 (`exportMinGames`) | % ≥ 5 |
+| ---------- | ------ | --- | --- | --- | ---- | ----- | ------------------- | ------------------------- | ----- |
+| pair_enemy | 22,417 | 1.0 | 1.0 | 2.3 | 25.6 | 307   | 10.3%               | 21.8%                     | 32.9% |
+| pair_ally  | 18,560 | 1.0 | 1.0 | 2.3 | 24.5 | 1,266 | 9.8%                | 21.6%                     | 32.8% |
+| lane_vs    | 23,102 | 1.0 | 1.0 | 1.0 | 3.6  | 103   | 0.25%               | 1.7%                      | 5.8%  |
+| lane_full  | 41,954 | 1.0 | 1.0 | 1.0 | 1.0  | 36    | 0.01%               | 0.06%                     | 0.4%  |
 
 Focused cells — top-30 supports (by game count), enemy SUPPORT and enemy ADC
 pair rows, DIAMOND:
 
 | other_role | cells | mean n_eff | % ≥ 25 | % ≥ 10 |
-|---|---|---|---|---|
-| SUPPORT | 2,135 | 18.1 | 20.7% | 36.1% |
-| ADC | 2,126 | 18.2 | 21.1% | 37.5% |
+| ---------- | ----- | ---------- | ------ | ------ |
+| SUPPORT    | 2,135 | 18.1       | 20.7%  | 36.1%  |
+| ADC        | 2,126 | 18.2       | 21.1%  | 37.5%  |
 
 Triples `(candidate, enemy support, enemy ADC)` (`lane_vs`/`lane_full`) are
 essentially empty: median n_eff = 1.0.
@@ -67,7 +67,7 @@ Report: `/tmp/backtest-baseline.json` (run 2026-11-12; holdout = patch 16.22,
 training = 10,379 games on 11 earlier patches, holdout = 13,946 games).
 
 - log-loss: engine **0.6967** vs champion-baseline-only **0.6946** — the current
-  engine is *worse* than baseline-only on the frozen holdout.
+  engine is _worse_ than baseline-only on the frozen holdout.
 - Brier: engine 0.2517 vs baseline 0.2507.
 - SUPPORT per-role: log-loss 0.6981, mean prediction 0.509 vs actual 0.500.
 - Calibration (10 bins): predictions cluster in [0.38, 0.72]; extreme bins are
@@ -157,13 +157,13 @@ amortized id-listing + amortized enrichment ≈ **2.1–2.3**.
 Methodology note: counts raw purchase events (not net replay); n = participants
 with ≥1 such purchase per role (~20.9k each — timeline coverage 44% of matches).
 
-| Role | k=1 p25/p50/p75 (min) | k=3 | k=5 | median completed items at game end (p25/p75) |
-|---|---|---|---|---|
-| TOP | 5/7/10 | 14/16/18 | 23/25/28 | 4 (4/5) |
-| JUNGLE | 6/9/10 | 14/17/19 | 22/24/27 | 5 (4/6) |
-| MID | 4/6/9 | 12/14/16 | 22/24/27 | 5 (4/5) |
-| ADC | 5/8/10 | 13/14/17 | 21/23/26 | 5 (4/6) |
-| SUPPORT | 4/5/9 | 14/16/19 | 26/29/31 | 4 (3/4) |
+| Role    | k=1 p25/p50/p75 (min) | k=3      | k=5      | median completed items at game end (p25/p75) |
+| ------- | --------------------- | -------- | -------- | -------------------------------------------- |
+| TOP     | 5/7/10                | 14/16/18 | 23/25/28 | 4 (4/5)                                      |
+| JUNGLE  | 6/9/10                | 14/17/19 | 22/24/27 | 5 (4/6)                                      |
+| MID     | 4/6/9                 | 12/14/16 | 22/24/27 | 5 (4/5)                                      |
+| ADC     | 5/8/10                | 13/14/17 | 21/23/26 | 5 (4/6)                                      |
+| SUPPORT | 4/5/9                 | 14/16/19 | 26/29/31 | 4 (3/4)                                      |
 
 Implication for Phase 5.5: median core length ≈ 4 completed items (min 2, max 6).
 
@@ -192,7 +192,7 @@ difference" (Phase 5.4).
   counter needs ~1,100 games/cell — unreachable at current volume even ×10.
   The engine effectively reduces to baseline + comp + blind for most drafts.
 - **F2 (`pairTerm` flaw): CONFIRMED analytically.** `pairTerm = logit(shrunk
-  pair WR) − logit(p0_c)` subtracts only the candidate baseline. For a weak
+pair WR) − logit(p0_c)` subtracts only the candidate baseline. For a weak
   enemy (`p0_e < 0.5`), pair WR exceeds `p0_c` for every candidate → a positive
   ~constant shift for all candidates (distorts absolute probabilities, badges,
   the −4.5 pp warning; count-dependent shrinkage leaks a small ranking bias).

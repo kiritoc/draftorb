@@ -15,16 +15,16 @@
 
 ## 2. Changes by phase
 
-| Phase | Status | Key files / commands | Commits |
-|---|---|---|---|
-| 0 Audit & baseline | done | `docs/RIOT_API.md`, `docs/reports/model-review-baseline.md` | pending |
-| 1 Engine fixes | in progress | `pairMainEffectAdjust`, `tune-priors`, logit blend | – |
-| 2 Data scaling | not started | timeline/detail extractors, `matches --time-budget` | – |
-| 3 Joint model | not started | `packages/engine/src/joint/`, `etl fit-model` | – |
-| 4 Drafting UI | not started | experimental views | – |
-| 5 Items engine | not started | `items/analytic.ts`, `recommendItems` | – |
-| 6 Items UI | not started | build view, GameState panel | – |
-| 7 Consolidation | not started | docs + final comparison | – |
+| Phase              | Status      | Key files / commands                                        | Commits |
+| ------------------ | ----------- | ----------------------------------------------------------- | ------- |
+| 0 Audit & baseline | done        | `docs/RIOT_API.md`, `docs/reports/model-review-baseline.md` | pending |
+| 1 Engine fixes     | in progress | `pairMainEffectAdjust`, `tune-priors`, logit blend          | –       |
+| 2 Data scaling     | not started | timeline/detail extractors, `matches --time-budget`         | –       |
+| 3 Joint model      | not started | `packages/engine/src/joint/`, `etl fit-model`               | –       |
+| 4 Drafting UI      | not started | experimental views                                          | –       |
+| 5 Items engine     | not started | `items/analytic.ts`, `recommendItems`                       | –       |
+| 6 Items UI         | not started | build view, GameState panel                                 | –       |
+| 7 Consolidation    | not started | docs + final comparison                                     | –       |
 
 ## 3. Key numbers before/after
 
@@ -34,11 +34,11 @@ baseline-only 0.6946 on holdout patch 16.22.
 
 ## 4. Gates and how to enable
 
-| Flag | Gate | Verdict | validationStatus | Enable change |
-|---|---|---|---|---|
-| `pairMainEffectAdjust` | backtest old vs new | pending Phase 1 | unvalidated | set `pairMainEffectAdjust: true` in engine config |
-| joint model | D-023-extended holdout gate | not run | unvalidated | load joint export files + flag |
-| items layers | ranking-accuracy bootstrap | not run | unvalidated | per-layer flags |
+| Flag                   | Gate                        | Verdict         | validationStatus | Enable change                                     |
+| ---------------------- | --------------------------- | --------------- | ---------------- | ------------------------------------------------- |
+| `pairMainEffectAdjust` | backtest old vs new         | pending Phase 1 | unvalidated      | set `pairMainEffectAdjust: true` in engine config |
+| joint model            | D-023-extended holdout gate | not run         | unvalidated      | load joint export files + flag                    |
+| items layers           | ranking-accuracy bootstrap  | not run         | unvalidated      | per-layer flags                                   |
 
 ## 5. ADRs proposed
 

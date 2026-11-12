@@ -233,11 +233,15 @@ T-120..T-126 (one per phase) plus sub-items.
   probabilities). Verdict: gate FAILS → `pairMainEffectAdjust` stays
   `false`; the flag and `pairMainEffects` remain available for the Phase 3
   joint model where interaction terms are fit jointly rather than demeaned.
-- `tune-priors --role=SUPPORT`: grid running at report time; early rows
-  (k0=10, k=20–40) show SUPPORT log-loss 0.6983–0.7011 vs the deployed
-  (20/40/40) 0.6981 — no dramatic prior win so far. Final JSON:
-  `/tmp/tune-priors-support.json` (session-local; rerun command documented
-  in SETUP pending Phase 7 docs).
+- `tune-priors --role=SUPPORT` (36-config grid, SUPPORT players only,
+  27,892 predictions): best **k0=40, k=160, kLane=80 → log-loss 0.6951**
+  vs deployed (20/40/40) **0.6981** (Δ ≈ −0.003). kLane is irrelevant
+  (lane cells ~empty, all values tie). Larger pair shrinkage `k` helps
+  monotonically — consistent with F1 sparsity. Caveat: the grid selects on
+  the same holdout it reports, so the gain is optimistic; confirm on a
+  different holdout patch / rolling split before adopting. Report:
+  `/tmp/tune-priors-support.json` (session-local; rerun:
+  `pnpm etl tune-priors --role=SUPPORT`).
 
 ## Assumptions made
 

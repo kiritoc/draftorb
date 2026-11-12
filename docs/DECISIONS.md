@@ -954,12 +954,12 @@ Owner decision 2026-11-08.
 Context / Decision / Alternatives / Consequences
 ```
 
-
 Update (Phase B, D-083..D-087): clause .1 amended (generated taxonomy +
 path rows), .2 kept, .3 superseded (at-purchase threat via kill_events +
 ownedItemsAt, 'unknown' profile), .4 superseded (time-normalized
 stateBucket + item_state_scale), .5 kept, .6 amended (laneArchKey
 archetype backoff), .7 kept (rank-agnostic, measured in D-087).
+
 ### D-083 — Item taxonomy pipeline and path decisions — PROPOSED
 
 Generated item classes (`data/item-classes.generated.json`, produced by

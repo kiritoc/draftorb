@@ -15,7 +15,7 @@ backfill). Prompt-2 work NOT started.
   migrations applied cleanly.
 - `timeline-events.ts` / `timeline-extractors.ts` / `timeline.ts`:
   registry-based extraction; `etl timeline` + `etl backfill-timelines
-  [--limit] [--call-budget]`; per-(match,extractor) resumability;
+[--limit] [--call-budget]`; per-(match,extractor) resumability;
   participantId-0 purchases attributed to supports.
 - `item-classes.ts` + `classify-items` command +
   `data/item-classes.generated.json` (859 items, patch 16.22) +

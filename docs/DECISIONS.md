@@ -1074,3 +1074,34 @@ backup asset, gh CLI, no new dependency) is ticketed as T-128; until it
 lands the runbook in `docs/proposed-etl-schedule.md` documents the manual
 `gh release` procedure. Update: `.github/workflows/etl.yml`,
 `docs/proposed-etl-schedule.md`, SETUP.md runbook section.
+
+### D-092 — Joint regularized draft model (T-123) — PROPOSED
+
+`packages/engine/src/joint/` implements a jointly fit logistic model that
+replaces the layered heuristic log-odds terms: per-match training rows
+scored from team 1's perspective with sparse features — champion main
+effects (`role:champ`), ally-pair, ordered enemy-pair, and same-role
+lane-vs interaction coefficients — all L2-regularized, full-batch
+gradient descent, fully deterministic (fixed row/feature order, fixed LR
+schedule, no randomness). `pnpm etl fit-model` builds rows from
+`participants`+`matches`, fits on patches < eval patch, and evaluates on
+masked drafts (each stored participant is a hidden pick; the other nine
+players are known). Validation report (rolling holdout on patch 16.22,
+train <16.22 = 10,379 matches, eval = 13,946 matches, 29,198 masked picks,
+2026-11-12): joint top1 0.0427 / top5 0.1580 / meanLogProb -4.199 vs
+champion pick-frequency prior top1 0.0650 / top5 0.2745 / -3.754; a
+joint+pick-prior hybrid (logit + 1.0*log pick count) collapses to the
+prior (CI [0, 0.0001]) — the win-probability signal is negligible next to
+pick frequency at current data scale (~10k training matches, pair n_eff
+~2.3). Layer ablations: noAllyPairs top1 0.0441, noEnemyPairs 0.0447,
+noChampMain 0.0395 — removing any layer hurts slightly, so features carry
+weak but real signal. Planted-effect simulation (engine unit test)
+confirms the fitter recovers an injected synergy. Gate verdict:
+`validationStatus` stays `unvalidated`; the export
+`data/public/joint-model.json` is written for inspection but no UI or
+recommendation path consumes it. Follow-up options: fit on more patches
+as the backfill lands, add pick-rate as an explicit feature rather than a
+post-hoc blend, or evaluate on win-probability metrics (the existing
+draft backtest) instead of pick prediction. Update:
+`packages/engine/src/joint/`, `packages/etl/src/joint-fit.ts`,
+`packages/etl/src/commands/fit-model.ts`.

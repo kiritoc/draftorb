@@ -27,6 +27,7 @@ import { matchesCommand } from './commands/matches';
 import { timelineCommand } from './commands/timeline';
 import { backfillTimelinesCommand } from './commands/backfill';
 import { backfillChallengesCommand } from './commands/backfill-challenges';
+import { fitModelCommand } from './commands/fit-model';
 import { classifyItemsCommand } from './commands/classify-items';
 import { pruneCommand } from './commands/prune';
 import { migrateCommand } from './commands/migrate';
@@ -54,6 +55,7 @@ const COMMANDS: readonly Command[] = [
   timelineCommand,
   backfillTimelinesCommand,
   backfillChallengesCommand,
+  fitModelCommand,
   classifyItemsCommand,
   pruneCommand,
   migrateCommand,

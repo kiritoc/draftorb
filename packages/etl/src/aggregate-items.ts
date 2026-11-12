@@ -494,6 +494,23 @@ export async function aggregateItemBuilds(
     };
 
     for (const me of group) {
+      // Starter bundles are recorded for EVERY participant (not just
+      // experts): they describe what was bought, independent of expertise.
+      const starterPid =
+        me.participantId !== null && me.participantId > 0
+          ? me.participantId
+          : pidByPuuid.get(me.puuid);
+      if (starterPid !== undefined) {
+        const bundle = starterBundleKey(
+          toTimelineEvents(eventsByPid.get(starterPid) ?? []),
+          itemConfig.starterWindowSeconds,
+          itemConfig,
+        );
+        if (bundle !== '') {
+          starterRows.push({ matchId, participantId: starterPid, puuid: me.puuid, bundle });
+        }
+      }
+
       const windowGames = me.championGames - (futureGames.get(`${me.puuid}|${me.championId}`) ?? 0);
       const masteryExpert =
         me.masteryPoints !== null && me.masteryPoints >= config.minMasteryPoints;
@@ -508,19 +525,9 @@ export async function aggregateItemBuilds(
       const slots = contextSlots(me, allies, enemies, config);
       const myLaneKey = laneKeyOf(slots);
 
-      const myPid =
-        me.participantId !== null && me.participantId > 0
-          ? me.participantId
-          : pidByPuuid.get(me.puuid);
+      const myPid = starterPid;
       if (myPid === undefined) continue;
       const myEvents = eventsByPid.get(myPid) ?? [];
-      const timelineEvents = toTimelineEvents(myEvents);
-
-      // Starter bundle for this participant.
-      const bundle = starterBundleKey(timelineEvents, itemConfig.starterWindowSeconds, itemConfig);
-      if (bundle !== '') {
-        starterRows.push({ matchId, participantId: myPid, puuid: me.puuid, bundle });
-      }
 
       // Replay ALL events in order, netting undo/sold/destroyed. The
       // completed-item slot is the count of completed/boots items owned

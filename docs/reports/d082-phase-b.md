@@ -37,14 +37,28 @@ aggregate-items.test.ts (path rows, netting, starters, idempotency),
 item-context.test.ts (helpers), migrate.test.ts/prune.test.ts (new
 schema).
 
-## Numbers
+## Numbers (real data, state release 20261111T2325Z)
 
-- Local real DB copy migrated 15->18 cleanly; item_events legacy rows are
-  dropped by design and must be re-extracted via backfill (documented in
-  migration 017).
-- NOT yet re-measured on real data: sparsity/bucket/profile deltas require
-  running `backfill-timelines` + `aggregate` on the 150-match sample —
-  left as next step (needs Riot API key).
+DB pulled via `pnpm etl pull --db` (24,325 euw1 matches). Backfilled the
+300 newest matches: 157,043 raw events (68,837 purchase / 2,665 sold /
+2,142 undo / 65,325 destroyed — destroyed is mostly consumable/quest-item
+consumption plus granted internals), 0 failures.
+
+`pnpm etl aggregate` -> item_build: 2,718 rows / 108 champions.
+
+- decision_kind: 2,660 item / 58 path (jungle pets + support quest
+  rewards only ever appear as path rows; slot-0/item slots stay clean).
+- state_bucket: ahead 921 / behind 630 / even 1167 (was severely
+  time-biased under fixed ±2000g/±3k thresholds).
+- profile_key: AD 316 / AP 2276 / mixed 126; no 'unknown' rows because
+  kill_events exist for all 300 matches.
+- item_state_scale (16.22): gold-diff sd grows 565 (0-5min) -> ~4,900
+  (40-45min), confirming the time bias the normalization fixes.
+- participant_starters: 2,996 rows (~10/match, all participants); top
+  bundles are Doran+potions+refiller and Atlas support lines as expected.
+- Bug found by real run: pendingMatches bound platform before extractor
+  placeholders (0 candidates); fixed. Starter bundles initially covered
+  experts only; now all participants.
 
 ## ADRs (all PROPOSED)
 

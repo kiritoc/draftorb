@@ -98,9 +98,9 @@ function pendingMatches(
   const names = extractors.map((e) => e.name);
   const placeholders = names.map(() => '?').join(',');
   const wherePlatform = platform === undefined ? '' : 'AND m.platform = ?';
-  const params: Array<string | number> = [];
+  // Bind order follows SQL text: extractor names, count, platform, limit.
+  const params: Array<string | number> = [...names, names.length];
   if (platform !== undefined) params.push(platform);
-  params.push(...names, names.length);
   const limitSql = limit === undefined ? '' : 'LIMIT ?';
   if (limit !== undefined) params.push(limit);
 

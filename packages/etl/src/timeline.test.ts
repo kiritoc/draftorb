@@ -114,8 +114,13 @@ describe('runTimelinePipeline', () => {
       const result = await runTimelinePipeline({ db, client });
       expect(result.fetched).toBe(1);
       expect(result.failed).toBe(0);
-      expect(result.extractorsDone).toBe(3);
-      expect(extractorRuns(db, 'm1')).toEqual(['item-events', 'kill-events', 'participant-ids']);
+      expect(result.extractorsDone).toBe(4);
+      expect(extractorRuns(db, 'm1')).toEqual([
+        'item-events',
+        'kill-events',
+        'lane-snapshots',
+        'participant-ids',
+      ]);
 
       const rows = itemEventRows(db, 'm1');
       expect(rows).toHaveLength(4);
@@ -163,7 +168,7 @@ describe('runTimelinePipeline', () => {
       const client = mockClient(makeTimeline([]));
       const result = await runTimelinePipeline({ db, client });
       expect(result.fetched).toBe(1);
-      expect(extractorRuns(db, 'm1')).toHaveLength(3);
+      expect(extractorRuns(db, 'm1')).toHaveLength(4);
       expect(client.getMatchTimeline).toHaveBeenCalledTimes(1);
     });
   });
@@ -198,7 +203,7 @@ describe('runTimelinePipeline', () => {
       const result = await runTimelinePipeline({ db, client });
       expect(result.skipped).toBe(1);
       expect(result.fetched).toBe(0);
-      expect(extractorRuns(db, 'm1')).toHaveLength(3);
+      expect(extractorRuns(db, 'm1')).toHaveLength(4);
     });
   });
 

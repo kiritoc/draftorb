@@ -56,6 +56,7 @@ Open questions that remain after the 2026-11-08 acceptance:
 
 ### 2026-11-12 — Devin — Owner decisions: Riot registration verified + local-first ETL (D-091)
 
+- Phase 2 extractor: `lane-snapshots` (migration 019) records per-participant level/gold/XP/CS/position at minutes 5/10/15/20/25 from timeline participantFrames; resumable via `extractor_runs` like the other extractors.
 - `pnpm etl publish` implemented (T-128): pure-Node tar.gz writer + gh release publisher with `--db`/`--vacuum`/`--keep`; exports every run, DB backup periodic.
 - Owner confirmed DraftOrb is registered on the Riot Developer Portal as a personal product (Phase 0 UNVERIFIED item resolved; docs updated).
 - `etl.yml` cron DISABLED — `workflow_dispatch` only; ingestion/aggregate/export now run locally. Publish model: small `public-exports.tar.gz` every run + `DraftOrb.sqlite.gz` periodic backups only (~475 MiB vs 512 MiB cap). Actions usage ~0 min/month. Runbook: `docs/proposed-etl-schedule.md`; local publisher ticketed T-128. Phase 2 partial: `matches --call-budget/--time-budget` shipped; tune-priors SUPPORT best k0=40/k=160 (0.6951 vs 0.6981, in-sample caveat).

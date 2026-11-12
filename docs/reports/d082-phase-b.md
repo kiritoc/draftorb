@@ -100,6 +100,20 @@ consumption plus granted internals), 0 failures.
   builds/*.json absent because max games_w=6 < exportMinGames=10 with
   only 300 matches backfilled (honest sparsity).
 
+## Scale-up run (2026-11-12)
+
+- Backfilled 2,300 matches total (300 + 2,000 batch; ~1.16M raw events,
+  0 failures). `aggregate` -> 18,869 item_build rows / 154 champions.
+- Export now emits 14 `roles/SUPPORT/builds/*.json` files (schema v4,
+  82 files total). Contexts observed with slotIdx 2-3, time/state/
+  profile buckets; lane_key present on 10,675 slot-0/1 rows in DB but
+  no lane context has reached exportMinGames yet. Path rows: 424 rows /
+  476 games, none >= 10 games yet. profile_key='unknown': 0 (kill_events
+  coverage complete on backfilled matches).
+- Remaining ~22k matches backfilling in background; per-context
+  games_w scales ~linearly, so lane/path/starter contexts need the
+  full corpus to pass exportMinGames=10.
+
 ## Owner questions
 
 1. Accept pid-0 -> first eligible SUPPORT attribution rule?

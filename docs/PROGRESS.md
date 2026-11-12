@@ -1253,3 +1253,12 @@ The 2026-10-22 entries had no timestamps; their order was reconstructed from tic
   backfill.
 - Real-data run caught + fixed: pendingMatches bind order, starter
   bundles now cover all participants, isSummonersRift requires map '11'.
+
+## Backfill scale-up (2026-11-12)
+
+- `backfill-timelines euw1`: 2,300 matches done (~1.16M raw events,
+  0 failures); remaining ~22k running in background (resumable via
+  extractor_runs).
+- `aggregate`: item_build 18,869 rows / 154 champions; export emits
+  14 SUPPORT builds files; lane/path contexts still below
+  exportMinGames=10 (honest sparsity, resolves with full corpus).

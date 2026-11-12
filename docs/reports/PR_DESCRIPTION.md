@@ -18,7 +18,7 @@
 | Phase              | Status      | Key files / commands                                        | Commits |
 | ------------------ | ----------- | ----------------------------------------------------------- | ------- |
 | 0 Audit & baseline | done        | `docs/RIOT_API.md`, `docs/reports/model-review-baseline.md` | pending |
-| 1 Engine fixes     | in progress | `pairMainEffectAdjust`, `tune-priors`, logit blend          | –       |
+| 1 Engine fixes     | done (flags off) | `pairMainEffectAdjust` (D-088) + `--pair-adjust` backtest gate, `tune-priors` (D-090), `blendMode='logit'` (D-089); 532 engine tests green | `746c9a5` |
 | 2 Data scaling     | not started | timeline/detail extractors, `matches --time-budget`         | –       |
 | 3 Joint model      | not started | `packages/engine/src/joint/`, `etl fit-model`               | –       |
 | 4 Drafting UI      | not started | experimental views                                          | –       |
@@ -36,13 +36,18 @@ baseline-only 0.6946 on holdout patch 16.22.
 
 | Flag                   | Gate                        | Verdict         | validationStatus | Enable change                                     |
 | ---------------------- | --------------------------- | --------------- | ---------------- | ------------------------------------------------- |
-| `pairMainEffectAdjust` | backtest old vs new         | pending Phase 1 | unvalidated      | set `pairMainEffectAdjust: true` in engine config |
+| `pairMainEffectAdjust` | backtest old vs new (`--pair-adjust`) | running | unvalidated      | set `pairMainEffectAdjust: true` in engine config |
+| `blendMode='logit'`     | personalization ordering review       | implemented, unvalidated | n/a     | pass `blendMode:'logit'` in PersonalizeConfig     |
+| tuned priors            | `tune-priors` report review           | running (SUPPORT) | unvalidated | adopt winning k0/k/kLane into DEFAULT_CONFIG after owner review |
 | joint model            | D-023-extended holdout gate | not run         | unvalidated      | load joint export files + flag                    |
 | items layers           | ranking-accuracy bootstrap  | not run         | unvalidated      | per-layer flags                                   |
 
 ## 5. ADRs proposed
 
-Pending Phase 1+ (all PROPOSED).
+- D-088 `pairMainEffectAdjust` — pair main-effect subtraction (PROPOSED, off by default)
+- D-089 `blendMode='logit'` — log-odds personalization blend (PROPOSED, legacy default)
+- D-090 `pnpm etl tune-priors` — prior grid search command (PROPOSED)
+- D-082..D-087 (Phase B items) unchanged — no amendments needed so far
 
 ## 6. Findings F1–F9
 

@@ -19,15 +19,15 @@ a released export or the web app consumes any D-082 behavior. **Conclusion:
 Phase B changes defaults directly in this PR lineage; no legacy config flags
 are required** (the prompt's rule-2.6 escape hatch does not apply).
 
-| Clause | Content | Code location | Verdict |
-| ------ | ------- | ------------- | ------- |
-| D-082.1 | Completed item = empty `into`, not Consumable/Trinket, **not `Lane`**; boots count | `item-events.ts` `classifyItem` | **AMEND** — core kept, but the `Lane` catch-all misclassifies quest rewards as non-items and jungle pets as completed (A2/A3) |
-| D-082.2 | `item_events.ts` raw ms, /1000 at aggregation | `item-events.ts`, `aggregate-items.ts` | **KEEP** — verified |
-| D-082.3 | `profile_key` from FINAL KDA + `items_json` | `aggregate-items.ts` `enemyStates` | **SUPERSEDE** — outcome leakage + train/serve skew (D3); replace with at-purchase `kill_events`/`ownedItemsAt` |
-| D-082.4 | State bucket = OR-rule, absolute 2000 g / 3 kills, ahead priority | `item-context.ts` `itemStateBucket` | **SUPERSEDE** — time bias proven (A5); replace with time-normalized z-score |
-| D-082.5 | `item_build` weight = recency × reliability, no rank kernel | `aggregate-items.ts` `baseW` | **KEEP** — rank question deferred to B7 measurement (D6) |
-| D-082.6 | `lane_key` = full influence-sorted slot list, drop whole dimension | `aggregate-items.ts` `laneKeyOf` | **AMEND** — keep stored keys, add archetype-level derived level at export (D5) |
-| D-082.7 | `lane_key=''` outside lane phase → absent `laneKey` at export | `aggregate-items.ts`, exporter | **KEEP** — verified |
+| Clause  | Content                                                                            | Code location                          | Verdict                                                                                                                       |
+| ------- | ---------------------------------------------------------------------------------- | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| D-082.1 | Completed item = empty `into`, not Consumable/Trinket, **not `Lane`**; boots count | `item-events.ts` `classifyItem`        | **AMEND** — core kept, but the `Lane` catch-all misclassifies quest rewards as non-items and jungle pets as completed (A2/A3) |
+| D-082.2 | `item_events.ts` raw ms, /1000 at aggregation                                      | `item-events.ts`, `aggregate-items.ts` | **KEEP** — verified                                                                                                           |
+| D-082.3 | `profile_key` from FINAL KDA + `items_json`                                        | `aggregate-items.ts` `enemyStates`     | **SUPERSEDE** — outcome leakage + train/serve skew (D3); replace with at-purchase `kill_events`/`ownedItemsAt`                |
+| D-082.4 | State bucket = OR-rule, absolute 2000 g / 3 kills, ahead priority                  | `item-context.ts` `itemStateBucket`    | **SUPERSEDE** — time bias proven (A5); replace with time-normalized z-score                                                   |
+| D-082.5 | `item_build` weight = recency × reliability, no rank kernel                        | `aggregate-items.ts` `baseW`           | **KEEP** — rank question deferred to B7 measurement (D6)                                                                      |
+| D-082.6 | `lane_key` = full influence-sorted slot list, drop whole dimension                 | `aggregate-items.ts` `laneKeyOf`       | **AMEND** — keep stored keys, add archetype-level derived level at export (D5)                                                |
+| D-082.7 | `lane_key=''` outside lane phase → absent `laneKey` at export                      | `aggregate-items.ts`, exporter         | **KEEP** — verified                                                                                                           |
 
 Ticket status: T-051 **REVIEW** (this PR), T-056 **TODO**, T-027.b **TODO**,
 T-050 (item tags) **TODO** — item recommender chain does not exist yet.
@@ -48,16 +48,16 @@ current `classifyItem`: 160 `completed`, 80 `component`, 13 `consumable`.
 
 ### Lane-tagged items (24 SR-purchasable)
 
-| Group | Items | Current class | Correct class (proposed) |
-| ----- | ----- | ------------- | ------------------------ |
-| Doran's starters | 1054 Shield, 1055 Blade, 1056 Ring, 1086 Bow, 1120 Helm | component→slot 0 | `starter` |
-| Other lane starters | 1083 Cull | component→slot 0 | `starter` |
-| Support quest line | 3865 World Atlas (`specialRecipe`→3866), 3866 Runic Compass, 3867 Bounty of Worlds (`specialRecipe`→3866, `into`=[3869,3870,3871,3876,3877]) | component | `quest_line` |
-| Quest rewards | 3869 Celestial Opposition, 3870 Dream Maker, 3871 Zaz'Zak's Realmspike, 3876 Solstice Sleigh, 3877 Bloodsong (`from`=[3867]) | component (**invisible — D1 confirmed**) | `quest_reward` |
-| Jungle pets | 1101/1105 Scorchclaw, 1102/1106 Gustwalker, 1103 Mosstomper (`tags=['Jungle']`, `into`=[]) | **completed (BUG — D2 confirmed)** | `jungle_path` |
-| Lane components | 1036 Long Sword and similar (`Lane`+non-empty `into`) | component | `component`, `laneFamily=true` |
-| Consumables/wards | 2003 Health Potion, 2031 Refillable, 2055 Control Ward, 3330 Scarecrow, 3340 Stealth Ward | consumable | `consumable`/`trinket`/`ward` (earlier rules win) |
-| Ambiguous | 2051 Guardian's Horn, 3112 Guardian's Orb, 3177 Guardian's Blade, 3184 Guardian's Hammer, 663039 Atma's Reckoning | component (invisible) | **unclassified → owner decision** (Q3) |
+| Group               | Items                                                                                                                                        | Current class                            | Correct class (proposed)                          |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- | ------------------------------------------------- |
+| Doran's starters    | 1054 Shield, 1055 Blade, 1056 Ring, 1086 Bow, 1120 Helm                                                                                      | component→slot 0                         | `starter`                                         |
+| Other lane starters | 1083 Cull                                                                                                                                    | component→slot 0                         | `starter`                                         |
+| Support quest line  | 3865 World Atlas (`specialRecipe`→3866), 3866 Runic Compass, 3867 Bounty of Worlds (`specialRecipe`→3866, `into`=[3869,3870,3871,3876,3877]) | component                                | `quest_line`                                      |
+| Quest rewards       | 3869 Celestial Opposition, 3870 Dream Maker, 3871 Zaz'Zak's Realmspike, 3876 Solstice Sleigh, 3877 Bloodsong (`from`=[3867])                 | component (**invisible — D1 confirmed**) | `quest_reward`                                    |
+| Jungle pets         | 1101/1105 Scorchclaw, 1102/1106 Gustwalker, 1103 Mosstomper (`tags=['Jungle']`, `into`=[])                                                   | **completed (BUG — D2 confirmed)**       | `jungle_path`                                     |
+| Lane components     | 1036 Long Sword and similar (`Lane`+non-empty `into`)                                                                                        | component                                | `component`, `laneFamily=true`                    |
+| Consumables/wards   | 2003 Health Potion, 2031 Refillable, 2055 Control Ward, 3330 Scarecrow, 3340 Stealth Ward                                                    | consumable                               | `consumable`/`trinket`/`ward` (earlier rules win) |
+| Ambiguous           | 2051 Guardian's Horn, 3112 Guardian's Orb, 3177 Guardian's Blade, 3184 Guardian's Hammer, 663039 Atma's Reckoning                            | component (invisible)                    | **unclassified → owner decision** (Q3)            |
 
 Quest chain reconstruction (from `specialRecipe`/`from`/`into`, not names):
 `3865 World Atlas` -(specialRecipe)→ `3866 Runic Compass` -(specialRecipe)→
@@ -72,6 +72,7 @@ still flags `maps[11]` — ~30 items inflate the "completed" class but are
 never bought on SR.
 
 **Misclassifications under D-082.1 as implemented:**
+
 1. Jungle pets (6 SR ids) → `completed`: they emit `ITEM_PURCHASED` at ~2–15 s
    and currently take `item_slot = 1`, shifting every real item (A3).
 2. Quest rewards (5 ids) → `component`: invisible everywhere (D1).
@@ -99,9 +100,9 @@ Payload shapes verified on 12 live EUW1 timelines (patch 16.22):
   `ITEM_DESTROYED 3867` + `ITEM_PURCHASED 3869` at the same timestamp).
 - `ITEM_UNDO {timestamp, type, participantId, beforeId, afterId, goldGain}`:
   - Purchase undo of a normal item: `beforeId=<item>, afterId=0,
-    goldGain=+refund` (e.g. potion +50, Doran's Bow +400, pet +450).
+goldGain=+refund` (e.g. potion +50, Doran's Bow +400, pet +450).
   - Purchase undo of a trinket/ward: `beforeId=0, afterId=<item>,
-    goldGain=0` — same field shape as a sale undo.
+goldGain=0` — same field shape as a sale undo.
   - Sale undo: `beforeId=0, afterId=<item>, goldGain<0` (Dark Seal sale then
     undo, goldGain −140). **The `beforeId=0/afterId>0` shape is ambiguous**
     between "undo a trinket purchase" and "undo a sale"; disambiguation must
@@ -109,9 +110,9 @@ Payload shapes verified on 12 live EUW1 timelines (patch 16.22):
     alone. Current T-051 code always treats it as a sale undo — harmless for
     `item_build` (trinkets never aggregate) but wrong for `ownedItemsAt`.
 - `CHAMPION_KILL {timestamp, type, killerId, victimId, assistingParticipantIds,
-  bounty, shutdownBounty, killStreakLength, victimDamageDealt,
-  victimDamageReceived, victimTeamfightDamageDealt,
-  victimTeamfightDamageReceived, position}`. `killerId=0` occurs (turret/
+bounty, shutdownBounty, killStreakLength, victimDamageDealt,
+victimDamageReceived, victimTeamfightDamageDealt,
+victimTeamfightDamageReceived, position}`. `killerId=0` occurs (turret/
   minion last-hit kills, 2/629 in sample) → `killer_pid` must be NULL, never 0.
 - `info.participants[]` = `{participantId, puuid}` only — **no role, no
   team**; team/role come from stored `participants`.
@@ -161,12 +162,12 @@ patches) — champion level is NOT the constraint.
 Item-context cells (SUPPORT purchases with `item_slot`, 150 matches;
 purchases, not distinct matches — true `n_eff` is lower):
 
-| Back-off level | Cells | Median purchases/cell | p90 | Cells ≥5 purchases |
-| -------------- | ----- | --------------------- | --- | ------------------ |
-| champion + slot | 233 | 2 | 12 | 32% |
-| + time_bucket | 437 | 1 | 5 | 15% |
-| + state_bucket | 636 | 1 | 3 | 5% |
-| + lane flag | 637 | 1 | 3 | 5% |
+| Back-off level  | Cells | Median purchases/cell | p90 | Cells ≥5 purchases |
+| --------------- | ----- | --------------------- | --- | ------------------ |
+| champion + slot | 233   | 2                     | 12  | 32%                |
+| + time_bucket   | 437   | 1                     | 5   | 15%                |
+| + state_bucket  | 636   | 1                     | 3   | 5%                 |
+| + lane flag     | 637   | 1                     | 3   | 5%                 |
 
 `profile_key` (3 values) is not yet included and will divide cells further.
 Extrapolated to the full backlog (×24): median cell ≈ 24–48 purchases, but
@@ -197,7 +198,7 @@ state. Same pattern over all purchases.
    mode-variant leftovers. Proposed class `excluded`; confirm.
 4. **Undo `beforeId=0/afterId>0` ambiguity** (trinket purchase-undo vs
    sale-undo): proposed rule — match against live state (undo reverts the
-   most recent *unresolved* transaction for that item; a held item ⇒
+   most recent _unresolved_ transaction for that item; a held item ⇒
    purchase undo, a sold item ⇒ sale undo). Acceptable?
 5. **Jungle path scope**: pets are the only observable jungle path decision;
    there is no jungle-upgrade item in 16.22. Should `jungle_path` cover only

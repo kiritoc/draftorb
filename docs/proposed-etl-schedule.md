@@ -4,7 +4,8 @@ The GitHub Actions schedule is **disabled** (`etl.yml` keeps only
 `workflow_dispatch`). Ingestion, aggregation and export run locally; the
 private state repo receives (a) small `public-exports.tar.gz` releases after
 each pipeline run and (b) `DraftOrb.sqlite.gz` only as **periodic backups**
-(~475 MiB gzipped — near the 512 MiB asset cap, never every run). Actions
+(~475 MiB gzipped ≈ 23% of the real 2 GiB per-file release-asset limit —
+periodic cadence is an ops choice, not a storage constraint). Actions
 usage is ~0 min/month.
 
 ## Routine local refresh
@@ -28,6 +29,14 @@ All commands are resumable (cursors, `extractor_runs`); budgets are checked
 at player/match boundaries so a stopped run loses at most one unit of work.
 `localCallBudget` default: 8000 Riot calls per session (see
 `docs/RIOT_API.md`).
+
+**Overlap guard (external review, 2026-11-12):** scheduled and manual runs
+must never overlap — take a lock file before starting and release it when
+the pipeline exits (the Actions `concurrency` group this replaces did the
+same). Until a dedicated lock lands in the CLI, wrap the routine commands
+in a small Node/PowerShell script that creates
+`data/.etl.lock` (fail if it exists and is fresh, e.g. < 6 h old) and
+deletes it on exit.
 
 ## Publishing
 

@@ -1065,8 +1065,10 @@ personal product (resolves the Phase 0 UNVERIFIED item). The scheduled
 Ingestion, aggregation and export now run locally as the primary path.
 Publishing to the private state repo keeps two tiers: small
 `public-exports.tar.gz` releases after each local pipeline run, and
-`DraftOrb.sqlite.gz` only as periodic backups (the gzipped DB is ~475 MiB,
-near the 512 MiB asset-budget cap, so it must not ship every run). Actions
+`DraftOrb.sqlite.gz` only as periodic backups (the gzipped DB is ~475 MiB
+≈ 23% of the real 2 GiB per-file release-asset limit — an earlier "512 MiB
+cap" figure was a self-imposed 25% headroom rule, corrected 2026-11-12;
+periodic cadence is an ops choice, not a storage constraint). Actions
 usage drops to ~0 min/month. Amends D-078/D-079 delivery flow: the pipeline
 steps are unchanged, only the trigger and publish cadence move to local.
 A dedicated `pnpm etl publish` command (exports tarball + optional DB

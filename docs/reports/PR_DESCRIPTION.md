@@ -64,8 +64,10 @@ F7 resolved by measurement (0.833 req/s app-bound), F8/F9 scope gaps confirmed.
 - 5.2 guard evaluated: repo is PRIVATE (`kiritoc/draftorb`), Actions minutes
   UNVERIFIED, current runs ~1–3.5 h × 2/day. Higher ingest volume would increase
   monthly minutes → schedule change NOT applied; proposal doc to follow.
-- 5.3 storage: gzipped DB ≈ 475 MiB vs 25% of verified 2 GiB asset limit
-  (512 MiB) — ingest volume must be capped near current size.
+- 5.3 storage: CORRECTED — GitHub's real per-file release-asset limit is
+  2 GiB (≤1000 assets, no total cap); the earlier "512 MiB cap" was a
+  self-imposed 25% headroom rule. Gzipped DB ≈ 475 MiB ≈ 23% of the real
+  limit; periodic DB backups remain an ops choice, not a hard constraint.
 - Backtest report copied from `data/public/backtest-draft.json` run output;
   masked-draft/paired-bootstrap metrics remain unimplemented (Phase 3 gate).
 

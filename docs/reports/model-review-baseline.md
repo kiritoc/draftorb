@@ -143,9 +143,12 @@ amortized id-listing + amortized enrichment ≈ **2.1–2.3**.
 - Per-table (dbstat, top): `item_events` ~600 MB + indexes ~920 MB total;
   `rune_ctx` ~600 MB; `participants` ~158 MB; pair/lane tables ~150 MB combined.
 - Release-asset limit verified from docs.github.com (2026-11-12): **2 GiB per
-  file**, ≤1000 assets per release, no total-size limit. 25% cap = 512 MiB.
-  Current gzipped DB at ~475 MiB is already at **~93% of that cap** — ingest
-  volume must be capped accordingly (decision rule 5.3).
+  file**, ≤1000 assets per release, no total-size limit. CORRECTION
+  (2026-11-12, external review): an earlier revision of this report called
+  512 MiB "the cap" — that was a self-imposed 25%-of-limit headroom rule, not
+  a GitHub limit. The real per-file cap is 2 GiB; the ~475 MiB gzipped DB is
+  at ~23% of it. Periodic (not every-run) DB backups remain a reasonable
+  bandwidth/ops choice but are no longer forced by a storage constraint.
 - Repository visibility: **`kiritoc/draftorb` is PRIVATE** (gh, 2026-11-12) —
   this contradicts the D-079 note "the main repo stays public". Consequence for
   5.2(iv): private-repo Actions minutes apply; current `etl.yml` runs last

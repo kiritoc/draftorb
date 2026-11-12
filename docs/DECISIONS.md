@@ -933,6 +933,20 @@ Owner decision 2026-11-08.
 - Alternatives: a real average-item-gold curve from match data (rejected for now — no such export exists; revisit with T-051/T-056 data); scaling factor from champion stats (champion catalog carries no stats — tags are the only champion metadata); per-enemy role-keyed shares now (rejected — would need role inference inside the threat module).
 - Consequences: all weights/anchors are priors calibrated only by the D-023 gate, like every other engine parameter. `mid`-phase `threatShares` consumers (T-054) must map the order-aligned shares onto roles themselves.
 
+### D-082 — Item-build context interpretations (completed-item rule, profile approximation, state buckets) — PROPOSED
+
+- Context: T-051 leaves several item-context terms underspecified: what counts as a "completed item" for `item_slot`, how the per-purchase threat-weighted enemy profile is derived offline, the exact state-bucket rule, and the aggregation weight. Assumptions made while implementing; pending owner review.
+- Decision (assumptions made while implementing T-051; simplest reading, pending owner review):
+  1. **Completed item** = Data Dragon item with empty `into`, not tagged `Consumable`/`Trinket`, **and not tagged `Lane`**; boots count via the `Boots` tag. The `Lane` tag marks the laning-phase family — Doran's-style starters, the support quest line (World Atlas -> Bounty of Worlds -> quest rewards) and lane components — which never advances the completed-item index. Rationale: read literally ("no `into`, not consumable/trinket/ward"), Doran's Blade and World Atlas would count as completed items, so `item_slot = 0` ("starting items") would almost never be populated and the lane-phase k=0 context the D-020/D-022 design is built around would be dead. This is the quest-line rule the ticket asks to be documented: the whole `Lane`-tagged family is treated as non-completed.
+  2. `item_events.ts` stores raw timeline **milliseconds**; aggregation divides by 1000 for the 5-minute `time_bucket` and the `laneEndSeconds` phase check.
+  3. `profile_key` = enemy champion damage types weighted by `computeThreatScores` shares. Per-purchase enemy KDA/items are not stored anywhere, so threat uses each enemy's **final** KDA and `items_json` with `avgItemGold` evaluated at the purchase second — an approximation; revisit if backtest (T-027.b) shows profile drift matters.
+  4. State bucket: `ahead` when `team_gold_diff >= stateAheadGoldDiff` OR `kills_diff >= stateAheadKillsDiff`; `behind` symmetrically; `ahead` is checked first so conflicting signals resolve to `ahead`. Defaults 2000 gold / 3 kills (`ItemContextConfig`, priors).
+  5. `item_build` weight = `recencyFactor * reliabilityFactor` only: the table has no rank bucket, so the `expertWeight` kernel does not apply; the D-022 expert gate (`champion_games >= minChampGames` in-window, role-limited mastery fallback) is unchanged.
+  6. `lane_key` stores the full influence-sorted lane-context slot list (`lane:` + `formatSlot` entries joined by `|`); the D-022 back-off's first step drops the whole lane dimension at once (unlike rune contexts, which write one row per slot count — `item_build` has no context-level column).
+  7. `lane_key` is the empty string outside the `lane` phase (column is `NOT NULL`); the export maps `''` to an absent `laneKey`, never a sentinel.
+- Alternatives: store per-purchase enemy profile at ingestion (rejected — needs new `item_events` columns and a second timeline pass; the approximation is cheaper and revisit-able); unweighted enemy damage mix like rune contexts (rejected — D-022 explicitly says threat-weighted); per-backoff-level lane rows (rejected — schema has no level column and rows are additive across `lane_key`).
+- Consequences: `item_slot = 0` contexts contain starting-item purchases (Doran's, World Atlas, early components); quest reward items never appear as completed items. All thresholds are priors calibrated only by the D-023 gate. T-056 must reproduce `lane_key`/`profile_key`/`state_bucket`/`time_bucket` with the same engine helpers (`item-context.ts`) or lookups will miss.
+
 ### Template
 
 ```

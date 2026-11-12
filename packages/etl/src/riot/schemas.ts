@@ -186,13 +186,34 @@ export const riotMatchTimelineEventSchema = z
     type: z.string(),
     participantId: z.number().int().optional(),
     itemId: z.number().int().optional(),
+    // ITEM_UNDO payload (T-051): item ids around the reverted transaction.
+    beforeId: z.number().int().optional(),
+    afterId: z.number().int().optional(),
+    // CHAMPION_KILL payload (T-051): victim team feeds kills_diff.
+    victimId: z.number().int().optional(),
   })
   .passthrough();
 export type RiotMatchTimelineEvent = z.infer<typeof riotMatchTimelineEventSchema>;
 
+/**
+ * Per-participant frame state (T-051): only `currentGold` is consumed for the
+ * per-purchase team gold difference; everything else stays passthrough.
+ */
+export const riotMatchTimelineParticipantFrameSchema = z
+  .object({
+    participantId: z.number().int().optional(),
+    currentGold: z.number().optional(),
+  })
+  .passthrough();
+export type RiotMatchTimelineParticipantFrame = z.infer<
+  typeof riotMatchTimelineParticipantFrameSchema
+>;
+
 export const riotMatchTimelineFrameSchema = z
   .object({
+    timestamp: z.number().optional(),
     events: z.array(riotMatchTimelineEventSchema),
+    participantFrames: z.record(z.string(), riotMatchTimelineParticipantFrameSchema).optional(),
   })
   .passthrough();
 export type RiotMatchTimelineFrame = z.infer<typeof riotMatchTimelineFrameSchema>;
@@ -203,6 +224,17 @@ export const riotMatchTimelineSchema = z
       .object({
         gameId: z.number().optional(),
         frames: z.array(riotMatchTimelineFrameSchema),
+        // participantId -> puuid map (T-051); teamId comes from stored participants.
+        participants: z
+          .array(
+            z
+              .object({
+                participantId: z.number().int(),
+                puuid: z.string().min(1),
+              })
+              .passthrough(),
+          )
+          .optional(),
       })
       .passthrough(),
   })

@@ -145,6 +145,14 @@ jobs:
       - name: Prune matches beyond retention window
         run: pnpm etl prune
 
+      # Bounded + non-fatal (T-051): timelines cost ~1 request per match and
+      # the initial backlog is large, so the step drains it gradually across
+      # runs. fetched_timeline only flips on success, so reruns resume.
+      - name: Fetch match timelines (bounded)
+        env:
+          RIOT_API_KEY: ${{ secrets.RIOT_API_KEY }}
+        run: pnpm etl timeline euw1 --limit 200 || echo "::warning::timeline ingestion failed; item_build keeps previous data"
+
       - name: Rebuild aggregates and export
         run: |
           pnpm etl aggregate

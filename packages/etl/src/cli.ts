@@ -23,6 +23,7 @@ import { checkTagsCommand } from './commands/check-tags';
 import { checkKeyCommand } from './commands/check-key';
 import { playersCommand } from './commands/players';
 import { matchesCommand } from './commands/matches';
+import { timelineCommand } from './commands/timeline';
 import { pruneCommand } from './commands/prune';
 import { migrateCommand } from './commands/migrate';
 import { aggregateCommand } from './commands/aggregate';
@@ -44,6 +45,7 @@ const COMMANDS: readonly Command[] = [
   checkKeyCommand,
   playersCommand,
   matchesCommand,
+  timelineCommand,
   pruneCommand,
   migrateCommand,
   aggregateCommand,

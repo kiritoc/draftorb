@@ -318,6 +318,41 @@ export const DEFAULT_THREAT_CONFIG: ThreatConfig = Object.freeze({
   scalingFactorNeutral: 0.6,
 });
 
+// --- Item context config (SPECS §8.2, D-020/D-022, T-051) ---
+
+/**
+ * Item-context config: the phase rule, purchase time buckets and the
+ * ahead/even/behind state thresholds shared by the ETL `item_build`
+ * aggregation and the item recommenders (T-054/T-056). All values are priors
+ * until the D-023 backtest calibrates them.
+ */
+export interface ItemContextConfig {
+  /**
+   * Phase rule (D-020): `lane` = slot k = 0 always, and completed item
+   * k = 1 bought before `laneEndSeconds`; `mid` otherwise.
+   */
+  readonly laneEndSeconds: number;
+  /** Purchase time-bucket width in seconds (SPECS §8.2: 5 min). */
+  readonly timeBucketSeconds: number;
+  /** |team gold diff| at/above this marks `ahead` (kills diff is the OR-ed twin). */
+  readonly stateAheadGoldDiff: number;
+  /** Team kill diff at/above this marks `ahead`. */
+  readonly stateAheadKillsDiff: number;
+  /** |team gold diff| at/above this marks `behind` (symmetric magnitudes). */
+  readonly stateBehindGoldDiff: number;
+  /** Team kill diff at/above this marks `behind`. */
+  readonly stateBehindKillsDiff: number;
+}
+
+export const DEFAULT_ITEM_CONTEXT_CONFIG: ItemContextConfig = Object.freeze({
+  laneEndSeconds: 840,
+  timeBucketSeconds: 300,
+  stateAheadGoldDiff: 2000,
+  stateAheadKillsDiff: 3,
+  stateBehindGoldDiff: 2000,
+  stateBehindKillsDiff: 3,
+});
+
 // --- Influence lookup ---
 
 export interface InfluenceOpts {

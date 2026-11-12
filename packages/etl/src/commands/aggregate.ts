@@ -5,6 +5,7 @@ import { getMigrationStatus, openDb } from '../db';
 import { aggregateBaseline } from '../aggregate-baseline';
 import { aggregatePairTables } from '../aggregate-pairs';
 import { aggregateRunesByContext } from '../aggregate-runes';
+import { aggregateItemBuilds } from '../aggregate-items';
 import { aggregateRoleProb, latestPatch, PATCH_PATTERN } from '../aggregate';
 import { loadPatchWindow } from '../aggregate-shared';
 import { recordAggregateSnapshot } from '../aggregate-meta';
@@ -108,6 +109,21 @@ async function runAggregate(args: string[]): Promise<void> {
       );
     }
 
+    const itemRows = await aggregateItemBuilds(db, {
+      patch,
+      onWarn: (message) => console.log(`[ETL] Warning: ${message}`),
+    });
+    if (itemRows.length === 0) {
+      console.log(
+        `No item purchases${patch === undefined ? '' : ` up to patch ${patch}`}; item_build left unchanged.`,
+      );
+    } else {
+      const champions = new Set(itemRows.map((row) => row.championId)).size;
+      console.log(
+        `Aggregated item builds: ${itemRows.length} row(s) for ${champions} champion(s) written to item_build.`,
+      );
+    }
+
     // Record which patch-catalog state the aggregates were computed against
     // (D-055): exported as patch-meta.json so results stay explainable when
     // the catalog later grows. Only when at least one table was rewritten —
@@ -119,7 +135,8 @@ async function runAggregate(args: string[]): Promise<void> {
         pairTables.pairEnemy.length +
         pairTables.laneVs.length +
         pairTables.laneFull.length +
-        runeRows.length >
+        runeRows.length +
+        itemRows.length >
       0;
     if (wroteRows) {
       const snapshotLabel = patch ?? latestPatch(db) ?? null;
@@ -141,6 +158,6 @@ export const aggregateCommand: Command = {
   name: 'aggregate',
   usage: 'aggregate [patch]',
   description:
-    'Compute aggregated tables (role probabilities, rank-weighted baselines, pair tables and rune contexts)',
+    'Compute aggregated tables (role probabilities, rank-weighted baselines, pair tables, rune contexts and item builds)',
   run: runAggregate,
 };

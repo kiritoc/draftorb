@@ -76,6 +76,14 @@ export class RiotRateLimiter {
     return this.appTimestamps.length;
   }
 
+  /** Total acquire() calls since construction — one per API request attempt. */
+  private requestsMade = 0;
+
+  /** API request attempts so far (for --call-budget accounting). */
+  getRequestsMade(): number {
+    return this.requestsMade;
+  }
+
   /**
    * Returns active method limit windows for a given method key.
    */
@@ -96,6 +104,7 @@ export class RiotRateLimiter {
     });
 
     await previousTurn;
+    this.requestsMade += 1;
     try {
       await this.waitForSlot(methodKey);
     } finally {

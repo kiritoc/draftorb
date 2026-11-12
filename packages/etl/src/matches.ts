@@ -52,6 +52,10 @@ export interface MatchIngestionOptions {
   onProgress?: (message: string) => void;
   myRole?: Role;
   minChampGames?: number;
+  /** Stop before starting a new player once this many API calls were made. */
+  callBudget?: number;
+  /** Stop before starting a new player once this many ms elapsed. */
+  timeBudgetMs?: number;
 }
 
 export interface PlayerIngestionResult {
@@ -72,6 +76,8 @@ export interface MatchIngestionResult {
   playersFailed: number;
   /** True when the run stopped early after 3 consecutive transient failures. */
   stoppedEarly: boolean;
+  /** True when the run stopped cleanly at --call-budget or --time-budget. */
+  budgetExhausted: boolean;
   listed: number;
   stored: number;
   duplicates: number;
@@ -211,8 +217,28 @@ export async function ingestMatches(
 
     const stmts = prepareMatchPersist(db);
     const loadRanks = createRankLoader(db);
+    const deadline =
+      options.timeBudgetMs !== undefined ? Date.now() + options.timeBudgetMs : undefined;
+    let budgetExhausted = false;
 
     for (const [index, player] of players.entries()) {
+      // Budgets are checked at player boundaries only: a single player costs
+      // at most ~perPlayer match calls plus one listing call, so overrun is
+      // bounded and cursors stay consistent (a mid-player stop would leave
+      // the snapshot half-processed).
+      if (options.callBudget !== undefined) {
+        const made = client.getRateLimiter().getRequestsMade();
+        if (made >= options.callBudget) {
+          budgetExhausted = true;
+          log(`Call budget ${options.callBudget} reached (${made} calls); stopping.`);
+          break;
+        }
+      }
+      if (deadline !== undefined && Date.now() >= deadline) {
+        budgetExhausted = true;
+        log('Time budget reached; stopping.');
+        break;
+      }
       const key = cursorKey(platform, player.puuid);
       let cursor = options.reset ? null : readCursor(db, key);
 
@@ -374,6 +400,7 @@ export async function ingestMatches(
       playersSkipped,
       playersFailed,
       stoppedEarly,
+      budgetExhausted,
       ...totals,
       playerResults,
     };

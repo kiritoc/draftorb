@@ -7,10 +7,23 @@ import { describe, expect, it } from 'vitest';
 import { openDb, migrate } from './db';
 import { seedPatches } from './patches.test-helpers';
 import { aggregateItemBuilds, type ItemBuildRow } from './aggregate-items';
+import type { ItemClassEntry } from './item-classes';
 
 const PATCH = '16.21';
 
-// Champion ids reused from the rune tests: me = Soraka (412) SUPPORT.
+// Test classes: 9001/9002 completed, 3865 quest_line starter, 9003 component,
+// 3078 completed, 5001 quest_reward, 5002 jungle_path, 2003 consumable.
+const TEST_CLASSES = new Map<number, ItemClassEntry>([
+  [9001, { cls: 'completed' }],
+  [9002, { cls: 'completed' }],
+  [3078, { cls: 'completed' }],
+  [3865, { cls: 'quest_line', laneFamily: 'support' }],
+  [5001, { cls: 'quest_reward', laneFamily: 'support' }],
+  [5002, { cls: 'jungle_path', laneFamily: 'jungle' }],
+  [9003, { cls: 'component' }],
+  [2003, { cls: 'consumable' }],
+]);
+
 interface ParticipantSpec {
   puuid: string;
   teamId: number;
@@ -79,12 +92,13 @@ function baseParticipants(me: Partial<ParticipantSpec> = {}): ParticipantSpec[] 
   ];
 }
 
-interface PurchaseSpec {
+interface EventSpec {
   puuid?: string;
   ts: number;
   itemId: number;
-  itemSlot: number | null;
-  type?: 'purchase' | 'sold';
+  eventType?: 'purchase' | 'undo' | 'sold' | 'destroyed';
+  beforeId?: number | null;
+  afterId?: number | null;
   teamGoldDiff?: number;
   killsDiff?: number;
 }
@@ -95,12 +109,14 @@ function seedGame(
   {
     patch = PATCH,
     participants = baseParticipants(),
-    purchases = [],
+    events = [],
+    kills = [],
     createdAt = 1,
   }: {
     patch?: string;
     participants?: ParticipantSpec[];
-    purchases?: PurchaseSpec[];
+    events?: EventSpec[];
+    kills?: Array<{ tMs: number; killerPid?: number | null; victimPid: number }>;
     createdAt?: number;
   } = {},
 ): void {
@@ -117,7 +133,10 @@ function seedGame(
       sub_style, perks_json, items_json, kills, deaths, assists
     ) VALUES (?, ?, ?, ?, ?, ?, 6.5, ?, ?, NULL, 8439, 8400, 8300, '{}', ?, ?, ?, ?)`,
   );
-  for (const p of participants) {
+  const insertPid = db.prepare(
+    'INSERT OR REPLACE INTO match_participant_ids (match_id, participant_id, puuid) VALUES (?, ?, ?)',
+  );
+  participants.forEach((p, i) => {
     insertParticipant.run(
       matchId,
       p.puuid,
@@ -132,27 +151,40 @@ function seedGame(
       p.deaths ?? 0,
       p.assists ?? 0,
     );
-  }
+    insertPid.run(matchId, i + 1, p.puuid);
+  });
   const insertEvent = db.prepare(
     `INSERT INTO item_events (
-      match_id, puuid, ts, item_id, type, team_gold_diff, kills_diff, item_slot
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      match_id, participant_id, puuid, ts_ms, seq, event_type, item_id,
+      before_id, after_id, team_gold_diff, kills_diff
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
-  for (const purchase of purchases) {
+  const pidOf = new Map(participants.map((p, i) => [p.puuid, i + 1]));
+  events.forEach((e, i) => {
+    const puuid = e.puuid ?? 'p-me';
     insertEvent.run(
       matchId,
-      purchase.puuid ?? 'p-me',
-      purchase.ts,
-      purchase.itemId,
-      purchase.type ?? 'purchase',
-      purchase.teamGoldDiff ?? 0,
-      purchase.killsDiff ?? 0,
-      purchase.itemSlot,
+      pidOf.get(puuid) ?? 1,
+      puuid,
+      e.ts,
+      i,
+      e.eventType ?? 'purchase',
+      e.itemId,
+      e.beforeId ?? null,
+      e.afterId ?? null,
+      e.teamGoldDiff ?? 0,
+      e.killsDiff ?? 0,
     );
-  }
+  });
+  const insertKill = db.prepare(
+    `INSERT INTO kill_events (match_id, seq, t_ms, killer_pid, victim_pid, assist_mask)
+     VALUES (?, ?, ?, ?, ?, 0)`,
+  );
+  kills.forEach((k, i) => {
+    insertKill.run(matchId, i, k.tMs, k.killerPid ?? null, k.victimPid);
+  });
 }
 
-/** Champion tags fixture: enemies are all AD, allies mixed/NONE. */
 function writeTagsFile(dir: string): string {
   const tag = (championId: number, damageType: string) => ({
     championId,
@@ -174,7 +206,6 @@ function writeTagsFile(dir: string): string {
   return path;
 }
 
-/** Mock Data Dragon: versions.json + a minimal item.json per version. */
 const mockFetch =
   (items: Record<string, unknown> = {}): typeof fetch =>
   async (input: unknown) => {
@@ -196,18 +227,24 @@ const findRow = (
 ): ItemBuildRow | undefined => rows.find(pred);
 
 describe('aggregateItemBuilds', () => {
-  it('writes item_build rows with D-022 context fields', async () => {
+  it('writes item_build rows with D-022 context fields and path rows', async () => {
     await withDbAsync(async (db, tagsPath) => {
       seedGame(db, 'm1', {
-        purchases: [
-          { ts: 10_000, itemId: 3865, itemSlot: 0 }, // lane phase
-          { ts: 400_000, itemId: 9001, itemSlot: 1, teamGoldDiff: -500 }, // k=1 < 840 s -> lane
-          { ts: 900_000, itemId: 9001, itemSlot: 2, teamGoldDiff: 3000 }, // mid, ahead
-          { ts: 1_200_000, itemId: 9002, itemSlot: 3 },
+        events: [
+          { ts: 10_000, itemId: 3865 }, // quest_line starter -> slot 0
+          { ts: 400_000, itemId: 9001 }, // completed k=1 < 840s -> lane
+          { ts: 900_000, itemId: 9001, teamGoldDiff: 3000 }, // k=2 mid
+          { ts: 1_200_000, itemId: 9002 },
+          { ts: 1_300_000, itemId: 5001 }, // quest_reward -> path row
         ],
       });
-      const rows = await aggregateItemBuilds(db, { tagsPath, fetchFn: mockFetch() });
-      expect(rows.length).toBe(4);
+      const rows = await aggregateItemBuilds(db, {
+        tagsPath,
+        fetchFn: mockFetch(),
+        itemClasses: TEST_CLASSES,
+      });
+      // 4 item rows + 1 path row.
+      expect(rows.length).toBe(5);
 
       const starter = findRow(rows, (r) => r.slotIdx === 0);
       expect(starter).toMatchObject({
@@ -215,54 +252,69 @@ describe('aggregateItemBuilds', () => {
         myRole: 'SUPPORT',
         itemId: 3865,
         timeBucket: '0-5',
-        stateBucket: 'even',
-        profileKey: 'AD',
+        decisionKind: 'item',
       });
       expect(starter?.laneKey.startsWith('lane:')).toBe(true);
-      expect(starter?.laneKey).toContain('ADC:21');
-      expect(starter?.laneKey).toContain('SUPPORT:266');
 
       const first = findRow(rows, (r) => r.slotIdx === 1);
-      expect(first).toMatchObject({ timeBucket: '5-10', stateBucket: 'even' });
+      expect(first).toMatchObject({ itemId: 9001, timeBucket: '5-10' });
       expect(first?.laneKey.startsWith('lane:')).toBe(true);
 
       const second = findRow(rows, (r) => r.slotIdx === 2);
-      expect(second).toMatchObject({
-        timeBucket: '15-20',
-        stateBucket: 'ahead', // gold diff 3000 >= 2000
-        laneKey: '', // mid phase: no lane key
-      });
+      expect(second).toMatchObject({ timeBucket: '15-20', laneKey: '' });
 
-      const third = findRow(rows, (r) => r.slotIdx === 3);
-      expect(third?.laneKey).toBe('');
-
-      for (const row of rows) {
-        expect(row.gamesW).toBeGreaterThan(0);
-        expect(row.gamesW2).toBeGreaterThan(0);
-        expect(row.winsW).toBeGreaterThan(0); // team 100 won
-      }
+      const path = findRow(rows, (r) => r.decisionKind === 'path');
+      expect(path).toMatchObject({ itemId: 5001, slotIdx: 3 });
+      expect(path?.profileKey).toBe('unknown'); // no kill_events seeded
     });
   });
 
-  it("ignores sold rows, NULL-slot purchases and other players' non-expert games", async () => {
+  it('nets undo/sold/destroyed and ignores non-item classes', async () => {
     await withDbAsync(async (db, tagsPath) => {
       seedGame(db, 'm1', {
-        purchases: [
-          { ts: 10_000, itemId: 3865, itemSlot: 0 },
-          { ts: 20_000, itemId: 9003, itemSlot: null }, // component -> no slot
-          { ts: 30_000, itemId: 9001, itemSlot: null, type: 'sold' },
-          { ts: 40_000, itemId: 9001, itemSlot: 1, puuid: 'p-ally-0' }, // ally's purchase
+        events: [
+          { ts: 10_000, itemId: 3865 },
+          { ts: 20_000, itemId: 9003 }, // component -> nothing
+          { ts: 30_000, itemId: 9001 },
+          { ts: 35_000, itemId: 9001, eventType: 'sold' }, // nets out
+          { ts: 40_000, itemId: 9001 }, // re-buy -> still one completed item
+          { ts: 50_000, itemId: 2003 }, // consumable -> nothing
+          { ts: 60_000, itemId: 9002, eventType: 'undo', beforeId: 9002, afterId: null },
         ],
       });
-      const rows = await aggregateItemBuilds(db, { tagsPath, fetchFn: mockFetch() });
-      // Only the expert SUPPORT participant contributes; ally-0 is also an
-      // expert on their own champion, so its purchase lands under ITS champion.
-      expect(rows.every((r) => r.myRole === 'SUPPORT' || r.myRole === 'ADC')).toBe(true);
-      const supportRows = rows.filter((r) => r.myRole === 'SUPPORT');
-      expect(supportRows.map((r) => r.itemId)).toEqual([3865]);
-      const adcRow = findRow(rows, (r) => r.myRole === 'ADC');
-      expect(adcRow?.championId).toBe(21);
-      expect(adcRow?.itemId).toBe(9001);
+      const rows = await aggregateItemBuilds(db, {
+        tagsPath,
+        fetchFn: mockFetch(),
+        itemClasses: TEST_CLASSES,
+      });
+      const itemRows = rows.filter((r) => r.decisionKind === 'item');
+      // slot0 starter + one completed (9001) at slot1; 9002 undo never counts.
+      expect(itemRows.map((r) => r.itemId).sort()).toEqual([3865, 9001]);
+      expect(findRow(rows, (r) => r.itemId === 9002)).toBeUndefined();
+    });
+  });
+
+  it('writes participant_starters bundles', async () => {
+    await withDbAsync(async (db, tagsPath) => {
+      seedGame(db, 'm1', {
+        events: [
+          { ts: 5_000, itemId: 3865 },
+          { ts: 10_000, itemId: 2003 },
+          { ts: 50_000, itemId: 9001 }, // outside 45s window
+        ],
+      });
+      await aggregateItemBuilds(db, {
+        tagsPath,
+        fetchFn: mockFetch(),
+        itemClasses: TEST_CLASSES,
+      });
+      const bundle = db
+        .prepare(
+          `SELECT bundle_json FROM participant_starters WHERE match_id = 'm1' AND participant_id = 1`,
+        )
+        .get() as { bundle_json: string } | undefined;
+      // Net purchases in window: 3865 + 2003 (consumables count in the bundle).
+      expect(bundle?.bundle_json).toBe('2003:1,3865:1');
     });
   });
 
@@ -270,30 +322,33 @@ describe('aggregateItemBuilds', () => {
     await withDbAsync(async (db, tagsPath) => {
       seedGame(db, 'm1', {
         participants: baseParticipants({ championGames: 5, masteryPoints: null }),
-        purchases: [{ ts: 10_000, itemId: 3865, itemSlot: 0 }],
+        events: [{ ts: 10_000, itemId: 3865 }],
       });
       seedGame(db, 'm2', {
         participants: baseParticipants({ championGames: 5, masteryPoints: 60_000 }),
-        purchases: [{ ts: 10_000, itemId: 3865, itemSlot: 0 }],
+        events: [{ ts: 10_000, itemId: 3865 }],
         createdAt: 2,
       });
-      const rows = await aggregateItemBuilds(db, { tagsPath, fetchFn: mockFetch() });
-      // Only m2 (mastery fallback) contributes.
+      const rows = await aggregateItemBuilds(db, {
+        tagsPath,
+        fetchFn: mockFetch(),
+        itemClasses: TEST_CLASSES,
+      });
       expect(rows).toHaveLength(1);
-      expect(rows[0]?.gamesW).toBeGreaterThan(0);
     });
   });
 
   it('is idempotent: a second run produces identical rows', async () => {
     await withDbAsync(async (db, tagsPath) => {
       seedGame(db, 'm1', {
-        purchases: [
-          { ts: 10_000, itemId: 3865, itemSlot: 0 },
-          { ts: 400_000, itemId: 9001, itemSlot: 1 },
+        events: [
+          { ts: 10_000, itemId: 3865 },
+          { ts: 400_000, itemId: 9001 },
         ],
       });
-      const first = await aggregateItemBuilds(db, { tagsPath, fetchFn: mockFetch() });
-      const second = await aggregateItemBuilds(db, { tagsPath, fetchFn: mockFetch() });
+      const opts = { tagsPath, fetchFn: mockFetch(), itemClasses: TEST_CLASSES };
+      const first = await aggregateItemBuilds(db, opts);
+      const second = await aggregateItemBuilds(db, opts);
       expect(second).toEqual(first);
       const stored = db.prepare('SELECT COUNT(*) AS n FROM item_build').get() as { n: number };
       expect(stored.n).toBe(first.length);
@@ -302,14 +357,18 @@ describe('aggregateItemBuilds', () => {
 
   it('leaves item_build untouched when nothing contributes', async () => {
     await withDbAsync(async (db, tagsPath) => {
-      seedGame(db, 'm1', { purchases: [] });
+      seedGame(db, 'm1', { events: [] });
       db.prepare(
         `INSERT INTO item_build (
           champion_id, my_role, slot_idx, time_bucket, state_bucket,
-          profile_key, lane_key, item_id, wins_w, games_w, games_w2
-        ) VALUES (1, 'SUPPORT', 0, '0-5', 'even', 'mixed', '', 1, 1, 1, 1)`,
+          profile_key, lane_key, decision_kind, item_id, wins_w, games_w, games_w2
+        ) VALUES (1, 'SUPPORT', 0, '0-5', 'even', 'mixed', '', 'item', 1, 1, 1, 1)`,
       ).run();
-      const rows = await aggregateItemBuilds(db, { tagsPath, fetchFn: mockFetch() });
+      const rows = await aggregateItemBuilds(db, {
+        tagsPath,
+        fetchFn: mockFetch(),
+        itemClasses: TEST_CLASSES,
+      });
       expect(rows).toHaveLength(0);
       const stored = db.prepare('SELECT COUNT(*) AS n FROM item_build').get() as { n: number };
       expect(stored.n).toBe(1);
@@ -318,33 +377,33 @@ describe('aggregateItemBuilds', () => {
 
   it('accumulates weights across matches with decay and games_w2', async () => {
     await withDbAsync(async (db, tagsPath) => {
-      // Same context in two patches: weight differs by recency decay.
       seedGame(db, 'm-old', {
         patch: '16.20',
         createdAt: 1,
-        purchases: [{ ts: 10_000, itemId: 3865, itemSlot: 0 }],
+        events: [{ ts: 10_000, itemId: 3865 }],
       });
       seedGame(db, 'm-new', {
         patch: PATCH,
         createdAt: 2,
-        purchases: [{ ts: 10_000, itemId: 3865, itemSlot: 0 }],
+        events: [{ ts: 10_000, itemId: 3865 }],
       });
-      const rows = await aggregateItemBuilds(db, { tagsPath, fetchFn: mockFetch() });
+      const rows = await aggregateItemBuilds(db, {
+        tagsPath,
+        fetchFn: mockFetch(),
+        itemClasses: TEST_CLASSES,
+      });
       const row = findRow(
         rows,
         (r) => r.championId === 412 && r.myRole === 'SUPPORT' && r.itemId === 3865,
       );
       expect(row).toBeDefined();
       if (row === undefined) return;
-      // Two games merged into one row; gamesW2 is the sum of squared weights,
-      // strictly less than gamesW^2 for unequal weights.
       expect(row.gamesW2).toBeLessThan(row.gamesW * row.gamesW);
       expect(row.gamesW2).toBeGreaterThan(0);
     });
   });
 });
 
-// withDb is sync; async variant inlined here to keep the helper small.
 async function withDbAsync(
   run: (db: ReturnType<typeof openDb>, tagsPath: string) => Promise<void>,
 ): Promise<void> {

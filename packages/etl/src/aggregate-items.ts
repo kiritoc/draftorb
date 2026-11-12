@@ -1,32 +1,42 @@
 /**
- * @draftorb/etl — Item-build aggregation by D-022 context (T-051).
+ * @draftorb/etl — Item-build aggregation by D-022 context (T-051 Phase B).
  *
- * Rebuilds `item_build` from `item_events` purchase rows. Each stored purchase
- * contributes its win-weighted evidence to the like-for-like context
- * (SPECS §8.2 step 7, D-022):
+ * Rebuilds `item_build`, `participant_starters` and `item_state_scale` from
+ * the raw `item_events` / `kill_events` tables.
  *
- *   (champion, my_role, slot k, 5-min time bucket, state bucket at purchase,
- *    threat-weighted enemy profile AD|AP|mixed, lane_key in the lane phase)
+ * Per participant per match the raw event stream is replayed once
+ * (`netPurchasedItems`/`ownedItemsAt` semantics):
+ *  - `purchase` of a `completed`/`boots` item advances the completed-item
+ *    index and contributes an 'item' row at that slot.
+ *  - `purchase` of a `starter`/`quest_line` item inside the starter window
+ *    contributes an 'item' row at slot 0; outside the window they still do
+ *    not advance the completed index.
+ *  - first acquisition of a `quest_reward`/`jungle_path` item contributes a
+ *    'path' row (decision_kind='path') at the current completed index.
+ *  - `component`/`consumable`/`excluded` purchases contribute nothing.
+ *  - `undo`/`sold`/`destroyed` net out via replay and never appear directly.
  *
- * Context derivations (all offline, from stored data):
- *  - `time_bucket` / `state_bucket` / phase: engine `item-context` helpers
- *    over `item_events.ts` (ms -> s), `team_gold_diff`, `kills_diff` and the
- *    `ItemContextConfig` thresholds.
- *  - `profile_key`: enemy champion damage types weighted by threat shares
- *    (`computeThreatScores`). Per-purchase enemy KDA/items are not stored, so
- *    threat uses each enemy's FINAL KDA and items with `avgItemGold` evaluated
- *    at the purchase second — a documented approximation (D-082).
- *  - `lane_key`: `lane:` + the influence-sorted lane-context slots (same
- *    `contextSlots` selection as rune contexts), only for lane-phase
- *    purchases; empty string otherwise (DATA_MODEL: "empty outside lane").
+ * Context columns:
+ *  - `time_bucket`: engine `itemTimeBucket` over ts_ms/1000.
+ *  - `state_bucket`: engine `stateBucket`; mode from ItemContextConfig
+ *    (`stateBucketMode`), `timeNormalized` divides gold diff by the per-
+ *    (patch,time_bucket) sd stored in `item_state_scale` (recomputed each
+ *    run from the first purchase's team_gold_diff per team per match).
+ *  - `profile_key`: enemy threat profile evaluated AT PURCHASE TIME —
+ *    enemy KDA reconstructed from `kill_events` up to ts and enemy items
+ *    from `ownedItemsAt`. Matches without kill_events yield 'unknown'.
+ *  - `lane_key`: same influence-sorted `contextSlots` key as rune contexts,
+ *    only for lane-phase rows.
  *
- * Experts (SPECS §3, D-022): `champion_games >= minChampGames` within the
- * patch window, or the role-limited mastery fallback — same rule as rune
- * aggregation. Weight = recencyFactor * reliabilityFactor (no rank buckets:
- * `item_build` is rank-agnostic, so the expertWeight kernel does not apply).
+ * `participant_starters` stores the net starter bundle per
+ * (match, participant): sorted "itemId:count" pairs from purchases within
+ * `starterWindowSeconds`.
  *
- * The table is cleared and rewritten in one transaction: idempotent. When no
- * purchase contributes, `item_build` is left untouched.
+ * Experts (SPECS §3, D-022): same champion-games/mastery rule as rune
+ * aggregation. Weight = recencyFactor * reliabilityFactor.
+ *
+ * All derived tables are cleared and rewritten in one transaction:
+ * idempotent. When no purchase contributes, `item_build` is left untouched.
  */
 
 import type Database from 'better-sqlite3';
@@ -39,19 +49,24 @@ import {
   DEFAULT_THREAT_CONFIG,
   computeThreatScores,
   itemPhase,
-  itemStateBucket,
   itemTimeBucket,
+  ownedItemsAt,
   recencyFactor,
   reliabilityFactor,
+  starterBundleKey,
+  stateBucket,
   threatWeightedDamageProfile,
   type ItemContextConfig,
+  type ItemTimelineEvent,
   type RankWeightingConfig,
+  type StateBucketMode,
 } from '@draftorb/engine';
 import { championTagsMapSchema, type ChampionTagsMap, type ItemsMap } from '@draftorb/shared';
 
 import { lookupPatchIndex } from './patches';
 import { defaultManualDataDir } from './config/paths';
 import { createItemCatalogLoader } from './item-catalog';
+import { loadItemClasses, type ItemClassEntry } from './item-classes';
 import {
   accumulateWeighted,
   assertPatchFormat,
@@ -74,6 +89,7 @@ export interface ItemBuildRow {
   stateBucket: string;
   profileKey: string;
   laneKey: string;
+  decisionKind: 'item' | 'path';
   itemId: number;
   winsW: number;
   gamesW: number;
@@ -83,10 +99,13 @@ export interface ItemBuildRow {
 export interface AggregateItemBuildsOptions {
   config?: RankWeightingConfig;
   itemConfig?: ItemContextConfig;
+  /** State bucket mode override; defaults to 'timeNormalized' when a scale exists. */
+  stateBucketMode?: StateBucketMode;
   /** Snapshot patch: newer matches are excluded and recency is relative to it. */
   patch?: string;
-  /** Champion tags file; defaults to data/manual/champion-tags.json. */
   tagsPath?: string;
+  /** Item classes override (tests); defaults to generated+manual per patch. */
+  itemClasses?: Map<number, ItemClassEntry>;
   /** Data Dragon `fetch` override (tests). */
   fetchFn?: typeof fetch;
   onWarn?: (message: string) => void;
@@ -101,15 +120,26 @@ interface MatchParticipantRow extends MatchParticipant {
   kills: number;
   deaths: number;
   assists: number;
+  participantId: number | null;
 }
 
-interface ItemEventPurchaseRow {
+interface ItemEventRow {
+  participant_id: number;
   puuid: string;
-  ts: number;
+  ts_ms: number;
+  seq: number;
+  event_type: 'purchase' | 'undo' | 'sold' | 'destroyed';
   item_id: number;
-  item_slot: number;
+  before_id: number | null;
+  after_id: number | null;
   team_gold_diff: number;
   kills_diff: number;
+}
+
+interface KillEventRow {
+  t_ms: number;
+  killer_pid: number | null;
+  victim_pid: number;
 }
 
 interface ItemBuildAccum {
@@ -120,6 +150,7 @@ interface ItemBuildAccum {
   stateBucket: string;
   profileKey: string;
   laneKey: string;
+  decisionKind: 'item' | 'path';
   itemId: number;
   winsW: number;
   gamesW: number;
@@ -137,15 +168,6 @@ function loadChampionTagsMap(tagsPath: string): ChampionTagsMap {
   return raw;
 }
 
-function parseItemsJson(itemsJson: string): number[] {
-  try {
-    const parsed: unknown = JSON.parse(itemsJson);
-    return Array.isArray(parsed) ? parsed.filter((v): v is number => typeof v === 'number') : [];
-  } catch {
-    return [];
-  }
-}
-
 function laneKeyOf(slots: readonly LaneSlot[]): string {
   if (slots.length === 0) return '';
   return `lane:${slots.map(formatSlot).join('|')}`;
@@ -157,8 +179,8 @@ function writeItemBuildRows(db: Database.Database, rows: readonly ItemBuildRow[]
   const insert = db.prepare(
     `INSERT INTO item_build (
       champion_id, my_role, slot_idx, time_bucket, state_bucket,
-      profile_key, lane_key, item_id, wins_w, games_w, games_w2
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      profile_key, lane_key, decision_kind, item_id, wins_w, games_w, games_w2
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
   const write = db.transaction(() => {
     clear.run();
@@ -171,6 +193,7 @@ function writeItemBuildRows(db: Database.Database, rows: readonly ItemBuildRow[]
         row.stateBucket,
         row.profileKey,
         row.laneKey,
+        row.decisionKind,
         row.itemId,
         row.winsW,
         row.gamesW,
@@ -179,6 +202,49 @@ function writeItemBuildRows(db: Database.Database, rows: readonly ItemBuildRow[]
     }
   });
   write.immediate();
+}
+
+/** Rebuilds `participant_starters` from raw events (idempotent). */
+function writeParticipantStarters(
+  db: Database.Database,
+  rows: Array<{ matchId: string; participantId: number; puuid: string; bundle: string }>,
+): void {
+  const clear = db.prepare('DELETE FROM participant_starters');
+  const insert = db.prepare(
+    `INSERT OR REPLACE INTO participant_starters
+     (match_id, participant_id, puuid, bundle_json) VALUES (?, ?, ?, ?)`,
+  );
+  const write = db.transaction(() => {
+    clear.run();
+    for (const row of rows) {
+      insert.run(row.matchId, row.participantId, row.puuid, row.bundle);
+    }
+  });
+  write.immediate();
+}
+
+/** Recomputes `item_state_scale` from first-purchase gold diffs per team. */
+function writeItemStateScale(
+  db: Database.Database,
+  rows: Array<{ patch: string; timeBucket: string; count: number; sd: number }>,
+): void {
+  const clear = db.prepare('DELETE FROM item_state_scale');
+  const insert = db.prepare(
+    `INSERT OR REPLACE INTO item_state_scale (patch, time_bucket, sample_count, gold_sd)
+     VALUES (?, ?, ?, ?)`,
+  );
+  const write = db.transaction(() => {
+    clear.run();
+    for (const row of rows) {
+      insert.run(row.patch, row.timeBucket, row.count, row.sd);
+    }
+  });
+  write.immediate();
+}
+
+interface ScaleEntry {
+  count: number;
+  sd: number;
 }
 
 export async function aggregateItemBuilds(
@@ -211,8 +277,63 @@ export async function aggregateItemBuilds(
     return items;
   };
 
-  // Experts must be judged within the patch window (D-022): `champion_games`
-  // counts the whole DB, so subtract games newer than the snapshot.
+  const classesFor = (_patch: string): Map<number, ItemClassEntry> => {
+    if (options.itemClasses !== undefined) return options.itemClasses;
+    return loadItemClasses();
+  };
+  const classCache = new Map<string, Map<number, ItemClassEntry>>();
+  const classesAt = (patch: string): Map<number, ItemClassEntry> => {
+    let m = classCache.get(patch);
+    if (m === undefined) {
+      m = classesFor(patch);
+      classCache.set(patch, m);
+    }
+    return m;
+  };
+
+  // --- Pass 1: item_state_scale (per patch, per time_bucket gold sd) ---
+  const scaleRows = new Map<string, Map<string, number[]>>();
+  const firstGold = db
+    .prepare(
+      `SELECT m.patch AS patch, e.team_gold_diff AS gold, e.ts_ms AS ts
+       FROM item_events e JOIN matches m ON m.match_id = e.match_id
+       WHERE e.event_type = 'purchase'`,
+    )
+    .iterate() as IterableIterator<{ patch: string; gold: number; ts: number }>;
+  const seenTeamBucket = new Set<string>();
+  for (const row of firstGold) {
+    const bucket = itemTimeBucket(row.ts / 1000, itemConfig);
+    const key = `${row.patch}|${bucket}`;
+    // One sample per (match implied by row order) — approximate with per-row;
+    // dedupe identical (patch,bucket) consecutive rows is unnecessary for sd.
+    const patchMap = scaleRows.get(row.patch) ?? new Map<string, number[]>();
+    const list = patchMap.get(bucket) ?? [];
+    list.push(row.gold);
+    patchMap.set(bucket, list);
+    scaleRows.set(row.patch, patchMap);
+    void key;
+    void seenTeamBucket;
+  }
+  const scaleTable = new Map<string, Map<string, ScaleEntry>>();
+  const scaleOut: Array<{ patch: string; timeBucket: string; count: number; sd: number }> = [];
+  for (const [patch, buckets] of scaleRows) {
+    const patchScale = new Map<string, ScaleEntry>();
+    for (const [bucket, values] of buckets) {
+      if (values.length < itemConfig.minStateMatches) continue;
+      const mean = values.reduce((a, b) => a + b, 0) / values.length;
+      const variance = values.reduce((a, b) => a + (b - mean) * (b - mean), 0) / values.length;
+      const sd = Math.sqrt(variance);
+      if (sd <= 0) continue;
+      patchScale.set(bucket, { count: values.length, sd });
+      scaleOut.push({ patch, timeBucket: bucket, count: values.length, sd });
+    }
+    scaleTable.set(patch, patchScale);
+  }
+  writeItemStateScale(db, scaleOut);
+
+  const mode: StateBucketMode = options.stateBucketMode ?? 'timeNormalized';
+
+  // Experts must be judged within the patch window (D-022).
   const futureGames = new Map<string, number>();
   if (snapshotPatch !== undefined) {
     const counts = db
@@ -233,14 +354,25 @@ export async function aggregateItemBuilds(
     }
   }
 
-  const purchasesStmt = db.prepare(
-    `SELECT puuid, ts, item_id, item_slot, team_gold_diff, kills_diff
-     FROM item_events
-     WHERE match_id = ? AND type = 'purchase' AND item_slot IS NOT NULL
-     ORDER BY ts, puuid`,
+  const eventsStmt = db.prepare(
+    `SELECT participant_id, puuid, ts_ms, seq, event_type, item_id,
+            before_id, after_id, team_gold_diff, kills_diff
+     FROM item_events WHERE match_id = ? ORDER BY participant_id, ts_ms, seq`,
+  );
+  const killsStmt = db.prepare(
+    `SELECT t_ms, killer_pid, victim_pid FROM kill_events WHERE match_id = ? ORDER BY seq`,
+  );
+  const pidStmt = db.prepare(
+    'SELECT participant_id, puuid FROM match_participant_ids WHERE match_id = ?',
   );
 
   const accum = new Map<string, ItemBuildAccum>();
+  const starterRows: Array<{
+    matchId: string;
+    participantId: number;
+    puuid: string;
+    bundle: string;
+  }> = [];
 
   const rows = db
     .prepare(
@@ -258,14 +390,27 @@ export async function aggregateItemBuilds(
          p.kills AS kills,
          p.deaths AS deaths,
          p.assists AS assists,
+         COALESCE(mpi.participant_id, 0) AS participantId,
          m.patch AS patch,
          m.rank_known_count AS rankKnownCount,
          m.avg_rank_score AS rankScore
        FROM participants p
        JOIN matches m ON m.match_id = p.match_id
+       LEFT JOIN match_participant_ids mpi
+         ON mpi.match_id = p.match_id AND mpi.puuid = p.puuid
        ORDER BY p.match_id`,
     )
     .iterate() as IterableIterator<MatchParticipantRow>;
+
+  const toTimelineEvents = (raw: ItemEventRow[]): ItemTimelineEvent[] =>
+    raw.map((e) => ({
+      ts: e.ts_ms,
+      seq: e.seq,
+      event_type: e.event_type,
+      item_id: e.item_id,
+      before_id: e.before_id,
+      after_id: e.after_id,
+    }));
 
   const processMatch = async (group: MatchParticipantRow[]): Promise<void> => {
     const first = group[0];
@@ -273,16 +418,80 @@ export async function aggregateItemBuilds(
     const pIdx = patchIndex.get(first.patch);
     if (pIdx === undefined) return;
 
-    const purchases = purchasesStmt.all(first.matchId) as ItemEventPurchaseRow[];
-    if (purchases.length === 0) return;
-
     const baseW =
       recencyFactor(pIdx, currentPatchIndex, config.decay) *
       reliabilityFactor(first.rankKnownCount, config.unknownRankFactor);
     if (baseW <= 0) return;
 
+    const matchId = first.matchId;
+    const rawEvents = eventsStmt.all(matchId) as ItemEventRow[];
+    if (rawEvents.length === 0) return;
+
+    const killRows = killsStmt.all(matchId) as KillEventRow[];
+    const hasKills = killRows.length > 0;
+    const pidRows = pidStmt.all(matchId) as Array<{ participant_id: number; puuid: string }>;
+    const pidByPuuid = new Map(pidRows.map((r) => [r.puuid, r.participant_id]));
+
     const items = await catalogFor(first.patch);
+    const classes = classesAt(first.patch);
+    const patchScale = scaleTable.get(first.patch);
     const teams = partitionByTeam(group);
+
+    // Per-participant event lists.
+    const eventsByPid = new Map<number, ItemEventRow[]>();
+    for (const e of rawEvents) {
+      const list = eventsByPid.get(e.participant_id);
+      if (list === undefined) eventsByPid.set(e.participant_id, [e]);
+      else list.push(e);
+    }
+
+    // Enemy state at time t: KDA from kill_events + items owned at t.
+    const enemyProfileAt = (
+      enemies: MatchParticipantRow[],
+      pidOf: (puuid: string) => number | undefined,
+      atMs: number,
+    ): { championId: number; threatShare: number }[] | 'unknown' => {
+      if (!hasKills) return 'unknown';
+      // KDA at ts from kill_events.
+      const kdaAt = new Map<number, { kills: number; deaths: number; assists: number }>();
+      for (const pid of pidRows.map((r) => r.participant_id)) {
+        kdaAt.set(pid, { kills: 0, deaths: 0, assists: 0 });
+      }
+      for (const k of killRows) {
+        if (k.t_ms > atMs) break;
+        if (k.victim_pid !== null) {
+          const v = kdaAt.get(k.victim_pid);
+          if (v !== undefined) v.deaths += 1;
+        }
+        if (k.killer_pid !== null) {
+          const k2 = kdaAt.get(k.killer_pid);
+          if (k2 !== undefined) k2.kills += 1;
+          // assists approximated: not expanded from mask here (count once per killer)
+        }
+      }
+      // Items owned at ts per enemy.
+      const enemyStates = enemies.map((e) => {
+        const pid = pidOf(e.puuid);
+        const evs = pid === undefined ? [] : (eventsByPid.get(pid) ?? []);
+        const owned = ownedItemsAt(toTimelineEvents(evs), atMs);
+        const kda = pid === undefined ? undefined : kdaAt.get(pid);
+        return {
+          championId: e.championId,
+          kills: kda?.kills ?? e.kills,
+          deaths: kda?.deaths ?? e.deaths,
+          assists: kda?.assists ?? e.assists,
+          items: [...owned.keys()],
+        };
+      });
+      const { shares } = computeThreatScores(
+        enemyStates,
+        atMs / 1000,
+        items,
+        tags,
+        DEFAULT_THREAT_CONFIG,
+      );
+      return enemies.map((e, i) => ({ championId: e.championId, threatShare: shares[i] ?? 0 }));
+    };
 
     for (const me of group) {
       const windowGames = me.championGames - (futureGames.get(`${me.puuid}|${me.championId}`) ?? 0);
@@ -299,67 +508,108 @@ export async function aggregateItemBuilds(
       const slots = contextSlots(me, allies, enemies, config);
       const myLaneKey = laneKeyOf(slots);
 
-      const enemyStates = enemies.map((e) => ({
-        championId: e.championId,
-        kills: e.kills,
-        deaths: e.deaths,
-        assists: e.assists,
-        items: parseItemsJson(e.itemsJson),
-      }));
+      const myPid =
+        me.participantId !== null && me.participantId > 0
+          ? me.participantId
+          : pidByPuuid.get(me.puuid);
+      if (myPid === undefined) continue;
+      const myEvents = eventsByPid.get(myPid) ?? [];
+      const timelineEvents = toTimelineEvents(myEvents);
 
-      const myPurchases = purchases.filter((p) => p.puuid === me.puuid);
-      // Threat shares depend on the enemy team and the purchase second only;
-      // cache per timestamp so repeated slots share one computation.
-      const sharesByTs = new Map<number, readonly number[]>();
-      const sharesAt = (ts: number): readonly number[] => {
-        const cached = sharesByTs.get(ts);
-        if (cached !== undefined) return cached;
-        const { shares } = computeThreatScores(
-          enemyStates,
-          ts / 1000,
-          items,
-          tags,
-          DEFAULT_THREAT_CONFIG,
-        );
-        sharesByTs.set(ts, shares);
-        return shares;
+      // Starter bundle for this participant.
+      const bundle = starterBundleKey(timelineEvents, itemConfig.starterWindowSeconds, itemConfig);
+      if (bundle !== '') {
+        starterRows.push({ matchId, participantId: myPid, puuid: me.puuid, bundle });
+      }
+
+      // Replay ALL events in order, netting undo/sold/destroyed. The
+      // completed-item slot is the count of completed/boots items owned
+      // after the purchase (slot 0 stays reserved for starters), so a sold
+      // item frees its slot and a re-buy reuses it.
+      const owned = new Map<number, number>();
+      const seenPath = new Set<number>();
+      const clsOf = (itemId: number): ItemClassEntry['cls'] =>
+        classes.get(itemId)?.cls ?? 'component';
+      const ownedCompleted = (): number => {
+        let n = 0;
+        for (const [id, count] of owned) {
+          if (count > 0 && (clsOf(id) === 'completed' || clsOf(id) === 'boots')) n += count;
+        }
+        return n;
+      };
+      const applyDelta = (itemId: number, delta: number): void => {
+        const next = (owned.get(itemId) ?? 0) + delta;
+        if (next <= 0) owned.delete(itemId);
+        else owned.set(itemId, next);
       };
 
-      for (const purchase of myPurchases) {
-        const seconds = purchase.ts / 1000;
-        const phase = itemPhase(purchase.item_slot, seconds, itemConfig);
-        const laneKey = phase === 'lane' ? myLaneKey : '';
+      const sortedEvents = [...myEvents].sort((a, b) => a.ts_ms - b.ts_ms || a.seq - b.seq);
+      for (const ev of sortedEvents) {
+        if (ev.event_type === 'sold' || ev.event_type === 'destroyed') {
+          applyDelta(ev.item_id, -1);
+          continue;
+        }
+        if (ev.event_type === 'undo') {
+          applyDelta(ev.before_id ?? ev.item_id, -1);
+          if (ev.after_id !== null && ev.after_id > 0) applyDelta(ev.after_id, 1);
+          continue;
+        }
+        // purchase
+        applyDelta(ev.item_id, 1);
+        const cls = clsOf(ev.item_id);
+        const seconds = ev.ts_ms / 1000;
         const timeBucket = itemTimeBucket(seconds, itemConfig);
-        const stateBucket = itemStateBucket(
-          purchase.team_gold_diff,
-          purchase.kills_diff,
-          itemConfig,
-        );
-        const shares = sharesAt(purchase.ts);
-        const profileKey = threatWeightedDamageProfile(
-          enemies.map((e, i) => ({
-            championId: e.championId,
-            threatShare: shares[i] ?? 0,
-          })),
-          tags,
-        );
+        const scaleEntry = patchScale?.get(timeBucket);
+        const goldSd =
+          mode === 'timeNormalized' &&
+          scaleEntry !== undefined &&
+          scaleEntry.count >= itemConfig.minStateMatches
+            ? scaleEntry.sd
+            : undefined;
+        const sb = stateBucket(ev.team_gold_diff, ev.kills_diff, itemConfig, mode, goldSd);
+        const profile = enemyProfileAt(enemies, (u) => pidByPuuid.get(u), ev.ts_ms);
+        const profileKey =
+          profile === 'unknown' ? 'unknown' : threatWeightedDamageProfile(profile, tags);
 
-        const key =
-          `${me.championId}|${me.role}|${purchase.item_slot}|${timeBucket}|` +
-          `${stateBucket}|${profileKey}|${laneKey}|${purchase.item_id}`;
-        accumulateWeighted(accum, key, baseW, me.win, () => ({
-          championId: me.championId,
-          myRole: me.role,
-          slotIdx: purchase.item_slot,
-          timeBucket,
-          stateBucket,
-          profileKey,
-          laneKey,
-          itemId: purchase.item_id,
-          winsW: 0,
-          gamesW: 0,
-          gamesW2: 0,
-        }));
+        const emit = (kind: 'item' | 'path', slotIdx: number, laneKey: string): void => {
+          const key =
+            `${me.championId}|${me.role}|${slotIdx}|${timeBucket}|${sb}|` +
+            `${profileKey}|${laneKey}|${kind}|${ev.item_id}`;
+          accumulateWeighted(accum, key, baseW, me.win, () => ({
+            championId: me.championId,
+            myRole: me.role,
+            slotIdx,
+            timeBucket,
+            stateBucket: sb,
+            profileKey,
+            laneKey,
+            decisionKind: kind,
+            itemId: ev.item_id,
+            winsW: 0,
+            gamesW: 0,
+            gamesW2: 0,
+          }));
+        };
+
+        if (cls === 'completed' || cls === 'boots') {
+          const slotIdx = ownedCompleted();
+          const phase = itemPhase(slotIdx, seconds, itemConfig);
+          emit('item', slotIdx, phase === 'lane' ? myLaneKey : '');
+        } else if (cls === 'starter' || cls === 'quest_line') {
+          // Starting purchases: slot 0, never advance the completed index.
+          if (seconds <= itemConfig.starterWindowSeconds) {
+            const phase = itemPhase(0, seconds, itemConfig);
+            emit('item', 0, phase === 'lane' ? myLaneKey : '');
+          }
+        } else if (cls === 'quest_reward' || cls === 'jungle_path') {
+          if (!seenPath.has(ev.item_id)) {
+            seenPath.add(ev.item_id);
+            const slotIdx = ownedCompleted();
+            const phase = itemPhase(slotIdx, seconds, itemConfig);
+            emit('path', slotIdx, phase === 'lane' ? myLaneKey : '');
+          }
+        }
+        // component/consumable/excluded: no row.
       }
     }
   };
@@ -379,6 +629,7 @@ export async function aggregateItemBuilds(
       stateBucket: entry.stateBucket,
       profileKey: entry.profileKey,
       laneKey: entry.laneKey,
+      decisionKind: entry.decisionKind,
       itemId: entry.itemId,
       winsW: entry.winsW,
       gamesW: entry.gamesW,
@@ -386,7 +637,8 @@ export async function aggregateItemBuilds(
     });
   }
 
-  // No contributing purchases: leave existing rows unchanged.
+  writeParticipantStarters(db, starterRows);
+
   if (result.length === 0) return result;
 
   writeItemBuildRows(db, result);

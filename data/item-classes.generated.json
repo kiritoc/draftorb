@@ -1,0 +1,2601 @@
+{
+  "patch": "16.22",
+  "version": "16.22.1",
+  "items": {
+    "1001": {
+      "cls": "boots"
+    },
+    "1004": {
+      "cls": "component"
+    },
+    "1006": {
+      "cls": "component"
+    },
+    "1011": {
+      "cls": "component"
+    },
+    "1018": {
+      "cls": "component"
+    },
+    "1026": {
+      "cls": "component"
+    },
+    "1027": {
+      "cls": "component"
+    },
+    "1028": {
+      "cls": "component"
+    },
+    "1029": {
+      "cls": "component"
+    },
+    "1031": {
+      "cls": "component"
+    },
+    "1033": {
+      "cls": "component"
+    },
+    "1035": {
+      "cls": "excluded"
+    },
+    "1036": {
+      "cls": "component"
+    },
+    "1037": {
+      "cls": "component"
+    },
+    "1038": {
+      "cls": "component"
+    },
+    "1039": {
+      "cls": "excluded"
+    },
+    "1040": {
+      "cls": "excluded"
+    },
+    "1042": {
+      "cls": "component"
+    },
+    "1043": {
+      "cls": "component"
+    },
+    "1052": {
+      "cls": "component"
+    },
+    "1053": {
+      "cls": "component"
+    },
+    "1054": {
+      "cls": "starter"
+    },
+    "1055": {
+      "cls": "starter"
+    },
+    "1056": {
+      "cls": "starter"
+    },
+    "1057": {
+      "cls": "component"
+    },
+    "1058": {
+      "cls": "component"
+    },
+    "1082": {
+      "cls": "component"
+    },
+    "1083": {
+      "cls": "starter"
+    },
+    "1086": {
+      "cls": "starter"
+    },
+    "1090": {
+      "cls": "excluded"
+    },
+    "1091": {
+      "cls": "excluded"
+    },
+    "1092": {
+      "cls": "excluded"
+    },
+    "1093": {
+      "cls": "excluded"
+    },
+    "1094": {
+      "cls": "excluded"
+    },
+    "1101": {
+      "cls": "jungle_path",
+      "laneFamily": "jungle"
+    },
+    "1102": {
+      "cls": "jungle_path",
+      "laneFamily": "jungle"
+    },
+    "1103": {
+      "cls": "jungle_path",
+      "laneFamily": "jungle"
+    },
+    "1104": {
+      "cls": "excluded"
+    },
+    "1105": {
+      "cls": "jungle_path",
+      "laneFamily": "jungle"
+    },
+    "1106": {
+      "cls": "jungle_path",
+      "laneFamily": "jungle"
+    },
+    "1107": {
+      "cls": "jungle_path",
+      "laneFamily": "jungle"
+    },
+    "1111": {
+      "cls": "boots"
+    },
+    "1120": {
+      "cls": "starter"
+    },
+    "1200": {
+      "cls": "excluded"
+    },
+    "1201": {
+      "cls": "excluded"
+    },
+    "1202": {
+      "cls": "excluded"
+    },
+    "1203": {
+      "cls": "excluded"
+    },
+    "1204": {
+      "cls": "excluded"
+    },
+    "1205": {
+      "cls": "excluded"
+    },
+    "1206": {
+      "cls": "excluded"
+    },
+    "1207": {
+      "cls": "excluded"
+    },
+    "1208": {
+      "cls": "excluded"
+    },
+    "1209": {
+      "cls": "excluded"
+    },
+    "1210": {
+      "cls": "excluded"
+    },
+    "1211": {
+      "cls": "excluded"
+    },
+    "1220": {
+      "cls": "excluded"
+    },
+    "1221": {
+      "cls": "excluded"
+    },
+    "1222": {
+      "cls": "excluded"
+    },
+    "1500": {
+      "cls": "excluded"
+    },
+    "1501": {
+      "cls": "excluded"
+    },
+    "1502": {
+      "cls": "excluded"
+    },
+    "1503": {
+      "cls": "excluded"
+    },
+    "1504": {
+      "cls": "excluded"
+    },
+    "1505": {
+      "cls": "excluded"
+    },
+    "1506": {
+      "cls": "excluded"
+    },
+    "1507": {
+      "cls": "excluded"
+    },
+    "1508": {
+      "cls": "excluded"
+    },
+    "1509": {
+      "cls": "excluded"
+    },
+    "1510": {
+      "cls": "excluded"
+    },
+    "1511": {
+      "cls": "excluded"
+    },
+    "1512": {
+      "cls": "excluded"
+    },
+    "1515": {
+      "cls": "excluded"
+    },
+    "1516": {
+      "cls": "excluded"
+    },
+    "1517": {
+      "cls": "excluded"
+    },
+    "1518": {
+      "cls": "excluded"
+    },
+    "1519": {
+      "cls": "excluded"
+    },
+    "1520": {
+      "cls": "excluded"
+    },
+    "1521": {
+      "cls": "excluded"
+    },
+    "1522": {
+      "cls": "excluded"
+    },
+    "1523": {
+      "cls": "excluded"
+    },
+    "1524": {
+      "cls": "excluded"
+    },
+    "2001": {
+      "cls": "excluded"
+    },
+    "2002": {
+      "cls": "excluded"
+    },
+    "2003": {
+      "cls": "consumable"
+    },
+    "2007": {
+      "cls": "excluded"
+    },
+    "2010": {
+      "cls": "excluded"
+    },
+    "2015": {
+      "cls": "excluded"
+    },
+    "2019": {
+      "cls": "component"
+    },
+    "2020": {
+      "cls": "component"
+    },
+    "2021": {
+      "cls": "component"
+    },
+    "2022": {
+      "cls": "component"
+    },
+    "2031": {
+      "cls": "consumable"
+    },
+    "2033": {
+      "cls": "consumable"
+    },
+    "2049": {
+      "cls": "excluded"
+    },
+    "2050": {
+      "cls": "excluded"
+    },
+    "2051": {
+      "cls": "starter"
+    },
+    "2052": {
+      "cls": "excluded"
+    },
+    "2055": {
+      "cls": "consumable"
+    },
+    "2056": {
+      "cls": "excluded"
+    },
+    "2065": {
+      "cls": "completed"
+    },
+    "2138": {
+      "cls": "consumable"
+    },
+    "2139": {
+      "cls": "consumable"
+    },
+    "2140": {
+      "cls": "consumable"
+    },
+    "2141": {
+      "cls": "consumable"
+    },
+    "2142": {
+      "cls": "consumable"
+    },
+    "2143": {
+      "cls": "consumable"
+    },
+    "2144": {
+      "cls": "consumable"
+    },
+    "2145": {
+      "cls": "consumable"
+    },
+    "2146": {
+      "cls": "consumable"
+    },
+    "2147": {
+      "cls": "excluded"
+    },
+    "2150": {
+      "cls": "consumable"
+    },
+    "2151": {
+      "cls": "consumable"
+    },
+    "2152": {
+      "cls": "consumable"
+    },
+    "2161": {
+      "cls": "excluded"
+    },
+    "2162": {
+      "cls": "excluded"
+    },
+    "2163": {
+      "cls": "excluded"
+    },
+    "2403": {
+      "cls": "excluded"
+    },
+    "2420": {
+      "cls": "component"
+    },
+    "2421": {
+      "cls": "excluded"
+    },
+    "2422": {
+      "cls": "boots"
+    },
+    "2501": {
+      "cls": "completed"
+    },
+    "2502": {
+      "cls": "completed"
+    },
+    "2503": {
+      "cls": "completed"
+    },
+    "2504": {
+      "cls": "completed"
+    },
+    "2508": {
+      "cls": "component"
+    },
+    "2510": {
+      "cls": "completed"
+    },
+    "2512": {
+      "cls": "completed"
+    },
+    "2517": {
+      "cls": "completed"
+    },
+    "2520": {
+      "cls": "completed"
+    },
+    "2522": {
+      "cls": "completed"
+    },
+    "2523": {
+      "cls": "completed"
+    },
+    "2524": {
+      "cls": "completed"
+    },
+    "2525": {
+      "cls": "completed"
+    },
+    "2526": {
+      "cls": "component"
+    },
+    "2530": {
+      "cls": "excluded"
+    },
+    "3001": {
+      "cls": "excluded"
+    },
+    "3002": {
+      "cls": "excluded"
+    },
+    "3003": {
+      "cls": "completed"
+    },
+    "3004": {
+      "cls": "completed"
+    },
+    "3005": {
+      "cls": "excluded"
+    },
+    "3006": {
+      "cls": "boots"
+    },
+    "3008": {
+      "cls": "boots"
+    },
+    "3009": {
+      "cls": "boots"
+    },
+    "3010": {
+      "cls": "boots"
+    },
+    "3011": {
+      "cls": "excluded"
+    },
+    "3012": {
+      "cls": "excluded"
+    },
+    "3013": {
+      "cls": "boots"
+    },
+    "3020": {
+      "cls": "boots"
+    },
+    "3023": {
+      "cls": "excluded"
+    },
+    "3024": {
+      "cls": "component"
+    },
+    "3026": {
+      "cls": "completed"
+    },
+    "3031": {
+      "cls": "completed"
+    },
+    "3032": {
+      "cls": "completed"
+    },
+    "3033": {
+      "cls": "completed"
+    },
+    "3035": {
+      "cls": "component"
+    },
+    "3036": {
+      "cls": "completed"
+    },
+    "3039": {
+      "cls": "completed"
+    },
+    "3040": {
+      "cls": "excluded"
+    },
+    "3041": {
+      "cls": "completed"
+    },
+    "3042": {
+      "cls": "excluded"
+    },
+    "3044": {
+      "cls": "component"
+    },
+    "3046": {
+      "cls": "completed"
+    },
+    "3047": {
+      "cls": "boots"
+    },
+    "3050": {
+      "cls": "completed"
+    },
+    "3051": {
+      "cls": "component"
+    },
+    "3053": {
+      "cls": "completed"
+    },
+    "3057": {
+      "cls": "component"
+    },
+    "3065": {
+      "cls": "completed"
+    },
+    "3066": {
+      "cls": "component"
+    },
+    "3067": {
+      "cls": "component"
+    },
+    "3068": {
+      "cls": "completed"
+    },
+    "3070": {
+      "cls": "component"
+    },
+    "3071": {
+      "cls": "completed"
+    },
+    "3072": {
+      "cls": "completed"
+    },
+    "3073": {
+      "cls": "completed"
+    },
+    "3074": {
+      "cls": "completed"
+    },
+    "3075": {
+      "cls": "completed"
+    },
+    "3076": {
+      "cls": "component"
+    },
+    "3077": {
+      "cls": "component"
+    },
+    "3078": {
+      "cls": "completed"
+    },
+    "3082": {
+      "cls": "component"
+    },
+    "3083": {
+      "cls": "completed"
+    },
+    "3084": {
+      "cls": "completed"
+    },
+    "3085": {
+      "cls": "completed"
+    },
+    "3086": {
+      "cls": "component"
+    },
+    "3087": {
+      "cls": "completed"
+    },
+    "3089": {
+      "cls": "completed"
+    },
+    "3091": {
+      "cls": "completed"
+    },
+    "3094": {
+      "cls": "completed"
+    },
+    "3095": {
+      "cls": "completed"
+    },
+    "3100": {
+      "cls": "completed"
+    },
+    "3102": {
+      "cls": "completed"
+    },
+    "3105": {
+      "cls": "excluded"
+    },
+    "3107": {
+      "cls": "completed"
+    },
+    "3108": {
+      "cls": "component"
+    },
+    "3109": {
+      "cls": "completed"
+    },
+    "3110": {
+      "cls": "completed"
+    },
+    "3111": {
+      "cls": "boots"
+    },
+    "3112": {
+      "cls": "starter"
+    },
+    "3113": {
+      "cls": "component"
+    },
+    "3114": {
+      "cls": "component"
+    },
+    "3115": {
+      "cls": "completed"
+    },
+    "3116": {
+      "cls": "completed"
+    },
+    "3117": {
+      "cls": "boots"
+    },
+    "3118": {
+      "cls": "completed"
+    },
+    "3119": {
+      "cls": "completed"
+    },
+    "3121": {
+      "cls": "excluded"
+    },
+    "3123": {
+      "cls": "component"
+    },
+    "3124": {
+      "cls": "completed"
+    },
+    "3128": {
+      "cls": "excluded"
+    },
+    "3131": {
+      "cls": "excluded"
+    },
+    "3133": {
+      "cls": "component"
+    },
+    "3134": {
+      "cls": "component"
+    },
+    "3135": {
+      "cls": "completed"
+    },
+    "3137": {
+      "cls": "completed"
+    },
+    "3139": {
+      "cls": "completed"
+    },
+    "3140": {
+      "cls": "component"
+    },
+    "3142": {
+      "cls": "completed"
+    },
+    "3143": {
+      "cls": "completed"
+    },
+    "3144": {
+      "cls": "component"
+    },
+    "3145": {
+      "cls": "component"
+    },
+    "3146": {
+      "cls": "completed"
+    },
+    "3147": {
+      "cls": "component"
+    },
+    "3152": {
+      "cls": "completed"
+    },
+    "3153": {
+      "cls": "completed"
+    },
+    "3155": {
+      "cls": "component"
+    },
+    "3156": {
+      "cls": "completed"
+    },
+    "3157": {
+      "cls": "completed"
+    },
+    "3158": {
+      "cls": "boots"
+    },
+    "3161": {
+      "cls": "completed"
+    },
+    "3165": {
+      "cls": "completed"
+    },
+    "3168": {
+      "cls": "boots"
+    },
+    "3170": {
+      "cls": "boots"
+    },
+    "3171": {
+      "cls": "boots"
+    },
+    "3172": {
+      "cls": "completed"
+    },
+    "3173": {
+      "cls": "boots"
+    },
+    "3174": {
+      "cls": "boots"
+    },
+    "3175": {
+      "cls": "boots"
+    },
+    "3176": {
+      "cls": "boots"
+    },
+    "3177": {
+      "cls": "starter"
+    },
+    "3179": {
+      "cls": "completed"
+    },
+    "3181": {
+      "cls": "completed"
+    },
+    "3184": {
+      "cls": "starter"
+    },
+    "3190": {
+      "cls": "completed"
+    },
+    "3193": {
+      "cls": "excluded"
+    },
+    "3211": {
+      "cls": "component"
+    },
+    "3222": {
+      "cls": "completed"
+    },
+    "3302": {
+      "cls": "completed"
+    },
+    "3330": {
+      "cls": "excluded"
+    },
+    "3340": {
+      "cls": "consumable"
+    },
+    "3348": {
+      "cls": "jungle_path",
+      "laneFamily": "jungle"
+    },
+    "3349": {
+      "cls": "excluded"
+    },
+    "3363": {
+      "cls": "consumable"
+    },
+    "3364": {
+      "cls": "consumable"
+    },
+    "3398": {
+      "cls": "excluded"
+    },
+    "3399": {
+      "cls": "excluded"
+    },
+    "3400": {
+      "cls": "excluded"
+    },
+    "3430": {
+      "cls": "completed"
+    },
+    "3504": {
+      "cls": "completed"
+    },
+    "3508": {
+      "cls": "completed"
+    },
+    "3513": {
+      "cls": "excluded"
+    },
+    "3599": {
+      "cls": "excluded"
+    },
+    "3600": {
+      "cls": "excluded"
+    },
+    "3742": {
+      "cls": "completed"
+    },
+    "3748": {
+      "cls": "completed"
+    },
+    "3801": {
+      "cls": "component"
+    },
+    "3802": {
+      "cls": "component"
+    },
+    "3803": {
+      "cls": "component"
+    },
+    "3814": {
+      "cls": "completed"
+    },
+    "3850": {
+      "cls": "excluded"
+    },
+    "3851": {
+      "cls": "excluded"
+    },
+    "3853": {
+      "cls": "excluded"
+    },
+    "3854": {
+      "cls": "excluded"
+    },
+    "3855": {
+      "cls": "excluded"
+    },
+    "3857": {
+      "cls": "excluded"
+    },
+    "3858": {
+      "cls": "excluded"
+    },
+    "3859": {
+      "cls": "excluded"
+    },
+    "3860": {
+      "cls": "excluded"
+    },
+    "3862": {
+      "cls": "excluded"
+    },
+    "3863": {
+      "cls": "excluded"
+    },
+    "3864": {
+      "cls": "excluded"
+    },
+    "3865": {
+      "cls": "quest_line",
+      "laneFamily": "support"
+    },
+    "3866": {
+      "cls": "quest_line",
+      "laneFamily": "support"
+    },
+    "3867": {
+      "cls": "quest_line",
+      "laneFamily": "support"
+    },
+    "3869": {
+      "cls": "quest_reward",
+      "laneFamily": "support"
+    },
+    "3870": {
+      "cls": "quest_reward",
+      "laneFamily": "support"
+    },
+    "3871": {
+      "cls": "quest_reward",
+      "laneFamily": "support"
+    },
+    "3876": {
+      "cls": "quest_reward",
+      "laneFamily": "support"
+    },
+    "3877": {
+      "cls": "quest_reward",
+      "laneFamily": "support"
+    },
+    "3901": {
+      "cls": "excluded"
+    },
+    "3902": {
+      "cls": "excluded"
+    },
+    "3903": {
+      "cls": "excluded"
+    },
+    "3916": {
+      "cls": "component"
+    },
+    "4003": {
+      "cls": "component"
+    },
+    "4004": {
+      "cls": "completed"
+    },
+    "4005": {
+      "cls": "completed"
+    },
+    "4010": {
+      "cls": "completed"
+    },
+    "4011": {
+      "cls": "completed"
+    },
+    "4012": {
+      "cls": "excluded"
+    },
+    "4013": {
+      "cls": "excluded"
+    },
+    "4014": {
+      "cls": "excluded"
+    },
+    "4015": {
+      "cls": "completed"
+    },
+    "4016": {
+      "cls": "completed"
+    },
+    "4017": {
+      "cls": "completed"
+    },
+    "4401": {
+      "cls": "completed"
+    },
+    "4402": {
+      "cls": "excluded"
+    },
+    "4403": {
+      "cls": "excluded"
+    },
+    "4628": {
+      "cls": "completed"
+    },
+    "4629": {
+      "cls": "completed"
+    },
+    "4630": {
+      "cls": "component"
+    },
+    "4632": {
+      "cls": "component"
+    },
+    "4633": {
+      "cls": "completed"
+    },
+    "4635": {
+      "cls": "excluded"
+    },
+    "4636": {
+      "cls": "excluded"
+    },
+    "4637": {
+      "cls": "excluded"
+    },
+    "4638": {
+      "cls": "excluded"
+    },
+    "4641": {
+      "cls": "excluded"
+    },
+    "4642": {
+      "cls": "component"
+    },
+    "4643": {
+      "cls": "excluded"
+    },
+    "4644": {
+      "cls": "excluded"
+    },
+    "4645": {
+      "cls": "completed"
+    },
+    "4646": {
+      "cls": "completed"
+    },
+    "6029": {
+      "cls": "excluded"
+    },
+    "6032": {
+      "cls": "consumable"
+    },
+    "6035": {
+      "cls": "excluded"
+    },
+    "6333": {
+      "cls": "completed"
+    },
+    "6609": {
+      "cls": "completed"
+    },
+    "6610": {
+      "cls": "completed"
+    },
+    "6616": {
+      "cls": "completed"
+    },
+    "6617": {
+      "cls": "completed"
+    },
+    "6620": {
+      "cls": "completed"
+    },
+    "6621": {
+      "cls": "completed"
+    },
+    "6630": {
+      "cls": "excluded"
+    },
+    "6631": {
+      "cls": "completed"
+    },
+    "6632": {
+      "cls": "excluded"
+    },
+    "6653": {
+      "cls": "completed"
+    },
+    "6655": {
+      "cls": "completed"
+    },
+    "6656": {
+      "cls": "excluded"
+    },
+    "6657": {
+      "cls": "completed"
+    },
+    "6660": {
+      "cls": "component"
+    },
+    "6662": {
+      "cls": "completed"
+    },
+    "6664": {
+      "cls": "completed"
+    },
+    "6665": {
+      "cls": "completed"
+    },
+    "6667": {
+      "cls": "excluded"
+    },
+    "6670": {
+      "cls": "component"
+    },
+    "6671": {
+      "cls": "excluded"
+    },
+    "6672": {
+      "cls": "completed"
+    },
+    "6673": {
+      "cls": "completed"
+    },
+    "6675": {
+      "cls": "completed"
+    },
+    "6676": {
+      "cls": "completed"
+    },
+    "6677": {
+      "cls": "excluded"
+    },
+    "6690": {
+      "cls": "component"
+    },
+    "6691": {
+      "cls": "excluded"
+    },
+    "6692": {
+      "cls": "completed"
+    },
+    "6693": {
+      "cls": "excluded"
+    },
+    "6694": {
+      "cls": "completed"
+    },
+    "6695": {
+      "cls": "completed"
+    },
+    "6696": {
+      "cls": "completed"
+    },
+    "6697": {
+      "cls": "completed"
+    },
+    "6698": {
+      "cls": "completed"
+    },
+    "6699": {
+      "cls": "completed"
+    },
+    "6700": {
+      "cls": "excluded"
+    },
+    "6701": {
+      "cls": "excluded"
+    },
+    "6702": {
+      "cls": "excluded"
+    },
+    "7050": {
+      "cls": "excluded"
+    },
+    "8001": {
+      "cls": "excluded"
+    },
+    "8010": {
+      "cls": "completed"
+    },
+    "8020": {
+      "cls": "completed"
+    },
+    "9168": {
+      "cls": "excluded"
+    },
+    "9171": {
+      "cls": "excluded"
+    },
+    "9172": {
+      "cls": "excluded"
+    },
+    "9173": {
+      "cls": "excluded"
+    },
+    "9174": {
+      "cls": "excluded"
+    },
+    "9175": {
+      "cls": "excluded"
+    },
+    "9176": {
+      "cls": "excluded"
+    },
+    "9177": {
+      "cls": "excluded"
+    },
+    "9178": {
+      "cls": "excluded"
+    },
+    "9179": {
+      "cls": "excluded"
+    },
+    "9180": {
+      "cls": "excluded"
+    },
+    "9181": {
+      "cls": "excluded"
+    },
+    "9183": {
+      "cls": "excluded"
+    },
+    "9184": {
+      "cls": "excluded"
+    },
+    "9185": {
+      "cls": "excluded"
+    },
+    "9187": {
+      "cls": "excluded"
+    },
+    "9188": {
+      "cls": "excluded"
+    },
+    "9189": {
+      "cls": "excluded"
+    },
+    "9190": {
+      "cls": "excluded"
+    },
+    "9192": {
+      "cls": "excluded"
+    },
+    "9193": {
+      "cls": "excluded"
+    },
+    "9271": {
+      "cls": "excluded"
+    },
+    "9272": {
+      "cls": "excluded"
+    },
+    "9273": {
+      "cls": "excluded"
+    },
+    "9274": {
+      "cls": "excluded"
+    },
+    "9275": {
+      "cls": "excluded"
+    },
+    "9276": {
+      "cls": "excluded"
+    },
+    "9277": {
+      "cls": "excluded"
+    },
+    "9278": {
+      "cls": "excluded"
+    },
+    "9279": {
+      "cls": "excluded"
+    },
+    "9280": {
+      "cls": "excluded"
+    },
+    "9281": {
+      "cls": "excluded"
+    },
+    "9283": {
+      "cls": "excluded"
+    },
+    "9284": {
+      "cls": "excluded"
+    },
+    "9285": {
+      "cls": "excluded"
+    },
+    "9287": {
+      "cls": "excluded"
+    },
+    "9288": {
+      "cls": "excluded"
+    },
+    "9289": {
+      "cls": "excluded"
+    },
+    "9290": {
+      "cls": "excluded"
+    },
+    "9292": {
+      "cls": "excluded"
+    },
+    "9293": {
+      "cls": "excluded"
+    },
+    "9300": {
+      "cls": "excluded"
+    },
+    "9301": {
+      "cls": "excluded"
+    },
+    "9302": {
+      "cls": "excluded"
+    },
+    "9303": {
+      "cls": "excluded"
+    },
+    "9304": {
+      "cls": "excluded"
+    },
+    "9305": {
+      "cls": "excluded"
+    },
+    "9306": {
+      "cls": "excluded"
+    },
+    "9307": {
+      "cls": "excluded"
+    },
+    "9308": {
+      "cls": "excluded"
+    },
+    "9400": {
+      "cls": "excluded"
+    },
+    "9401": {
+      "cls": "excluded"
+    },
+    "9402": {
+      "cls": "excluded"
+    },
+    "9403": {
+      "cls": "excluded"
+    },
+    "9404": {
+      "cls": "excluded"
+    },
+    "9405": {
+      "cls": "excluded"
+    },
+    "9406": {
+      "cls": "excluded"
+    },
+    "9407": {
+      "cls": "excluded"
+    },
+    "9408": {
+      "cls": "excluded"
+    },
+    "123430": {
+      "cls": "completed"
+    },
+    "124011": {
+      "cls": "completed"
+    },
+    "126697": {
+      "cls": "completed"
+    },
+    "220000": {
+      "cls": "consumable"
+    },
+    "220001": {
+      "cls": "completed"
+    },
+    "220002": {
+      "cls": "completed"
+    },
+    "220003": {
+      "cls": "completed"
+    },
+    "220004": {
+      "cls": "completed"
+    },
+    "220005": {
+      "cls": "completed"
+    },
+    "220006": {
+      "cls": "completed"
+    },
+    "220007": {
+      "cls": "consumable"
+    },
+    "220008": {
+      "cls": "excluded"
+    },
+    "220009": {
+      "cls": "excluded"
+    },
+    "220010": {
+      "cls": "excluded"
+    },
+    "220011": {
+      "cls": "excluded"
+    },
+    "220012": {
+      "cls": "excluded"
+    },
+    "220013": {
+      "cls": "excluded"
+    },
+    "221011": {
+      "cls": "excluded"
+    },
+    "221026": {
+      "cls": "excluded"
+    },
+    "221031": {
+      "cls": "excluded"
+    },
+    "221038": {
+      "cls": "excluded"
+    },
+    "221043": {
+      "cls": "excluded"
+    },
+    "221053": {
+      "cls": "excluded"
+    },
+    "221057": {
+      "cls": "excluded"
+    },
+    "221058": {
+      "cls": "excluded"
+    },
+    "222022": {
+      "cls": "excluded"
+    },
+    "222051": {
+      "cls": "excluded"
+    },
+    "222065": {
+      "cls": "completed"
+    },
+    "222141": {
+      "cls": "consumable"
+    },
+    "222502": {
+      "cls": "completed"
+    },
+    "222503": {
+      "cls": "completed"
+    },
+    "222504": {
+      "cls": "completed"
+    },
+    "222510": {
+      "cls": "completed"
+    },
+    "222512": {
+      "cls": "completed"
+    },
+    "222517": {
+      "cls": "completed"
+    },
+    "222522": {
+      "cls": "completed"
+    },
+    "222523": {
+      "cls": "completed"
+    },
+    "222524": {
+      "cls": "completed"
+    },
+    "222525": {
+      "cls": "completed"
+    },
+    "222526": {
+      "cls": "completed"
+    },
+    "222530": {
+      "cls": "excluded"
+    },
+    "223001": {
+      "cls": "excluded"
+    },
+    "223002": {
+      "cls": "excluded"
+    },
+    "223003": {
+      "cls": "completed"
+    },
+    "223004": {
+      "cls": "completed"
+    },
+    "223005": {
+      "cls": "boots"
+    },
+    "223006": {
+      "cls": "boots"
+    },
+    "223008": {
+      "cls": "boots"
+    },
+    "223009": {
+      "cls": "boots"
+    },
+    "223011": {
+      "cls": "excluded"
+    },
+    "223020": {
+      "cls": "boots"
+    },
+    "223026": {
+      "cls": "completed"
+    },
+    "223031": {
+      "cls": "completed"
+    },
+    "223032": {
+      "cls": "completed"
+    },
+    "223033": {
+      "cls": "completed"
+    },
+    "223036": {
+      "cls": "completed"
+    },
+    "223039": {
+      "cls": "starter"
+    },
+    "223040": {
+      "cls": "excluded"
+    },
+    "223042": {
+      "cls": "excluded"
+    },
+    "223046": {
+      "cls": "completed"
+    },
+    "223047": {
+      "cls": "boots"
+    },
+    "223050": {
+      "cls": "completed"
+    },
+    "223053": {
+      "cls": "completed"
+    },
+    "223057": {
+      "cls": "excluded"
+    },
+    "223065": {
+      "cls": "completed"
+    },
+    "223067": {
+      "cls": "excluded"
+    },
+    "223068": {
+      "cls": "completed"
+    },
+    "223069": {
+      "cls": "completed"
+    },
+    "223071": {
+      "cls": "completed"
+    },
+    "223072": {
+      "cls": "completed"
+    },
+    "223073": {
+      "cls": "completed"
+    },
+    "223074": {
+      "cls": "completed"
+    },
+    "223075": {
+      "cls": "completed"
+    },
+    "223078": {
+      "cls": "completed"
+    },
+    "223084": {
+      "cls": "completed"
+    },
+    "223085": {
+      "cls": "completed"
+    },
+    "223087": {
+      "cls": "completed"
+    },
+    "223089": {
+      "cls": "completed"
+    },
+    "223091": {
+      "cls": "completed"
+    },
+    "223094": {
+      "cls": "completed"
+    },
+    "223095": {
+      "cls": "completed"
+    },
+    "223100": {
+      "cls": "completed"
+    },
+    "223102": {
+      "cls": "completed"
+    },
+    "223105": {
+      "cls": "excluded"
+    },
+    "223107": {
+      "cls": "completed"
+    },
+    "223109": {
+      "cls": "completed"
+    },
+    "223110": {
+      "cls": "completed"
+    },
+    "223111": {
+      "cls": "boots"
+    },
+    "223112": {
+      "cls": "excluded"
+    },
+    "223115": {
+      "cls": "completed"
+    },
+    "223116": {
+      "cls": "completed"
+    },
+    "223118": {
+      "cls": "completed"
+    },
+    "223119": {
+      "cls": "completed"
+    },
+    "223121": {
+      "cls": "excluded"
+    },
+    "223124": {
+      "cls": "completed"
+    },
+    "223135": {
+      "cls": "completed"
+    },
+    "223137": {
+      "cls": "completed"
+    },
+    "223139": {
+      "cls": "completed"
+    },
+    "223142": {
+      "cls": "completed"
+    },
+    "223143": {
+      "cls": "completed"
+    },
+    "223146": {
+      "cls": "completed"
+    },
+    "223152": {
+      "cls": "completed"
+    },
+    "223153": {
+      "cls": "completed"
+    },
+    "223156": {
+      "cls": "completed"
+    },
+    "223157": {
+      "cls": "completed"
+    },
+    "223158": {
+      "cls": "boots"
+    },
+    "223161": {
+      "cls": "completed"
+    },
+    "223165": {
+      "cls": "completed"
+    },
+    "223172": {
+      "cls": "completed"
+    },
+    "223177": {
+      "cls": "excluded"
+    },
+    "223181": {
+      "cls": "completed"
+    },
+    "223184": {
+      "cls": "excluded"
+    },
+    "223185": {
+      "cls": "excluded"
+    },
+    "223190": {
+      "cls": "completed"
+    },
+    "223193": {
+      "cls": "excluded"
+    },
+    "223222": {
+      "cls": "completed"
+    },
+    "223302": {
+      "cls": "completed"
+    },
+    "223504": {
+      "cls": "completed"
+    },
+    "223508": {
+      "cls": "completed"
+    },
+    "223742": {
+      "cls": "completed"
+    },
+    "223748": {
+      "cls": "completed"
+    },
+    "223814": {
+      "cls": "completed"
+    },
+    "224004": {
+      "cls": "completed"
+    },
+    "224005": {
+      "cls": "completed"
+    },
+    "224401": {
+      "cls": "completed"
+    },
+    "224403": {
+      "cls": "completed"
+    },
+    "224628": {
+      "cls": "completed"
+    },
+    "224629": {
+      "cls": "completed"
+    },
+    "224633": {
+      "cls": "completed"
+    },
+    "224636": {
+      "cls": "excluded"
+    },
+    "224637": {
+      "cls": "excluded"
+    },
+    "224644": {
+      "cls": "excluded"
+    },
+    "224645": {
+      "cls": "completed"
+    },
+    "224646": {
+      "cls": "completed"
+    },
+    "226035": {
+      "cls": "excluded"
+    },
+    "226333": {
+      "cls": "completed"
+    },
+    "226609": {
+      "cls": "completed"
+    },
+    "226610": {
+      "cls": "completed"
+    },
+    "226616": {
+      "cls": "completed"
+    },
+    "226617": {
+      "cls": "completed"
+    },
+    "226620": {
+      "cls": "completed"
+    },
+    "226621": {
+      "cls": "completed"
+    },
+    "226630": {
+      "cls": "completed"
+    },
+    "226631": {
+      "cls": "completed"
+    },
+    "226632": {
+      "cls": "excluded"
+    },
+    "226653": {
+      "cls": "completed"
+    },
+    "226655": {
+      "cls": "completed"
+    },
+    "226656": {
+      "cls": "excluded"
+    },
+    "226657": {
+      "cls": "completed"
+    },
+    "226662": {
+      "cls": "completed"
+    },
+    "226664": {
+      "cls": "completed"
+    },
+    "226665": {
+      "cls": "completed"
+    },
+    "226667": {
+      "cls": "excluded"
+    },
+    "226668": {
+      "cls": "completed"
+    },
+    "226671": {
+      "cls": "excluded"
+    },
+    "226672": {
+      "cls": "completed"
+    },
+    "226673": {
+      "cls": "completed"
+    },
+    "226675": {
+      "cls": "completed"
+    },
+    "226676": {
+      "cls": "completed"
+    },
+    "226691": {
+      "cls": "excluded"
+    },
+    "226692": {
+      "cls": "completed"
+    },
+    "226693": {
+      "cls": "completed"
+    },
+    "226694": {
+      "cls": "completed"
+    },
+    "226695": {
+      "cls": "completed"
+    },
+    "226696": {
+      "cls": "completed"
+    },
+    "226697": {
+      "cls": "completed"
+    },
+    "226698": {
+      "cls": "completed"
+    },
+    "226699": {
+      "cls": "completed"
+    },
+    "226701": {
+      "cls": "completed"
+    },
+    "228001": {
+      "cls": "completed"
+    },
+    "228002": {
+      "cls": "completed"
+    },
+    "228003": {
+      "cls": "excluded"
+    },
+    "228004": {
+      "cls": "excluded"
+    },
+    "228005": {
+      "cls": "excluded"
+    },
+    "228006": {
+      "cls": "excluded"
+    },
+    "228008": {
+      "cls": "excluded"
+    },
+    "228009": {
+      "cls": "excluded"
+    },
+    "228020": {
+      "cls": "completed"
+    },
+    "322065": {
+      "cls": "completed"
+    },
+    "322526": {
+      "cls": "component"
+    },
+    "322530": {
+      "cls": "excluded"
+    },
+    "323002": {
+      "cls": "excluded"
+    },
+    "323003": {
+      "cls": "completed"
+    },
+    "323004": {
+      "cls": "completed"
+    },
+    "323040": {
+      "cls": "excluded"
+    },
+    "323042": {
+      "cls": "excluded"
+    },
+    "323050": {
+      "cls": "completed"
+    },
+    "323070": {
+      "cls": "component"
+    },
+    "323075": {
+      "cls": "completed"
+    },
+    "323107": {
+      "cls": "completed"
+    },
+    "323109": {
+      "cls": "completed"
+    },
+    "323110": {
+      "cls": "completed"
+    },
+    "323119": {
+      "cls": "completed"
+    },
+    "323121": {
+      "cls": "excluded"
+    },
+    "323190": {
+      "cls": "completed"
+    },
+    "323222": {
+      "cls": "completed"
+    },
+    "323504": {
+      "cls": "completed"
+    },
+    "324005": {
+      "cls": "completed"
+    },
+    "326616": {
+      "cls": "completed"
+    },
+    "326617": {
+      "cls": "completed"
+    },
+    "326620": {
+      "cls": "completed"
+    },
+    "326621": {
+      "cls": "completed"
+    },
+    "326657": {
+      "cls": "completed"
+    },
+    "328020": {
+      "cls": "completed"
+    },
+    "443054": {
+      "cls": "completed"
+    },
+    "443055": {
+      "cls": "completed"
+    },
+    "443056": {
+      "cls": "completed"
+    },
+    "443058": {
+      "cls": "completed"
+    },
+    "443059": {
+      "cls": "completed"
+    },
+    "443060": {
+      "cls": "completed"
+    },
+    "443061": {
+      "cls": "completed"
+    },
+    "443062": {
+      "cls": "completed"
+    },
+    "443063": {
+      "cls": "completed"
+    },
+    "443064": {
+      "cls": "completed"
+    },
+    "443069": {
+      "cls": "completed"
+    },
+    "443079": {
+      "cls": "completed"
+    },
+    "443080": {
+      "cls": "excluded"
+    },
+    "443081": {
+      "cls": "completed"
+    },
+    "443083": {
+      "cls": "completed"
+    },
+    "443090": {
+      "cls": "completed"
+    },
+    "443193": {
+      "cls": "completed"
+    },
+    "444636": {
+      "cls": "completed"
+    },
+    "444637": {
+      "cls": "completed"
+    },
+    "444644": {
+      "cls": "completed"
+    },
+    "446632": {
+      "cls": "completed"
+    },
+    "446656": {
+      "cls": "completed"
+    },
+    "446667": {
+      "cls": "completed"
+    },
+    "446671": {
+      "cls": "completed"
+    },
+    "446691": {
+      "cls": "completed"
+    },
+    "446693": {
+      "cls": "excluded"
+    },
+    "447100": {
+      "cls": "completed"
+    },
+    "447101": {
+      "cls": "completed"
+    },
+    "447102": {
+      "cls": "completed"
+    },
+    "447103": {
+      "cls": "completed"
+    },
+    "447104": {
+      "cls": "completed"
+    },
+    "447105": {
+      "cls": "completed"
+    },
+    "447106": {
+      "cls": "completed"
+    },
+    "447107": {
+      "cls": "completed"
+    },
+    "447108": {
+      "cls": "completed"
+    },
+    "447109": {
+      "cls": "completed"
+    },
+    "447110": {
+      "cls": "completed"
+    },
+    "447111": {
+      "cls": "completed"
+    },
+    "447112": {
+      "cls": "completed"
+    },
+    "447113": {
+      "cls": "completed"
+    },
+    "447114": {
+      "cls": "completed"
+    },
+    "447115": {
+      "cls": "completed"
+    },
+    "447116": {
+      "cls": "completed"
+    },
+    "447118": {
+      "cls": "completed"
+    },
+    "447119": {
+      "cls": "completed"
+    },
+    "447120": {
+      "cls": "completed"
+    },
+    "447121": {
+      "cls": "completed"
+    },
+    "447122": {
+      "cls": "completed"
+    },
+    "447123": {
+      "cls": "completed"
+    },
+    "663039": {
+      "cls": "starter"
+    },
+    "663056": {
+      "cls": "completed"
+    },
+    "663058": {
+      "cls": "completed"
+    },
+    "663059": {
+      "cls": "completed"
+    },
+    "663060": {
+      "cls": "completed"
+    },
+    "663064": {
+      "cls": "completed"
+    },
+    "663146": {
+      "cls": "completed"
+    },
+    "663172": {
+      "cls": "completed"
+    },
+    "663193": {
+      "cls": "completed"
+    },
+    "664011": {
+      "cls": "completed"
+    },
+    "664403": {
+      "cls": "excluded"
+    },
+    "664644": {
+      "cls": "completed"
+    },
+    "667101": {
+      "cls": "completed"
+    },
+    "667109": {
+      "cls": "completed"
+    },
+    "667112": {
+      "cls": "completed"
+    },
+    "667666": {
+      "cls": "completed"
+    },
+    "771001": {
+      "cls": "boots"
+    },
+    "771004": {
+      "cls": "component"
+    },
+    "771006": {
+      "cls": "component"
+    },
+    "771011": {
+      "cls": "component"
+    },
+    "771018": {
+      "cls": "component"
+    },
+    "771026": {
+      "cls": "component"
+    },
+    "771027": {
+      "cls": "component"
+    },
+    "771028": {
+      "cls": "component"
+    },
+    "771029": {
+      "cls": "component"
+    },
+    "771031": {
+      "cls": "component"
+    },
+    "771033": {
+      "cls": "component"
+    },
+    "771036": {
+      "cls": "component"
+    },
+    "771037": {
+      "cls": "component"
+    },
+    "771038": {
+      "cls": "component"
+    },
+    "771039": {
+      "cls": "component"
+    },
+    "771042": {
+      "cls": "component"
+    },
+    "771043": {
+      "cls": "component"
+    },
+    "771051": {
+      "cls": "component"
+    },
+    "771052": {
+      "cls": "component"
+    },
+    "771053": {
+      "cls": "component"
+    },
+    "771054": {
+      "cls": "starter"
+    },
+    "771055": {
+      "cls": "starter"
+    },
+    "771056": {
+      "cls": "starter"
+    },
+    "771057": {
+      "cls": "component"
+    },
+    "771058": {
+      "cls": "component"
+    },
+    "771080": {
+      "cls": "component"
+    },
+    "771500": {
+      "cls": "excluded"
+    },
+    "772001": {
+      "cls": "excluded"
+    },
+    "772003": {
+      "cls": "consumable"
+    },
+    "772004": {
+      "cls": "consumable"
+    },
+    "772009": {
+      "cls": "excluded"
+    },
+    "772037": {
+      "cls": "consumable"
+    },
+    "772038": {
+      "cls": "consumable"
+    },
+    "772039": {
+      "cls": "consumable"
+    },
+    "772041": {
+      "cls": "consumable"
+    },
+    "772042": {
+      "cls": "consumable"
+    },
+    "772043": {
+      "cls": "consumable"
+    },
+    "772044": {
+      "cls": "consumable"
+    },
+    "772045": {
+      "cls": "consumable"
+    },
+    "772049": {
+      "cls": "consumable"
+    },
+    "772050": {
+      "cls": "excluded"
+    },
+    "773001": {
+      "cls": "completed"
+    },
+    "773003": {
+      "cls": "component"
+    },
+    "773004": {
+      "cls": "completed"
+    },
+    "773005": {
+      "cls": "completed"
+    },
+    "773006": {
+      "cls": "boots"
+    },
+    "773009": {
+      "cls": "boots"
+    },
+    "773010": {
+      "cls": "component"
+    },
+    "773020": {
+      "cls": "boots"
+    },
+    "773022": {
+      "cls": "completed"
+    },
+    "773023": {
+      "cls": "completed"
+    },
+    "773024": {
+      "cls": "component"
+    },
+    "773025": {
+      "cls": "completed"
+    },
+    "773026": {
+      "cls": "completed"
+    },
+    "773027": {
+      "cls": "completed"
+    },
+    "773028": {
+      "cls": "component"
+    },
+    "773031": {
+      "cls": "completed"
+    },
+    "773035": {
+      "cls": "completed"
+    },
+    "773037": {
+      "cls": "component"
+    },
+    "773040": {
+      "cls": "excluded"
+    },
+    "773041": {
+      "cls": "completed"
+    },
+    "773042": {
+      "cls": "excluded"
+    },
+    "773044": {
+      "cls": "component"
+    },
+    "773046": {
+      "cls": "completed"
+    },
+    "773047": {
+      "cls": "boots"
+    },
+    "773050": {
+      "cls": "completed"
+    },
+    "773052": {
+      "cls": "component"
+    },
+    "773056": {
+      "cls": "completed"
+    },
+    "773057": {
+      "cls": "component"
+    },
+    "773060": {
+      "cls": "completed"
+    },
+    "773063": {
+      "cls": "completed"
+    },
+    "773064": {
+      "cls": "completed"
+    },
+    "773065": {
+      "cls": "completed"
+    },
+    "773067": {
+      "cls": "component"
+    },
+    "773068": {
+      "cls": "completed"
+    },
+    "773069": {
+      "cls": "completed"
+    },
+    "773070": {
+      "cls": "component"
+    },
+    "773071": {
+      "cls": "completed"
+    },
+    "773072": {
+      "cls": "completed"
+    },
+    "773073": {
+      "cls": "completed"
+    },
+    "773074": {
+      "cls": "completed"
+    },
+    "773075": {
+      "cls": "completed"
+    },
+    "773077": {
+      "cls": "component"
+    },
+    "773078": {
+      "cls": "completed"
+    },
+    "773082": {
+      "cls": "component"
+    },
+    "773083": {
+      "cls": "completed"
+    },
+    "773084": {
+      "cls": "completed"
+    },
+    "773085": {
+      "cls": "completed"
+    },
+    "773086": {
+      "cls": "component"
+    },
+    "773087": {
+      "cls": "completed"
+    },
+    "773089": {
+      "cls": "completed"
+    },
+    "773091": {
+      "cls": "completed"
+    },
+    "773092": {
+      "cls": "completed"
+    },
+    "773093": {
+      "cls": "component"
+    },
+    "773096": {
+      "cls": "component"
+    },
+    "773098": {
+      "cls": "component"
+    },
+    "773100": {
+      "cls": "completed"
+    },
+    "773101": {
+      "cls": "component"
+    },
+    "773102": {
+      "cls": "completed"
+    },
+    "773105": {
+      "cls": "component"
+    },
+    "773106": {
+      "cls": "component"
+    },
+    "773107": {
+      "cls": "completed"
+    },
+    "773108": {
+      "cls": "component"
+    },
+    "773109": {
+      "cls": "completed"
+    },
+    "773110": {
+      "cls": "completed"
+    },
+    "773111": {
+      "cls": "boots"
+    },
+    "773114": {
+      "cls": "completed"
+    },
+    "773115": {
+      "cls": "completed"
+    },
+    "773116": {
+      "cls": "completed"
+    },
+    "773117": {
+      "cls": "boots"
+    },
+    "773123": {
+      "cls": "completed"
+    },
+    "773124": {
+      "cls": "completed"
+    },
+    "773128": {
+      "cls": "completed"
+    },
+    "773131": {
+      "cls": "completed"
+    },
+    "773132": {
+      "cls": "component"
+    },
+    "773134": {
+      "cls": "component"
+    },
+    "773135": {
+      "cls": "completed"
+    },
+    "773136": {
+      "cls": "component"
+    },
+    "773138": {
+      "cls": "completed"
+    },
+    "773139": {
+      "cls": "completed"
+    },
+    "773140": {
+      "cls": "component"
+    },
+    "773141": {
+      "cls": "completed"
+    },
+    "773142": {
+      "cls": "completed"
+    },
+    "773143": {
+      "cls": "completed"
+    },
+    "773144": {
+      "cls": "component"
+    },
+    "773145": {
+      "cls": "component"
+    },
+    "773146": {
+      "cls": "completed"
+    },
+    "773151": {
+      "cls": "completed"
+    },
+    "773152": {
+      "cls": "completed"
+    },
+    "773153": {
+      "cls": "completed"
+    },
+    "773154": {
+      "cls": "completed"
+    },
+    "773155": {
+      "cls": "component"
+    },
+    "773156": {
+      "cls": "completed"
+    },
+    "773157": {
+      "cls": "completed"
+    },
+    "773158": {
+      "cls": "boots"
+    },
+    "773160": {
+      "cls": "excluded"
+    },
+    "773161": {
+      "cls": "completed"
+    },
+    "773162": {
+      "cls": "completed"
+    },
+    "773165": {
+      "cls": "completed"
+    },
+    "773172": {
+      "cls": "completed"
+    },
+    "773173": {
+      "cls": "completed"
+    },
+    "773174": {
+      "cls": "completed"
+    },
+    "773178": {
+      "cls": "completed"
+    },
+    "773190": {
+      "cls": "completed"
+    },
+    "773191": {
+      "cls": "component"
+    },
+    "773206": {
+      "cls": "completed"
+    },
+    "773207": {
+      "cls": "completed"
+    },
+    "773209": {
+      "cls": "completed"
+    },
+    "773211": {
+      "cls": "component"
+    },
+    "773222": {
+      "cls": "completed"
+    },
+    "773340": {
+      "cls": "consumable"
+    },
+    "773348": {
+      "cls": "consumable"
+    },
+    "773504": {
+      "cls": "completed"
+    },
+    "773512": {
+      "cls": "completed"
+    },
+    "773513": {
+      "cls": "component"
+    },
+    "773514": {
+      "cls": "component"
+    },
+    "773515": {
+      "cls": "component"
+    },
+    "773516": {
+      "cls": "completed"
+    },
+    "773517": {
+      "cls": "jungle_path",
+      "laneFamily": "jungle"
+    },
+    "773518": {
+      "cls": "jungle_path",
+      "laneFamily": "jungle"
+    },
+    "773519": {
+      "cls": "jungle_path",
+      "laneFamily": "jungle"
+    },
+    "773521": {
+      "cls": "consumable"
+    },
+    "994403": {
+      "cls": "completed"
+    }
+  }
+}

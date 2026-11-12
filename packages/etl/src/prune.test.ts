@@ -29,8 +29,9 @@ function insertParticipant(db: ReturnType<typeof openDb>, matchId: string): void
 function insertItemEvent(db: ReturnType<typeof openDb>, matchId: string): void {
   db.prepare(
     `INSERT INTO item_events (
-      match_id, puuid, ts, item_id, type, team_gold_diff, kills_diff, item_slot
-    ) VALUES (?, 'p-1', 1000, 3109, 'ITEM_PURCHASED', 0, 0, 6)`,
+      match_id, participant_id, puuid, ts_ms, seq, event_type, item_id,
+      before_id, after_id, team_gold_diff, kills_diff
+    ) VALUES (?, 1, 'p-1', 1000, 0, 'purchase', 3109, NULL, NULL, 0, 0)`,
   ).run(matchId);
 }
 

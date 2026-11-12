@@ -1214,3 +1214,24 @@ The 2026-10-22 entries had no timestamps; their order was reconstructed from tic
 - Next step:
 - Pitfalls / notes for next AI:
 ```
+
+## Phase B — D-082 item-context corrections (feat/d082-item-contexts-fix)
+
+- Raw timeline model: `item_events` (purchase/undo/sold/destroyed +
+  participant_id + seq), `kill_events`, `match_participant_ids`,
+  `extractor_runs`; migrations 017-018. `etl timeline` and new
+  `etl backfill-timelines --call-budget` share the registry pipeline.
+- Item taxonomy: `etl classify-items` generates
+  `data/item-classes.generated.json` (+ `data/manual/item-classes.json`
+  overrides); `item_build.decision_kind` adds 'path' rows; completed slots
+  never contain quest/jungle-path items.
+- Aggregation: slot index from net replay (undo/sold/destroyed net out),
+  `participant_starters` bundles (45 s window), `item_state_scale` +
+  time-normalized `stateBucket`, at-purchase threat profile with
+  `profile_key='unknown'` fallback, `starterBundleKey`/`laneArchKey`/
+  `netPurchasedItems`/`ownedItemsAt`/`stateBucket` engine helpers.
+- ADRs D-083..D-087 PROPOSED; D-082 clause dispositions recorded.
+- NOT done (documented, needs owner/next phase): export of
+  item-classes/stateScale sections + zod schemas, lane-archetype export
+  level, rank-dimension is deferred (D-087), backfill of the 150 local
+  timelines, Prompt-2 statistical work.

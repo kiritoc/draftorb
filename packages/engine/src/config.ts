@@ -342,6 +342,22 @@ export interface ItemContextConfig {
   readonly stateBehindGoldDiff: number;
   /** Team kill diff at/above this marks `behind`. */
   readonly stateBehindKillsDiff: number;
+  /**
+   * Seconds after game start during which purchases count as "starting"
+   * items for the starter bundle (`participant_starters`) and slot-0 rows.
+   */
+  readonly starterWindowSeconds: number;
+  /**
+   * Z-score at/above which a time-normalized gold diff marks `ahead`
+   * (`stateBucket` with mode `timeNormalized`).
+   */
+  readonly stateZAhead: number;
+  /**
+   * Minimum per-(patch, time_bucket) sample count for a usable gold standard
+   * deviation; below it the scale falls back to the legacy absolute
+   * thresholds.
+   */
+  readonly minStateMatches: number;
 }
 
 export const DEFAULT_ITEM_CONTEXT_CONFIG: ItemContextConfig = Object.freeze({
@@ -351,6 +367,9 @@ export const DEFAULT_ITEM_CONTEXT_CONFIG: ItemContextConfig = Object.freeze({
   stateAheadKillsDiff: 3,
   stateBehindGoldDiff: 2000,
   stateBehindKillsDiff: 3,
+  starterWindowSeconds: 45,
+  stateZAhead: 1,
+  minStateMatches: 30,
 });
 
 // --- Influence lookup ---

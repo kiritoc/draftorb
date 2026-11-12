@@ -44,6 +44,14 @@ export interface RawDDragonItem {
   from?: string[];
   into?: string[];
   stats?: Record<string, number>;
+  /** Raw classification fields used by `etl classify-items` (D-082). */
+  maps?: Record<string, boolean>;
+  inStore?: boolean;
+  specialRecipe?: number;
+  consumed?: boolean;
+  hideFromAll?: boolean;
+  depth?: number;
+  requiredChampion?: string;
 }
 
 export interface RawDDragonRunePerk {
@@ -126,6 +134,25 @@ export async function fetchItems(version: string, fetchFn = fetch): Promise<Item
   }
   const json = (await res.json()) as { data: Record<string, RawDDragonItem> };
   return transformItems(json.data ?? {});
+}
+
+/**
+ * Fetches the RAW Data Dragon item.json (untransformed) for classification.
+ * Unlike `fetchItems`, this keeps fields the transformed `ItemsMap` drops
+ * (`maps`, `specialRecipe`, `inStore`, `consumed`, `hideFromAll`, `depth`,
+ * `requiredChampion`) which `etl classify-items` needs (D-082).
+ */
+export async function fetchRawItems(
+  version: string,
+  fetchFn = fetch,
+): Promise<Record<string, RawDDragonItem>> {
+  const url = `${DDRAGON_BASE}/cdn/${version}/data/en_US/item.json`;
+  const res = await fetchFn(url);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch items from ${url}: HTTP ${res.status} ${res.statusText}`);
+  }
+  const json = (await res.json()) as { data: Record<string, RawDDragonItem> };
+  return json.data ?? {};
 }
 
 /**

@@ -1,6 +1,6 @@
 import { parseArgs } from 'node:util';
 
-import { ingestTimelines } from '../timeline';
+import { runTimelinePipeline } from '../timeline';
 import { resolveDbPath } from '../config/paths';
 import { openDb } from '../db';
 import { CliError, UsageError, parseStrictPositiveInt } from '../cli-args';
@@ -39,7 +39,7 @@ async function runTimeline(args: string[]): Promise<void> {
   log.info(`Fetching match timelines for platform "${platform}"...`);
   const db = openDb(resolveDbPath());
   try {
-    const result = await ingestTimelines({
+    const result = await runTimelinePipeline({
       platform,
       limit,
       db,
@@ -47,12 +47,13 @@ async function runTimeline(args: string[]): Promise<void> {
     });
 
     log.info(
-      `Done: ${result.fetched} timelines fetched (${result.events} item events), ` +
-        `${result.skipped} skipped, ${result.failed} failed.`,
+      `Done: ${result.fetched} timelines fetched (${result.events} raw events, ` +
+        `${result.extractorsDone} extractor runs), ${result.skipped} skipped, ` +
+        `${result.failed} failed.`,
     );
     if (result.stoppedEarly) {
       // Non-zero exit so scheduled runs do not publish a partial refresh;
-      // fetched_timeline is only set on success so reruns resume.
+      // extractor_runs is only set on success so reruns resume.
       throw new CliError(
         `Timeline ingestion stopped early after 3 consecutive transient failures ` +
           `(${result.failed} failed). Rerun the command to resume.`,
@@ -67,6 +68,6 @@ export const timelineCommand: Command = {
   name: 'timeline',
   usage: 'timeline [platform] [--limit=N]',
   description:
-    'Fetch match timelines for stored matches and build item_events (resumable, Ctrl+C safe)',
+    'Fetch match timelines for stored matches and run raw timeline extractors (resumable, Ctrl+C safe)',
   run: runTimeline,
 };

@@ -256,6 +256,8 @@ describe('migration runner', () => {
       '014_patches_drop_released_at',
       '015_profiles',
       '016_breakpoints_change_scores',
+      '017_raw_timeline_events',
+      '018_item_build_phase_b',
     ]);
     expect(migrate(db)).toEqual([]);
 
@@ -276,9 +278,11 @@ describe('migration runner', () => {
           is_expert: number | null;
         }
       | undefined;
+    // Migration 017 rebuilds item_events as raw events; the legacy derived
+    // row is dropped and must be re-extracted by `etl backfill-timelines`.
     const event = db
-      .prepare('SELECT item_slot FROM item_events WHERE match_id = ?')
-      .get('legacy-match') as { item_slot: number | null } | undefined;
+      .prepare('SELECT COUNT(*) AS n FROM item_events WHERE match_id = ?')
+      .get('legacy-match') as { n: number } | undefined;
 
     expect(match?.match_id).toBe('legacy-match');
     expect(participant).toEqual({
@@ -288,7 +292,7 @@ describe('migration runner', () => {
       mastery_points: null,
       is_expert: null,
     });
-    expect(event?.item_slot).toBeNull();
+    expect(event?.n).toBe(0);
     // Migration 013 rebuilt match_rejects: existing rows survive and the new
     // CHECK accepts the 'pruned' reason (D-044).
     expect(
@@ -332,7 +336,7 @@ describe('migration runner', () => {
       ) VALUES (1, 'TOP', NULL, 10, 5, 'DIAMOND', 1, 1, 1)`,
     ).run();
     expect(db.prepare('SELECT COUNT(*) AS count FROM _migrations').get()).toMatchObject({
-      count: 16,
+      count: 18,
     });
     db.close();
   });
@@ -358,6 +362,8 @@ describe('migration runner', () => {
       '014_patches_drop_released_at',
       '015_profiles',
       '016_breakpoints_change_scores',
+      '017_raw_timeline_events',
+      '018_item_build_phase_b',
     ]);
 
     const columns = db.prepare('PRAGMA table_info(patches)').all() as { name: string }[];
@@ -442,6 +448,8 @@ describe('migration runner', () => {
       '014_patches_drop_released_at',
       '015_profiles',
       '016_breakpoints_change_scores',
+      '017_raw_timeline_events',
+      '018_item_build_phase_b',
     ]);
     expect(migrate(db)).toEqual([]);
 
@@ -499,8 +507,9 @@ describe('migration runner', () => {
     ).run();
     db.prepare(
       `INSERT INTO item_events (
-        match_id, puuid, ts, item_id, type, team_gold_diff, kills_diff, item_slot
-      ) VALUES ('cascade-match', 'cascade-player', 1000, 3109, 'ITEM_PURCHASED', 0, 0, 1)`,
+        match_id, participant_id, puuid, ts_ms, seq, event_type, item_id,
+        before_id, after_id, team_gold_diff, kills_diff
+      ) VALUES ('cascade-match', 1, 'cascade-player', 1000, 0, 'purchase', 3109, NULL, NULL, 0, 0)`,
     ).run();
 
     db.prepare('DELETE FROM matches WHERE match_id = ?').run('cascade-match');
@@ -551,18 +560,20 @@ describe('migration runner', () => {
     ).run();
 
     const insert = db.prepare(`
-      INSERT INTO item_events (match_id, puuid, ts, item_id, type, team_gold_diff, kills_diff)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO item_events (
+        match_id, participant_id, puuid, ts_ms, seq, event_type, item_id,
+        before_id, after_id, team_gold_diff, kills_diff
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?)
     `);
 
-    insert.run('test-match', 'test-puuid', 60000, 1001, 'ITEM_PURCHASED', 500, 1);
-    insert.run('test-match', 'test-puuid', 60000, 1001, 'ITEM_UNDO', 500, 1);
+    insert.run('test-match', 1, 'test-puuid', 60000, 0, 'purchase', 1001, 500, 1);
+    insert.run('test-match', 1, 'test-puuid', 60000, 1, 'undo', 1001, 500, 1);
 
     const events = db
-      .prepare('SELECT type FROM item_events WHERE match_id = ? ORDER BY type')
-      .all('test-match') as { type: string }[];
+      .prepare('SELECT event_type FROM item_events WHERE match_id = ? ORDER BY seq')
+      .all('test-match') as { event_type: string }[];
 
-    expect(events).toEqual([{ type: 'ITEM_PURCHASED' }, { type: 'ITEM_UNDO' }]);
+    expect(events).toEqual([{ event_type: 'purchase' }, { event_type: 'undo' }]);
     db.close();
   });
 

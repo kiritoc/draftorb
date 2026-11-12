@@ -953,3 +953,68 @@ Owner decision 2026-11-08.
 ### D-xxx — Title — STATUS
 Context / Decision / Alternatives / Consequences
 ```
+
+Update (Phase B, D-083..D-087): clause .1 amended (generated taxonomy +
+path rows), .2 kept, .3 superseded (at-purchase threat via kill_events +
+ownedItemsAt, 'unknown' profile), .4 superseded (time-normalized
+stateBucket + item_state_scale), .5 kept, .6 amended (laneArchKey
+archetype backoff), .7 kept (rank-agnostic, measured in D-087).
+
+### D-083 — Item taxonomy pipeline and path decisions — PROPOSED
+
+Generated item classes (`data/item-classes.generated.json`, produced by
+`etl classify-items` from raw Data Dragon fields `maps`, `inStore`,
+`specialRecipe`, `consumed`, `hideFromAll`, `depth`, `requiredChampion`)
+plus manual overrides (`data/manual/item-classes.json`). Classes:
+`starter`, `quest_line`, `quest_reward`, `jungle_path`, `component`,
+`boots`, `completed`, `consumable`, `excluded`. Invariants: `item_slot = 0`
+and all completed slots never contain quest-line/quest-reward items;
+`quest_reward`/`jungle_path` first acquisitions emit `decision_kind='path'`
+rows; jungle pets are path info, not completed items. Disposition of D-082
+clauses: .1 amended (taxonomy), .2 kept, .5 kept, .6 amended (archetype
+level at export), .7 kept. Update (2026-…, D-083): implemented in
+`packages/etl/src/item-classes.ts`, `classify-items` command, migration
+018 (`decision_kind`).
+
+### D-084 — Raw timeline facts, kill events, at-purchase threat — PROPOSED
+
+`item_events` stores raw purchase/undo/sold/destroyed rows keyed by
+`participant_id` + `seq` (same-ms duplicates preserved); `kill_events`
+stores CHAMPION_KILL facts (killer_pid NULL for non-champion kills,
+assist_mask, bounty); `match_participant_ids` maps pid->puuid;
+`extractor_runs` makes `etl backfill-timelines` resumable per extractor.
+Pseudo participantId 0 purchases (World Atlas) are attributed to SUPPORT
+participants lacking that item. Enemy threat profiles are computed AT
+PURCHASE TIME from `kill_events` + `ownedItemsAt`; matches without
+`kill_events` yield `profile_key='unknown'` (never invented). D-082 .3
+superseded (was final-state approximation). Update: implemented in
+`timeline-events.ts`, `timeline-extractors.ts`, `timeline.ts`, migrations
+017-018.
+
+### D-085 — Time-normalized state buckets and exported scale — PROPOSED
+
+`item_state_scale` stores per-(patch, time_bucket) gold-diff standard
+deviation (min `minStateMatches` samples). `stateBucket(mode,
+' timeNormalized')` divides gold diff by that sd (z >= `stateZAhead` =>
+ahead) and falls back to legacy absolute thresholds when no scale exists.
+Mode flag `stateBucketMode` on aggregation options; default
+`timeNormalized`. D-082 .4 superseded (was fixed absolute thresholds).
+Update: `stateBucket`/`item_state_scale` in engine `item-context.ts` and
+`aggregate-items.ts`.
+
+### D-086 — Starter bundles and lane archetype backoff — PROPOSED
+
+`participant_starters` stores the net purchased bundle per
+(match, participant) within `starterWindowSeconds` (default 45 s, from the
+Phase A audit; was 90 s implicit). `starterBundleKey()` produces the stable
+"itemId:count" grouping key in the engine. `laneArchKey()` collapses the
+exact lane matchup to the most influential champion's archetype for
+backoff; the extended chain is exact lane -> archetype -> role -> global.
+D-082 .6 amended. Update: engine helpers + `participant_starters` table.
+
+### D-087 — Rank dimension for item_build: measured, deferred — PROPOSED
+
+Phase A sparsity audit showed champion+slot cells are thin (median 2
+games); adding a rank dimension would fragment further. Decision: keep
+`item_build` rank-agnostic; revisit only if Prompt-2 backtests show rank
+interactions. No schema change.

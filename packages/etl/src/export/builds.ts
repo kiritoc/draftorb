@@ -14,7 +14,13 @@
  * directory. myRole comes from the group key.
  */
 
-import { championIdSchema, itemBuildExportSchema, roleSchema } from '@draftorb/shared';
+import {
+  championIdSchema,
+  itemBuildExportSchema,
+  roleSchema,
+  type ChampionTagsMap,
+} from '@draftorb/shared';
+import { laneArchKey } from '@draftorb/engine';
 import { passesGate, round6 } from './io.js';
 
 export interface ItemBuildRow {
@@ -29,6 +35,13 @@ export interface ItemBuildRow {
   winsW: number;
   gamesW: number;
   gamesW2: number;
+}
+
+export interface BuildFilesOptions {
+  /** Subdirectory under roles/<ROLE>/ (default 'builds'; 'build-paths' for path rows). */
+  subdirectory?: string;
+  /** Champion tags for the lane-archetype backoff field (D-086). */
+  championTags?: ChampionTagsMap;
 }
 
 interface ItemBuildEntryWithKey {
@@ -46,6 +59,7 @@ interface ItemBuildContextWithKey {
   stateBucket: string;
   profileKey: string;
   laneKey: string | null;
+  laneArch: string | null;
   items: ItemBuildEntryWithKey[];
 }
 
@@ -57,7 +71,10 @@ export function buildBuildFiles(
   rows: readonly ItemBuildRow[],
   roles: readonly string[],
   exportMinGames: number,
+  options: BuildFilesOptions = {},
 ): RuneBuildFiles {
+  const subdirectory = options.subdirectory ?? 'builds';
+  const tags = options.championTags;
   const roleSet = new Set(roles);
   // Group by (championId, myRole) (B6).
   const byGroup = new Map<string, { myRole: string; rows: ItemBuildRow[] }>();
@@ -90,12 +107,17 @@ export function buildBuildFiles(
       ]);
       let ctx = byContext.get(contextKey);
       if (ctx === undefined) {
+        const laneArch =
+          laneKey !== null && laneKey !== '' && tags !== undefined
+            ? laneArchKey(laneKey, tags) || null
+            : null;
         ctx = {
           slotIdx: row.slotIdx,
           timeBucket: row.timeBucket,
           stateBucket: row.stateBucket,
           profileKey: row.profileKey,
           laneKey,
+          laneArch,
           items: [],
         };
         byContext.set(contextKey, ctx);
@@ -138,18 +160,20 @@ export function buildBuildFiles(
       if (a.profileKey !== b.profileKey) return a.profileKey.localeCompare(b.profileKey);
       const ak = a.laneKey ?? '';
       const bk = b.laneKey ?? '';
-      return ak.localeCompare(bk);
+      if (ak !== bk) return ak.localeCompare(bk);
+      return (a.laneArch ?? '').localeCompare(b.laneArch ?? '');
     });
     const exportObj = {
       championId,
       myRole,
       contexts: contexts.map(
-        ({ slotIdx, timeBucket, stateBucket, profileKey, laneKey, items }) => ({
+        ({ slotIdx, timeBucket, stateBucket, profileKey, laneKey, laneArch, items }) => ({
           slotIdx,
           timeBucket,
           stateBucket,
           profileKey,
           ...(laneKey === null || laneKey === '' ? {} : { laneKey }),
+          ...(laneArch === null || laneArch === '' ? {} : { laneArch }),
           items: items.map((item) => ({
             itemId: item.itemId,
             winsW: item.winsW,
@@ -167,11 +191,11 @@ export function buildBuildFiles(
       itemBuildExportSchema.parse(exportObj);
     } catch (error: unknown) {
       throw new Error(
-        `Invalid build export for roles/${myRole}/builds/${championId}.json: ${error instanceof Error ? error.message : String(error)}`,
+        `Invalid build export for roles/${myRole}/${subdirectory}/${championId}.json: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
     files.push({
-      relativePath: `roles/${myRole}/builds/${championId}.json`,
+      relativePath: `roles/${myRole}/${subdirectory}/${championId}.json`,
       content: JSON.stringify(exportObj),
     });
   }

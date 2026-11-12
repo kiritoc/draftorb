@@ -84,7 +84,7 @@ describe('exportCommand', () => {
     db.close();
 
     await exportCommand.run([]);
-    expect(output()).toMatch(/schema v3/);
+    expect(output()).toMatch(/schema v4/);
     expect(output()).toMatch(/roles: SUPPORT/);
 
     const manifest = JSON.parse(
@@ -93,7 +93,7 @@ describe('exportCommand', () => {
         'utf8',
       ),
     );
-    expect(manifest.schemaVersion).toBe(3);
+    expect(manifest.schemaVersion).toBe(4);
     expect(manifest.patch).toBe('16.21');
     expect(manifest.roles).toEqual(['SUPPORT']);
     expect(manifest.rankBuckets).toEqual([

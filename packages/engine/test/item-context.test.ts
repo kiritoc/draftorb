@@ -18,6 +18,9 @@ const cfg: ItemContextConfig = {
   stateAheadKillsDiff: 3,
   stateBehindGoldDiff: 2000,
   stateBehindKillsDiff: 3,
+  starterWindowSeconds: 45,
+  stateZAhead: 1,
+  minStateMatches: 30,
 };
 
 describe('itemTimeBucket', () => {
@@ -152,5 +155,139 @@ describe('threatWeightedDamageProfile', () => {
     expect(threatWeightedDamageProfile([{ championId: 1, threatShare: 1 }], undefined)).toBe(
       'mixed',
     );
+  });
+});
+
+describe('Phase B helpers', () => {
+  it('netPurchasedItems nets purchase/sold/undo/destroyed deterministically', async () => {
+    const { netPurchasedItems } = await import('../src/item-context');
+    const events = [
+      {
+        ts: 1000,
+        seq: 0,
+        event_type: 'purchase' as const,
+        item_id: 1,
+        before_id: null,
+        after_id: null,
+      },
+      {
+        ts: 2000,
+        seq: 0,
+        event_type: 'purchase' as const,
+        item_id: 2,
+        before_id: null,
+        after_id: null,
+      },
+      {
+        ts: 3000,
+        seq: 0,
+        event_type: 'sold' as const,
+        item_id: 1,
+        before_id: null,
+        after_id: null,
+      },
+      { ts: 4000, seq: 0, event_type: 'undo' as const, item_id: 2, before_id: 2, after_id: null },
+      {
+        ts: 5000,
+        seq: 0,
+        event_type: 'purchase' as const,
+        item_id: 3,
+        before_id: null,
+        after_id: null,
+      },
+      {
+        ts: 6000,
+        seq: 0,
+        event_type: 'destroyed' as const,
+        item_id: 3,
+        before_id: null,
+        after_id: null,
+      },
+    ];
+    const owned = netPurchasedItems(events);
+    expect([...owned.entries()]).toEqual([]);
+    const partial = netPurchasedItems(events.slice(0, 4));
+    expect(partial.get(1)).toBeUndefined();
+    expect(partial.get(2)).toBeUndefined();
+  });
+
+  it('ownedItemsAt ignores later events (no leakage)', async () => {
+    const { ownedItemsAt } = await import('../src/item-context');
+    const events = [
+      {
+        ts: 1000,
+        seq: 0,
+        event_type: 'purchase' as const,
+        item_id: 1,
+        before_id: null,
+        after_id: null,
+      },
+      {
+        ts: 9000,
+        seq: 0,
+        event_type: 'purchase' as const,
+        item_id: 2,
+        before_id: null,
+        after_id: null,
+      },
+    ];
+    const at = ownedItemsAt(events, 5000);
+    expect(at.has(1)).toBe(true);
+    expect(at.has(2)).toBe(false);
+  });
+
+  it('starterBundleKey is stable and window-bounded', async () => {
+    const { starterBundleKey } = await import('../src/item-context');
+    const events = [
+      {
+        ts: 5_000,
+        seq: 0,
+        event_type: 'purchase' as const,
+        item_id: 3865,
+        before_id: null,
+        after_id: null,
+      },
+      {
+        ts: 10_000,
+        seq: 0,
+        event_type: 'purchase' as const,
+        item_id: 2003,
+        before_id: null,
+        after_id: null,
+      },
+      {
+        ts: 60_000,
+        seq: 0,
+        event_type: 'purchase' as const,
+        item_id: 9001,
+        before_id: null,
+        after_id: null,
+      },
+    ];
+    expect(starterBundleKey(events, 45)).toBe('2003:1,3865:1');
+    expect(starterBundleKey(events, 45)).toBe(starterBundleKey([...events].reverse(), 45));
+  });
+
+  it('stateBucket timeNormalized uses z-score and falls back without scale', async () => {
+    const { stateBucket } = await import('../src/item-context');
+    const c = DEFAULT_ITEM_CONTEXT_CONFIG;
+    // gold diff 3000, sd 1000 -> z=3 >= 1 -> ahead even though kills even.
+    expect(stateBucket(3000, 0, c, 'timeNormalized', 1000)).toBe('ahead');
+    expect(stateBucket(-3000, 0, c, 'timeNormalized', 1000)).toBe('behind');
+    expect(stateBucket(500, 0, c, 'timeNormalized', 1000)).toBe('even');
+    // No sd -> legacy absolute: 3000 >= 2000 still ahead; 500 even.
+    expect(stateBucket(500, 0, c, 'timeNormalized', undefined)).toBe('even');
+    expect(stateBucket(500, 5, c, 'timeNormalized', undefined)).toBe('ahead');
+    expect(stateBucket(500, 0, c, 'legacyAbsolute')).toBe('even');
+  });
+
+  it('laneArchKey extracts the most influential champion archetype', async () => {
+    const { laneArchKey } = await import('../src/item-context');
+    const tags = {
+      '21': { archetype: 'marksman', damageType: 'AD' },
+    } as unknown as Parameters<typeof laneArchKey>[1];
+    expect(laneArchKey('lane:0.ADC:21|1.SUPPORT:266', tags)).toBe('marksman');
+    expect(laneArchKey('', tags)).toBe('');
+    expect(laneArchKey('lane:0.ADC:999', tags)).toBe('');
   });
 });

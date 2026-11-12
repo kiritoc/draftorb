@@ -67,6 +67,7 @@ describe('exportJson', () => {
       .map((relativePath) => relativePath.replaceAll('\\', '/'))
       .sort();
     expect(remaining).toEqual([
+      'item-classes.json',
       'manifest.json',
       'pick-rate.json',
       'role-prob.json',

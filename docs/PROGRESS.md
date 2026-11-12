@@ -1214,3 +1214,51 @@ The 2026-10-22 entries had no timestamps; their order was reconstructed from tic
 - Next step:
 - Pitfalls / notes for next AI:
 ```
+
+## Phase B — D-082 item-context corrections (feat/d082-item-contexts-fix)
+
+- Raw timeline model: `item_events` (purchase/undo/sold/destroyed +
+  participant_id + seq), `kill_events`, `match_participant_ids`,
+  `extractor_runs`; migrations 017-018. `etl timeline` and new
+  `etl backfill-timelines --call-budget` share the registry pipeline.
+- Item taxonomy: `etl classify-items` generates
+  `data/item-classes.generated.json` (+ `data/manual/item-classes.json`
+  overrides); `item_build.decision_kind` adds 'path' rows; completed slots
+  never contain quest/jungle-path items.
+- Aggregation: slot index from net replay (undo/sold/destroyed net out),
+  `participant_starters` bundles (45 s window), `item_state_scale` +
+  time-normalized `stateBucket`, at-purchase threat profile with
+  `profile_key='unknown'` fallback, `starterBundleKey`/`laneArchKey`/
+  `netPurchasedItems`/`ownedItemsAt`/`stateBucket` engine helpers.
+- ADRs D-083..D-087 PROPOSED; D-082 clause dispositions recorded.
+- NOT done (documented, needs owner/next phase): export of
+  item-classes/stateScale sections + zod schemas, lane-archetype export
+  level, rank-dimension is deferred (D-087), backfill of the 150 local
+  timelines, Prompt-2 statistical work.
+
+## Phase B gaps closed (same branch)
+
+- Export: `item-classes.json` + `state-scale.json` (schema v4),
+  `decision_kind` split — builds export item rows only, path rows go to
+  `roles/<ROLE>/build-paths/`; `laneArch` field on lane contexts via
+  champion-tags archetypes; `profileKey` enum gains `unknown`.
+- Shared zod: itemClasses/stateScale export schemas, laneArch optional,
+  MANIFEST_SCHEMA_VERSION 3 -> 4 (loaders reject unknown versions via
+  literal).
+- classify-items `--check` CI mode + generated-file completeness test.
+- Real export verified on state DB: 66 files incl. item-classes.json
+  (859 items) + state-scale.json; public tarball ~1.5 MB gz (< 5 MB).
+  No builds files yet: max games_w = 6 < exportMinGames = 10 with only
+  300 backfilled matches — expected sparsity, resolves with full
+  backfill.
+- Real-data run caught + fixed: pendingMatches bind order, starter
+  bundles now cover all participants, isSummonersRift requires map '11'.
+
+## Backfill scale-up (2026-11-12)
+
+- `backfill-timelines euw1`: 2,300 matches done (~1.16M raw events,
+  0 failures); remaining ~22k running in background (resumable via
+  extractor_runs).
+- `aggregate`: item_build 18,869 rows / 154 champions; export emits
+  14 SUPPORT builds files; lane/path contexts still below
+  exportMinGames=10 (honest sparsity, resolves with full corpus).

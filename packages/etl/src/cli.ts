@@ -24,6 +24,8 @@ import { checkKeyCommand } from './commands/check-key';
 import { playersCommand } from './commands/players';
 import { matchesCommand } from './commands/matches';
 import { timelineCommand } from './commands/timeline';
+import { backfillTimelinesCommand } from './commands/backfill';
+import { classifyItemsCommand } from './commands/classify-items';
 import { pruneCommand } from './commands/prune';
 import { migrateCommand } from './commands/migrate';
 import { aggregateCommand } from './commands/aggregate';
@@ -46,6 +48,8 @@ const COMMANDS: readonly Command[] = [
   playersCommand,
   matchesCommand,
   timelineCommand,
+  backfillTimelinesCommand,
+  classifyItemsCommand,
   pruneCommand,
   migrateCommand,
   aggregateCommand,

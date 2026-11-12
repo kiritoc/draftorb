@@ -19,7 +19,11 @@ import { join } from 'node:path';
 import { DEFAULT_CONFIG, type RankWeightingConfig } from '@draftorb/engine';
 import {
   LATEST_SCHEMA_VERSION,
+  championTagsMapSchema,
+  itemClassesExportSchema,
+  stateScaleExportSchema,
   manifestSchema,
+  type ChampionTagsMap,
   type Latest,
   type Manifest,
   type Role,
@@ -28,7 +32,8 @@ import {
 import { latestPatch, PATCH_PATTERN } from '../aggregate';
 import { readAggregateSnapshot } from '../aggregate-meta';
 import { comparePatches } from '../matches-store';
-import { defaultPublicDataDir } from '../config/paths';
+import { defaultManualDataDir, defaultPublicDataDir } from '../config/paths';
+import { loadItemClasses } from '../item-classes';
 import { buildManifest } from './manifest.js';
 import { buildRuneFiles } from './runes.js';
 import { buildBuildFiles } from './builds.js';
@@ -191,14 +196,29 @@ export function exportJson(db: Database.Database, options: ExportOptions = {}): 
      FROM rune_ctx ORDER BY champion_id, my_role, rank_bucket, context_key, context_level`,
   );
 
-  const buildRows = all<ItemBuildRow>(
+  const buildRows = all<ItemBuildRow & { decisionKind: string }>(
     db,
     `SELECT champion_id AS championId, my_role AS myRole, slot_idx AS slotIdx,
            time_bucket AS timeBucket, state_bucket AS stateBucket,
            profile_key AS profileKey, lane_key AS laneKey,
+           decision_kind AS decisionKind,
            item_id AS itemId, wins_w AS winsW, games_w AS gamesW, games_w2 AS gamesW2
      FROM item_build ORDER BY champion_id, my_role, slot_idx, time_bucket, state_bucket, profile_key, lane_key`,
   );
+  // Path rows (quest rewards, jungle pet upgrades) export to build-paths/,
+  // kept out of the item pick-share files (D-082/D-086).
+  const itemBuildRows = buildRows.filter((r) => r.decisionKind !== 'path');
+  const pathBuildRows = buildRows.filter((r) => r.decisionKind === 'path');
+
+  // Champion tags for the lane-archetype backoff field (D-086).
+  let championTags: ChampionTagsMap | undefined;
+  try {
+    championTags = championTagsMapSchema.parse(
+      JSON.parse(readFileSync(join(defaultManualDataDir(), 'champion-tags.json'), 'utf8')),
+    );
+  } catch {
+    warnings.push('export: champion-tags.json unavailable; laneArch fields omitted');
+  }
 
   // --- Region (C5) ---
   const platformRows = all<{ platform: string }>(
@@ -245,7 +265,61 @@ export function exportJson(db: Database.Database, options: ExportOptions = {}): 
     );
   }
 
-  filesToWrite.push(...buildBuildFiles(buildRows, roles, exportMinGames).files);
+  filesToWrite.push(
+    ...buildBuildFiles(itemBuildRows, roles, exportMinGames, { championTags }).files,
+    ...buildBuildFiles(pathBuildRows, roles, exportMinGames, {
+      subdirectory: 'build-paths',
+      championTags,
+    }).files,
+  );
+
+  // Item classes + state scale exports (D-082/B8).
+  const itemClasses = loadItemClasses();
+  if (itemClasses.size > 0) {
+    const classesExport = itemClassesExportSchema.parse({
+      patch: targetPatch,
+      items: Object.fromEntries(
+        [...itemClasses.entries()].map(([id, entry]) => [
+          String(id),
+          entry.laneFamily === undefined
+            ? { cls: entry.cls }
+            : { cls: entry.cls, laneFamily: entry.laneFamily },
+        ]),
+      ),
+    });
+    filesToWrite.push({
+      relativePath: 'item-classes.json',
+      content: JSON.stringify(classesExport),
+    });
+  } else {
+    warnings.push('export: no item classes found; item-classes.json omitted');
+  }
+
+  const scaleRows = all<{
+    patch: string;
+    timeBucket: string;
+    sampleCount: number;
+    goldSd: number;
+  }>(
+    db,
+    `SELECT patch, time_bucket AS timeBucket, sample_count AS sampleCount, gold_sd AS goldSd
+     FROM item_state_scale WHERE patch = ? ORDER BY time_bucket`,
+    [targetPatch],
+  );
+  if (scaleRows.length > 0) {
+    const scaleExport = stateScaleExportSchema.parse({
+      patch: targetPatch,
+      buckets: scaleRows.map((r) => ({
+        timeBucket: r.timeBucket,
+        sampleCount: r.sampleCount,
+        goldSd: r.goldSd,
+      })),
+    });
+    filesToWrite.push({
+      relativePath: 'state-scale.json',
+      content: JSON.stringify(scaleExport),
+    });
+  }
 
   // D-055: publish the patch-catalog state the aggregates were computed
   // against (patch_index, currentPatchIndex, catalog max) so the snapshot

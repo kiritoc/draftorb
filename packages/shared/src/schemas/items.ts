@@ -55,7 +55,7 @@ export type ItemTagsMap = z.infer<typeof itemTagsMapSchema>;
 export const itemBuildStateBucketSchema = z.enum(['ahead', 'even', 'behind']);
 export type ItemBuildStateBucket = z.infer<typeof itemBuildStateBucketSchema>;
 
-export const itemBuildProfileKeySchema = z.enum(['AD', 'AP', 'mixed']);
+export const itemBuildProfileKeySchema = z.enum(['AD', 'AP', 'mixed', 'unknown']);
 export type ItemBuildProfileKey = z.infer<typeof itemBuildProfileKeySchema>;
 
 export const itemBuildEntrySchema = z
@@ -77,6 +77,8 @@ export const itemBuildContextSchema = z
     stateBucket: itemBuildStateBucketSchema,
     profileKey: itemBuildProfileKeySchema,
     laneKey: z.string().optional(),
+    /** Lane archetype backoff level (D-082/D-086): archetype of the most influential lane slot. */
+    laneArch: z.string().optional(),
     items: z.array(itemBuildEntrySchema),
   })
   .strict();
@@ -90,3 +92,52 @@ export const itemBuildExportSchema = z
   })
   .strict();
 export type ItemBuildExport = z.infer<typeof itemBuildExportSchema>;
+
+// --- Item classes export (data/item-classes.generated.json + overrides) ---
+
+export const itemClassNameSchema = z.enum([
+  'starter',
+  'quest_line',
+  'quest_reward',
+  'jungle_path',
+  'component',
+  'boots',
+  'completed',
+  'consumable',
+  'excluded',
+]);
+export type ItemClassName = z.infer<typeof itemClassNameSchema>;
+
+export const itemClassesExportSchema = z
+  .object({
+    patch: z.string().min(1),
+    items: z.record(
+      z.string(),
+      z
+        .object({
+          cls: itemClassNameSchema,
+          laneFamily: z.string().optional(),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+export type ItemClassesExport = z.infer<typeof itemClassesExportSchema>;
+
+// --- State scale export (item_state_scale table) ---
+
+export const stateScaleExportSchema = z
+  .object({
+    patch: z.string().min(1),
+    buckets: z.array(
+      z
+        .object({
+          timeBucket: z.string().min(1),
+          sampleCount: z.number().int().nonnegative(),
+          goldSd: z.number().positive(),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+export type StateScaleExport = z.infer<typeof stateScaleExportSchema>;

@@ -54,7 +54,7 @@ function writeExport(publicDir: string, baseline: unknown): void {
     rankBuckets: ['DIAMOND'],
     roles: ['SUPPORT'],
     files: files.map((path) => ({ path })),
-    schemaVersion: 3,
+    schemaVersion: 4,
   });
   writeJson(join(patchDir, 'champions.json'), {
     '412': { id: 412, name: 'Thresh', icon: 'Thresh.png', roles: ['SUPPORT', 'TOP'] },

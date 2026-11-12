@@ -6,23 +6,19 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { openDb, migrate } from './db';
 import { seedPatches } from './patches.test-helpers';
-import { ingestTimelines } from './timeline';
+import { runTimelinePipeline } from './timeline';
 import type { RiotMatchTimeline, RiotMatchTimelineEvent } from './riot';
 import { RiotApiError, type RiotClient } from './riot';
 
 const PATCH = '16.21';
 
-function seedMatch(
-  db: ReturnType<typeof openDb>,
-  matchId: string,
-  { fetchedTimeline = 0 }: { fetchedTimeline?: number } = {},
-): void {
+function seedMatch(db: ReturnType<typeof openDb>, matchId: string): void {
   seedPatches(db, [PATCH]);
   db.prepare(
     `INSERT INTO matches (
       match_id, platform, patch, queue_id, duration, created_at, avg_rank_score, rank_known_count, fetched_timeline
-    ) VALUES (?, 'euw1', ?, 420, 1800, 1, 6.5, 2, ?)`,
-  ).run(matchId, PATCH, fetchedTimeline);
+    ) VALUES (?, 'euw1', ?, 420, 1800, 1, 6.5, 2, 0)`,
+  ).run(matchId, PATCH);
   const insertParticipant = db.prepare(
     `INSERT INTO participants (
       match_id, puuid, team_id, champion_id, role, win, rank_score,
@@ -33,35 +29,6 @@ function seedMatch(
   insertParticipant.run(matchId, 'puuid-a', 100, 412, 'SUPPORT', 1);
   insertParticipant.run(matchId, 'puuid-b', 200, 266, 'SUPPORT', 0);
 }
-
-/** Minimal catalog: 9001 completed, 3865 lane starter, 2003 consumable. */
-const rawItem = (id: number, into: string[], tags: string[]) => ({
-  name: `item-${id}`,
-  image: { full: `${id}.png` },
-  gold: { base: 0, purchasable: true, total: 1000, sell: 0 },
-  tags,
-  from: [],
-  into,
-});
-
-const mockFetch =
-  (items: Record<string, unknown> | null = null): typeof fetch =>
-  async (input: unknown) => {
-    const url = String(input);
-    const json = (body: unknown) =>
-      Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
-    if (url.endsWith('/api/versions.json')) return json(['16.21.1']);
-    if (url.includes('/data/en_US/item.json')) {
-      return json({
-        data: items ?? {
-          '9001': rawItem(9001, [], []),
-          '3865': rawItem(3865, [], ['Health', 'GoldPer', 'Lane']),
-          '2003': rawItem(2003, [], ['Consumable', 'Lane']),
-        },
-      });
-    }
-    return new Response('not found', { status: 404 });
-  };
 
 function makeTimeline(events: RiotMatchTimelineEvent[]): RiotMatchTimeline {
   return {
@@ -108,80 +75,106 @@ function withDb(run: (db: ReturnType<typeof openDb>) => Promise<void>): Promise<
   })();
 }
 
-const fetchedFlag = (db: ReturnType<typeof openDb>, matchId: string): number =>
+const extractorRuns = (db: ReturnType<typeof openDb>, matchId: string) =>
   (
-    db.prepare('SELECT fetched_timeline AS f FROM matches WHERE match_id = ?').get(matchId) as {
-      f: number;
-    }
-  ).f;
+    db
+      .prepare('SELECT extractor FROM extractor_runs WHERE match_id = ? ORDER BY extractor')
+      .all(matchId) as Array<{ extractor: string }>
+  ).map((r) => r.extractor);
 
-const eventRows = (db: ReturnType<typeof openDb>, matchId: string) =>
+const itemEventRows = (db: ReturnType<typeof openDb>, matchId: string) =>
   db
     .prepare(
-      'SELECT puuid, ts, item_id, type, team_gold_diff, kills_diff, item_slot FROM item_events WHERE match_id = ? ORDER BY ts, puuid',
+      `SELECT participant_id, puuid, ts_ms, seq, event_type, item_id, before_id, after_id,
+              team_gold_diff, kills_diff
+       FROM item_events WHERE match_id = ? ORDER BY ts_ms, seq`,
     )
     .all(matchId) as Array<Record<string, unknown>>;
 
-describe('ingestTimelines', () => {
-  it('fetches timelines, writes item_events and marks fetched_timeline', async () => {
+describe('runTimelinePipeline', () => {
+  it('writes raw item_events, kill_events, participant ids and extractor_runs', async () => {
     await withDb(async (db) => {
       seedMatch(db, 'm1');
       const client = mockClient(
         makeTimeline([
           { timestamp: 10_000, type: 'ITEM_PURCHASED', participantId: 1, itemId: 3865 },
           { timestamp: 400_000, type: 'ITEM_PURCHASED', participantId: 1, itemId: 9001 },
-          { timestamp: 500_000, type: 'ITEM_PURCHASED', participantId: 2, itemId: 2003 },
+          { timestamp: 400_000, type: 'ITEM_PURCHASED', participantId: 1, itemId: 2003 },
+          { timestamp: 500_000, type: 'ITEM_SOLD', participantId: 1, itemId: 9001 },
+          {
+            timestamp: 600_000,
+            type: 'CHAMPION_KILL',
+            killerId: 2,
+            victimId: 1,
+            assistingParticipantIds: [2],
+            bounty: 300,
+          },
         ]),
       );
-      const result = await ingestTimelines({ db, client, fetchFn: mockFetch() });
-      expect(result).toMatchObject({ candidates: 1, fetched: 1, events: 3, failed: 0 });
-      expect(fetchedFlag(db, 'm1')).toBe(1);
+      const result = await runTimelinePipeline({ db, client });
+      expect(result.fetched).toBe(1);
+      expect(result.failed).toBe(0);
+      expect(result.extractorsDone).toBe(3);
+      expect(extractorRuns(db, 'm1')).toEqual(['item-events', 'kill-events', 'participant-ids']);
 
-      const rows = eventRows(db, 'm1');
-      expect(rows).toHaveLength(3);
-      const starter = rows.find((r) => r.item_id === 3865);
-      expect(starter).toMatchObject({ puuid: 'puuid-a', item_slot: 0, type: 'purchase' });
-      const completed = rows.find((r) => r.item_id === 9001);
-      expect(completed).toMatchObject({ puuid: 'puuid-a', item_slot: 1 });
-      const consumable = rows.find((r) => r.item_id === 2003);
-      expect(consumable).toMatchObject({ puuid: 'puuid-b', item_slot: null });
+      const rows = itemEventRows(db, 'm1');
+      expect(rows).toHaveLength(4);
+      expect(rows.map((r) => r.event_type)).toEqual(['purchase', 'purchase', 'purchase', 'sold']);
+      // Same-ms duplicate purchases get distinct seq values.
+      const sameMs = rows.filter((r) => r.ts_ms === 400_000);
+      expect(new Set(sameMs.map((r) => r.seq)).size).toBe(2);
+
+      const kills = db
+        .prepare('SELECT killer_pid, victim_pid, assist_mask FROM kill_events WHERE match_id = ?')
+        .all('m1') as Array<Record<string, unknown>>;
+      expect(kills).toHaveLength(1);
+      expect(kills[0]).toMatchObject({ killer_pid: 2, victim_pid: 1 });
+
+      const pids = db
+        .prepare(
+          'SELECT participant_id, puuid FROM match_participant_ids WHERE match_id = ? ORDER BY participant_id',
+        )
+        .all('m1') as Array<Record<string, unknown>>;
+      expect(pids).toEqual([
+        { participant_id: 1, puuid: 'puuid-a' },
+        { participant_id: 2, puuid: 'puuid-b' },
+      ]);
     });
   });
 
-  it('is a no-op on a second run (fetched_timeline = 1)', async () => {
+  it('is a no-op on a second run (extractor_runs complete)', async () => {
     await withDb(async (db) => {
       seedMatch(db, 'm1');
       const client = mockClient(makeTimeline([]));
-      await ingestTimelines({ db, client, fetchFn: mockFetch() });
-      const again = await ingestTimelines({ db, client, fetchFn: mockFetch() });
+      await runTimelinePipeline({ db, client });
+      const again = await runTimelinePipeline({ db, client });
       expect(again.candidates).toBe(0);
       expect(client.getMatchTimeline).toHaveBeenCalledTimes(1);
     });
   });
 
-  it('re-ingesting rewrites events idempotently when the flag is reset', async () => {
+  it('resumes per extractor: a match missing one extractor still fetches', async () => {
     await withDb(async (db) => {
       seedMatch(db, 'm1');
-      const client = mockClient(
-        makeTimeline([
-          { timestamp: 10_000, type: 'ITEM_PURCHASED', participantId: 1, itemId: 3865 },
-        ]),
-      );
-      await ingestTimelines({ db, client, fetchFn: mockFetch() });
-      db.prepare('UPDATE matches SET fetched_timeline = 0 WHERE match_id = ?').run('m1');
-      await ingestTimelines({ db, client, fetchFn: mockFetch() });
-      expect(eventRows(db, 'm1')).toHaveLength(1);
+      // Simulate a previous partial run: only item-events done.
+      db.prepare(
+        "INSERT INTO extractor_runs (match_id, extractor) VALUES ('m1', 'item-events')",
+      ).run();
+      const client = mockClient(makeTimeline([]));
+      const result = await runTimelinePipeline({ db, client });
+      expect(result.fetched).toBe(1);
+      expect(extractorRuns(db, 'm1')).toHaveLength(3);
+      expect(client.getMatchTimeline).toHaveBeenCalledTimes(1);
     });
   });
 
-  it('keeps fetched_timeline = 0 on transient failure so the match retries', async () => {
+  it('marks nothing on transient failure so the match retries', async () => {
     await withDb(async (db) => {
       seedMatch(db, 'm1');
       const client = mockClient(new RiotApiError('boom', 500, 'https://x'));
-      const result = await ingestTimelines({ db, client, fetchFn: mockFetch() });
+      const result = await runTimelinePipeline({ db, client });
       expect(result.failed).toBe(1);
-      expect(fetchedFlag(db, 'm1')).toBe(0);
-      expect(eventRows(db, 'm1')).toHaveLength(0);
+      expect(extractorRuns(db, 'm1')).toHaveLength(0);
     });
   });
 
@@ -189,7 +182,7 @@ describe('ingestTimelines', () => {
     await withDb(async (db) => {
       for (const id of ['m1', 'm2', 'm3', 'm4']) seedMatch(db, id);
       const client = mockClient(new RiotApiError('boom', 429, 'https://x'));
-      const result = await ingestTimelines({ db, client, fetchFn: mockFetch() });
+      const result = await runTimelinePipeline({ db, client });
       expect(result.stoppedEarly).toBe(true);
       expect(result.failed).toBe(3);
       expect(client.getMatchTimeline).toHaveBeenCalledTimes(3);
@@ -202,32 +195,61 @@ describe('ingestTimelines', () => {
       const tl = makeTimeline([]) as { info: Record<string, unknown> };
       delete tl.info.participants;
       const client = mockClient(tl as RiotMatchTimeline);
-      const result = await ingestTimelines({ db, client, fetchFn: mockFetch() });
+      const result = await runTimelinePipeline({ db, client });
       expect(result.skipped).toBe(1);
       expect(result.fetched).toBe(0);
-      // Consumed anyway: a payload without participants can never map ids.
-      expect(fetchedFlag(db, 'm1')).toBe(1);
-      expect(eventRows(db, 'm1')).toHaveLength(0);
+      expect(extractorRuns(db, 'm1')).toHaveLength(3);
     });
   });
 
-  it('skips matches whose patch has no item catalog', async () => {
+  it('respects --call-budget', async () => {
+    await withDb(async (db) => {
+      for (const id of ['m1', 'm2', 'm3']) seedMatch(db, id);
+      const client = mockClient(makeTimeline([]));
+      const result = await runTimelinePipeline({ db, client, callBudget: 2 });
+      expect(result.budgetExhausted).toBe(true);
+      expect(client.getMatchTimeline).toHaveBeenCalledTimes(2);
+      const again = await runTimelinePipeline({ db, client });
+      expect(again.fetched).toBe(1);
+    });
+  });
+
+  it('attributes pseudo participantId 0 purchases to a support', async () => {
     await withDb(async (db) => {
       seedMatch(db, 'm1');
-      const client = mockClient(makeTimeline([]));
-      // versions.json lists only 16.22 -> patch 16.21 unresolved.
-      const fetchFn: typeof fetch = async (input: unknown) => {
-        const url = String(input);
-        if (url.endsWith('/api/versions.json')) {
-          return new Response(JSON.stringify(['16.22.1']), { status: 200 });
-        }
-        return new Response('not found', { status: 404 });
-      };
-      const result = await ingestTimelines({ db, client, fetchFn });
-      expect(result.skipped).toBe(1);
-      expect(result.fetched).toBe(0);
-      expect(fetchedFlag(db, 'm1')).toBe(0); // stays retryable
-      expect(client.getMatchTimeline).not.toHaveBeenCalled();
+      const client = mockClient(
+        makeTimeline([{ timestamp: 0, type: 'ITEM_PURCHASED', participantId: 0, itemId: 3865 }]),
+      );
+      await runTimelinePipeline({ db, client });
+      const rows = itemEventRows(db, 'm1');
+      // Both participants are SUPPORT; the first eligible (pid 1) gets it.
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ participant_id: 1, item_id: 3865 });
     });
+  });
+});
+
+describe('log privacy', () => {
+  it('pipeline progress logs contain no puuids, participant ids or match ids', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'draftorb-timeline-'));
+    const db = openDb(join(dir, 'test.sqlite'));
+    try {
+      migrate(db);
+      seedMatch(db, 'secret-match-id-123');
+      const client = mockClient(
+        makeTimeline([
+          { timestamp: 10_000, type: 'ITEM_PURCHASED', participantId: 1, itemId: 3865 },
+        ]),
+      );
+      const messages: string[] = [];
+      await runTimelinePipeline({ db, client, onProgress: (m) => messages.push(m) });
+      const joined = messages.join('\n');
+      expect(joined).not.toContain('puuid');
+      expect(joined).not.toContain('secret-match-id-123');
+      expect(joined).not.toContain('participantId');
+    } finally {
+      db.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

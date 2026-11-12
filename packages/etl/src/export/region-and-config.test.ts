@@ -35,7 +35,7 @@ describe('exportJson', () => {
     expect(roleProb['26']).toBeUndefined();
     expect(roleProb['412']?.MID).toBeUndefined();
     expect(result.patch).toBe(PATCH);
-    expect(result.manifest.schemaVersion).toBe(3);
+    expect(result.manifest.schemaVersion).toBe(4);
   });
 
   it('keeps global roles even when the roles option selects only SUPPORT (X2)', () => {

@@ -45,7 +45,7 @@ describe('exportJson', () => {
     seed(suite.db, 'baseline', [supportBaselineRow()]);
     const result = suite.exportOnce();
     const manifest = result.manifest;
-    expect(manifest.schemaVersion).toBe(3);
+    expect(manifest.schemaVersion).toBe(4);
     expect(manifest.roles).toEqual(['SUPPORT']);
     expect(manifest.rankBuckets).toEqual([
       'IRON',
@@ -62,6 +62,7 @@ describe('exportJson', () => {
     const paths = manifest.files.map((f) => f.path).sort();
     // The manifest is not listed in its own `files`.
     expect(paths).toEqual([
+      'item-classes.json',
       'pick-rate.json',
       'role-prob.json',
       'roles/SUPPORT/ally-pairs.json',

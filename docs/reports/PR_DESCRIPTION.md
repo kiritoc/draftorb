@@ -44,6 +44,8 @@ baseline-only 0.6946 on holdout patch 16.22.
 
 ## 5. ADRs proposed
 
+- D-091 local-first ETL: schedule disabled, exports + periodic DB backups — **ACCEPTED by owner 2026-11-12**
+
 - D-088 `pairMainEffectAdjust` — pair main-effect subtraction (PROPOSED, off by default)
 - D-089 `blendMode='logit'` — log-odds personalization blend (PROPOSED, legacy default)
 - D-090 `pnpm etl tune-priors` — prior grid search command (PROPOSED)
@@ -70,10 +72,9 @@ F7 resolved by measurement (0.833 req/s app-bound), F8/F9 scope gaps confirmed.
 ## 8. Owner actions
 
 - [ ] Accept/reject upcoming PROPOSED ADRs (Phase 1+).
-- [ ] Apply `docs/proposed-etl-schedule.md` manually if desired (not applied by
-      this PR — guard 5.2(iv) fails on unverified private-repo minutes).
-- [ ] Verify whether the DraftOrb product is registered/audited on the Riot
-      Developer Portal (General Policies requirement) — UNVERIFIED.
+- [x] ~~Apply schedule~~ — SUPERSEDED by owner decision (D-091): schedule DISABLED,
+      local-first pipeline; see `docs/proposed-etl-schedule.md` runbook.
+- [x] Verify Riot portal registration — DONE (owner): registered as a personal product.
 - [ ] Watch the first scheduled `etl.yml` run after merge.
 
 ## 9. Risks / approximations / unverified facts

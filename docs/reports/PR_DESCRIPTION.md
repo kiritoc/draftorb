@@ -19,7 +19,7 @@
 | ------------------ | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | --------- |
 | 0 Audit & baseline | done             | `docs/RIOT_API.md`, `docs/reports/model-review-baseline.md`                                                                                | pending   |
 | 1 Engine fixes     | done (flags off) | `pairMainEffectAdjust` (D-088) + `--pair-adjust` backtest gate, `tune-priors` (D-090), `blendMode='logit'` (D-089); 532 engine tests green | `746c9a5` |
-| 2 Data scaling     | partial          | `matches --call-budget/--time-budget`, `docs/proposed-etl-schedule.md` (schedule NOT applied)                                              | `b8c6e86` |
+| 2 Data scaling     | partial          | budgets on `matches`, `etl publish` (T-128), schedule disabled (D-091); extractors pending                                                              | `0b2efd0` |
 | 3 Joint model      | not started      | `packages/engine/src/joint/`, `etl fit-model`                                                                                              | –         |
 | 4 Drafting UI      | not started      | experimental views                                                                                                                         | –         |
 | 5 Items engine     | not started      | `items/analytic.ts`, `recommendItems`                                                                                                      | –         |

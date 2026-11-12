@@ -776,3 +776,10 @@ No new bugs were identified while revising T-013 patch-window and rank-known-cou
 T-019 review follow-up found export regressions in paired-role serialization, rank-specific rune grouping, probability rounding, warnings, and post-publish backup cleanup; these are recorded as B-037 through B-042 below and fixed in this pass.
 
 No new bugs were identified during T-019.c (retention prune, `pruned` tombstones, default ingestion window).
+
+### B-067 — `check-key` prints `undefined` for the league name — OPEN
+
+`pnpm etl check-key` logs the fetched league's `name`/`id` fields; the current
+Challenger-league payload shape returns `undefined` for the logged field while
+still confirming the key and returning 300 entries. Cosmetic logging issue only
+— no functional impact observed (2026-11-12, Prompt-2 Phase 0).

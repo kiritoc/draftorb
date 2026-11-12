@@ -146,3 +146,14 @@ Format: `ID | Title | Deps | Status | Acceptance`. Status: TODO, DOING, REVIEW, 
 - Files likely touched
 - Notes
 ```
+
+## Prompt-2 model upgrade (single branch `feat/joint-model-and-items-engine`, one draft PR — owner-authorized override of the one-ticket-per-PR preference)
+
+- **T-120 | Phase 0 — audit and baseline** | – | DONE | `docs/RIOT_API.md` updated (method limits, measured effective limits 0.833 req/s app-bound); `docs/reports/model-review-baseline.md` with prerequisite check, cell n_eff distributions, backtest baseline, payload verification, policy/storage measurements, F1–F9 verdicts.
+- **T-121 | Phase 1 — fix current draft engine** | T-120 | DOING | pairTerm interaction fix behind `pairMainEffectAdjust` (default off); `pnpm etl tune-priors` for k0/kPair/kLane; logit-space personalization blend; golden + property tests; ADRs PROPOSED; flag-off byte-identical regression test.
+- **T-122 | Phase 2 — data: timeline/detail features + ingest scaling** | T-121 | TODO | lane/team per-minute snapshot extractors in the existing registry; match-detail challenges extractor; `matches --time-budget`; `--call-budget` on matches; budget model in SETUP.md; schedule applied only if decision rule 5.2 guards pass, else `docs/proposed-etl-schedule.md`.
+- **T-123 | Phase 3 — joint regularized model** | T-122 | TODO | `packages/engine/src/joint/`, `pnpm etl fit-model`, `JointDraftResult` schema, niche export, D-023-extended gate, planted-effect simulation, ADRs.
+- **T-124 | Phase 4 — drafting UI** | T-123 | TODO | uncertainty display, counters view, best-matchups view, legacy toggle; hidden unless flags/`experimentalModels`.
+- **T-125 | Phase 5 — items engine** | T-122,T-123 | TODO | W(state) model + winProb stateBucketMode, analytic fight-power model, like-for-like + hierarchical prior, support utility + quest rewards, starters, build plan, modes, `recommendItems`.
+- **T-126 | Phase 6 — items UI** | T-125 | TODO | build view linked to draft, manual GameState panel, item compare, states, copy-as-text; live-client ADR only.
+- **T-127 | Phase 7 — consolidation** | T-124,T-126 | TODO | SPECS/DATA_MODEL/TESTING/SETUP/GLOSSARY/ARCHITECTURE/PROGRESS updates, `docs/reports/final-comparison.md`, PR description final.

@@ -259,6 +259,7 @@ describe('migration runner', () => {
       '017_raw_timeline_events',
       '018_item_build_phase_b',
       '019_lane_snapshots',
+      '020_participant_challenges',
     ]);
     expect(migrate(db)).toEqual([]);
 
@@ -337,7 +338,7 @@ describe('migration runner', () => {
       ) VALUES (1, 'TOP', NULL, 10, 5, 'DIAMOND', 1, 1, 1)`,
     ).run();
     expect(db.prepare('SELECT COUNT(*) AS count FROM _migrations').get()).toMatchObject({
-      count: 19,
+      count: 20,
     });
     db.close();
   });
@@ -366,6 +367,7 @@ describe('migration runner', () => {
       '017_raw_timeline_events',
       '018_item_build_phase_b',
       '019_lane_snapshots',
+      '020_participant_challenges',
     ]);
 
     const columns = db.prepare('PRAGMA table_info(patches)').all() as { name: string }[];
@@ -453,6 +455,7 @@ describe('migration runner', () => {
       '017_raw_timeline_events',
       '018_item_build_phase_b',
       '019_lane_snapshots',
+      '020_participant_challenges',
     ]);
     expect(migrate(db)).toEqual([]);
 

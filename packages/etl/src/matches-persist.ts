@@ -1,15 +1,18 @@
 import type Database from 'better-sqlite3';
 
 import { MATCH_PARTICIPANT_COUNT, type ParticipantRow } from './participants';
+import type { ChallengeRow } from './challenges';
 import { writeCursor, type PlayerCursor } from './matches-store';
 
 export interface MatchPersistStatements {
   getStoredMatch: Database.Statement;
   deleteMatch: Database.Statement;
   deleteParticipants: Database.Statement;
+  deleteChallenges: Database.Statement;
   insertMatch: Database.Statement;
   updateMatchRanks: Database.Statement;
   insertParticipant: Database.Statement;
+  insertChallenge: Database.Statement;
   insertReject: Database.Statement;
   isEnriched: Database.Statement;
   markEnriched: Database.Statement;
@@ -32,6 +35,7 @@ export function prepareMatchPersist(db: Database.Database): MatchPersistStatemen
     ),
     deleteMatch: db.prepare('DELETE FROM matches WHERE match_id = ?'),
     deleteParticipants: db.prepare('DELETE FROM participants WHERE match_id = ?'),
+    deleteChallenges: db.prepare('DELETE FROM participant_challenges WHERE match_id = ?'),
     insertMatch: db.prepare(
       `INSERT OR IGNORE INTO matches
        (match_id, platform, patch, queue_id, duration, created_at, avg_rank_score,
@@ -61,6 +65,10 @@ export function prepareMatchPersist(db: Database.Database): MatchPersistStatemen
           @mastery_points, @is_expert, @keystone, @primary_style, @sub_style, @perks_json,
           @items_json, @kills, @deaths, @assists
         )`,
+    ),
+    insertChallenge: db.prepare(
+      `INSERT INTO participant_challenges (match_id, puuid, participant_id, challenges_json)
+       VALUES (@match_id, @puuid, @participant_id, @challenges_json)`,
     ),
     isEnriched: db.prepare('SELECT enriched FROM matches WHERE match_id = ?'),
     markEnriched: db.prepare('UPDATE matches SET enriched = 1 WHERE match_id = ?'),
@@ -122,6 +130,7 @@ export function persistAcceptedMatch(
   params: {
     match: StoredMatchRow;
     participants: ParticipantRow[];
+    challenges?: ChallengeRow[];
     repairingIncompleteMatch: boolean;
     cursorKey: string;
     applyOutcome: (outcome: 'stored' | 'duplicate') => PlayerCursor;
@@ -136,9 +145,15 @@ export function persistAcceptedMatch(
       if (params.repairingIncompleteMatch) {
         stmts.updateMatchRanks.run(params.match);
         stmts.deleteParticipants.run(params.match.match_id);
+        stmts.deleteChallenges.run(params.match.match_id);
       }
       for (const participant of params.participants) {
         stmts.insertParticipant.run(participant);
+      }
+      if (params.challenges !== undefined) {
+        for (const challenge of params.challenges) {
+          stmts.insertChallenge.run(challenge);
+        }
       }
       outcome = 'stored';
     }

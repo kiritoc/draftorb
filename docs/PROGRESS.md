@@ -56,6 +56,7 @@ Open questions that remain after the 2026-11-08 acceptance:
 
 ### 2026-11-12 — Devin — Owner decisions: Riot registration verified + local-first ETL (D-091)
 
+- Phase 2 extractors DONE: `lane-snapshots` (migration 019, minutes 5/10/15/20/25) + `participant_challenges` (migration 020, raw challenges JSON; ingestion writes it for new matches, `etl backfill-challenges` backfills stored ones with `--call-budget`/`--limit`; NULL rows mark checked-unavailable).
 - Phase 2 extractor: `lane-snapshots` (migration 019) records per-participant level/gold/XP/CS/position at minutes 5/10/15/20/25 from timeline participantFrames; resumable via `extractor_runs` like the other extractors.
 - `pnpm etl publish` implemented (T-128): pure-Node tar.gz writer + gh release publisher with `--db`/`--vacuum`/`--keep`; exports every run, DB backup periodic.
 - Owner confirmed DraftOrb is registered on the Riot Developer Portal as a personal product (Phase 0 UNVERIFIED item resolved; docs updated).

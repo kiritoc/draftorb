@@ -14,6 +14,7 @@ import {
   InvalidMatchParticipantsError,
   type ParticipantRow,
 } from './participants';
+import { extractChallenges } from './challenges';
 import {
   isCompleteStoredMatch,
   storedParticipantCount,
@@ -173,6 +174,7 @@ export async function processMatch(
         outcome = persistAcceptedMatch(ctx.db, ctx.stmts, {
           match: matchRow,
           participants,
+          challenges: extractChallenges(match, matchId),
           repairingIncompleteMatch,
           cursorKey: ctx.cursorKey,
           applyOutcome: (persisted) => {

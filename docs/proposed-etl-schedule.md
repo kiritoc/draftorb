@@ -29,38 +29,25 @@ at player/match boundaries so a stopped run loses at most one unit of work.
 `localCallBudget` default: 8000 Riot calls per session (see
 `docs/RIOT_API.md`).
 
-## Publishing (until `pnpm etl publish` lands — T-128)
+## Publishing
 
-State repo: private `draftorb-state` (or `$DRAFTORB_STATE_REPO`).
+State repo: private `draftorb-state` (or `$DRAFTORB_STATE_REPO` / `--repo`).
+Use `pnpm etl publish` (T-128, D-091) — pure Node, Windows-safe, uses your
+own `gh auth`:
 
-1. **Exports release** (every run, small):
+```bash
+pnpm etl publish                  # exports release (small, every run)
+pnpm etl publish --db --vacuum    # adds DraftOrb.sqlite.gz (periodic backup)
+pnpm etl publish --keep=8         # prune old state-* releases (default 8)
+```
 
-   ```bash
-   tar -czf /tmp/public-exports.tar.gz -C data/public .
-   gh release create "state-$(date -u +%Y%m%dT%H%MZ)" \
-     --repo kiritoc/draftorb-state /tmp/public-exports.tar.gz \
-     --title "state-$(date -u +%Y%m%dT%H%MZ)" --notes "exports only"
-   ```
-
-   Note: `pickNewestStateTagWithAssets` requires `public-exports.tar.gz`,
-   so exports releases keep `pnpm etl pull` working.
-
-2. **DB backup** (periodic — weekly or before risky operations):
-
-   ```bash
-   pnpm etl migrate
-   # checkpoint + integrity check + VACUUM (see former etl.yml steps), then:
-   gzip -9 -n -c data/DraftOrb.sqlite > /tmp/DraftOrb.sqlite.gz
-   gh release create "state-$(date -u +%Y%m%dT%H%MZ)-backup" \
-     --repo kiritoc/draftorb-state /tmp/DraftOrb.sqlite.gz \
-     --title "state-…-backup" --notes "DB backup"
-   ```
-
-   A DB-only release is safe: pull skips releases without the exports
-   asset. Keep total release count bounded (the old workflow kept 7;
-   prune old `state-*` releases manually or via `gh release delete`).
-
-3. The app reads exports via `pnpm etl pull` (unchanged).
+- Exports releases always carry `public-exports.tar.gz`, so `pnpm etl pull`
+  keeps working; `--db` releases carry both assets (a DB-only asset set is
+  also safe — pull skips releases without the exports asset).
+- `--db` runs `wal_checkpoint(TRUNCATE)` + `integrity_check` (must be `ok`)
+  before gzipping; `--vacuum` compacts first (slower, smaller).
+- The first real publish is owner-run; the command is unit-tested for the
+  tar round-trip and arg parsing only.
 
 ## If a manual Actions run is ever needed
 

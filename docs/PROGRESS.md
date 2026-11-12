@@ -1235,3 +1235,21 @@ The 2026-10-22 entries had no timestamps; their order was reconstructed from tic
   item-classes/stateScale sections + zod schemas, lane-archetype export
   level, rank-dimension is deferred (D-087), backfill of the 150 local
   timelines, Prompt-2 statistical work.
+
+## Phase B gaps closed (same branch)
+
+- Export: `item-classes.json` + `state-scale.json` (schema v4),
+  `decision_kind` split — builds export item rows only, path rows go to
+  `roles/<ROLE>/build-paths/`; `laneArch` field on lane contexts via
+  champion-tags archetypes; `profileKey` enum gains `unknown`.
+- Shared zod: itemClasses/stateScale export schemas, laneArch optional,
+  MANIFEST_SCHEMA_VERSION 3 -> 4 (loaders reject unknown versions via
+  literal).
+- classify-items `--check` CI mode + generated-file completeness test.
+- Real export verified on state DB: 66 files incl. item-classes.json
+  (859 items) + state-scale.json; public tarball ~1.5 MB gz (< 5 MB).
+  No builds files yet: max games_w = 6 < exportMinGames = 10 with only
+  300 backfilled matches — expected sparsity, resolves with full
+  backfill.
+- Real-data run caught + fixed: pendingMatches bind order, starter
+  bundles now cover all participants, isSummonersRift requires map '11'.

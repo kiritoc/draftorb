@@ -132,7 +132,7 @@
       "laneFamily": "jungle"
     },
     "1111": {
-      "cls": "boots"
+      "cls": "excluded"
     },
     "1120": {
       "cls": "starter"
@@ -321,19 +321,19 @@
       "cls": "consumable"
     },
     "2142": {
-      "cls": "consumable"
+      "cls": "excluded"
     },
     "2143": {
-      "cls": "consumable"
+      "cls": "excluded"
     },
     "2144": {
-      "cls": "consumable"
+      "cls": "excluded"
     },
     "2145": {
-      "cls": "consumable"
+      "cls": "excluded"
     },
     "2146": {
-      "cls": "consumable"
+      "cls": "excluded"
     },
     "2147": {
       "cls": "excluded"
@@ -477,7 +477,7 @@
       "cls": "completed"
     },
     "3039": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "3040": {
       "cls": "excluded"
@@ -759,8 +759,7 @@
       "cls": "consumable"
     },
     "3348": {
-      "cls": "jungle_path",
-      "laneFamily": "jungle"
+      "cls": "excluded"
     },
     "3349": {
       "cls": "excluded"
@@ -781,7 +780,7 @@
       "cls": "excluded"
     },
     "3430": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "3504": {
       "cls": "completed"
@@ -897,19 +896,19 @@
       "cls": "component"
     },
     "4003": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "4004": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "4005": {
       "cls": "completed"
     },
     "4010": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "4011": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "4012": {
       "cls": "excluded"
@@ -921,13 +920,13 @@
       "cls": "excluded"
     },
     "4015": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "4016": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "4017": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "4401": {
       "cls": "completed"
@@ -987,7 +986,7 @@
       "cls": "excluded"
     },
     "6032": {
-      "cls": "consumable"
+      "cls": "excluded"
     },
     "6035": {
       "cls": "excluded"
@@ -1299,37 +1298,37 @@
       "cls": "excluded"
     },
     "123430": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "124011": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "126697": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "220000": {
-      "cls": "consumable"
+      "cls": "excluded"
     },
     "220001": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "220002": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "220003": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "220004": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "220005": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "220006": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "220007": {
-      "cls": "consumable"
+      "cls": "excluded"
     },
     "220008": {
       "cls": "excluded"
@@ -1380,43 +1379,43 @@
       "cls": "excluded"
     },
     "222065": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "222141": {
-      "cls": "consumable"
+      "cls": "excluded"
     },
     "222502": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "222503": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "222504": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "222510": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "222512": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "222517": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "222522": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "222523": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "222524": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "222525": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "222526": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "222530": {
       "cls": "excluded"
@@ -1428,46 +1427,46 @@
       "cls": "excluded"
     },
     "223003": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223004": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223005": {
-      "cls": "boots"
+      "cls": "excluded"
     },
     "223006": {
-      "cls": "boots"
+      "cls": "excluded"
     },
     "223008": {
-      "cls": "boots"
+      "cls": "excluded"
     },
     "223009": {
-      "cls": "boots"
+      "cls": "excluded"
     },
     "223011": {
       "cls": "excluded"
     },
     "223020": {
-      "cls": "boots"
+      "cls": "excluded"
     },
     "223026": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223031": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223032": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223033": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223036": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223039": {
-      "cls": "starter"
+      "cls": "excluded"
     },
     "223040": {
       "cls": "excluded"
@@ -1476,160 +1475,160 @@
       "cls": "excluded"
     },
     "223046": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223047": {
-      "cls": "boots"
+      "cls": "excluded"
     },
     "223050": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223053": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223057": {
       "cls": "excluded"
     },
     "223065": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223067": {
       "cls": "excluded"
     },
     "223068": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223069": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223071": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223072": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223073": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223074": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223075": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223078": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223084": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223085": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223087": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223089": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223091": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223094": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223095": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223100": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223102": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223105": {
       "cls": "excluded"
     },
     "223107": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223109": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223110": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223111": {
-      "cls": "boots"
+      "cls": "excluded"
     },
     "223112": {
       "cls": "excluded"
     },
     "223115": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223116": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223118": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223119": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223121": {
       "cls": "excluded"
     },
     "223124": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223135": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223137": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223139": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223142": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223143": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223146": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223152": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223153": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223156": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223157": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223158": {
-      "cls": "boots"
+      "cls": "excluded"
     },
     "223161": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223165": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223172": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223177": {
       "cls": "excluded"
     },
     "223181": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223184": {
       "cls": "excluded"
@@ -1638,52 +1637,52 @@
       "cls": "excluded"
     },
     "223190": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223193": {
       "cls": "excluded"
     },
     "223222": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223302": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223504": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223508": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223742": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223748": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "223814": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "224004": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "224005": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "224401": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "224403": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "224628": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "224629": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "224633": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "224636": {
       "cls": "excluded"
@@ -1695,121 +1694,121 @@
       "cls": "excluded"
     },
     "224645": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "224646": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "226035": {
       "cls": "excluded"
     },
     "226333": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "226609": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "226610": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "226616": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "226617": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "226620": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "226621": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "226630": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "226631": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "226632": {
       "cls": "excluded"
     },
     "226653": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "226655": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "226656": {
       "cls": "excluded"
     },
     "226657": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "226662": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "226664": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "226665": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "226667": {
       "cls": "excluded"
     },
     "226668": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "226671": {
       "cls": "excluded"
     },
     "226672": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "226673": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "226675": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "226676": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "226691": {
       "cls": "excluded"
     },
     "226692": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "226693": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "226694": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "226695": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "226696": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "226697": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "226698": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "226699": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "226701": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "228001": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "228002": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "228003": {
       "cls": "excluded"
@@ -1830,7 +1829,7 @@
       "cls": "excluded"
     },
     "228020": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "322065": {
       "cls": "completed"
@@ -1911,151 +1910,151 @@
       "cls": "completed"
     },
     "443054": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "443055": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "443056": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "443058": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "443059": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "443060": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "443061": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "443062": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "443063": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "443064": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "443069": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "443079": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "443080": {
       "cls": "excluded"
     },
     "443081": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "443083": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "443090": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "443193": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "444636": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "444637": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "444644": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "446632": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "446656": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "446667": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "446671": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "446691": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "446693": {
       "cls": "excluded"
     },
     "447100": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "447101": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "447102": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "447103": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "447104": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "447105": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "447106": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "447107": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "447108": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "447109": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "447110": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "447111": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "447112": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "447113": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "447114": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "447115": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "447116": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "447118": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "447119": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "447120": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "447121": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "447122": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "447123": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "663039": {
       "cls": "starter"
@@ -2106,82 +2105,82 @@
       "cls": "completed"
     },
     "771001": {
-      "cls": "boots"
+      "cls": "excluded"
     },
     "771004": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "771006": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "771011": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "771018": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "771026": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "771027": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "771028": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "771029": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "771031": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "771033": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "771036": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "771037": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "771038": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "771039": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "771042": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "771043": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "771051": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "771052": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "771053": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "771054": {
-      "cls": "starter"
+      "cls": "excluded"
     },
     "771055": {
-      "cls": "starter"
+      "cls": "excluded"
     },
     "771056": {
-      "cls": "starter"
+      "cls": "excluded"
     },
     "771057": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "771058": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "771080": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "771500": {
       "cls": "excluded"
@@ -2190,412 +2189,409 @@
       "cls": "excluded"
     },
     "772003": {
-      "cls": "consumable"
+      "cls": "excluded"
     },
     "772004": {
-      "cls": "consumable"
+      "cls": "excluded"
     },
     "772009": {
       "cls": "excluded"
     },
     "772037": {
-      "cls": "consumable"
+      "cls": "excluded"
     },
     "772038": {
-      "cls": "consumable"
+      "cls": "excluded"
     },
     "772039": {
-      "cls": "consumable"
+      "cls": "excluded"
     },
     "772041": {
-      "cls": "consumable"
+      "cls": "excluded"
     },
     "772042": {
-      "cls": "consumable"
+      "cls": "excluded"
     },
     "772043": {
-      "cls": "consumable"
+      "cls": "excluded"
     },
     "772044": {
-      "cls": "consumable"
+      "cls": "excluded"
     },
     "772045": {
-      "cls": "consumable"
+      "cls": "excluded"
     },
     "772049": {
-      "cls": "consumable"
+      "cls": "excluded"
     },
     "772050": {
       "cls": "excluded"
     },
     "773001": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773003": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "773004": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773005": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773006": {
-      "cls": "boots"
+      "cls": "excluded"
     },
     "773009": {
-      "cls": "boots"
+      "cls": "excluded"
     },
     "773010": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "773020": {
-      "cls": "boots"
+      "cls": "excluded"
     },
     "773022": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773023": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773024": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "773025": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773026": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773027": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773028": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "773031": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773035": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773037": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "773040": {
       "cls": "excluded"
     },
     "773041": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773042": {
       "cls": "excluded"
     },
     "773044": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "773046": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773047": {
-      "cls": "boots"
+      "cls": "excluded"
     },
     "773050": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773052": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "773056": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773057": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "773060": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773063": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773064": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773065": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773067": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "773068": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773069": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773070": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "773071": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773072": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773073": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773074": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773075": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773077": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "773078": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773082": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "773083": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773084": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773085": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773086": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "773087": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773089": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773091": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773092": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773093": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "773096": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "773098": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "773100": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773101": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "773102": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773105": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "773106": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "773107": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773108": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "773109": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773110": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773111": {
-      "cls": "boots"
+      "cls": "excluded"
     },
     "773114": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773115": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773116": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773117": {
-      "cls": "boots"
+      "cls": "excluded"
     },
     "773123": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773124": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773128": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773131": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773132": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "773134": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "773135": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773136": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "773138": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773139": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773140": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "773141": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773142": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773143": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773144": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "773145": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "773146": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773151": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773152": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773153": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773154": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773155": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "773156": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773157": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773158": {
-      "cls": "boots"
+      "cls": "excluded"
     },
     "773160": {
       "cls": "excluded"
     },
     "773161": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773162": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773165": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773172": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773173": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773174": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773178": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773190": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773191": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "773206": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773207": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773209": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773211": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "773222": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773340": {
-      "cls": "consumable"
+      "cls": "excluded"
     },
     "773348": {
-      "cls": "consumable"
+      "cls": "excluded"
     },
     "773504": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773512": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773513": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "773514": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "773515": {
-      "cls": "component"
+      "cls": "excluded"
     },
     "773516": {
-      "cls": "completed"
+      "cls": "excluded"
     },
     "773517": {
-      "cls": "jungle_path",
-      "laneFamily": "jungle"
+      "cls": "excluded"
     },
     "773518": {
-      "cls": "jungle_path",
-      "laneFamily": "jungle"
+      "cls": "excluded"
     },
     "773519": {
-      "cls": "jungle_path",
-      "laneFamily": "jungle"
+      "cls": "excluded"
     },
     "773521": {
-      "cls": "consumable"
+      "cls": "excluded"
     },
     "994403": {
-      "cls": "completed"
+      "cls": "excluded"
     }
   }
 }

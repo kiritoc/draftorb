@@ -28,13 +28,25 @@ CREATE TABLE participants (
   kills INTEGER, deaths INTEGER, assists INTEGER,
   PRIMARY KEY (match_id, puuid)
 );
-CREATE TABLE item_events (    -- from timelines (epic E5)
+CREATE TABLE item_events (    -- RAW timeline item events (T-051 Phase B, D-084)
   match_id TEXT NOT NULL REFERENCES matches(match_id) ON DELETE CASCADE,
-  puuid TEXT NOT NULL, ts INTEGER NOT NULL, item_id INTEGER NOT NULL, type TEXT NOT NULL,  -- ts = raw timeline ms; type = 'purchase' | 'sold'
-  team_gold_diff INTEGER NOT NULL, kills_diff INTEGER NOT NULL,   -- purchaser team minus enemy team at ts
-  item_slot INTEGER,          -- 0 = starting purchase (before the first completed item and game time < 90 s), k >= 1 = k-th completed item, NULL for components/consumables bought later (D-022, D-082)
-  PRIMARY KEY (match_id, puuid, ts, item_id, type)
+  participant_id INTEGER NOT NULL, puuid TEXT NOT NULL,
+  ts_ms INTEGER NOT NULL, seq INTEGER NOT NULL DEFAULT 0,  -- per-participant order; same-ms duplicates preserved
+  event_type TEXT NOT NULL,   -- 'purchase' | 'undo' | 'sold' | 'destroyed'
+  item_id INTEGER NOT NULL, before_id INTEGER, after_id INTEGER,  -- ITEM_UNDO payload
+  team_gold_diff INTEGER NOT NULL, kills_diff INTEGER NOT NULL,   -- purchaser team minus enemy team at ts_ms
+  PRIMARY KEY (match_id, participant_id, ts_ms, seq)
 );
+CREATE TABLE kill_events (    -- CHAMPION_KILL facts (D-084)
+  match_id TEXT NOT NULL, seq INTEGER NOT NULL, t_ms INTEGER NOT NULL,
+  killer_pid INTEGER, victim_pid INTEGER NOT NULL, assist_mask INTEGER NOT NULL DEFAULT 0,
+  bounty INTEGER, shutdown_bounty INTEGER,
+  PRIMARY KEY (match_id, seq)
+);
+CREATE TABLE match_participant_ids (match_id TEXT NOT NULL, participant_id INTEGER NOT NULL, puuid TEXT NOT NULL, PRIMARY KEY (match_id, participant_id));
+CREATE TABLE extractor_runs (match_id TEXT NOT NULL, extractor TEXT NOT NULL, PRIMARY KEY (match_id, extractor));  -- resumable backfill
+CREATE TABLE participant_starters (match_id TEXT NOT NULL, participant_id INTEGER NOT NULL, puuid TEXT NOT NULL, bundle_json TEXT NOT NULL, PRIMARY KEY (match_id, participant_id));
+CREATE TABLE item_state_scale (patch TEXT NOT NULL, time_bucket TEXT NOT NULL, sample_count INTEGER NOT NULL, gold_sd REAL NOT NULL, PRIMARY KEY (patch, time_bucket));
 CREATE TABLE ingest_state (key TEXT PRIMARY KEY, value TEXT);  -- cursors for resumability
 CREATE TABLE match_rejects (  -- matches seen and rejected, deduped across players
   match_id TEXT PRIMARY KEY,
@@ -146,7 +158,7 @@ Rank buckets: every `rank_bucket` column and every exported `bucket` field uses 
 - `lane_vs(my_champion_id, my_role, opp1_id, opp2_id, rank_bucket, wins_w, games_w, games_w2)` (D-021; `opp*_id` = enemy lane-group champions in `laneGroup(my_role).enemies` order — SUPPORT: `[SUPPORT, ADC]`, ADC: `[ADC, SUPPORT]` — and `lane_full.partner_id` = `laneGroup(my_role).allies[0]`; the engine looks rows up in this order, so T-017 must export it; `opp2_id` NULL for 1v1 lane groups). SQLite PRIMARY KEY treats NULLs as distinct; uniqueness is enforced by the unique expression index `idx_lane_vs_unique` (migration 005) on `COALESCE(opp2_id, -1)`, so two rows with the same key and a NULL `opp2_id` conflict (-1 is never a valid champion id).
 - `lane_full(my_champion_id, my_role, partner_id, opp1_id, opp2_id, rank_bucket, wins_w, games_w, games_w2)` (D-021; `partner_id` = ally lane partner, NULL for 1v1 lane groups (TOP, MID, JUNGLE)). Uniqueness is enforced by the unique expression index `idx_lane_full_unique` (migration 005) on `COALESCE(partner_id, -1)` and `COALESCE(opp2_id, -1)`, with the same NULL handling.
 - `rune_ctx(champion_id, my_role, rank_bucket, context_key, context_level, perks_hash, perks_json, wins_w, games_w, games_w2, players)` (`context_key` = D-021 back-off level, SPECS §8.1; `context_level` = back-off hierarchy: lane contexts increment as slots drop (3-slot=1, 2-slot=2, 1-slot=3), damage mix=4, global=5; `rank_bucket` = user rank bucket, weighted by `expertWeight` (games below the bucket excluded, above boosted up to `wMax`, migration 011); experts = in-window `champion_games >= minChampGames` or `mastery_points >= minMasteryPoints`)
-- `item_build(champion_id, my_role, slot_idx, time_bucket, state_bucket, profile_key, lane_key, item_id, wins_w, games_w, games_w2)` (D-022; `slot_idx` = `item_events.item_slot`, 0 = starting items; `time_bucket` = 5-min purchase bucket `"<start>-<end>"` minutes; `state_bucket` = `ahead|even|behind` from the per-purchase team gold/kill diff (`ItemContextConfig` thresholds, D-082); `profile_key` = threat-weighted enemy damage mix `AD|AP|mixed`; `lane_key` = `lane:` + influence-sorted lane-context slots joined by `|`, empty string outside the `lane` phase — `''` maps to an absent `laneKey` in exports)
+- `item_build(champion_id, my_role, slot_idx, time_bucket, state_bucket, profile_key, lane_key, decision_kind, item_id, wins_w, games_w, games_w2)` (D-022/D-082 Phase B; `decision_kind` = `item` for purchased completed/boots/starter items, `path` for first acquisitions of `quest_reward`/`jungle_path` items — path rows never occupy item slots; `slot_idx` = completed-item index derived by net replay of raw events (undo/sold/destroyed net out), 0 = starting purchases within `starterWindowSeconds`; `time_bucket` = 5-min purchase bucket; `state_bucket` = `ahead|even|behind` — time-normalized z-score vs `item_state_scale` gold sd (`stateBucketMode`, falls back to absolute thresholds without scale); `profile_key` = threat-weighted enemy damage mix `AD|AP|mixed|unknown` computed AT PURCHASE TIME from `kill_events` + `ownedItemsAt` (`unknown` when the match has no kill events); `lane_key` = `lane:` + influence-sorted lane-context slots, empty outside the `lane` phase; exports add `laneArch` = archetype of the most influential slot for backoff)
 
 Adding a role means data only: no schema or code change. Migration 004 (T-011.b) creates these tables.
 
@@ -167,7 +179,10 @@ roles/<ROLE>/enemy-pairs.json // [championId, enemyId, otherRole, bucket, wins_w
 roles/<ROLE>/lane-vs.json     // [championId, opp1Id, opp2Id, bucket, wins_w, games_w, games_w2]
 roles/<ROLE>/lane-full.json   // [championId, partnerId, opp1Id, opp2Id, bucket, wins_w, games_w, games_w2]
 roles/<ROLE>/runes/<championId>.json  // contexts (rankBucket, contextKey, contextLevel) -> top pages
-roles/<ROLE>/builds/<championId>.json // item build stats
+roles/<ROLE>/builds/<championId>.json // item build stats (decision_kind='item' rows only)
+roles/<ROLE>/build-paths/<championId>.json // path decisions (quest rewards, jungle pet upgrades)
+item-classes.json       // generated+override item taxonomy { patch, items: { id: { cls, laneFamily? } } }
+state-scale.json        // { patch, buckets: [{ timeBucket, sampleCount, goldSd }] } for time-normalized state buckets
 patch-meta.json          // patch-catalog state of the last aggregate run (D-055): { patch, patchIndex, currentPatchIndex, patchesMaxIndex, aggregatedAt }; absent until `aggregate` records it
 ```
 

@@ -228,3 +228,28 @@ describe('runTimelinePipeline', () => {
     });
   });
 });
+
+describe('log privacy', () => {
+  it('pipeline progress logs contain no puuids, participant ids or match ids', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'draftorb-timeline-'));
+    const db = openDb(join(dir, 'test.sqlite'));
+    try {
+      migrate(db);
+      seedMatch(db, 'secret-match-id-123');
+      const client = mockClient(
+        makeTimeline([
+          { timestamp: 10_000, type: 'ITEM_PURCHASED', participantId: 1, itemId: 3865 },
+        ]),
+      );
+      const messages: string[] = [];
+      await runTimelinePipeline({ db, client, onProgress: (m) => messages.push(m) });
+      const joined = messages.join('\n');
+      expect(joined).not.toContain('puuid');
+      expect(joined).not.toContain('secret-match-id-123');
+      expect(joined).not.toContain('participantId');
+    } finally {
+      db.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});

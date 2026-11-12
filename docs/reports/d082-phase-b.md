@@ -92,8 +92,13 @@ consumption plus granted internals), 0 failures.
 - item-classes.generated.json is patch-16.22; older patches reuse it.
 - 1104-classified 'excluded' pets and similar edge items need owner
   review of overrides.
-- Export sections (item-classes, stateScale), zod schemas, loader
-  rejection, lane-archetype export level: NOT implemented (B8 partial).
+- Export sections DONE: `item-classes.json` (859 items) and
+  `state-scale.json` (10 buckets) exported; MANIFEST_SCHEMA_VERSION 3->4;
+  shared zod schemas added; `profileKey` enum gains 'unknown'; lane
+  contexts carry `laneArch`; path rows export to `build-paths/`.
+  Verified: real export = 66 files, public tarball ~1.5 MB gz.
+  builds/*.json absent because max games_w=6 < exportMinGames=10 with
+  only 300 matches backfilled (honest sparsity).
 
 ## Owner questions
 

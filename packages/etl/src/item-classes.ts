@@ -63,7 +63,8 @@ const JUNGLE_QUEST_IDS = new Set([
 function isSummonersRift(item: RawDDragonItem): boolean {
   const maps = item.maps;
   if (maps === undefined) return true; // older catalogs: assume SR
-  return maps['11'] === true || Object.values(maps).some((v) => v === true);
+  // Summoner's Rift is map id 11; mode-only items (Arena etc.) lack it.
+  return maps['11'] === true;
 }
 
 function isPurchasable(item: RawDDragonItem): boolean {

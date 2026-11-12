@@ -154,6 +154,9 @@ export {
   itemBuildEntrySchema,
   itemBuildContextSchema,
   itemBuildExportSchema,
+  itemClassNameSchema,
+  itemClassesExportSchema,
+  stateScaleExportSchema,
 } from './schemas/items.js';
 export type {
   Item,
@@ -165,6 +168,9 @@ export type {
   ItemBuildEntry,
   ItemBuildContext,
   ItemBuildExport,
+  ItemClassName,
+  ItemClassesExport,
+  StateScaleExport,
 } from './schemas/items.js';
 
 export {

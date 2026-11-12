@@ -218,7 +218,7 @@ describe('shared schemas', () => {
       rankBuckets: ['DIAMOND'],
       roles: ['SUPPORT'],
       files: [{ path: 'champions.json' }],
-      schemaVersion: 3,
+      schemaVersion: 4,
     };
     expect(manifestSchema.parse(manifest)).toEqual(manifest);
   });

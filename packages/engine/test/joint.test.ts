@@ -53,7 +53,7 @@ describe('joint model features', () => {
   it('candidate features omit constant draft terms', () => {
     const ally = [slot(1, 'TOP', 'ally'), slot(2, 'JUNGLE', 'ally')];
     const enemy = [slot(3, 'TOP', 'enemy')];
-    const features = candidateFeatures(5, 7, ally, enemy);
+    const features = candidateFeatures('MID', 7, ally, enemy);
     // 1 main + 2 ally pairs + 1 enemy pair + 0 lane (role MID vs TOP/JUNGLE? role=5? no)
     expect(features.some((f) => f.layer === 'champMain')).toBe(true);
     expect(features.filter((f) => f.layer === 'allyPair')).toHaveLength(2);

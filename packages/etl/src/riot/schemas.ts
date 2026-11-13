@@ -114,6 +114,9 @@ export const riotParticipantDtoSchema = z
     item6: z.number().int().default(0),
     spell1Id: z.number().int().optional(),
     spell2Id: z.number().int().optional(),
+    // Newer game versions renamed spell1Id/spell2Id to summoner1Id/summoner2Id.
+    summoner1Id: z.number().int().optional(),
+    summoner2Id: z.number().int().optional(),
     perks: riotPerksDtoSchema.optional(),
   })
   .passthrough();

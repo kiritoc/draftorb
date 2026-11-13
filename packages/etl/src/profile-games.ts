@@ -90,7 +90,9 @@ export function extractProfileGame(
     return null;
   }
   const role = participantRole(me);
-  if (role === null || me.spell1Id === undefined || me.spell2Id === undefined) {
+  const spell1Id = me.spell1Id ?? me.summoner1Id;
+  const spell2Id = me.spell2Id ?? me.summoner2Id;
+  if (role === null || spell1Id === undefined || spell2Id === undefined) {
     return null;
   }
   const participantId = me.participantId;
@@ -127,8 +129,8 @@ export function extractProfileGame(
       perks_json: runes.perksJson,
       items_json: JSON.stringify(items),
       items_ordered_json: null,
-      summoner1_id: me.spell1Id,
-      summoner2_id: me.spell2Id,
+      summoner1_id: spell1Id,
+      summoner2_id: spell2Id,
     },
   };
 }

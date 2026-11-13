@@ -31,6 +31,11 @@ export const championTagsSchema = z
     scaling: championTagsScalingSchema,
     range: championRangeSchema,
     ccCount: z.number().int().nonnegative(),
+    // Optional axes used by the lane-archetype pooling rules (D-095):
+    // `mobility` = reliable dash/blink/self-peel; `burst` = meaningful burst window.
+    // Absent means unknown — never guessed (SPECS §6, D-095).
+    mobility: z.boolean().optional(),
+    burst: z.boolean().optional(),
   })
   .strict();
 export type ChampionTags = z.infer<typeof championTagsSchema>;

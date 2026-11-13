@@ -1164,3 +1164,38 @@ artifacts are publicly downloadable). `RIOT_API_KEY` and
 returns to schedule; the two-tier publish model (small exports every run,
 DB backup each run under `if: always()`) is unchanged. Update:
 `.github/workflows/etl.yml`, SETUP.md.
+
+### D-095 — Lane archetype as threat/need vector + pooled shrinkage — PROPOSED
+
+External review (2026-11-13) of the D-086 `laneArchKey` design: keying the
+archetype off the first lane-key slot (ally ADC) with support-only tags can
+never produce a value, and a single champion label is the wrong abstraction
+for a 2v2 lane. Amends D-086's lane-archetype clause (starter bundles and
+the rest of D-086 unchanged).
+
+Decisions:
+
+- **Lane shape = two coarse axes**, not one label: `enemy_threat`
+  (hard_engage > poke > all_in > scaling, priority-ordered rules over enemy
+  support + enemy ADC tags) and `ally_need` (needs_peel /
+  self_sufficient_mobile / all_in, from ally ADC `range`, `mobility`,
+  `burst`, `hardEngage`). Damage type stays its own context dimension.
+- **Tag scope**: hand-tag only the ~30 meta ADCs on the subjective axes;
+  `range`/`damageType` derive from Data Dragon where possible. Untagged or
+  ambiguous champions map to `unknown` and are excluded from pooling —
+  never guessed. New optional tag fields `mobility`, `burst` added to
+  `championTagsSchema` (SPECS §6).
+- **Pooling = hierarchical shrinkage**, not a hard backoff level:
+  `p = (n·p_child + k·p_parent)/(n+k)` down a measured ladder
+  (laneVector -> enemyThreat -> noLane -> subjectArchetype -> role/global).
+  Every exported estimate carries its provenance level and effective n.
+- **Adoption gate**: pooled-hierarchy vs additive-lift model compared on
+  held-out log-loss (split by match id, never by participant); only levels
+  that improve held-out loss ship. Same D-023 gate philosophy.
+- **Known interim state**: `laneArch` in v4 exports is always empty until
+  this lands — documented gap, not a bug. `laneArchKey()` stays for
+  compatibility but is superseded by the vector rules.
+
+Open: exact `enemy_threat`/`ally_need` rule tables, whether subject-side
+(support archetype) pooling beats lane-side at current n, interaction
+terms (enemy engage x immobile ally) — all resolved by the log-loss gate.

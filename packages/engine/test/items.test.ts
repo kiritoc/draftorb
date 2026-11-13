@@ -46,24 +46,59 @@ function gameState(over: Partial<GameState> = {}): GameState {
 
 const ITEMS: ItemsMap = {
   '1001': {
-    id: 1001, name: 'Boots', icon: 'b.png', goldTotal: 300, purchasable: true,
-    tags: ['Boots'], from: [], into: [], stats: { FlatMovementSpeedMod: 25 },
+    id: 1001,
+    name: 'Boots',
+    icon: 'b.png',
+    goldTotal: 300,
+    purchasable: true,
+    tags: ['Boots'],
+    from: [],
+    into: [],
+    stats: { FlatMovementSpeedMod: 25 },
   },
   '3047': {
-    id: 3047, name: 'Plated Steelcaps', icon: 'p.png', goldTotal: 1100, purchasable: true,
-    tags: [], from: [1001], into: [], stats: { FlatArmorMod: 15 },
+    id: 3047,
+    name: 'Plated Steelcaps',
+    icon: 'p.png',
+    goldTotal: 1100,
+    purchasable: true,
+    tags: [],
+    from: [1001],
+    into: [],
+    stats: { FlatArmorMod: 15 },
   },
   '3083': {
-    id: 3083, name: 'Warmog', icon: 'w.png', goldTotal: 2800, purchasable: true,
-    tags: [], from: [], into: [], stats: { FlatHPPoolMod: 400, FlatHPRegenMod: 5 },
+    id: 3083,
+    name: 'Warmog',
+    icon: 'w.png',
+    goldTotal: 2800,
+    purchasable: true,
+    tags: [],
+    from: [],
+    into: [],
+    stats: { FlatHPPoolMod: 400, FlatHPRegenMod: 5 },
   },
   '3085': {
-    id: 3085, name: 'Runic Compendium', icon: 'r.png', goldTotal: 900, purchasable: true,
-    tags: [], from: [], into: [], stats: { FlatMPPoolMod: 300 },
+    id: 3085,
+    name: 'Runic Compendium',
+    icon: 'r.png',
+    goldTotal: 900,
+    purchasable: true,
+    tags: [],
+    from: [],
+    into: [],
+    stats: { FlatMPPoolMod: 300 },
   },
   '3131': {
-    id: 3131, name: 'Divine Sunderer', icon: 'd.png', goldTotal: 3000, purchasable: true,
-    tags: [], from: [], into: [], stats: { FlatPhysicalDamageMod: 40 },
+    id: 3131,
+    name: 'Divine Sunderer',
+    icon: 'd.png',
+    goldTotal: 3000,
+    purchasable: true,
+    tags: [],
+    from: [],
+    into: [],
+    stats: { FlatPhysicalDamageMod: 40 },
   },
 };
 
@@ -83,10 +118,54 @@ const CLASS_MAP = new Map<number, { cls: string }>(
 );
 
 const CHAMP_TAGS: ChampionTagsMap = {
-  '110': { championId: 110, damageType: 'AD', archetype: 'adc', hardEngage: false, peel: false, poke: true, waveclear: true, scaling: { early: true, mid: true, late: true }, range: 'RANGED', ccCount: 0 },
-  '235': { championId: 235, damageType: 'AP', archetype: 'support', hardEngage: true, peel: true, poke: false, waveclear: false, scaling: { early: true, mid: false, late: false }, range: 'MELEE', ccCount: 2 },
-  '804': { championId: 804, damageType: 'AD', archetype: 'adc', hardEngage: false, peel: false, poke: true, waveclear: true, scaling: { early: true, mid: true, late: true }, range: 'RANGED', ccCount: 0 },
-  '412': { championId: 412, damageType: 'NONE', archetype: 'support', hardEngage: true, peel: true, poke: false, waveclear: false, scaling: { early: true, mid: true, late: true }, range: 'MELEE', ccCount: 1 },
+  '110': {
+    championId: 110,
+    damageType: 'AD',
+    archetype: 'adc',
+    hardEngage: false,
+    peel: false,
+    poke: true,
+    waveclear: true,
+    scaling: { early: true, mid: true, late: true },
+    range: 'RANGED',
+    ccCount: 0,
+  },
+  '235': {
+    championId: 235,
+    damageType: 'AP',
+    archetype: 'support',
+    hardEngage: true,
+    peel: true,
+    poke: false,
+    waveclear: false,
+    scaling: { early: true, mid: false, late: false },
+    range: 'MELEE',
+    ccCount: 2,
+  },
+  '804': {
+    championId: 804,
+    damageType: 'AD',
+    archetype: 'adc',
+    hardEngage: false,
+    peel: false,
+    poke: true,
+    waveclear: true,
+    scaling: { early: true, mid: true, late: true },
+    range: 'RANGED',
+    ccCount: 0,
+  },
+  '412': {
+    championId: 412,
+    damageType: 'NONE',
+    archetype: 'support',
+    hardEngage: true,
+    peel: true,
+    poke: false,
+    waveclear: false,
+    scaling: { early: true, mid: true, late: true },
+    range: 'MELEE',
+    ccCount: 1,
+  },
 };
 
 type BuildCtx = ItemBuildExport['contexts'][number];
@@ -146,9 +225,7 @@ describe('itemLaneKey', () => {
 
   it('returns empty string without lane context or lane groups', () => {
     expect(itemLaneKey(SUPPORT, undefined, DEFAULT_LANE_GROUPS, DEFAULT_CONFIG)).toBe('');
-    expect(
-      itemLaneKey(SUPPORT, { allies: [], enemies: [] }, undefined, DEFAULT_CONFIG),
-    ).toBe('');
+    expect(itemLaneKey(SUPPORT, { allies: [], enemies: [] }, undefined, DEFAULT_CONFIG)).toBe('');
   });
 });
 
@@ -203,11 +280,15 @@ describe('deriveItemContext', () => {
     });
     expect(cLane.laneKey).not.toBe('');
 
-    const cMid = deriveItemContext(gameState({ time: 1200, me: player(412, [3047, 3083]) }), SUPPORT, {
-      itemClasses: CLASS_MAP,
-      championTags: CHAMP_TAGS,
-      lane,
-    });
+    const cMid = deriveItemContext(
+      gameState({ time: 1200, me: player(412, [3047, 3083]) }),
+      SUPPORT,
+      {
+        itemClasses: CLASS_MAP,
+        championTags: CHAMP_TAGS,
+        lane,
+      },
+    );
     expect(cMid.phase).toBe('mid');
     expect(cMid.laneKey).toBe('');
   });
@@ -229,7 +310,12 @@ describe('analyticItemPower', () => {
   it('values AD items higher when ahead', () => {
     const ad = ITEMS['3131'] as NonNullable<(typeof ITEMS)[string]>;
     const even = analyticItemPower(ad, itemCtx({}), undefined, DEFAULT_ITEMS_CONFIG);
-    const ahead = analyticItemPower(ad, itemCtx({ stateBucket: 'ahead' }), undefined, DEFAULT_ITEMS_CONFIG);
+    const ahead = analyticItemPower(
+      ad,
+      itemCtx({ stateBucket: 'ahead' }),
+      undefined,
+      DEFAULT_ITEMS_CONFIG,
+    );
     expect(ahead).toBeGreaterThan(even);
   });
 });
@@ -287,9 +373,7 @@ describe('recommendItems — data layer', () => {
       timeBucket: '0-5',
       stateBucket: 'ahead',
       profileKey: 'AP',
-      items: [
-        { itemId: 3083, winsW: 45, gamesW: 50, gamesW2: 50, winrate: 0.9, pickShare: 1 },
-      ],
+      items: [{ itemId: 3083, winsW: 45, gamesW: 50, gamesW2: 50, winrate: 0.9, pickShare: 1 }],
     });
     const state = gameState({ me: player(412, [3131]), time: 800 });
     const result = recommendItems({
@@ -323,9 +407,7 @@ describe('recommendItems — data layer', () => {
   it('uses the analytic fallback when no context clears minGames', () => {
     const tiny = bctx({
       slotIdx: 1,
-      items: [
-        { itemId: 3047, winsW: 1, gamesW: 2, gamesW2: 2, winrate: 0.5, pickShare: 1 },
-      ],
+      items: [{ itemId: 3047, winsW: 1, gamesW: 2, gamesW2: 2, winrate: 0.5, pickShare: 1 }],
     });
     const state = gameState({ me: player(412, [3131]), time: 800 });
     const result = recommendItems({
@@ -344,9 +426,7 @@ describe('recommendItems — data layer', () => {
   it('returns insufficient data when analytic is disabled and data is sparse', () => {
     const tiny = bctx({
       slotIdx: 1,
-      items: [
-        { itemId: 3047, winsW: 1, gamesW: 2, gamesW2: 2, winrate: 0.5, pickShare: 1 },
-      ],
+      items: [{ itemId: 3047, winsW: 1, gamesW: 2, gamesW2: 2, winrate: 0.5, pickShare: 1 }],
     });
     const state = gameState({ me: player(412, [3131]), time: 800 });
     const result = recommendItems({

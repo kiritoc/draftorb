@@ -79,7 +79,15 @@ interface MergedItem {
 }
 
 function mergeContexts(
-  contexts: readonly { items: readonly { itemId: ItemId; winsW: number; gamesW: number; gamesW2: number; pickShare: number }[] }[],
+  contexts: readonly {
+    items: readonly {
+      itemId: ItemId;
+      winsW: number;
+      gamesW: number;
+      gamesW2: number;
+      pickShare: number;
+    }[];
+  }[],
 ): Map<ItemId, MergedItem> {
   const merged = new Map<ItemId, MergedItem>();
   for (const ctx of contexts) {
@@ -103,7 +111,13 @@ function mergeContexts(
 
 function levelMatches(
   ctx: ItemContext,
-  buildCtx: { timeBucket: string; stateBucket: string; profileKey: string; laneKey?: string; laneArch?: string },
+  buildCtx: {
+    timeBucket: string;
+    stateBucket: string;
+    profileKey: string;
+    laneKey?: string;
+    laneArch?: string;
+  },
   spec: (typeof ITEM_CONTEXT_LEVELS)[number],
 ): boolean {
   if (spec.useTime && buildCtx.timeBucket !== ctx.timeBucket) return false;
@@ -125,7 +139,9 @@ function pickReasons(
 ): string[] {
   const reasons: string[] = [];
   if (source === 'data') {
-    reasons.push(`players who bought ${itemName ?? `item ${itemId}`} in this context won more often`);
+    reasons.push(
+      `players who bought ${itemName ?? `item ${itemId}`} in this context won more often`,
+    );
   }
   if (ctx.profileKey === 'AD') reasons.push('enemy team is AD-heavy');
   if (ctx.profileKey === 'AP') reasons.push('enemy team is AP-heavy');
@@ -245,9 +261,7 @@ export function recommendItems(input: RecommendItemsInput): ItemRecommendationRe
       if (scored.length === 0) continue;
       scored.sort(
         (a, b) =>
-          b.score - a.score ||
-          (b.pickShare ?? 0) - (a.pickShare ?? 0) ||
-          a.itemId - b.itemId,
+          b.score - a.score || (b.pickShare ?? 0) - (a.pickShare ?? 0) || a.itemId - b.itemId,
       );
       const picks = scored.slice(0, itemsConfig.topItems);
       const pickIds = new Set(picks.map((p) => p.itemId));

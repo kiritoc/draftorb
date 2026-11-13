@@ -11,9 +11,15 @@ import { recommendItems } from '../packages/engine/src/index.js';
 
 const pub = 'data/public/16.22';
 const items = itemsMapSchema.parse(JSON.parse(readFileSync(join(pub, 'items.json'), 'utf8')));
-const classes = itemClassesExportSchema.parse(JSON.parse(readFileSync(join(pub, 'item-classes.json'), 'utf8')));
-const tags = championTagsMapSchema.parse(JSON.parse(readFileSync('data/manual/champion-tags.json', 'utf8')));
-const scale = stateScaleExportSchema.parse(JSON.parse(readFileSync(join(pub, 'state-scale.json'), 'utf8')));
+const classes = itemClassesExportSchema.parse(
+  JSON.parse(readFileSync(join(pub, 'item-classes.json'), 'utf8')),
+);
+const tags = championTagsMapSchema.parse(
+  JSON.parse(readFileSync('data/manual/champion-tags.json', 'utf8')),
+);
+const scale = stateScaleExportSchema.parse(
+  JSON.parse(readFileSync(join(pub, 'state-scale.json'), 'utf8')),
+);
 const build = itemBuildExportSchema.parse(
   JSON.parse(readFileSync(join(pub, 'roles/SUPPORT/builds/412.json'), 'utf8')),
 );
@@ -57,5 +63,7 @@ for (const p of res.picks) {
   );
 }
 for (const p of res.avoid.slice(0, 3)) {
-  console.log(`avoid ${p.itemId} ${items[String(p.itemId)]?.name ?? '?'} score=${p.score.toFixed(3)}`);
+  console.log(
+    `avoid ${p.itemId} ${items[String(p.itemId)]?.name ?? '?'} score=${p.score.toFixed(3)}`,
+  );
 }

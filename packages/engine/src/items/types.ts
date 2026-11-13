@@ -14,12 +14,7 @@ export type ItemPickSource = 'data' | 'analytic';
 
 /** Back-off level that produced the pick (SPECS §8.2 step 7). */
 export type ItemContextLevel =
-  | 'laneExact'
-  | 'laneArch'
-  | 'profileStateTime'
-  | 'profileTime'
-  | 'timeOnly'
-  | 'championSlot';
+  'laneExact' | 'laneArch' | 'profileStateTime' | 'profileTime' | 'timeOnly' | 'championSlot';
 
 export interface ItemPick {
   readonly itemId: ItemId;

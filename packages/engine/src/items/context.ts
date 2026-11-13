@@ -18,9 +18,21 @@ import type {
   StateScaleExport,
 } from '@draftorb/shared';
 
-import { DEFAULT_CONFIG, DEFAULT_ITEM_CONTEXT_CONFIG, DEFAULT_LANE_GROUPS, DEFAULT_THREAT_CONFIG, getInfluence } from '../config.js';
+import {
+  DEFAULT_CONFIG,
+  DEFAULT_ITEM_CONTEXT_CONFIG,
+  DEFAULT_LANE_GROUPS,
+  DEFAULT_THREAT_CONFIG,
+  getInfluence,
+} from '../config.js';
 import type { ItemContextConfig, LaneGroup, RankWeightingConfig, ThreatConfig } from '../config.js';
-import { itemPhase, itemTimeBucket, laneArchKey, stateBucket, threatWeightedDamageProfile } from '../item-context.js';
+import {
+  itemPhase,
+  itemTimeBucket,
+  laneArchKey,
+  stateBucket,
+  threatWeightedDamageProfile,
+} from '../item-context.js';
 import type { ItemStateBucket } from '../item-context.js';
 import { computeThreatScores } from '../threat.js';
 import type { ItemsConfig } from './config.js';
@@ -177,7 +189,10 @@ export function deriveItemContext(
   const threat =
     opts.items !== undefined && enemies.length > 0
       ? computeThreatScores(enemies, seconds, opts.items, opts.championTags, threatConfig)
-      : { threats: enemies.map(() => 0), shares: enemies.map(() => (enemies.length > 0 ? 1 / enemies.length : 0)) };
+      : {
+          threats: enemies.map(() => 0),
+          shares: enemies.map(() => (enemies.length > 0 ? 1 / enemies.length : 0)),
+        };
   const threatShares = threat.shares;
 
   // Enemy profile: threat-share-weighted damage mix (SPECS §8.2 step 3).
@@ -201,7 +216,9 @@ export function deriveItemContext(
       ? itemLaneKey(myRole, opts.lane, opts.laneGroups ?? DEFAULT_LANE_GROUPS, rankConfig)
       : '';
   const laneArch =
-    laneKey !== '' && opts.championTags !== undefined ? laneArchKey(laneKey, opts.championTags) : '';
+    laneKey !== '' && opts.championTags !== undefined
+      ? laneArchKey(laneKey, opts.championTags)
+      : '';
 
   return {
     slotIdx,
@@ -231,10 +248,52 @@ export interface ContextLevelSpec {
 }
 
 export const ITEM_CONTEXT_LEVELS: readonly ContextLevelSpec[] = [
-  { level: 'laneExact', useLaneKey: true, useLaneArch: false, useProfile: true, useState: true, useTime: true },
-  { level: 'laneArch', useLaneKey: false, useLaneArch: true, useProfile: true, useState: true, useTime: true },
-  { level: 'profileStateTime', useLaneKey: false, useLaneArch: false, useProfile: true, useState: true, useTime: true },
-  { level: 'profileTime', useLaneKey: false, useLaneArch: false, useProfile: true, useState: false, useTime: true },
-  { level: 'timeOnly', useLaneKey: false, useLaneArch: false, useProfile: false, useState: false, useTime: true },
-  { level: 'championSlot', useLaneKey: false, useLaneArch: false, useProfile: false, useState: false, useTime: false },
+  {
+    level: 'laneExact',
+    useLaneKey: true,
+    useLaneArch: false,
+    useProfile: true,
+    useState: true,
+    useTime: true,
+  },
+  {
+    level: 'laneArch',
+    useLaneKey: false,
+    useLaneArch: true,
+    useProfile: true,
+    useState: true,
+    useTime: true,
+  },
+  {
+    level: 'profileStateTime',
+    useLaneKey: false,
+    useLaneArch: false,
+    useProfile: true,
+    useState: true,
+    useTime: true,
+  },
+  {
+    level: 'profileTime',
+    useLaneKey: false,
+    useLaneArch: false,
+    useProfile: true,
+    useState: false,
+    useTime: true,
+  },
+  {
+    level: 'timeOnly',
+    useLaneKey: false,
+    useLaneArch: false,
+    useProfile: false,
+    useState: false,
+    useTime: true,
+  },
+  {
+    level: 'championSlot',
+    useLaneKey: false,
+    useLaneArch: false,
+    useProfile: false,
+    useState: false,
+    useTime: false,
+  },
 ];

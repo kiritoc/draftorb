@@ -19,3 +19,4 @@ export * from './runes.js';
 export * from './threat.js';
 export * from './item-context.js';
 export * from './joint/index.js';
+export * from './items/index.js';

@@ -1278,3 +1278,16 @@ The 2026-10-22 entries had no timestamps; their order was reconstructed from tic
 - `aggregate`: item_build 18,869 rows / 154 champions; export emits
   14 SUPPORT builds files; lane/path contexts still below
   exportMinGames=10 (honest sparsity, resolves with full corpus).
+
+## Items engine core (T-125, 2026-11-13)
+
+- `packages/engine/src/items/`: `recommendItems` + context derivation +
+  analytic fight-power fallback behind `ItemsConfig` (D-093). Data layer
+  consumes existing `roles/<ROLE>/builds/<champ>.json` exports — no ETL
+  changes needed. 14 unit tests; verified against real 16.22 exports
+  (SUPPORT builds/412.json): picks carry nEff/lowData/contextLevel and
+  observational reasons.
+- `profile-sync` bug B-069 fixed earlier this session (summoner1Id
+  fallback); KiriToc 278 games stored.
+- Remaining T-125: W(state), quest/path rows, starters, build plans,
+  modes; then T-126 items UI.

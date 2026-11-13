@@ -1125,3 +1125,24 @@ gates on this win-probability metric (not pick prediction) and keeps
 timeline/challenges backfill and more patches land, or restrict the model
 to champion main effects + pick prior. Update: `joint-fit.ts` winProb
 evaluation, `commands/fit-model.ts` gate.
+
+### D-093 — Items engine v1: like-for-like backoff + analytic fallback — PROPOSED
+
+T-125 core (`packages/engine/src/items/`): `recommendItems` derives the
+SPECS §8.2 context (slotIdx from owned completed/boots items, 5-min time
+bucket, ahead/even/behind via `stateBucket` with `stateBucketMode`,
+threat-share-weighted enemy profile, `lane:`/`laneArch` keys in lane phase
+only) then walks `ITEM_CONTEXT_LEVELS`: laneExact → laneArch →
+profile+state+time → profile+time → time → champion/slot. The first level
+whose merged n_eff clears `minGames` (25) scores items by shrunk WR minus
+the pooled context estimate (`kItem` = 40 equivalent games); per-item
+`lowData` flags sub-gate rows inside a usable level. When no level clears
+the gate the analytic fight-power model (`analyticItemPower`: item stat
+components × enemy AD/AP profile × fed-enemy × state multipliers × item
+tags) ranks candidates; `analyticEnabled` can disable it for a pure
+insufficient-data answer. `avoid` mirrors the bottom of the same scored
+list, excluding picks. `lane:` keys need role-tagged draft context
+(`ItemLaneContext`) because `GameState` carries no roles — the UI/draft
+layer supplies it; absent, lane levels are simply skipped. Remaining
+T-125 scope: W(state) win-probability model, quest-reward/path handling,
+starter bundles, build plans, modes — tracked in TICKETS.

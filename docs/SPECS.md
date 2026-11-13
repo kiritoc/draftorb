@@ -114,7 +114,7 @@ Validation (T-020): every cell defined and in [0, 1]; the opponent cell is the r
 
 ## 6. Manual data (tags)
 
-`data/manual/champion-tags.json` (validated by zod): per champion: `damageType` (AP/AD/mixed/none), `archetype` (enchanter/engage/poke/catch/tank/...), booleans `hardEngage`, `peel`, `poke`, `waveclear`, `scaling` (early/mid/late), `range`, `ccCount`. Used for compNeed, cold-start priors, and explanations.
+`data/manual/champion-tags.json` (validated by zod): per champion: `damageType` (AP/AD/mixed/none), `archetype` (enchanter/engage/poke/catch/tank/...), booleans `hardEngage`, `peel`, `poke`, `waveclear`, optional `mobility`/`burst` (D-095 lane-archetype axes), `scaling` (early/mid/late), `range`, `ccCount`. Used for compNeed, cold-start priors, lane archetypes, and explanations.
 `data/manual/gameplans/<champion>.md`: optional short gameplan (level 1, matchup tips, roams, vision). Shown after pick. Optional.
 
 ## 7. Output

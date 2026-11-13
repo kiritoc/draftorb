@@ -1305,3 +1305,10 @@ The 2026-10-22 entries had no timestamps; their order was reconstructed from tic
   matches done, ~2k participant_challenges rows so far.
 - `scripts/items-smoke.ts`: manual real-export check for recommendItems
   (not part of test suite).
+
+## Operating model change (2026-11-13)
+
+- Owner decided the repo may go public (D-094): `etl.yml` cron
+  re-enabled (`37 */12 * * *`). DB stays out of git and out of Actions
+  artifacts — only `state-*` releases in the private state repo. Local
+  ingestion remains supported.

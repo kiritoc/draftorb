@@ -28,7 +28,7 @@ The app is **local-only** (D-079): there is no hosting and no deploy workflow. `
 
 ## State repo and token (D-078)
 
-The ETL (local primary since D-091; manual Actions fallback) persists the SQLite database and the `data/public` exports as assets of **releases** in a private GitHub repo — default name `draftorb-state`, no workflows inside. Each run publishes a release tagged `state-<UTC yyyymmddThhmmZ>` with two assets:
+The ETL (scheduled since D-094; local runs still supported) persists the SQLite database and the `data/public` exports as assets of **releases** in a private GitHub repo — default name `draftorb-state`, no workflows inside. Each run publishes a release tagged `state-<UTC yyyymmddThhmmZ>` with two assets:
 
 - `DraftOrb.sqlite.gz` — the gzipped database (~58 MB today);
 - `public-exports.tar.gz` — the contents of `data/public` (only uploaded when the pipeline succeeded).
@@ -52,9 +52,9 @@ gh release create state-$(date -u +%Y%m%dT%H%MZ) DraftOrb.sqlite.gz public-expor
 
 (Adjust `tar`/`gzip`/`date` for your platform — Git Bash or WSL on Windows.) The workflow's tag filter also accepts manually created tags that include seconds (`%H%M%S`, e.g. `state-20261108T112306Z`). Then verify: download the release assets again and check the gzip integrity and that `public-exports.tar.gz` extracts the expected `data/public` tree.
 
-## ETL workflow — manual only (D-091, was scheduled under D-057/D-078/D-079)
+## ETL workflow — scheduled + manual (D-094, was manual-only under D-091)
 
-The cron schedule is DISABLED (owner decision 2026-11-12): ingestion runs locally as the primary path — see `docs/proposed-etl-schedule.md` for the local runbook. `.github/workflows/etl.yml` keeps `workflow_dispatch` only (Actions → ETL refresh → Run workflow) for manual/emergency runs; it performs the same pipeline:
+The cron schedule is ENABLED again (owner decision 2026-11-13): the repo is public so Actions minutes are unlimited, and the database stays in the private state repo — see D-094. `.github/workflows/etl.yml` runs every 12h (`37 */12 * * *`) plus on `workflow_dispatch` (Actions → ETL refresh → Run workflow); it performs the same pipeline:
 
 1. Downloads the newest `state-*` release from the state repo and restores `data/DraftOrb.sqlite` (fails early if there is no release or the token is rejected).
 2. `migrate` → `check-key` → `static` → `matches euw1 --refresh` → `matches euw1 --limit 100` (bounded pending-player ingest) → `profile-sync --publish` (configured profiles only, non-fatal) → `prune` → `aggregate` → `derive-roles` → `export` → `status`.
@@ -86,7 +86,7 @@ The main repo is public, so **workflow logs are public** and secret masking does
 Personalization is fed by configured profiles declared in `data/profiles.config.json` (committed, no secrets). Default and only entry: `KiriToc#Toc` on `EUW1`. Only configured profiles are ever synced — visitors cannot add any, and adding another person's profile requires their consent.
 
 - Local: `pnpm etl profile-sync [profileId] [--publish]` uses `RIOT_API_KEY` from `.env` (same key as the other ETL commands; see "Riot key" above — a dev key expires every 24 h and cannot drive the schedule, use the personal key).
-- Manual Actions runs (`workflow_dispatch` only since D-091): `etl.yml` runs `profile-sync` for every configured profile using the `RIOT_API_KEY` GitHub Actions secret; routine syncs happen locally via `pnpm etl profile-sync`. Profile tables live in the same database persisted in the state releases (D-078).
+- Actions runs (scheduled every 12h since D-094, plus `workflow_dispatch`): `etl.yml` runs `profile-sync` for every configured profile using the `RIOT_API_KEY` GitHub Actions secret; local syncs remain available via `pnpm etl profile-sync`. Profile tables live in the same database persisted in the state releases (D-078).
 - Exports land in `data/public/profiles/` (`<id>.json` + `index.json`), anonymized per D-069; `data/public` is gitignored, so they are packed into `public-exports.tar.gz` and reach the local app via `pnpm etl pull`.
 - Key rotation: if `RIOT_API_KEY` ever changes, stored profile puuids are encrypted per key like match puuids (B-062/D-060) — re-resolve/re-key before the next sync (procedure in D-071, implementation detail in T-091/T-111).
 - Secret-leak check (T-092): `node scripts/check-secrets.mjs` scans committed files (`git ls-files`) and `apps/web/dist` for `RGAPI-` tokens and the literal `RIOT_API_KEY` value (when set). It runs in CI (`ci.yml` lint job); scanning `data/public` before it is packed into the release is planned (ticket). It reports file + needle name only, never the secret. Run it locally any time with `node scripts/check-secrets.mjs`.

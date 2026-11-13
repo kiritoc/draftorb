@@ -1146,3 +1146,21 @@ list, excluding picks. `lane:` keys need role-tagged draft context
 layer supplies it; absent, lane levels are simply skipped. Remaining
 T-125 scope: W(state) win-probability model, quest-reward/path handling,
 starter bundles, build plans, modes — tracked in TICKETS.
+
+### D-094 — Public repo + scheduled ETL cron — ACCEPTED (owner, 2026-11-13)
+
+Owner decision: the repository may go public. This removes the binding
+constraint behind D-091 — GitHub Actions on public repositories has
+unlimited standard-runner minutes, so the ~2,000 min/month private-repo
+budget no longer applies and the `etl.yml` cron is re-enabled
+(`37 */12 * * *`, every 12h). Nothing sensitive moves into the public
+repo: the SQLite database stays gitignored, never enters git history,
+and is only ever transferred as an asset of `state-*` releases in the
+PRIVATE state repo (workflow artifacts are not used for it — public-repo
+artifacts are publicly downloadable). `RIOT_API_KEY` and
+`STATE_REPO_TOKEN` remain Actions secrets. Local ingestion via
+`pnpm etl` remains supported and the overlap guard documented in
+`docs/proposed-etl-schedule.md` still applies. Amends D-091: the trigger
+returns to schedule; the two-tier publish model (small exports every run,
+DB backup each run under `if: always()`) is unchanged. Update:
+`.github/workflows/etl.yml`, SETUP.md.

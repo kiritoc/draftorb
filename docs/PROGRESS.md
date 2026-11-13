@@ -1291,3 +1291,17 @@ The 2026-10-22 entries had no timestamps; their order was reconstructed from tic
   fallback); KiriToc 278 games stored.
 - Remaining T-125: W(state), quest/path rows, starters, build plans,
   modes; then T-126 items UI.
+
+## Phase 2 fill rates + items data refresh (2026-11-13)
+
+- Timeline backfill COMPLETE: all 4 extractors ran on all 24,325 matches
+  (`extractor_runs` full coverage). `lane_snapshots` = 1,110,510 rows
+  (~45.7/match ≈ 10 participants x 5 targets, minus early endings).
+- `aggregate` rerun on full corpus: `item_build` 18,869 -> 169,868 rows;
+  `export` now emits 47 SUPPORT builds files (was 16) + 4 build-paths
+  files. Lane-key contexts still rare (1 in builds/412.json) — lane phase
+  is a small share of purchases.
+- `backfill-challenges` running (call-budget 4000, resumable): ~200/24,322
+  matches done, ~2k participant_challenges rows so far.
+- `scripts/items-smoke.ts`: manual real-export check for recommendItems
+  (not part of test suite).

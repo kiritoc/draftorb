@@ -7,9 +7,10 @@ import type { ChampionRoleProbabilities, EnemyPairTable, PickRate } from '@draft
 import { DEFAULT_CONFIG, DEFAULT_RECOMMEND_CONFIG, getInfluence } from '../src/config.js';
 import { indexPairs, makePairKey } from '../src/recommend-indexes.js';
 import { scorePair } from '../src/levels.js';
-import type { KnownSlot } from '../src/recommend-types.js';
+import type { DataRow, KnownSlot } from '../src/recommend-types.js';
 import {
   blindOpponents,
+  pairMainEffects,
   blindSafetyFromOpponents,
   computeBlindSafety,
   hardCounterWarnings,
@@ -307,5 +308,95 @@ describe('hardCounterWarnings', () => {
       DEFAULT_CONFIG,
     );
     expect(hardCounterWarnings(deltas, 100)).toEqual([]);
+  });
+});
+
+describe('pairMainEffects (D-088)', () => {
+  const enemySlot: KnownSlot = {
+    championId: 200,
+    role: 'SUPPORT',
+    side: 'enemy',
+    confidence: 1,
+    fixed: true,
+  };
+  const emptyAlly = new Map<string, DataRow>();
+
+  function setup() {
+    // c1 dominates 200 (45/50), c2 is even (30/50), c3 has too little data.
+    const table: EnemyPairTable = [
+      [1, 200, 'SUPPORT', 'DIAMOND', 45, 50, 0.1],
+      [2, 200, 'SUPPORT', 'DIAMOND', 30, 50, 0.1],
+      [3, 200, 'SUPPORT', 'DIAMOND', 5, 10, 10],
+    ];
+    return { table, idx: indexPairs(table, 'DIAMOND') };
+  }
+
+  it('returns the mean scored pair term per slot, skipping missing and lowData rows', () => {
+    const { idx } = setup();
+    const effects = pairMainEffects(
+      [1, 2, 3, 4],
+      [enemySlot],
+      emptyAlly,
+      idx,
+      () => 0.5,
+      DEFAULT_CONFIG,
+    );
+    const row1 = idx.get(makePairKey(1, 200, 'SUPPORT'));
+    const row2 = idx.get(makePairKey(2, 200, 'SUPPORT'));
+    if (!row1 || !row2) throw new Error('missing rows');
+    const e1 = scorePair(row1.winsE, row1.gamesE, 0.5, DEFAULT_CONFIG).term;
+    const e2 = scorePair(row2.winsE, row2.gamesE, 0.5, DEFAULT_CONFIG).term;
+    expect(effects.get('enemy:SUPPORT:200')).toBeCloseTo((e1 + e2) / 2, 12);
+    expect(e1).toBeGreaterThan(e2);
+  });
+
+  it('scorePairs subtracts the slot mean only for scored rows', () => {
+    const { idx } = setup();
+    const candidates = [1, 2, 3];
+    const effects = pairMainEffects(
+      candidates,
+      [enemySlot],
+      emptyAlly,
+      idx,
+      () => 0.5,
+      DEFAULT_CONFIG,
+    );
+    const row1 = idx.get(makePairKey(1, 200, 'SUPPORT'));
+    if (!row1) throw new Error('missing row');
+    const raw = scorePair(row1.winsE, row1.gamesE, 0.5, DEFAULT_CONFIG).term;
+    const mean = effects.get('enemy:SUPPORT:200') ?? 0;
+
+    const adjusted = scorePairs(
+      1,
+      'SUPPORT',
+      [enemySlot],
+      emptyAlly,
+      idx,
+      0.5,
+      DEFAULT_CONFIG,
+      undefined,
+      effects,
+    );
+    const legacy = scorePairs(1, 'SUPPORT', [enemySlot], emptyAlly, idx, 0.5, DEFAULT_CONFIG);
+
+    expect(adjusted.deltas).toHaveLength(1);
+    expect(adjusted.deltas[0]?.term).toBeCloseTo(raw - mean, 12);
+    expect(legacy.deltas[0]?.term).toBeCloseTo(raw, 12);
+    expect(adjusted.sum).toBeCloseTo(raw - mean, 12);
+
+    // lowData candidate keeps a 0 term even with a positive slot mean.
+    const low = scorePairs(
+      3,
+      'SUPPORT',
+      [enemySlot],
+      emptyAlly,
+      idx,
+      0.5,
+      DEFAULT_CONFIG,
+      undefined,
+      effects,
+    );
+    expect(low.deltas[0]?.term).toBe(0);
+    expect(low.deltas[0]?.lowData).toBe(true);
   });
 });

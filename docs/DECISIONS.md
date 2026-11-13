@@ -1018,3 +1018,149 @@ Phase A sparsity audit showed champion+slot cells are thin (median 2
 games); adding a rank dimension would fragment further. Decision: keep
 `item_build` rank-agnostic; revisit only if Prompt-2 backtests show rank
 interactions. No schema change.
+
+### D-088 — Pair main-effect adjustment (`pairMainEffectAdjust`) — PROPOSED
+
+Review finding F2: `pairTerm` shrinks the absolute matchup win rate toward
+the candidate baseline `p0_c`, so a weak (or strong) opponent contributes a
+term shared by every candidate — a constant log-odds shift that inflates
+absolute probabilities and slightly distorts calibration. When
+`pairMainEffectAdjust` is true, `recommend` computes each known slot's mean
+pair term over the candidate set (`pairMainEffects` in
+`recommend-terms.ts`) and subtracts it from scored rows only; missing and
+lowData rows keep 0, matching the mean interaction of the scored
+population. Default `false` in `DEFAULT_CONFIG`; enable only after the
+D-023 backtest gate shows improvement. Same treatment for the blind-safety
+and lane layers is deferred (lane cells are ~empty; blind is candidate-
+dependent through the opponent distribution). Update:
+`packages/engine/src/{config,recommend,recommend-terms}.ts`, tests in
+`recommend-terms.test.ts` / `recommend-pairs.test.ts`.
+
+### D-089 — Personalization blend in log-odds space (`blendMode`) — PROPOSED
+
+Review finding F5: `personalizedScore = (1-trust)*metaNorm + trust*p` mixed
+an ordinal rank-position value in [0,1] with a win probability. New
+`PersonalizeConfig.blendMode`: `'rankNorm'` (default, legacy D-073) or
+`'logit'`, which blends `logit(metaScore)` and `logit(p)` and maps back
+through `sigmoid`; insufficient-data entries use `metaScore` directly so
+all entries share probability units. Update:
+`packages/engine/src/personalize.ts`, tests in `personalize.test.ts`.
+
+### D-090 — `pnpm etl tune-priors` grid search — PROPOSED
+
+New ETL command grid-searches `k0`, `k`, `kLane` on the same frozen
+temporal holdout as `backtest draft`, reusing `buildEngineData` and
+`runBacktestDraft`. Default grid k0 {10,20,40} x k {20,40,80,160} x
+kLane {20,40,80}; `--role` restricts evaluation to one role's players.
+Results are in-sample for patch selection — confirm with
+`backtest draft` before changing `DEFAULT_CONFIG`. `s` and
+`pairMainEffectAdjust` are deliberately outside the grid. Update:
+`packages/etl/src/commands/{tune-priors,backtest}.ts`, `cli.ts`.
+
+### D-091 — Local-first ETL: schedule disabled, exports + periodic DB backups — ACCEPTED (owner, 2026-11-12)
+
+Owner decision: DraftOrb is registered on the Riot Developer Portal as a
+personal product (resolves the Phase 0 UNVERIFIED item). The scheduled
+`etl.yml` cron is removed; `workflow_dispatch` remains for manual runs only.
+Ingestion, aggregation and export now run locally as the primary path.
+Publishing to the private state repo keeps two tiers: small
+`public-exports.tar.gz` releases after each local pipeline run, and
+`DraftOrb.sqlite.gz` only as periodic backups (the gzipped DB is ~475 MiB
+≈ 23% of the real 2 GiB per-file release-asset limit — an earlier "512 MiB
+cap" figure was a self-imposed 25% headroom rule, corrected 2026-11-12;
+periodic cadence is an ops choice, not a storage constraint). Actions
+usage drops to ~0 min/month. Amends D-078/D-079 delivery flow: the pipeline
+steps are unchanged, only the trigger and publish cadence move to local.
+A dedicated `pnpm etl publish` command (exports tarball + optional DB
+backup asset, gh CLI, no new dependency) is ticketed as T-128; until it
+lands the runbook in `docs/proposed-etl-schedule.md` documents the manual
+`gh release` procedure. Update: `.github/workflows/etl.yml`,
+`docs/proposed-etl-schedule.md`, SETUP.md runbook section.
+
+### D-092 — Joint regularized draft model (T-123) — PROPOSED
+
+`packages/engine/src/joint/` implements a jointly fit logistic model that
+replaces the layered heuristic log-odds terms: per-match training rows
+scored from team 1's perspective with sparse features — champion main
+effects (`role:champ`), ally-pair, ordered enemy-pair, and same-role
+lane-vs interaction coefficients — all L2-regularized, full-batch
+gradient descent, fully deterministic (fixed row/feature order, fixed LR
+schedule, no randomness). `pnpm etl fit-model` builds rows from
+`participants`+`matches`, fits on patches < eval patch, and evaluates on
+masked drafts (each stored participant is a hidden pick; the other nine
+players are known). Validation report (rolling holdout on patch 16.22,
+train <16.22 = 10,379 matches, eval = 13,946 matches, 29,198 masked picks,
+2026-11-12): joint top1 0.0427 / top5 0.1580 / meanLogProb -4.199 vs
+champion pick-frequency prior top1 0.0650 / top5 0.2745 / -3.754; a
+joint+pick-prior hybrid (logit + 1.0*log pick count) collapses to the
+prior (CI [0, 0.0001]) — the win-probability signal is negligible next to
+pick frequency at current data scale (~10k training matches, pair n_eff
+~2.3). Layer ablations: noAllyPairs top1 0.0441, noEnemyPairs 0.0447,
+noChampMain 0.0395 — removing any layer hurts slightly, so features carry
+weak but real signal. Planted-effect simulation (engine unit test)
+confirms the fitter recovers an injected synergy. Gate verdict:
+`validationStatus` stays `unvalidated`; the export
+`data/public/joint-model.json` is written for inspection but no UI or
+recommendation path consumes it. Follow-up options: fit on more patches
+as the backfill lands, add pick-rate as an explicit feature rather than a
+post-hoc blend, or evaluate on win-probability metrics (the existing
+draft backtest) instead of pick prediction. Update:
+`packages/engine/src/joint/`, `packages/etl/src/joint-fit.ts`,
+`packages/etl/src/commands/fit-model.ts`.
+
+### D-092a — Win-probability gate verdict for the joint model — PROPOSED
+
+Follow-up measurement (same 16.22 holdout, per-participant masked drafts,
+P(team win) protocol matching `etl backtest draft`): joint model log-loss
+0.6929 / brier 0.2499 / accuracy 0.5088 vs constant 0.6931/0.5000 and
+side-only 0.6924/0.5199. Paired bootstrap ΔlogLoss vs the best trivial
+baseline: 95% CI [-0.00002, +0.00149] — includes 0 and the point estimate
+is worse than side-only. Ablations: noChampMain is the worst variant
+(0.6934), so champion mains carry what little signal exists; pair layers
+add nothing measurable. Verdict: at ~10k training matches the joint model
+has no win-prediction skill beyond team side — kill criteria from the
+external review are met for pairwise/interaction terms. `fit-model` now
+gates on this win-probability metric (not pick prediction) and keeps
+`validationStatus: "unvalidated"`. Options kept open: refit when the
+timeline/challenges backfill and more patches land, or restrict the model
+to champion main effects + pick prior. Update: `joint-fit.ts` winProb
+evaluation, `commands/fit-model.ts` gate.
+
+### D-093 — Items engine v1: like-for-like backoff + analytic fallback — PROPOSED
+
+T-125 core (`packages/engine/src/items/`): `recommendItems` derives the
+SPECS §8.2 context (slotIdx from owned completed/boots items, 5-min time
+bucket, ahead/even/behind via `stateBucket` with `stateBucketMode`,
+threat-share-weighted enemy profile, `lane:`/`laneArch` keys in lane phase
+only) then walks `ITEM_CONTEXT_LEVELS`: laneExact → laneArch →
+profile+state+time → profile+time → time → champion/slot. The first level
+whose merged n_eff clears `minGames` (25) scores items by shrunk WR minus
+the pooled context estimate (`kItem` = 40 equivalent games); per-item
+`lowData` flags sub-gate rows inside a usable level. When no level clears
+the gate the analytic fight-power model (`analyticItemPower`: item stat
+components × enemy AD/AP profile × fed-enemy × state multipliers × item
+tags) ranks candidates; `analyticEnabled` can disable it for a pure
+insufficient-data answer. `avoid` mirrors the bottom of the same scored
+list, excluding picks. `lane:` keys need role-tagged draft context
+(`ItemLaneContext`) because `GameState` carries no roles — the UI/draft
+layer supplies it; absent, lane levels are simply skipped. Remaining
+T-125 scope: W(state) win-probability model, quest-reward/path handling,
+starter bundles, build plans, modes — tracked in TICKETS.
+
+### D-094 — Public repo + scheduled ETL cron — ACCEPTED (owner, 2026-11-13)
+
+Owner decision: the repository may go public. This removes the binding
+constraint behind D-091 — GitHub Actions on public repositories has
+unlimited standard-runner minutes, so the ~2,000 min/month private-repo
+budget no longer applies and the `etl.yml` cron is re-enabled
+(`37 */12 * * *`, every 12h). Nothing sensitive moves into the public
+repo: the SQLite database stays gitignored, never enters git history,
+and is only ever transferred as an asset of `state-*` releases in the
+PRIVATE state repo (workflow artifacts are not used for it — public-repo
+artifacts are publicly downloadable). `RIOT_API_KEY` and
+`STATE_REPO_TOKEN` remain Actions secrets. Local ingestion via
+`pnpm etl` remains supported and the overlap guard documented in
+`docs/proposed-etl-schedule.md` still applies. Amends D-091: the trigger
+returns to schedule; the two-tier publish model (small exports every run,
+DB backup each run under `if: always()`) is unchanged. Update:
+`.github/workflows/etl.yml`, SETUP.md.

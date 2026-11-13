@@ -24,11 +24,11 @@ The app is **local-only** (D-079): there is no hosting and no deploy workflow. `
 
 1. Sign in at https://developer.riotgames.com, copy the Development API Key (expires every 24h) or your Personal key (no expiry — recommended).
 2. Paste into `.env`. With a dev key, re-paste daily.
-3. **Changing keys?** PUUIDs are encrypted per API key — run `pnpm etl rekey` (try `--dry-run` first) before the next `matches` run, then re-run `pnpm etl players` to repopulate pending players (B-062/D-060). Because the scheduled workflow restores its database from the latest state release, a key change also requires re-keying that stored database — see "Riot key rotation" below.
+3. **Changing keys?** PUUIDs are encrypted per API key — run `pnpm etl rekey` (try `--dry-run` first) before the next `matches` run, then re-run `pnpm etl players` to repopulate pending players (B-062/D-060). Because state releases store the database, a key change also requires re-keying the released database — see "Riot key rotation" below.
 
 ## State repo and token (D-078)
 
-The scheduled ETL persists its SQLite database and the `data/public` exports as assets of **releases** in a private GitHub repo — default name `draftorb-state`, no workflows inside. Each run publishes a release tagged `state-<UTC yyyymmddThhmmZ>` with two assets:
+The ETL (scheduled since D-094; local runs still supported) persists the SQLite database and the `data/public` exports as assets of **releases** in a private GitHub repo — default name `draftorb-state`, no workflows inside. Each run publishes a release tagged `state-<UTC yyyymmddThhmmZ>` with two assets:
 
 - `DraftOrb.sqlite.gz` — the gzipped database (~58 MB today);
 - `public-exports.tar.gz` — the contents of `data/public` (only uploaded when the pipeline succeeded).
@@ -52,9 +52,9 @@ gh release create state-$(date -u +%Y%m%dT%H%MZ) DraftOrb.sqlite.gz public-expor
 
 (Adjust `tar`/`gzip`/`date` for your platform — Git Bash or WSL on Windows.) The workflow's tag filter also accepts manually created tags that include seconds (`%H%M%S`, e.g. `state-20261108T112306Z`). Then verify: download the release assets again and check the gzip integrity and that `public-exports.tar.gz` extracts the expected `data/public` tree.
 
-## Scheduled ETL workflow (D-057, D-078, D-079)
+## ETL workflow — scheduled + manual (D-094, was manual-only under D-091)
 
-`.github/workflows/etl.yml` runs the pipeline every 12h (and on demand via _Actions → ETL refresh → Run workflow_; `workflow_dispatch` is also how the migration is verified — run it twice):
+The cron schedule is ENABLED again (owner decision 2026-11-13): the repo is public so Actions minutes are unlimited, and the database stays in the private state repo — see D-094. `.github/workflows/etl.yml` runs every 12h (`37 */12 * * *`) plus on `workflow_dispatch` (Actions → ETL refresh → Run workflow); it performs the same pipeline:
 
 1. Downloads the newest `state-*` release from the state repo and restores `data/DraftOrb.sqlite` (fails early if there is no release or the token is rejected).
 2. `migrate` → `check-key` → `static` → `matches euw1 --refresh` → `matches euw1 --limit 100` (bounded pending-player ingest) → `profile-sync --publish` (configured profiles only, non-fatal) → `prune` → `aggregate` → `derive-roles` → `export` → `status`.
@@ -80,14 +80,13 @@ The main repo is public, so **workflow logs are public** and secret masking does
 ## Reminders
 
 - **Token expiry**: fine-grained tokens expire at most one year — rotate `STATE_REPO_TOKEN` before the recorded expiry date.
-- **Scheduled-workflow keepalive**: GitHub may disable scheduled workflows in a public repo after ~60 days without repo activity (**to verify**). Set a reminder to touch the repo (or run `workflow_dispatch`) about every 50 days, or add a keepalive step (ticket).
 
 ## Profile sync (D-067..D-071, D-078, D-079)
 
 Personalization is fed by configured profiles declared in `data/profiles.config.json` (committed, no secrets). Default and only entry: `KiriToc#Toc` on `EUW1`. Only configured profiles are ever synced — visitors cannot add any, and adding another person's profile requires their consent.
 
 - Local: `pnpm etl profile-sync [profileId] [--publish]` uses `RIOT_API_KEY` from `.env` (same key as the other ETL commands; see "Riot key" above — a dev key expires every 24 h and cannot drive the schedule, use the personal key).
-- CI: `etl.yml` runs `profile-sync` for every configured profile on each scheduled run and on `workflow_dispatch`, using the `RIOT_API_KEY` GitHub Actions secret. Profile tables live in the same database persisted in the state releases (D-078).
+- Actions runs (scheduled every 12h since D-094, plus `workflow_dispatch`): `etl.yml` runs `profile-sync` for every configured profile using the `RIOT_API_KEY` GitHub Actions secret; local syncs remain available via `pnpm etl profile-sync`. Profile tables live in the same database persisted in the state releases (D-078).
 - Exports land in `data/public/profiles/` (`<id>.json` + `index.json`), anonymized per D-069; `data/public` is gitignored, so they are packed into `public-exports.tar.gz` and reach the local app via `pnpm etl pull`.
 - Key rotation: if `RIOT_API_KEY` ever changes, stored profile puuids are encrypted per key like match puuids (B-062/D-060) — re-resolve/re-key before the next sync (procedure in D-071, implementation detail in T-091/T-111).
 - Secret-leak check (T-092): `node scripts/check-secrets.mjs` scans committed files (`git ls-files`) and `apps/web/dist` for `RGAPI-` tokens and the literal `RIOT_API_KEY` value (when set). It runs in CI (`ci.yml` lint job); scanning `data/public` before it is packed into the release is planned (ticket). It reports file + needle name only, never the secret. Run it locally any time with `node scripts/check-secrets.mjs`.
@@ -99,8 +98,8 @@ If `RIOT_API_KEY` ever changes (personal key rotated, dev key swapped, etc.):
 1. Update the GitHub Actions secret `RIOT_API_KEY` and the local `.env`.
 2. Run `pnpm etl check-key` to confirm the new key works.
 3. PUUIDs are encrypted per key: run `pnpm etl rekey` (`--dry-run` first) on the local database, then re-run `pnpm etl players` to repopulate pending players (B-062/D-060). Profile puuids need the same treatment (open question, D-071 — tracked in T-111).
-4. The scheduled workflow restores its database from the **latest state release**, which still holds puuids encrypted under the old key — download that release's DB (or use your rekeyed local DB), apply `rekey`, and publish a fresh `state-*` release (same procedure as "Seeding the first state release") so the next run starts from re-keyed data.
-5. The next scheduled run resumes normally from cursors.
+4. The local database holds puuids encrypted under the old key — apply `rekey` to it (or restore the latest state release's DB and rekey that), then publish a fresh `state-*` release (same procedure as "Seeding the first state release") so other machines start from re-keyed data.
+5. The next local pipeline run resumes normally from cursors.
 
 ## ETL commands
 

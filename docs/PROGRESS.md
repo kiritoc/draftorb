@@ -4,7 +4,7 @@
 
 - Phase: 1 (Support / Diamond)
 - Current milestone: M3 Web MVP implementation complete (T-030..T-035 DONE). All REVIEW tickets accepted DONE on 2026-11-11: T-019.b (patch index, incl. D-055), T-019.c (retention prune), T-019.e (breakpoints/change-scores DDL + CLI), T-026 (golden suite, 23 scenarios), T-027.a (draft backtest — report still `unvalidated` until the D-023 paired-bootstrap gate is implemented), T-040 (engine rune recommender, D-059), T-041 (runes UI), T-052 (GameState), T-053 (threat score), T-106/T-108/T-111 (state-release migration). T-019.d..f and T-027.b remain TODO. T-097 engine half DONE (`recommendProfileRunes`/`recommendProfileSpells`); its UI half is now unblocked (T-040/T-041 DONE — `RunesPanel` exists). T-098 stays TODO (T-054/T-056 missing). Decisions D-052..D-080 are ACCEPTED as of 2026-11-08 (D-061..D-066 SUPERSEDED by D-067..D-077; parts of D-057/D-067/D-069/D-070/D-073 superseded by D-076..D-080); earlier per-user plan cancelled (T-080..T-086 CANCELLED). Docs updated 2026-11-08 for the accepted decisions. Migration to the private state repo + local-only app merged on `main` (PR #53, T-106..T-112 done; T-113 proposal-only; T-099..T-105 remain owner actions). `feat/game-state-threat-score` (PR #54: T-052, T-019.e, T-053, T-041) and `fix/state-tag-seconds` (PR #55) also merged; all merged tickets accepted DONE by the owner on 2026-11-11.
-- Last updated: 2026-11-12 by Devin (T-051 timeline ingestion + item builds → REVIEW on `t-051-timeline-item-builds`)
+- Last updated: 2026-11-12 by Devin (Prompt-2 model upgrade: Phase 0 audit + Phase 1 engine flags on `feat/joint-model-and-items-engine`, draft PR #60)
 
 ## Epic status
 
@@ -53,6 +53,22 @@ Open questions that remain after the 2026-11-08 acceptance:
 - T-019.d verification: please compare the champion and item lists in the 2026-11-04 "T-019.d verification step" entry below with the official 16.21 and 16.22 patch notes (misses and false positives).
 
 ## Session log (newest first)
+
+### 2026-11-12 — Devin — Owner decisions: Riot registration verified + local-first ETL (D-091)
+
+- `profile-sync` bug B-069 fixed: newer match-v5 payloads renamed spell ids to `summoner1Id`/`summoner2Id`; schema + `extractProfileGame` fallback added. KiriToc profile backfilled: 278 games stored (cursor had processed ids before `profile_games` existed — reset `ingest_state` cursor + `profiles.last_game_creation` to re-snapshot). Shen main verified: 177 support games, 54.2% WR.
+- Phase 3: `packages/engine/src/joint/` + `pnpm etl fit-model` implemented. BOTH gates failed honestly: (a) pick prediction — joint top1 0.0427 vs pick-frequency prior 0.0650; (b) win probability — joint log-loss 0.6929 vs side-only 0.6924, bootstrap CI [-0.00002,+0.00149] includes 0 (D-092a). No skill beyond team side at ~10k train matches; `validationStatus` stays `unvalidated`; export written for inspection only. External review corrections applied (2 GiB asset limit, lock-file note, B-068).
+- Phase 2 extractors DONE: `lane-snapshots` (migration 019, minutes 5/10/15/20/25) + `participant_challenges` (migration 020, raw challenges JSON; ingestion writes it for new matches, `etl backfill-challenges` backfills stored ones with `--call-budget`/`--limit`; NULL rows mark checked-unavailable).
+- Phase 2 extractor: `lane-snapshots` (migration 019) records per-participant level/gold/XP/CS/position at minutes 5/10/15/20/25 from timeline participantFrames; resumable via `extractor_runs` like the other extractors.
+- `pnpm etl publish` implemented (T-128): pure-Node tar.gz writer + gh release publisher with `--db`/`--vacuum`/`--keep`; exports every run, DB backup periodic.
+- Owner confirmed DraftOrb is registered on the Riot Developer Portal as a personal product (Phase 0 UNVERIFIED item resolved; docs updated).
+- `etl.yml` cron DISABLED — `workflow_dispatch` only; ingestion/aggregate/export now run locally. Publish model: small `public-exports.tar.gz` every run + `DraftOrb.sqlite.gz` periodic backups only (~475 MiB ≈ 23% of the real 2 GiB per-file asset limit — periodic backups are an ops choice). Actions usage ~0 min/month. Runbook: `docs/proposed-etl-schedule.md`; local publisher ticketed T-128. Phase 2 partial: `matches --call-budget/--time-budget` shipped; tune-priors SUPPORT best k0=40/k=160 (0.6951 vs 0.6981, in-sample caveat).
+
+### 2026-11-12 — Devin — Prompt-2 model upgrade, Phase 0 + Phase 1 (branch `feat/joint-model-and-items-engine`, draft PR #60)
+
+- Phase 0 audit done: D-082 prerequisites verified on `main`; measured app rate limit 100/120s + 20/1s (0.833 req/s, shared with CI); cell n_eff distributions far sparser than assumed (pair median 2.3, lane ~1.0); backtest baseline log-loss 0.6967 vs baseline-only 0.6946; real payload checks confirm challenges lane fields + timeline frames; DB gzip ~475 MiB ≈ 23% of the real 2 GiB per-file asset limit (earlier "512 MiB cap" was a self-imposed 25% headroom rule, corrected); repo confirmed PRIVATE. Full evidence: `docs/reports/model-review-baseline.md`; limits in `docs/RIOT_API.md`.
+- Phase 1 implemented behind flags (all default OFF): `pairMainEffectAdjust` (D-088, pair main-effect subtraction in `recommend`/`recommend-terms`), `PersonalizeConfig.blendMode='logit'` (D-089, log-odds personalization blend), `pnpm etl tune-priors` (D-090, k0/k/kLane grid on the holdout) and `backtest draft --pair-adjust` for the A/B gate. ADRs D-088..D-090 PROPOSED. Engine tests: 532 pass incl. golden suite (flag-off output unchanged).
+- Pending: pair-adjust backtest + SUPPORT tune-priors running; Phases 2–7 per TICKETS T-122..T-127.
 
 ### 2026-11-12 — Devin — T-051 Timeline ingestion + item builds (REVIEW)
 
@@ -1262,3 +1278,37 @@ The 2026-10-22 entries had no timestamps; their order was reconstructed from tic
 - `aggregate`: item_build 18,869 rows / 154 champions; export emits
   14 SUPPORT builds files; lane/path contexts still below
   exportMinGames=10 (honest sparsity, resolves with full corpus).
+
+## Items engine core (T-125, 2026-11-13)
+
+- `packages/engine/src/items/`: `recommendItems` + context derivation +
+  analytic fight-power fallback behind `ItemsConfig` (D-093). Data layer
+  consumes existing `roles/<ROLE>/builds/<champ>.json` exports — no ETL
+  changes needed. 14 unit tests; verified against real 16.22 exports
+  (SUPPORT builds/412.json): picks carry nEff/lowData/contextLevel and
+  observational reasons.
+- `profile-sync` bug B-069 fixed earlier this session (summoner1Id
+  fallback); KiriToc 278 games stored.
+- Remaining T-125: W(state), quest/path rows, starters, build plans,
+  modes; then T-126 items UI.
+
+## Phase 2 fill rates + items data refresh (2026-11-13)
+
+- Timeline backfill COMPLETE: all 4 extractors ran on all 24,325 matches
+  (`extractor_runs` full coverage). `lane_snapshots` = 1,110,510 rows
+  (~45.7/match ≈ 10 participants x 5 targets, minus early endings).
+- `aggregate` rerun on full corpus: `item_build` 18,869 -> 169,868 rows;
+  `export` now emits 47 SUPPORT builds files (was 16) + 4 build-paths
+  files. Lane-key contexts still rare (1 in builds/412.json) — lane phase
+  is a small share of purchases.
+- `backfill-challenges` running (call-budget 4000, resumable): ~200/24,322
+  matches done, ~2k participant_challenges rows so far.
+- `scripts/items-smoke.ts`: manual real-export check for recommendItems
+  (not part of test suite).
+
+## Operating model change (2026-11-13)
+
+- Owner decided the repo may go public (D-094): `etl.yml` cron
+  re-enabled (`37 */12 * * *`). DB stays out of git and out of Actions
+  artifacts — only `state-*` releases in the private state repo. Local
+  ingestion remains supported.

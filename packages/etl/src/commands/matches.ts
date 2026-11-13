@@ -23,12 +23,14 @@ async function runMatches(args: string[]): Promise<void> {
         reset: { type: 'boolean', default: false },
         'reset-tombstones': { type: 'boolean', default: false },
         refresh: { type: 'boolean', default: false },
+        'call-budget': { type: 'string' },
+        'time-budget': { type: 'string' },
       },
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     throw new UsageError(
-      `${message}\nUsage: etl matches [platform] [--since-patch=16.19] [--per-player=20] [--limit=N] [--queue=420] [--min-duration=900] [--reset] [--reset-tombstones] [--refresh]`,
+      `${message}\nUsage: etl matches [platform] [--since-patch=16.19] [--per-player=20] [--limit=N] [--queue=420] [--min-duration=900] [--reset] [--reset-tombstones] [--refresh] [--call-budget=N] [--time-budget=MIN]`,
     );
   }
   const { values, positionals } = parsed;
@@ -62,6 +64,14 @@ async function runMatches(args: string[]): Promise<void> {
     typeof values['min-duration'] === 'string' ? values['min-duration'] : undefined,
     '--min-duration',
   );
+  const callBudget = parseStrictPositiveInt(
+    typeof values['call-budget'] === 'string' ? values['call-budget'] : undefined,
+    '--call-budget',
+  );
+  const timeBudgetMinutes = parseStrictPositiveInt(
+    typeof values['time-budget'] === 'string' ? values['time-budget'] : undefined,
+    '--time-budget',
+  );
   const resetValue = values.reset === true;
   const resetTombstonesValue = values['reset-tombstones'] === true;
   const refreshValue = values.refresh === true;
@@ -89,6 +99,8 @@ async function runMatches(args: string[]): Promise<void> {
       reset: resetValue,
       resetTombstones: resetTombstonesValue,
       refresh: refreshValue,
+      callBudget,
+      timeBudgetMs: timeBudgetMinutes !== undefined ? timeBudgetMinutes * 60_000 : undefined,
       db,
       onProgress: (message) => log.info(message),
     });
@@ -99,6 +111,11 @@ async function runMatches(args: string[]): Promise<void> {
         `${result.filtered} filtered, ${result.invalid} invalid` +
         `${result.playersFailed > 0 ? `, ${result.playersFailed} failed` : ''}.`,
     );
+    if (result.budgetExhausted) {
+      log.info(
+        'Ingestion stopped at the call/time budget; cursors are saved and the run is resumable.',
+      );
+    }
     if (result.stoppedEarly) {
       // Non-zero exit so scheduled runs (etl.yml) do not publish a partial
       // refresh; completed cursors are still saved by the caller's finally.
@@ -116,7 +133,7 @@ async function runMatches(args: string[]): Promise<void> {
 export const matchesCommand: Command = {
   name: 'matches',
   usage:
-    'matches [platform] [--since-patch=16.19] [--per-player=20] [--limit=N] [--queue=420] [--min-duration=900] [--reset] [--reset-tombstones] [--refresh]',
+    'matches [platform] [--since-patch=16.19] [--per-player=20] [--limit=N] [--queue=420] [--min-duration=900] [--reset] [--reset-tombstones] [--refresh] [--call-budget=N] [--time-budget=MIN]',
   description:
     'Ingest ranked solo matches for discovered players (resumable, Ctrl+C safe). ' +
     '--reset-tombstones clears pruned tombstones: pruned matches become fetchable again. ' +

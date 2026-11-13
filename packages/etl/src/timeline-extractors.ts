@@ -21,6 +21,7 @@ import {
   type ParticipantIdRow,
   type TimelineParticipantRef,
 } from './timeline-events';
+import { extractLaneSnapshots, type LaneSnapshotRow } from './timeline-snapshots';
 
 export interface TimelineMatchContext {
   readonly matchId: string;
@@ -118,6 +119,36 @@ function writeParticipantIds(
   write.immediate();
 }
 
+function writeLaneSnapshots(
+  db: Database.Database,
+  matchId: string,
+  rows: readonly LaneSnapshotRow[],
+): void {
+  const remove = db.prepare('DELETE FROM lane_snapshots WHERE match_id = ?');
+  const insert = db.prepare(
+    `INSERT OR REPLACE INTO lane_snapshots
+     (match_id, participant_id, minute, ts_ms, position, level, gold, xp, cs)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  );
+  const write = db.transaction(() => {
+    remove.run(matchId);
+    for (const row of rows) {
+      insert.run(
+        matchId,
+        row.participant_id,
+        row.minute,
+        row.ts_ms,
+        row.position,
+        row.level,
+        row.gold,
+        row.xp,
+        row.cs,
+      );
+    }
+  });
+  write.immediate();
+}
+
 /** Built-in extractors, bound to a db handle for one run. */
 export function createTimelineExtractors(db: Database.Database): TimelineExtractor[] {
   return [
@@ -139,11 +170,22 @@ export function createTimelineExtractors(db: Database.Database): TimelineExtract
         writeParticipantIds(db, match.matchId, events.participantIds);
       },
     },
+    {
+      name: 'lane-snapshots',
+      extract(_events, match, _refs, timeline) {
+        writeLaneSnapshots(db, match.matchId, extractLaneSnapshots(timeline));
+      },
+    },
   ];
 }
 
 /** Names of the built-in timeline extractors (all share one timeline fetch). */
-export const TIMELINE_EXTRACTOR_NAMES = ['item-events', 'kill-events', 'participant-ids'] as const;
+export const TIMELINE_EXTRACTOR_NAMES = [
+  'item-events',
+  'kill-events',
+  'participant-ids',
+  'lane-snapshots',
+] as const;
 
 export function pendingExtractors(
   db: Database.Database,

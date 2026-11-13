@@ -18,6 +18,7 @@ import { RiotAuthError } from './riot';
 import { CliError, EXIT, UsageError } from './cli-args';
 import { staticCommand } from './commands/static';
 import { backtestCommand } from './commands/backtest';
+import { tunePriorsCommand } from './commands/tune-priors';
 import { validateTagsCommand } from './commands/validate-tags';
 import { checkTagsCommand } from './commands/check-tags';
 import { checkKeyCommand } from './commands/check-key';
@@ -25,6 +26,8 @@ import { playersCommand } from './commands/players';
 import { matchesCommand } from './commands/matches';
 import { timelineCommand } from './commands/timeline';
 import { backfillTimelinesCommand } from './commands/backfill';
+import { backfillChallengesCommand } from './commands/backfill-challenges';
+import { fitModelCommand } from './commands/fit-model';
 import { classifyItemsCommand } from './commands/classify-items';
 import { pruneCommand } from './commands/prune';
 import { migrateCommand } from './commands/migrate';
@@ -36,12 +39,14 @@ import { statusCommand } from './commands/status';
 import { rekeyCommand } from './commands/rekey';
 import { profileSyncCommand } from './commands/profile-sync';
 import { pullCommand } from './commands/pull';
+import { publishCommand } from './commands/publish';
 import { breakpointCommand } from './commands/breakpoint';
 import { log, type Command, findCommand, formatHelp, isHelpFlag } from './commands/shared';
 
 const COMMANDS: readonly Command[] = [
   staticCommand,
   backtestCommand,
+  tunePriorsCommand,
   validateTagsCommand,
   checkTagsCommand,
   checkKeyCommand,
@@ -49,6 +54,8 @@ const COMMANDS: readonly Command[] = [
   matchesCommand,
   timelineCommand,
   backfillTimelinesCommand,
+  backfillChallengesCommand,
+  fitModelCommand,
   classifyItemsCommand,
   pruneCommand,
   migrateCommand,
@@ -60,6 +67,7 @@ const COMMANDS: readonly Command[] = [
   rekeyCommand,
   profileSyncCommand,
   pullCommand,
+  publishCommand,
   breakpointCommand,
 ];
 

@@ -44,7 +44,7 @@ function resolveDbPathReadOnly(): string {
  * `pnpm etl aggregate`, so recency is relative to the patch before the
  * holdout (D-023).
  */
-function buildEngineData(dbPath: string, rows: readonly DraftRow[]): BacktestEngineData {
+export function buildEngineData(dbPath: string, rows: readonly DraftRow[]): BacktestEngineData {
   const { holdoutPatch, trainingPatches } = draftPatchSplit(rows);
   const snapshotPatch = trainingPatches[trainingPatches.length - 1];
   if (holdoutPatch === null || snapshotPatch === undefined) {
@@ -111,17 +111,29 @@ function buildEngineData(dbPath: string, rows: readonly DraftRow[]): BacktestEng
 }
 
 async function runBacktest(args: string[]): Promise<void> {
-  // `--out=<path>` is handled here, not by parsePositionals: the shared helper
-  // uses strict parseArgs with no options, which would reject the flag.
+  // `--out=<path>` and `--pair-adjust` are handled here, not by
+  // parsePositionals: the shared helper uses strict parseArgs with no
+  // options, which would reject the flags.
   const outArgs = args.filter((arg) => arg.startsWith('--out='));
+  const pairAdjustArgs = args.filter((arg) => arg === '--pair-adjust');
+  const pairAdjust = pairAdjustArgs.length > 0;
   if (outArgs.length > 1) {
     throw new UsageError('Duplicate --out option.\nUsage: backtest draft [--out=<path>]');
   }
-  const positionalArgs = args.filter((arg) => !arg.startsWith('--out='));
-  const [subcommand] = parsePositionals(positionalArgs, 1, 'backtest draft [--out=<path>]');
+  if (pairAdjustArgs.length > 1) {
+    throw new UsageError(
+      'Duplicate --pair-adjust option.\nUsage: backtest draft [--out=<path>] [--pair-adjust]',
+    );
+  }
+  const positionalArgs = args.filter((arg) => !arg.startsWith('--out=') && arg !== '--pair-adjust');
+  const [subcommand] = parsePositionals(
+    positionalArgs,
+    1,
+    'backtest draft [--out=<path>] [--pair-adjust]',
+  );
   if (subcommand !== 'draft') {
     throw new UsageError(
-      `Unknown backtest subcommand "${subcommand ?? ''}". Usage: backtest draft [--out=<path>]`,
+      `Unknown backtest subcommand "${subcommand ?? ''}". Usage: backtest draft [--out=<path>] [--pair-adjust]`,
     );
   }
 
@@ -154,7 +166,12 @@ async function runBacktest(args: string[]): Promise<void> {
       .all() as DraftRow[];
 
     const engine = buildEngineData(dbPath, rows);
-    const report = runBacktestDraft(rows, engine);
+    // D-088 A/B gate: `--pair-adjust` evaluates the pair main-effect
+    // adjustment without changing DEFAULT_CONFIG.
+    const evaluated = pairAdjust
+      ? { ...engine, config: { ...DEFAULT_CONFIG, pairMainEffectAdjust: true } }
+      : engine;
+    const report = runBacktestDraft(rows, evaluated);
 
     mkdirSync(dirname(out), { recursive: true });
     writeFileSync(out, JSON.stringify(report, null, 2), 'utf8');
@@ -180,7 +197,7 @@ async function runBacktest(args: string[]): Promise<void> {
 
 export const backtestCommand: Command = {
   name: 'backtest',
-  usage: 'backtest draft [--out=<path>]',
+  usage: 'backtest draft [--out=<path>] [--pair-adjust]',
   description: 'Backtest the draft recommendation model on a frozen temporal holdout',
   run: runBacktest,
 };

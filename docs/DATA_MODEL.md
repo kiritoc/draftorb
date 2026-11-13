@@ -44,6 +44,15 @@ CREATE TABLE kill_events (    -- CHAMPION_KILL facts (D-084)
   PRIMARY KEY (match_id, seq)
 );
 CREATE TABLE match_participant_ids (match_id TEXT NOT NULL, participant_id INTEGER NOT NULL, puuid TEXT NOT NULL, PRIMARY KEY (match_id, participant_id));
+CREATE TABLE lane_snapshots (   -- per-participant stats at minutes 5/10/15/20/25 (T-122)
+  match_id TEXT NOT NULL, participant_id INTEGER NOT NULL, minute INTEGER NOT NULL,
+  ts_ms INTEGER NOT NULL, position TEXT, level INTEGER, gold INTEGER, xp INTEGER, cs INTEGER,
+  PRIMARY KEY (match_id, participant_id, minute)
+);
+CREATE TABLE participant_challenges (  -- raw match-detail challenges JSON (T-122)
+  match_id TEXT NOT NULL, puuid TEXT NOT NULL, participant_id INTEGER, challenges_json TEXT,
+  PRIMARY KEY (match_id, puuid)
+);  -- challenges_json NULL = checked, payload absent/unavailable; populated by matches ingestion + `etl backfill-challenges`
 CREATE TABLE extractor_runs (match_id TEXT NOT NULL, extractor TEXT NOT NULL, PRIMARY KEY (match_id, extractor));  -- resumable backfill
 CREATE TABLE participant_starters (match_id TEXT NOT NULL, participant_id INTEGER NOT NULL, puuid TEXT NOT NULL, bundle_json TEXT NOT NULL, PRIMARY KEY (match_id, participant_id));
 CREATE TABLE item_state_scale (patch TEXT NOT NULL, time_bucket TEXT NOT NULL, sample_count INTEGER NOT NULL, gold_sd REAL NOT NULL, PRIMARY KEY (patch, time_bucket));

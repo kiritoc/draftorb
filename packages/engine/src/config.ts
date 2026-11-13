@@ -71,6 +71,12 @@ export const rankWeightingConfigSchema = z
     alpha: z.number().nonnegative(),
     wMax: z.number().gte(1),
     exportMinGames: z.number().nonnegative(),
+    /**
+     * D-088 (PROPOSED): subtract each known slot's mean pair term (the opponent
+     * main effect) so pair terms measure the candidate-relative interaction.
+     * Default off until the D-023 backtest gate passes.
+     */
+    pairMainEffectAdjust: z.boolean().default(false),
     influence: influenceConfigSchema,
   })
   .strict()
@@ -113,6 +119,7 @@ export const DEFAULT_CONFIG: RankWeightingConfig = rankWeightingConfigSchema.par
   alpha: 0.25,
   wMax: 2.0,
   exportMinGames: 10,
+  pairMainEffectAdjust: false,
   influence: {
     draft: createInfluenceMatrix(),
     lane: createInfluenceMatrix(),

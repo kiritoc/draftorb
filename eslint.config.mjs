@@ -15,6 +15,7 @@ export default tseslint.config(
             'apps/web/scripts/copy-public-data.mjs',
             'scripts/check-secrets.mjs',
             'scripts/check-secrets.test.ts',
+            'scripts/items-smoke.ts',
           ],
         },
         tsconfigRootDir: import.meta.dirname,

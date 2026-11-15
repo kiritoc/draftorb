@@ -16,15 +16,28 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 ## Current handoff
 
 - Date: 2026-11-15
-- Branch/PR: `docs/github-issue-tracking` / PR #115
+- Branch/PR: `docs/bl-001-decisions-d111-d115` / BL-001 PR (this PR)
 - State: REVIEW
-- Done: process docs and GitHub issues aligned after the backlog moved to GitHub issues + the Draftorb project board; ticket issue form added; missing plan issues created; project fields (Status/Milestone/Size/Owner decision needed) set up.
-- Files touched: `AGENTS.md`, `.github/ISSUE_TEMPLATE/ticket.yml`, `.github/pull_request_template.md`, `docs/{REVIEW_CHECKLIST,PROGRESS,TICKETS,PROMPTS,PROGRESS_ARCHIVE}.md`.
+- Done: recorded the five owner decisions of 2026-11-15 as D-111..D-115 in `docs/DECISIONS.md` (D-110 was already taken by the ETL snapshot-integrity decision, merged in PR #116 / ticket B-070); applied the D-115 AGENTS.md edits (rule 2 language, rule 4 Rust-toolchain exception scoped to the desktop shell, repo layout `apps/desktop` = Tauri); updated GOALS.md platform line and open items, REVIEW_CHECKLIST.md Windows rule; renumbered the language decision D-110 -> D-115 in issues #67, #68 and #69 after the owner confirmation comment on #67.
+- Files touched: `docs/{DECISIONS,GOALS,REVIEW_CHECKLIST,PROGRESS}.md`, `AGENTS.md`; GitHub issues #67, #68, #69.
 - Tests: docs-only; run `pnpm check` before merge.
-- Blockers / next step: owner reviews the PR; then BL-001 (#67) writes D-110..D-114.
-- Pitfalls: `docs/TICKETS.md`, `docs/PROMPTS.md`, `docs/PROGRESS.md`, `docs/PROGRESS_ARCHIVE.md` and `docs/BACKLOG.md` were deleted by the merge of PR #66; this PR restores the four tracking files (BACKLOG stays deleted — GitHub issues are the tracker). Issue bodies still pointing at `docs/BACKLOG.md` are reported as non-conforming in the PR description.
+- Blockers / next step: owner reviews the PR; then BL-002 (#68) runs the Windows Tauri spike that validates D-115 against owner-confirmed thresholds, and the aggregates-publishing ticket decides the public host for D-111.
+- Pitfalls: D-110 is the ETL state-upload decision (PR #116, ticket B-070) — do not reuse that id; the language/shell decision is D-115. Older log entries that say "BL-001 writes D-110..D-114" are outdated: the real range is D-111..D-115 (D-110 was already taken when BL-001 ran).
 
 ## Session log (newest first)
+
+### 2026-11-15 — Devin — BL-001 decisions D-111..D-115 and AGENTS.md language/shell update
+
+- Done:
+  - Appended D-111 (shared aggregates public), D-112 (delete joint draft model code), D-113 (keep raw data and ETL timeline extraction), D-114 (public versioned champion pool file `data/pool.config.json`) and D-115 (TypeScript engine + Tauri shell) to `docs/DECISIONS.md`, each ACCEPTED (owner, 2026-11-15) with an Amends line where the decision map specified one; added the status-header notes ("amended by" / "code deleted by D-112") on D-001, D-079, D-092, D-092a, D-098, D-099, D-101 and D-109 without touching any decision body.
+  - AGENTS.md: golden rule 2 now states the Windows desktop program is a Tauri shell around the TypeScript engine (D-115) pending the spike; golden rule 4 keeps every ETL/engine requirement and adds the Rust-toolchain exception scoped to the desktop shell only; repo layout `apps/desktop` line updated from Electron to Tauri.
+  - GOALS.md platform line and open items updated (language D-115 pending spike, aggregates location D-111, pool versioning D-114 resolved; Riot policy and patch display still open); REVIEW_CHECKLIST.md Windows bullet now states the final D-115 rule.
+  - Issues #67, #68, #69 renumbered after the owner confirmation comment on #67: language/shell decision D-110 -> D-115, range D-110..D-114 -> D-111..D-115; the AGENTS.md rule-4 amendment text moved from the D-110 bullet to the D-115 bullet in #67.
+- Files touched: `docs/{DECISIONS,GOALS,REVIEW_CHECKLIST,PROGRESS}.md`, `AGENTS.md`; GitHub issues #67, #68, #69.
+- Tests: docs-only change; `pnpm check` run before merge.
+- State left: REVIEW — awaiting owner review.
+- Next step: owner merges the PR; then BL-002 (#68) Windows Tauri spike and the aggregates-publishing ticket (D-111 host).
+- Pitfalls / notes for next AI: D-110 is the ETL snapshot-integrity decision (PR #116, B-070); the language decision is D-115 — older entries saying "BL-001 writes D-110..D-114" are outdated, the real range is D-111..D-115. D-114 records the owner quote "Oui, on peut versionner le pool"; D-115 records "Les perfs uniquement, mais je serai toujours à temps de changer plus tard."
 
 ### 2026-11-15 — Devin — Backlog ticket prefix `B-` → `BL-`
 

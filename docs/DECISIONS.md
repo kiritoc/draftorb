@@ -4,7 +4,7 @@ Status: PROPOSED (made by AI, awaiting owner) / ACCEPTED / SUPERSEDED. Newest at
 
 > Ticket IDs (`T-xxx`) refer to the retired Stage-1 backlog (`docs/TICKETS.md`, deleted 2026-11-15); full ticket text: history: see git log (`git log --follow -- docs/TICKETS.md`). Current scope: `docs/GOALS.md`; task tracking: GitHub issues/project.
 
-### D-001 — TypeScript everywhere — ACCEPTED, amended by D-098
+### D-001 — TypeScript everywhere — ACCEPTED, amended by D-098, amended by D-115
 
 Single language for ETL, engine, web, desktop, vision (opencv.js/tesseract.js/onnxruntime). Best fit for vibe coding and Windows setup (Node only). Java rejected despite owner expertise (would need 2 languages).
 
@@ -901,7 +901,7 @@ Owner decision 2026-11-07.
 
 Owner decision 2026-11-08.
 
-### D-079 — Local-only app: no hosting, no deploy workflow — ACCEPTED, amended by D-099
+### D-079 — Local-only app: no hosting, no deploy workflow — ACCEPTED, amended by D-099, amended by D-111
 
 - Context: the owner wants the app private and only needs the database refreshed automatically. GitHub Pages on the free plan requires a public repo; Cloudflare Access requires payment details even on its free plan.
 - Decision:
@@ -1078,7 +1078,7 @@ lands the runbook in `docs/proposed-etl-schedule.md` documents the manual
 `gh release` procedure. Update: `.github/workflows/etl.yml`,
 `docs/proposed-etl-schedule.md`, SETUP.md runbook section.
 
-### D-092 — Joint regularized draft model (T-123) — PROPOSED
+### D-092 — Joint regularized draft model (T-123) — PROPOSED, code deleted by D-112, kept as the record of a negative result
 
 `packages/engine/src/joint/` implements a jointly fit logistic model that
 replaces the layered heuristic log-odds terms: per-match training rows
@@ -1109,7 +1109,7 @@ draft backtest) instead of pick prediction. Update:
 `packages/engine/src/joint/`, `packages/etl/src/joint-fit.ts`,
 `packages/etl/src/commands/fit-model.ts`.
 
-### D-092a — Win-probability gate verdict for the joint model — PROPOSED
+### D-092a — Win-probability gate verdict for the joint model — PROPOSED, code deleted by D-112, kept as the record of a negative result
 
 Follow-up measurement (same 16.22 holdout, per-participant masked drafts,
 P(team win) protocol matching `etl backtest draft`): joint model log-loss
@@ -1210,11 +1210,11 @@ The tool is for one player (KiriToc, Diamond, EUW1). The code may be shared; the
 
 Usage is about 70% Support, 29.5% Top/Jungle, 0.5% ADC/Mid. Supersedes D-005. Amends D-023 (backtest runs for SUPPORT, TOP, JUNGLE), D-073 and D-074 (profile scope is no longer Support-only). ADC and Mid get champion-level statistics only until a later decision.
 
-### D-098 — Restart the code, keep the data pipeline — ACCEPTED (owner, 2026-11-15)
+### D-098 — Restart the code, keep the data pipeline — ACCEPTED (owner, 2026-11-15), amended by D-115
 
 Restart the engine and app from GOALS.md. Keep the SQLite database and the scheduled pipeline (D-003, D-094). A time-boxed audit judges existing modules by interface (database schema, export formats) as keep / rewrite / delete. The implementation language is decided after the audit. Amends D-001 ("TypeScript everywhere" no longer binding for the desktop shell). No PROPOSED decision is implemented before owner approval.
 
-### D-099 — Windows 11 desktop program; data fetched online at launch — ACCEPTED (owner, 2026-11-15)
+### D-099 — Windows 11 desktop program; data fetched online at launch — ACCEPTED (owner, 2026-11-15), amended by D-111, amended by D-115
 
 The app is a light, fast-starting Windows 11 program that may be compiled locally. It downloads the latest data at launch. Supersedes the "static site / local dev server" parts of D-002 and D-079 (the no-hosting rule stands). Recommended data location (open, pending the first ticket): shared aggregates as a public release asset (no token needed), profile data private. Note: `pnpm etl pull` currently relies on the GitHub CLI and a private repo (D-079).
 
@@ -1222,7 +1222,7 @@ The app is a light, fast-starting Windows 11 program that may be compiled locall
 
 Priority order: (1) champion pick screen, (2) runes and summoners with starters, (3) in-game items with auto-fill. Version 1 is the pick screen with an "Unvalidated model" label (D-023). The player's own record appears as a badge on each champion card; the blended "my results" ranking moves to version 2. Amends D-072 (the third list "KiriToc's picks" is not in version 1).
 
-### D-101 — Pool: per role, champion x roles, highlight only — ACCEPTED (owner, 2026-11-15)
+### D-101 — Pool: per role, champion x roles, highlight only — ACCEPTED (owner, 2026-11-15), amended by D-114
 
 The pool editor lets the player pick a champion once and tick the roles it applies to. Pool champions are highlighted, never filtered or boosted; "From your pool" stays above "Best overall" with "In pool" tags and both ranks. The pool is stored by the program, not browser localStorage. Amends D-024; D-053 (champion portraits next to names) stands.
 
@@ -1254,7 +1254,7 @@ Visual direction C (light, clean, large targets) with a light/dark toggle that r
 
 The interface shows the public patch name (for example 26.22). Internal data keeps Riot's data label (for example 16.22) as `major.minor`. The mapping appears to add 10 to the major number; this is unverified and needs a check against Data Dragon before it is coded. Amends D-043.
 
-### D-109 — Handling of the 14 PROPOSED decisions — ACCEPTED (owner, 2026-11-15)
+### D-109 — Handling of the 14 PROPOSED decisions — ACCEPTED (owner, 2026-11-15), amended by D-112
 
 None is auto-approved; each needs an explicit owner OK when its phase starts.
 
@@ -1266,3 +1266,23 @@ None is auto-approved; each needs an explicit owner OK when its phase starts.
 ### D-110 — ETL state upload gated on snapshot integrity — ACCEPTED (owner, 2026-11-15)
 
 Amends D-078 point 3: the `DraftOrb.sqlite.gz` upload now runs only when the "Compact and check database" step succeeds (`steps.compact.outcome == 'success'`). Pipeline-step failures still save partial progress (compact succeeds -> upload proceeds), but a failed/torn snapshot is never published (B-070). The compact step additionally refuses to snapshot while another process holds the DB and treats gzip's "file size changed while zipping" warning as fatal; `timeout-minutes` raised 300 -> 360 after a backlog run hit the cap.
+
+### D-111 — Shared aggregates are public — ACCEPTED (owner, 2026-11-15)
+
+Amends D-079 and D-099: the shared aggregates (`data/public/<patch>/` tree and `latest.json`) are published as a public release asset that anyone can download with no token; the exact host (the public main repo or a dedicated public repo) is decided by the aggregates-publishing ticket. `profiles/` (it contains the owner's Riot ID) and the SQLite database stay private. AUDIT.md section 5e verified the export tree contains no PUUIDs, match ids or foreign player names.
+
+### D-112 — Delete the joint draft model code — ACCEPTED (owner, 2026-11-15)
+
+Amends D-092 and D-109: delete the joint draft model code — engine `joint/`, ETL `joint-fit` and `fit-model`, the `joint-model.json` export and their tests. D-092 and D-092a stay in this log as the record of the negative result (both validation gates failed, no consumer). This overrides D-109 for D-092 and D-092a only (D-109 kept them as backtest experiments); D-088 and D-090 are unchanged.
+
+### D-113 — Keep the raw data and the ETL timeline extraction — ACCEPTED (owner, 2026-11-15)
+
+Keep the raw data and the ETL timeline extraction (`item_events`, `kill_events`, `lane_snapshots`, `participant_challenges`, `participant_starters`). The engine items layer is a rewrite in v3. D-081..D-087, D-093 and D-095 stay PROPOSED and follow D-109; each needs explicit owner approval when the items phase starts. Do not delete the raw tables.
+
+### D-114 — Public versioned champion pool file — ACCEPTED (owner, 2026-11-15)
+
+Amends D-101 (storage and sync mechanics) and feeds D-102 (pool-driven collection). Owner approval, verbatim: "Oui, on peut versionner le pool". The player's champion pool is versioned in the public repo as `data/pool.config.json` (secret-free, zod-validated, `schemaVersion`, champion ids per role with an optional display name), following the pattern of `data/profiles.config.json` (D-068). The program stays the source of truth for the screen; an "Export to repo file" action writes the file and the user commits it; the program warns when its pool and the repo file differ; the scheduled pipeline reads only the repo copy; the pool never changes scores (D-101). The repo is public, so the pool list is public.
+
+### D-115 — Language and shell: TypeScript engine with a Tauri shell — ACCEPTED (owner, 2026-11-15)
+
+Amends D-001, D-098 and D-099. TypeScript engine with a Tauri shell for the Windows 11 program. The Windows spike (issue #68) validates it against owner-confirmed thresholds; the starting thresholds from AUDIT.md section 6 (start under about 3 s, idle memory under about 400 MB) are estimates and need owner confirmation after measurement. The owner's criterion is performance and changing later stays possible (full Rust once the ranking is validated, or Electron as fallback). Owner approval, verbatim: "Les perfs uniquement, mais je serai toujours à temps de changer plus tard." AGENTS.md rule 4 amendment: the no-compiler native-dependency rule stays for `packages/shared`, `packages/engine`, `packages/etl` and tooling; the Windows desktop shell may require the Rust toolchain for Tauri.

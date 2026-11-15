@@ -20,9 +20,9 @@ Before any work, read the ticket: `gh issue view <n> --comments`. If you cannot 
 ## Golden rules (never break)
 
 1. **100% free.** No paid API, no paid LLM at runtime, no paid hosting. No scraping third-party stats sites (u.gg, op.gg...).
-2. **Language: TypeScript (strict) for `packages/shared`, `packages/engine`, `packages/etl` and tooling.** Node.js 22+, pnpm workspaces. The Windows desktop shell language is decided after the code audit (D-098/D-099) — do not assume TypeScript there.
+2. **Language: TypeScript (strict) for `packages/shared`, `packages/engine`, `packages/etl` and tooling.** Node.js 22+, pnpm workspaces. The Windows desktop program is a Tauri shell around the TypeScript engine (D-115), pending the Windows spike; its native layer is thin Rust glue; do not write the shell in another language without a decision.
 3. **`packages/engine` is pure**: no DOM, no Node APIs, no network, no file I/O, no randomness without a seed. It takes data objects in, returns results out. It must run in the browser, Node and the desktop shell.
-4. **Windows-first, minimal setup.** Only Node + pnpm required. No bash-only scripts (use Node scripts), use `path.join`, no symlinks, no native deps that need a compiler (prefer `better-sqlite3` prebuilt binaries; if it fails, log it in BUGS.md).
+4. **Windows-first, minimal setup.** Only Node + pnpm required. No bash-only scripts (use Node scripts), use `path.join`, no symlinks, no native deps that need a compiler (prefer `better-sqlite3` prebuilt binaries; if it fails, log it in BUGS.md). Exception: the Windows desktop shell may require the Rust toolchain for Tauri (D-115); the exception never applies to `packages/shared`, `packages/engine`, `packages/etl` or tooling.
 5. **No secrets in git.** Riot key goes in `.env` (gitignored). `.env.example` stays up to date.
 6. **One task per session.** Do not refactor unrelated code. Do not add dependencies without noting it in `docs/DECISIONS.md`.
 7. **Tests first for the engine.** Every engine change needs/updates tests (see `docs/TESTING.md`).
@@ -55,7 +55,7 @@ packages/shared   types + zod schemas (single source of truth)
 packages/engine   pure scoring/recommendation logic
 packages/etl      Riot API client, SQLite, aggregation, JSON export
 apps/web          Vite + React + Tailwind (static site)
-apps/desktop      Electron shell (phase 2, not created yet)
+apps/desktop      Tauri shell around the TypeScript engine (D-115; not created yet)
 data/             generated JSON (public), hand-written tags (manual) + raw/sqlite (gitignored)
 docs/             all project docs
 ```

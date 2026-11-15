@@ -1,6 +1,6 @@
 # BUGS
 
-Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATING, FIXED, WONTFIX. Add newest on top of the open list.
+Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATING, FIXED, WONTFIX. Add newest on top of the open list. Bug IDs use `B-xxx`; rework backlog ticket IDs (GitHub issues) use `BL-xxx` — the two namespaces are distinct.
 
 ## Open
 
@@ -9,6 +9,7 @@ Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATI
 | B-067 | S4  | etl  | `check-key` prints `undefined` for the league name                                                                                                                                 | OPEN   | Devin/2026-11-12           | –      |
 | B-068 | S4  | docs | "512 MiB release-asset cap" was a self-imposed 25% headroom rule, not a GitHub limit (real cap: 2 GiB/file)                                                                        | FIXED  | external review/2026-11-12 | –      |
 | B-069 | S2  | etl  | `profile-sync` marked every match `invalid`: Riot renamed `spell1Id`/`spell2Id` to `summoner1Id`/`summoner2Id` in newer game versions; `extractProfileGame` required the old names | FIXED  | Devin/2026-11-13           | –      |
+| B-070 | S1  | etl  | Corrupt `DraftOrb.sqlite.gz` published by a timeout-cancelled run broke every ETL refresh (`integrity_check` errors)                                                               | FIXED  | Devin/2026-11-15           | –      |
 
 ## Duplicate bug IDs (not renumbered)
 

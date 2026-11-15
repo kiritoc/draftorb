@@ -13,6 +13,10 @@ Project: **DraftOrb** — a personal Windows 11 companion for one player (KiriTo
 3. `docs/CONVENTIONS.md` and `docs/WORKFLOW.md` — rules of work
    Other docs on demand: `ARCHITECTURE.md`, `DATA_MODEL.md`, `RIOT_API.md`, `TESTING.md`, `DECISIONS.md`, `GLOSSARY.md`, `BUGS.md`, `SETUP.md`.
 
+## Tickets
+
+Before any work, read the ticket: `gh issue view <n> --comments`. If you cannot read it, stop and ask. The acceptance criteria in the issue are the contract; do not change them; comment and ask the owner. Decisions go into `docs/DECISIONS.md` as PROPOSED in the PR, never only in issue comments.
+
 ## Golden rules (never break)
 
 1. **100% free.** No paid API, no paid LLM at runtime, no paid hosting. No scraping third-party stats sites (u.gg, op.gg...).

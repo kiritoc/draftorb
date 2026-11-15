@@ -4,13 +4,13 @@ Use this for every PR in the rework. Source of truth: `docs/GOALS.md`, accepted 
 
 ## Goal alignment
 
-- [ ] The PR delivers exactly one linked GitHub issue/task — no scope creep, no unrelated refactors.
+- [ ] The PR delivers exactly one issue, and the PR description links it with `Closes #n`; every acceptance criterion is ticked with evidence.
 - [ ] The change moves the product toward GOALS.md (pick screen → runes/summoners/starters → in-game items) and respects the version scope (D-100, D-097).
 - [ ] Product invariants hold (AGENTS.md): "Best overall" always shown; "From your pool" above it when the pool is non-empty; both lists paginated with "Show more"; pool never changes `score(c)`; champion portraits next to names; "unvalidated" label until the D-023 gate passes.
 
 ## Decisions
 
-- [ ] Only ACCEPTED decisions are implemented. Any PROPOSED decision — exact current list: D-081..D-090, D-092, D-092a, D-093, D-095, plus any future PROPOSED entries — is either untouched or explicitly approved by the owner; approval is quoted in the PR.
+- [ ] Only ACCEPTED decisions are implemented. Any PROPOSED decision — exact current list: D-081..D-090, D-092, D-092a, D-093, D-095 — is either untouched or explicitly approved by the owner; approval is quoted in the PR.
 - [ ] New dependencies are recorded in `docs/DECISIONS.md` (name, why, size, license, free).
 - [ ] Spec gaps were logged as PROPOSED in `docs/DECISIONS.md` with the assumption used, not silently guessed.
 
@@ -24,8 +24,8 @@ Use this for every PR in the rework. Source of truth: `docs/GOALS.md`, accepted 
 ## Evidence, live data and pipeline scope
 
 - [ ] PRs that change a parameter or any number cite a backtest report (D-023).
-- [ ] Live-data code (LCU / Live Client Data) lands only after the Riot policy GO verdict and owner sign-off; no memory reading or input injection anywhere.
-- [ ] No database schema/migration or pipeline changes outside the ticket's stated scope.
+- [ ] Live-data code (LCU / Live Client Data API) lands only after the Riot-policy ticket has a GO verdict recorded in DECISIONS.md; never memory reading or input injection (SPECS §9).
+- [ ] No database or pipeline changes outside the ticket's stated scope.
 
 ## Tests and specs
 
@@ -42,11 +42,12 @@ Use this for every PR in the rework. Source of truth: `docs/GOALS.md`, accepted 
 
 ## Windows impact
 
-- [ ] Paths use `path.join`; no bash-only scripts; no symlinks. `packages/shared`, `packages/engine`, `packages/etl` and tooling keep the no-compiler native-dependency rule (AGENTS.md rule 4); any future Rust toolchain exception for the Windows desktop shell must first be recorded as an accepted decision and scoped to `apps/desktop` build tooling only.
+- [ ] Paths use `path.join`; no bash-only scripts; no symlinks. The native-dependency rule stays as is until D-110 is merged; the amendment (Rust toolchain allowed only for the Tauri desktop shell) is made by BL-001 — do not apply it earlier.
 - [ ] Windows CI job (`windows-latest`) stays green; Windows-specific behavior is called out in the PR.
 - [ ] better-sqlite3 continues to use prebuilt binaries on Windows Node 22.
 
 ## Process
 
+- [ ] The reviewer reads the linked issue and checks each acceptance criterion, and lists the files actually read.
 - [ ] Linked GitHub issue/project status updated; `docs/BUGS.md` updated for new/fixed bugs.
 - [ ] Commit messages follow Conventional Commits and reference the issue/ticket id.

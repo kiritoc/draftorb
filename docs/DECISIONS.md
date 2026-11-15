@@ -2,11 +2,11 @@
 
 Status: PROPOSED (made by AI, awaiting owner) / ACCEPTED / SUPERSEDED. Newest at bottom.
 
-### D-001 — TypeScript everywhere — ACCEPTED
+### D-001 — TypeScript everywhere — ACCEPTED, amended by D-098
 
 Single language for ETL, engine, web, desktop, vision (opencv.js/tesseract.js/onnxruntime). Best fit for vibe coding and Windows setup (Node only). Java rejected despite owner expertise (would need 2 languages).
 
-### D-002 — Static site + precomputed JSON, no backend — ACCEPTED
+### D-002 — Static site + precomputed JSON, no backend — ACCEPTED, amended by D-099
 
 Free hosting, no maintenance. Engine runs client-side.
 
@@ -20,7 +20,7 @@ No server to install. `better-sqlite3`.
 
 Draft probabilities from games near user's rank; runes/items from user's rank and above (experts), with experience filters. See SPECS §3.
 
-### D-005 — Phase 1 scope = Support/Diamond/one region — ACCEPTED
+### D-005 — Phase 1 scope = Support/Diamond/one region — SUPERSEDED by D-097
 
 ### D-006 — No paid services, no runtime LLM — ACCEPTED
 
@@ -140,7 +140,7 @@ Owner decision 2026-10-29.
 
 Owner decision 2026-10-29.
 
-### D-021 — Context win rates: layered back-off with shrinkage in log-odds space — ACCEPTED
+### D-021 — Context win rates: layered back-off with shrinkage in log-odds space — ACCEPTED, amended by D-102
 
 - Context: The goal is "what do other players pick/build in this situation, and does it win", counting games that match the current situation exactly more than games that only match partly. SPECS §5 added independent pair deltas in percentage points: exact bot-lane matchups never got extra weight, effects could double-count, and sums could leave [0, 100] %.
 - Decision: Every win-rate estimate is a chain of layers from general to exact; each layer is shrunk toward the prediction of the layer below it: `p_L = (wins_L + k_L * q_{L-1}) / (n_L + k_L)`, where `q_{L-1}` is the previous layer's prediction (not the global baseline). Exact contexts therefore dominate when they have enough games and fall back smoothly when they do not. Effects combine on the log-odds scale: `term = logit(p_L) - logit(q_{L-1})`, scaled by the D-020 influence weight and the §4 role confidence. Pair terms are summed and correlated (several describe the same matchups), so a global scale `s` (default 1.0, fit on the validation window by T-027.a) multiplies their sum; only the lane layers chain toward the running prediction `q = sigmoid(x)`. The result is converted back with the logistic function, so no score can leave [0, 1]. Layers per `myRole` (config `laneGroup(myRole)`): champion baseline -> pair terms for every known slot (weighted by `influence[myRole][*][*][draft]`) -> `lane_vs` (enemy lane-group champions) -> `lane_full` (with the ally lane partners); a layer is skipped when one of its champions is unknown. For a support the lane group is the bot lane: `lane_vs` = `(c, enemySupport, enemyAdc)`, `lane_full` = `(c, allyAdc, enemySupport, enemyAdc)`; for a top laner the lane group has no ally partner, so `lane_full` is skipped and only `lane_vs` (c vs enemy top) fires — a layer never duplicates the one below it. Counts are rank- and recency-weighted (§3); thresholds use the effective sample size `n_eff = (sum w)^2 / sum w^2`, so a handful of heavily weighted games cannot pass `minGames`. Before shrinkage, weighted counts are converted to equivalent counts (`games_e = n_eff`, `wins_e = wins_w * n_eff / games_w`) so the prior strength `k` is in raw-game units. Below `minGames` a layer contributes nothing and the reason is flagged `lowData` (golden rule 8).
@@ -149,7 +149,7 @@ Owner decision 2026-10-29.
 
 Owner decision 2026-10-29.
 
-### D-022 — Runes and items compared like for like; definition of experts — ACCEPTED
+### D-022 — Runes and items compared like for like; definition of experts — ACCEPTED, amended by D-102
 
 - Context: Raw item win rates are biased: late items only appear in long games and players who are ahead can afford more, so "item X has 58 % win rate" mostly measures game state. SPECS §3 also asks for players with `championGames >= 30`, but champion-mastery-v4 returns points, not games.
 - Decision: An item is only compared with other items bought in the same situation: same champion, same item slot `k` (0 = starting items, k >= 1 = k-th completed item), same purchase time bucket (5 min), same state bucket at purchase (`ahead|even|behind` from the team gold difference in the timeline, §8.2 thresholds), same enemy profile bucket (threat-weighted damage mix: `AD|AP|mixed`); for the `lane` phase (k = 0 always; k = 1 only when bought before `laneEndSeconds`, D-020) the context also contains the lane-context slots (top `contextSlots` by lane-phase influence). The score is the shrunk win rate of the item versus the average of all items bought in that same context, with the D-021 back-off chain dropping context dimensions in this order: lane champions -> enemy profile -> state -> time bucket -> (champion, k). Runes use the same chain with context = lane champions -> enemy damage mix -> champion. The `contextSlots` selection ranks slots by descending lane-phase influence (ties by side, ally before enemy, then role order TOP, JUNGLE, MID, ADC, SUPPORT); back-off drops them in the reverse order, least influential first, so the strongest matchup signal survives longest. Experts: a participant counts as an expert on a champion when they have `>= minChampGames` (default 30, config) games on that champion in our own `participants` data within the patch window. The champion-mastery-v4 fallback (`championPoints >= minMasteryPoints`, default 50 000, config) applies only to participants of the role the recommendation is built from (the user's role): mastery is fetched once per (puuid, champion) pair via the by-champion endpoint (`champion-mastery-v4 .../by-puuid/{puuid}/by-champion/{id}`) and cached in `participants.mastery_points` for that champion's rows only — mastery is champion-specific, so a player's points on one champion never bleed into another. Mastery points span all queues and years, so the fallback is an approximation like D-008. `is_expert` is derived: ... (line truncated to 2000 chars)
@@ -158,7 +158,7 @@ Owner decision 2026-10-29.
 
 Owner decision 2026-10-29.
 
-### D-023 — Offline backtest gates every weight and parameter — ACCEPTED
+### D-023 — Offline backtest gates every weight and parameter — ACCEPTED, amended by D-097
 
 - Context: Influence weights, shrinkage strengths, the rank kernel and the recency decay are all guesses until checked against real outcomes. A tool that ranks champions by win rate must prove its numbers predict wins on games it has not seen.
 - Decision: New ETL command `pnpm etl backtest`, split into T-027.a (draft predictions) and T-027.b (rune/item context calibration), role-parametrized (`myRole`, reports per `myRole` and per phase; Phase 1 runs only `SUPPORT`). A frozen test holdout (default: the latest patch in the window, or the last 20 % by `created_at`) is never used for training or tuning; tuning uses a rolling temporal validation window inside the training period. Evaluation: `userRank` = each holdout game's own rank bucket (a fixed-Diamond run is also reported) and `currentPatchIndex` = the patch right before the holdout; the engine predicts each holdout player's win with (a) the full draft and (b) masked drafts (blind pick, enemy lane group only, random partial). Metrics: log-loss, Brier score, calibration error over 10 bins, layer coverage (share of holdout drafts where each D-021 layer fires) and per-layer/per-slot ablation, against 0.5 and champion-baseline-only. Gate: an `engine/config.ts` parameter change is accepted only if a paired bootstrap (config `bootstrapResamples`, default 1000) with resampling unit `bootstrapUnit` (`match` default, `player` option — the same player appears in many matches, so match-level resampling can understate variance; the report includes both) shows no significant regression in holdout log-loss beyond `logLossTolerance` (config) AND the model stays significantly better than baseline-only. For runes/items the backtest checks calibration of the shrunk context win rates on holdout purchases (T-027.b). Reports go to `data/reports/backtest-<myRole>-<phase>-<timestamp>.json` (gitignored) and are linked in the PR.
@@ -167,7 +167,7 @@ Owner decision 2026-10-29.
 
 Owner decision 2026-10-29.
 
-### D-024 — Champion pool: personal pool list plus an always-visible, paginated overall list — ACCEPTED
+### D-024 — Champion pool: personal pool list plus an always-visible, paginated overall list — ACCEPTED, amended by D-101
 
 - Context: Owner request. A player knows a few champions well. The tool should (1) show the best picks among _those_ champions for the current draft and (2) always show the best picks overall, so the player can also learn a new champion. SPECS §2 only had an optional `pool` "filter" and T-033 a vague "second list"; a hard filter would hide the "learn something new" case, and it was undefined whether the pool changes scores or widens the candidate set.
 - Decision:
@@ -318,7 +318,7 @@ Owner decision 2026-11-04.
 
 _Note: D-037..D-042 were never assigned; numbering resumes at D-043._
 
-### D-043 — Patch index from Data Dragon versions.json — ACCEPTED
+### D-043 — Patch index from Data Dragon versions.json — ACCEPTED, amended by D-108
 
 - Context: SPECS §12 requires a `patches(patch_index, version_label, released_at)` table. `matches.patch` is TEXT `major.minor` (RIOT_API.md). Data Dragon `versions.json` lists versions newest-first; hotfixes share a `major.minor` label.
 - Decision:
@@ -360,7 +360,7 @@ Owner decision 2026-11-04.
 
 Owner decision 2026-11-04: keep 20 patches by default, with manual pruning still possible after a major game rework.
 
-### D-045 — Weight formula — ACCEPTED
+### D-045 — Weight formula — ACCEPTED, amended by D-102
 
 - Context: SPECS §14 needs one weight formula combining rank kernel, reliability, recency, and change weight. Two decays (0.85 in section 3, 0.7 in the PR) conflict; keep one: `decay = 0.85`.
 - Decision:
@@ -567,7 +567,7 @@ Owner decision 2026-11-07.
 
 Owner decision 2026-11-08.
 
-### D-057 — Scheduled ETL refresh in GitHub Actions with DB state on an orphan branch — ACCEPTED
+### D-057 — Scheduled ETL refresh in GitHub Actions with DB state on an orphan branch — SUPERSEDED by D-078
 
 - Context: the owner obtained a Riot **personal key** (no expiry) and wants the pipeline to refresh the database every 12h, persist the ~265 MB SQLite between runs, and auto-publish `data/public` exports. Constraints: the DB is gitignored and >100 MB (GitHub's per-file limit) uncompressed; the deployed site serves only committed `data/public` JSON; ingestion must stay resumable and bounded under the 6h job limit.
 - Decision:
@@ -594,6 +594,8 @@ Owner decision 2026-11-08.
 
 Update (2026-11-07, D-079): deploy.yml is retired; the main-only guard stays.
 
+Owner confirmation (2026-11-15, owner review of the DECISIONS_AMENDMENTS status table): the assumptions marked PROPOSED in this entry are confirmed by the owner.
+
 Owner decision 2026-11-07.
 
 Owner decision 2026-11-08.
@@ -613,6 +615,8 @@ Owner decision 2026-11-08.
 - Consequences: T-041 (runes UI) consumes `RuneRecommendationResult` as-is; T-027.b calibrates `kRune`/`topPages` through the D-023 gate.
 
 Note: kRune = 40 and topPages = 3 are priors; calibrated in T-027.b through the D-023 gate.
+
+Owner confirmation (2026-11-15, owner review of the DECISIONS_AMENDMENTS status table): the assumptions marked PROPOSED in this entry are confirmed by the owner.
 
 Owner decision 2026-11-07.
 
@@ -698,7 +702,7 @@ Owner decision 2026-11-08.
 - Alternatives: (a) hide insufficient entries — rejected, hides information the user needs; (b) lower thresholds — rejected until real profile volumes are known; revisit with data.
 - Consequences: shared result schemas carry the insufficient-data fields; UI renders badges per SPECS §18.
 
-### D-067 — Personalization ships as static data only: no login, no server, no sessions — ACCEPTED
+### D-067 — Personalization ships as static data only: no login, no server, no sessions — ACCEPTED, amended by D-096
 
 - Context: the deployment target is GitHub Pages, which serves only static files. An earlier planning pass assumed per-user profiles synced on demand (`user-sync`, D-062) with a possible selector; the owner has now fixed the model: the app is public, there is NO login and NO server, and only the pipeline ever talks to Riot. This supersedes the delivery side of D-062 and the storage side of D-063 (both marked SUPERSEDED).
 - Decision:
@@ -714,7 +718,7 @@ Owner decision 2026-11-07.
 
 Owner decision 2026-11-08.
 
-### D-068 — Profile configuration is declarative and committed; only configured profiles are synced — ACCEPTED
+### D-068 — Profile configuration is declarative and committed; only configured profiles are synced — ACCEPTED, amended by D-096
 
 - Context: with no login (D-067) the set of personalized profiles must be fixed in the repository. The owner wants `KiriToc#Toc` on `EUW1` as the default and only entry for now, but the structure must allow adding more configured profiles later without code changes. Visitors can never add a profile.
 - Decision:
@@ -730,7 +734,7 @@ Owner decision 2026-11-07.
 
 Owner decision 2026-11-08.
 
-### D-069 — Profile exports are public, minimal and anonymized; a build check blocks key leaks — ACCEPTED
+### D-069 — Profile exports are public, minimal and anonymized; a build check blocks key leaks — ACCEPTED, amended by D-096
 
 - Context: the profile owner (the repository owner) accepts publishing their own stats. But `profile_games` rows sit next to other players' data, and a careless export could leak other Riot IDs, puuids or match ids, or the API key itself.
 - Decision:
@@ -747,7 +751,7 @@ Owner decision 2026-11-07.
 
 Owner decision 2026-11-08.
 
-### D-070 — Profile sync runs inside the existing scheduled pipeline and reuses the `etl-db` state branch — ACCEPTED
+### D-070 — Profile sync runs inside the existing scheduled pipeline and reuses the `etl-db` state branch — SUPERSEDED by D-078
 
 - Context: the profile tables live in the same SQLite database the scheduled ETL already persists on the orphan branch `etl-db` (D-057). A separate workflow would duplicate the restore/upload machinery; folding `profile-sync` into `etl.yml` reuses it.
 - Decision:
@@ -777,11 +781,13 @@ Owner decision 2026-11-08.
 
 Note: the Riot terms for a personal key are still to verify. A private, local-only tool lowers the risk but does not remove the need to check.
 
+Update (2026-11-15, D-091): the production-key question in point 2 is resolved — the owner registered DraftOrb as a personal product on the Riot Developer Portal, so the personal key is the pipeline key (D-094 keeps the scheduled cron).
+
 Owner decision 2026-11-07.
 
 Owner decision 2026-11-08.
 
-### D-072 — The personalized list is labeled with the profile label, never "For you" — ACCEPTED
+### D-072 — The personalized list is labeled with the profile label, never "For you" — ACCEPTED, amended by D-100
 
 - Context: D-061 introduced a third list named "For you" fed by a `UserProfile` the visitor supposedly owns. Under D-067/D-068 the data belongs to a configured profile (`KiriToc#Toc`), not the visitor; "For you" would be misleading.
 - Decision:
@@ -796,7 +802,7 @@ Owner decision 2026-11-07.
 
 Owner decision 2026-11-08.
 
-### D-073 — Profile statistics: recency weighting, shrinkage, fallback hierarchy, trust blend — ACCEPTED
+### D-073 — Profile statistics: recency weighting, shrinkage, fallback hierarchy, trust blend — ACCEPTED, amended by D-097
 
 - Context: same statistical need as D-064, but the subject is the configured profile's Support games (phase 1), not "the user's" games. Constants are priors in engine config, tunable later; there is still no personalization backtest (open question).
 - Decision (carried over from D-064 with profile semantics):
@@ -815,7 +821,7 @@ Owner decision 2026-11-07.
 
 Owner decision 2026-11-08.
 
-### D-074 — Favorites are computed by the pipeline; visitors import them into their browser pool — ACCEPTED
+### D-074 — Favorites are computed by the pipeline; visitors import them into their browser pool — ACCEPTED, amended by D-096, D-097
 
 - Context: the owner wants favorites derived from the profile's real history, importable into each visitor's own pool, plus a display toggle — all without touching `score(c)` (D-024 invariant).
 - Decision:
@@ -893,7 +899,7 @@ Owner decision 2026-11-07.
 
 Owner decision 2026-11-08.
 
-### D-079 — Local-only app: no hosting, no deploy workflow — ACCEPTED
+### D-079 — Local-only app: no hosting, no deploy workflow — ACCEPTED, amended by D-099
 
 - Context: the owner wants the app private and only needs the database refreshed automatically. GitHub Pages on the free plan requires a public repo; Cloudflare Access requires payment details even on its free plan.
 - Decision:
@@ -946,13 +952,6 @@ Owner decision 2026-11-08.
   7. `lane_key` is the empty string outside the `lane` phase (column is `NOT NULL`); the export maps `''` to an absent `laneKey`, never a sentinel.
 - Alternatives: store per-purchase enemy profile at ingestion (rejected — needs new `item_events` columns and a second timeline pass; the approximation is cheaper and revisit-able); unweighted enemy damage mix like rune contexts (rejected — D-022 explicitly says threat-weighted); per-backoff-level lane rows (rejected — schema has no level column and rows are additive across `lane_key`).
 - Consequences: `item_slot = 0` contexts contain starting-item purchases (Doran's, World Atlas, early components); quest reward items never appear as completed items. All thresholds are priors calibrated only by the D-023 gate. T-056 must reproduce `lane_key`/`profile_key`/`state_bucket`/`time_bucket` with the same engine helpers (`item-context.ts`) or lookups will miss.
-
-### Template
-
-```
-### D-xxx — Title — STATUS
-Context / Decision / Alternatives / Consequences
-```
 
 Update (Phase B, D-083..D-087): clause .1 amended (generated taxonomy +
 path rows), .2 kept, .3 superseded (at-purchase threat via kill_events +
@@ -1057,7 +1056,7 @@ Results are in-sample for patch selection — confirm with
 `pairMainEffectAdjust` are deliberately outside the grid. Update:
 `packages/etl/src/commands/{tune-priors,backtest}.ts`, `cli.ts`.
 
-### D-091 — Local-first ETL: schedule disabled, exports + periodic DB backups — ACCEPTED (owner, 2026-11-12)
+### D-091 — Local-first ETL: schedule disabled, exports + periodic DB backups — ACCEPTED (owner, 2026-11-12), amended by D-094
 
 Owner decision: DraftOrb is registered on the Riot Developer Portal as a
 personal product (resolves the Phase 0 UNVERIFIED item). The scheduled
@@ -1199,3 +1198,64 @@ Decisions:
 Open: exact `enemy_threat`/`ally_need` rule tables, whether subject-side
 (support archetype) pooling beats lane-side at current n, interaction
 terms (enemy engage x immobile ally) — all resolved by the log-loss gate.
+
+### D-096 — Product audience: one player, shareable code — ACCEPTED (owner, 2026-11-15)
+
+The tool is for one player (KiriToc, Diamond, EUW1). The code may be shared; the player's profile and pool stay local. Shared aggregate statistics contain no PUUIDs and may be published; profile data stays private. PUUIDs are encrypted per API key (D-060), so another user cannot reuse this database and needs their own key for profile sync. Amends D-067, D-068, D-069, D-074 (remove the "public app" and "visitor" premise).
+
+### D-097 — Role scope: Support, Top, Jungle in full; ADC and Mid minimal — ACCEPTED (owner, 2026-11-15)
+
+Usage is about 70% Support, 29.5% Top/Jungle, 0.5% ADC/Mid. Supersedes D-005. Amends D-023 (backtest runs for SUPPORT, TOP, JUNGLE), D-073 and D-074 (profile scope is no longer Support-only). ADC and Mid get champion-level statistics only until a later decision.
+
+### D-098 — Restart the code, keep the data pipeline — ACCEPTED (owner, 2026-11-15)
+
+Restart the engine and app from GOALS.md. Keep the SQLite database and the scheduled pipeline (D-003, D-094). A time-boxed audit judges existing modules by interface (database schema, export formats) as keep / rewrite / delete. The implementation language is decided after the audit. Amends D-001 ("TypeScript everywhere" no longer binding for the desktop shell). No PROPOSED decision is implemented before owner approval.
+
+### D-099 — Windows 11 desktop program; data fetched online at launch — ACCEPTED (owner, 2026-11-15)
+
+The app is a light, fast-starting Windows 11 program that may be compiled locally. It downloads the latest data at launch. Supersedes the "static site / local dev server" parts of D-002 and D-079 (the no-hosting rule stands). Recommended data location (open, pending the first ticket): shared aggregates as a public release asset (no token needed), profile data private. Note: `pnpm etl pull` currently relies on the GitHub CLI and a private repo (D-079).
+
+### D-100 — Build order and version 1 — ACCEPTED (owner, 2026-11-15)
+
+Priority order: (1) champion pick screen, (2) runes and summoners with starters, (3) in-game items with auto-fill. Version 1 is the pick screen with an "Unvalidated model" label (D-023). The player's own record appears as a badge on each champion card; the blended "my results" ranking moves to version 2. Amends D-072 (the third list "KiriToc's picks" is not in version 1).
+
+### D-101 — Pool: per role, champion x roles, highlight only — ACCEPTED (owner, 2026-11-15)
+
+The pool editor lets the player pick a champion once and tick the roles it applies to. Pool champions are highlighted, never filtered or boosted; "From your pool" stays above "Best overall" with "In pool" tags and both ranks. The pool is stored by the program, not browser localStorage. Amends D-024; D-053 (champion portraits next to names) stands.
+
+### D-102 — Evidence rule for runes, summoners and items — ACCEPTED (owner, 2026-11-15)
+
+Keep the expert filter (D-022). Add a per-player cap on each player's weight within a context and a minimum number of distinct players behind any number. Show win rate and pick share separately. "Master+ only" is an optional toggle, off by default. Collect extra data for the champion-role pairs in the player's pool (pool-driven collection); the draft ranking keeps using broad data. Values for the cap and minimum are set by the backtest. Amends D-021, D-022, D-045.
+
+### D-103 — Thin-data fallback — ACCEPTED (owner, 2026-11-15)
+
+When data is too thin: picks and runes show a broader statistic (for example the champion's win rate in that role), clearly labeled; items show a rule-based suggestion (D-093 analytic fallback), clearly labeled as a rule. D-054 stands. D-087 measured a median of 2 games per champion-and-slot cell for items.
+
+### D-104 — Enemy roles and "safe" pick — ACCEPTED (owner, 2026-11-15)
+
+Enemy champions are entered without roles; the tool infers roles with a confidence and the player can override (SPECS §4; D-050 stands). "Safe" means: counter the known opponent; with no opponent known, a pick that is hard to counter (D-030 blind safety).
+
+### D-105 — Auto-fill from the game client — ACCEPTED (owner, 2026-11-15)
+
+Draft and in-game data are read from the LCU and the Live Client Data API. Screenshot import is dropped from the plan and kept only as a fallback if client access is not allowed or does not work (D-007 stands). First ticket of the live phase: read Riot's policy on in-game advice tools and record the result in DECISIONS.md. Gold is not exposed for other players, so win/lose/even is an estimate; the threat score (D-081) uses kills, deaths, assists and items.
+
+### D-106 — Bans and item slots — ACCEPTED (owner, 2026-11-15)
+
+Bans come from the draft screen. Version 1 has a manual bans input; banned champions are excluded from recommendations and from enemy role assignment. Since patch 26.1 the ADC role quest moves boots into a separate seventh slot (6 items plus boots); mid gets free tier 3 boots; Support gets a role-quest slot for up to 2 Control Wards. Build display rule: up to 6 inventory items including boots, and ADC gets boots as a seventh slot after the quest. D-082 and D-083 (item slots, quest items) must be extended to these role quests. Top's quest upgrades Teleport; check the effect on summoner advice in the runes and summoners phase.
+
+### D-107 — Look and feel — ACCEPTED (owner, 2026-11-15)
+
+Visual direction C (light, clean, large targets) with a light/dark toggle that remembers the last choice. Assumption: the first launch follows the Windows theme. The style canvas lives at the artifact link shared in the interview.
+
+### D-108 — Patch naming — ACCEPTED (owner, 2026-11-15)
+
+The interface shows the public patch name (for example 26.22). Internal data keeps Riot's data label (for example 16.22) as `major.minor`. The mapping appears to add 10 to the major number; this is unverified and needs a check against Data Dragon before it is coded. Amends D-043.
+
+### D-109 — Handling of the 14 PROPOSED decisions — ACCEPTED (owner, 2026-11-15)
+
+None is auto-approved; each needs an explicit owner OK when its phase starts.
+
+- Items and live game, kept as design direction: D-081, D-083, D-084, D-085, D-086, D-093.
+- Fold into the items rewrite: D-082, D-087, D-095.
+- Version 2: D-089.
+- Draft-model experiments, used only by the backtest until validated: D-088, D-090, D-092, D-092a.

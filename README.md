@@ -1,6 +1,6 @@
 # DraftOrb
 
-Free League of Legends draft & itemization assistant. Phase 1: **Support / Diamond**.
+Personal League of Legends draft & itemization companion for Windows 11 (one player: Diamond, EUW). Roles: **Support, Top, Jungle** in full; ADC and Mid minimal. See `docs/GOALS.md`.
 
 - Draft: recommends a champion (and runes) from any partial draft (blind pick, unknown roles).
 - In-game: recommends items based on game state (winning/losing) and who is fed.

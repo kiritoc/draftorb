@@ -1,5 +1,7 @@
 # TICKETS
 
+> **OBSOLETE: superseded by docs/GOALS.md and DECISIONS.md D-096..D-109. Do not follow.** Kept for history; the Stage-2 backlog replaces it.
+
 Format: `ID | Title | Deps | Status | Acceptance`. Status: TODO, DOING, REVIEW, DONE, BLOCKED, CANCELLED. Only one ticket DOING per AI session. Size: S (<1h), M (half day), L (1 day). When a ticket is too big, split it and add sub-tickets (T-xxx.a).
 
 ## E0 Foundations

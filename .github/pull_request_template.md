@@ -4,7 +4,7 @@
 
 Closes #___
 
-<!-- The issue title must start with the ticket id (B-xxx). Copy the acceptance criteria from the issue into the checklist below and tick each one with evidence (command, test, screenshot). -->
+<!-- The issue title must start with the ticket id (BL-xxx). Copy the acceptance criteria from the issue into the checklist below and tick each one with evidence (command, test, screenshot). -->
 
 ## Verified / Not verified
 
@@ -26,7 +26,7 @@ Needed: yes/no
 
 ## Checklist
 
-- [ ] PR title starts with the ticket id (B-xxx) and the body links the issue with `Closes #n` (one task = one PR)
+- [ ] PR title starts with the ticket id (BL-xxx) and the body links the issue with `Closes #n` (one task = one PR)
 - [ ] Acceptance criteria of the linked issue are copied above and each one is ticked with evidence (command, test, screenshot)
 - [ ] Tests added/updated and `pnpm check` is green (typecheck + lint + format + tests)
 - [ ] Works on Windows 11 (paths, scripts, shell-specific behavior)

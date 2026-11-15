@@ -1,14 +1,14 @@
 name: Ticket
-description: A rework ticket (B-xxx). One ticket = one PR.
-title: 'B-xxx — '
+description: A rework ticket (BL-xxx). One ticket = one PR.
+title: 'BL-xxx — '
 labels: ['ticket']
 body:
   - type: input
     id: ticket-id
     attributes:
       label: Ticket ID
-      description: B-xxx — must also be at the start of the issue title.
-      placeholder: B-000
+      description: BL-xxx — must also be at the start of the issue title.
+      placeholder: BL-000
     validations:
       required: true
   - type: textarea

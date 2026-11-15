@@ -2,6 +2,8 @@
 
 Status: PROPOSED (made by AI, awaiting owner) / ACCEPTED / SUPERSEDED. Newest at bottom.
 
+> Ticket IDs (`T-xxx`) refer to the retired Stage-1 backlog (`docs/TICKETS.md`, deleted 2026-11-15); full ticket text: history: see git log (`git log --follow -- docs/TICKETS.md`). Current scope and backlog: `docs/GOALS.md`.
+
 ### D-001 — TypeScript everywhere — ACCEPTED, amended by D-098
 
 Single language for ETL, engine, web, desktop, vision (opencv.js/tesseract.js/onnxruntime). Best fit for vibe coding and Windows setup (Node only). Java rejected despite owner expertise (would need 2 languages).
@@ -191,7 +193,7 @@ Owner decision 2026-10-29.
 - Alternatives:
   - Make Node 20 work by pinning an older `better-sqlite3` to a version with Node 20 prebuilt binaries — rejected by policy [B]; the owner requires Node 22.
   - Support both Node 20 and 22 — rejected by policy [B]; not pursued.
-- Consequences: Node 20 is no longer a supported runtime. Developers and CI must use Node 22. `better-sqlite3` 13.0.3 remains pinned in `packages/etl/package.json` (it already satisfies the Node 22 requirement). The `Node version policy` open question in PROGRESS.md is resolved.
+- Consequences: Node 20 is no longer a supported runtime. Developers and CI must use Node 22. `better-sqlite3` 13.0.3 remains pinned in `packages/etl/package.json` (it already satisfies the Node 22 requirement). The `Node version policy` open question in the retired PROGRESS.md (git history) is resolved.
 
 ### D-027 — B-011 resolution: n semantics, apex bucket name, role-prob sparsity — ACCEPTED (owner decision)
 
@@ -282,7 +284,7 @@ Owner decision 2026-10-31.
 
 ### D-034 — Champion roles derived from role-prob data, `champions.json.roles` kept — ACCEPTED
 
-- Context: `TICKETS.md` T-015.b says "replace the Data Dragon champion-tag bootstrap roles with roles derived from `role-prob.json`; remove `champions.json.roles`." However `championSchema.roles` is required (SPECS/shared), `champions.json` is documented as `id, name, icon, roles` in `DATA_MODEL.md`, and the tag-coverage validation (`packages/etl/src/tags.ts`) reads `champion.roles`. `role-prob.json` itself is not produced until T-019, so T-015.b can only derive roles from the SQLite `role_prob` table produced by T-015.
+- Context: the T-015.b ticket (retired backlog, history: see git log) said "replace the Data Dragon champion-tag bootstrap roles with roles derived from `role-prob.json`; remove `champions.json.roles`." However `championSchema.roles` is required (SPECS/shared), `champions.json` is documented as `id, name, icon, roles` in `DATA_MODEL.md`, and the tag-coverage validation (`packages/etl/src/tags.ts`) reads `champion.roles`. `role-prob.json` itself is not produced until T-019, so T-015.b can only derive roles from the SQLite `role_prob` table produced by T-015.
 - Assumption (T-015.b): keep `champions.json.roles` as a required field, but replace its source where observed data exists: roles are derived from `role_prob` (roles with observed probability, canonical order), falling back to the Data Dragon tag bootstrap for champions without role-prob data. Add a pure, tested `deriveChampionRoles` function and a `derive-roles` ETL command that rewrites `champions.json.roles` from `role_prob`. The Data Dragon tag mapping stays as the fallback and remains covered by its existing tests.
 - Alternatives: remove `roles` from `champions.json` and the shared schema. Rejected: breaks the shared contract, DATA_MODEL.md, and tag coverage; `role-prob.json` is a separate file that does not yet exist.
 - Consequences: `transformChampions` gains an optional `roleProbabilities` parameter (tag fallback when absent, backward compatible). `champions.json.roles` now reflects observed probabilities once `pnpm etl derive-roles` runs after `pnpm etl aggregate`. Only roles with probability >= `roleProbThreshold` (default 0.05) are kept, and a champion always keeps at least its highest-probability role (B-046).
@@ -401,8 +403,8 @@ Owner decision 2026-11-04.
   - Bands (half-open): [0, 0.1) x1.0; [0.1, 0.3) x0.9; [0.3, 0.6) x0.5; [0.6, 1] creates `suggested` breakpoint (source `auto`, mode `downweight`, `weight_factor` 0.2). While a suggestion is pending or after rejection: effective weight = [0.3, 0.6) band weight (x0.5), never 1.0 (F18).
   - Fallback: missing/unreadable/incomplete source, or no previous patch with data -> `change_score = NULL`, weight 1.0, warning logged (first patch: NULL, no warning). Stated once in SPECS §15; all other sections reference it. Never invent a score, never block the pipeline.
   - Fixtures (arithmetic shown in SPECS §15): cooldown scalar 10->9 = 0.05 ([0,0.1) x1.0); armor 30->36 (0.1) + cooldown 10->9 (0.05) = 0.15 ([0.1,0.3) x0.9); damage array [10,9,8,7,6]->[9,8,7,6,5] ≈ 0.065 ([0,0.1) x1.0); AP ratio 0.5->0.55 = 0.05; ability replaced = 0.6 ([0.6,1] suggested); identical = 0; skin/VFX-only change = 0; ARAM-only item = 0.
-  - Verification update (2026-11-04, prototype on 16.20 -> 16.21 and 16.21 -> 16.22; results in SPECS §15 and PROGRESS.md). The algorithm above is refined as follows (normative text in SPECS §15): champions limited to the Data Dragon catalog (drops `Jade_*` game-mode variants) and items to `maps["11"]`; all entry paths and field names compared in FNV-1a hashed form (CommunityDragon resolves hashed names over time); `DataValues`/`mDataValues` keyed by name (position keys created false changes when values were inserted); a change repeated inside one entity counts once; the 0.6 structural weight applies to root spells only (child missiles were false positives); perk per-mode overrides ignored; a score for the still-live patch is provisional because folders change during the patch (hotfixes) and are final once the next patch is out. Remaining false-positive class: internal data refactors with the same in-game effect, handled by rejecting the suggested breakpoint.
-  - Sequencing: manual breakpoints (T-019.e) ship before automatic scores (T-019.d). T-019.d starts with a verification step on two real consecutive patches: every champion and item change listed in the official patch notes must get a non-zero score, unchanged entities must score 0, and the list of misses and false positives is recorded in PROGRESS.md before the allowlist is frozen. Whether change weighting is turned on at all is decided by the backtest (D-023, T-027.a); it stays off (`changeWeightEnabled = false`) otherwise.
+  - Verification update (2026-11-04, prototype on 16.20 -> 16.21 and 16.21 -> 16.22; results in SPECS §15 and the retired PROGRESS.md, git history). The algorithm above is refined as follows (normative text in SPECS §15): champions limited to the Data Dragon catalog (drops `Jade_*` game-mode variants) and items to `maps["11"]`; all entry paths and field names compared in FNV-1a hashed form (CommunityDragon resolves hashed names over time); `DataValues`/`mDataValues` keyed by name (position keys created false changes when values were inserted); a change repeated inside one entity counts once; the 0.6 structural weight applies to root spells only (child missiles were false positives); perk per-mode overrides ignored; a score for the still-live patch is provisional because folders change during the patch (hotfixes) and are final once the next patch is out. Remaining false-positive class: internal data refactors with the same in-game effect, handled by rejecting the suggested breakpoint.
+  - Sequencing: manual breakpoints (T-019.e) ship before automatic scores (T-019.d). T-019.d starts with a verification step on two real consecutive patches: every champion and item change listed in the official patch notes must get a non-zero score, unchanged entities must score 0, and the list of misses and false positives is recorded (was tracked in the retired PROGRESS.md, git history) before the allowlist is frozen. Whether change weighting is turned on at all is decided by the backtest (D-023, T-027.a); it stays off (`changeWeightEnabled = false`) otherwise.
 - Alternatives:
   - Data Dragon as the source — rejected: no ability values, so most champion changes are invisible.
   - Ignore-list over whole files — rejected: game files are dominated by skin/VFX entries (65 entries in Ahri's file), so almost every patch would look changed.
@@ -654,7 +656,7 @@ Owner decision 2026-11-08.
   2. A second step of the same command (or `pnpm etl user-export`) writes one JSON file per profile (`data/users/<puuid>.json`) validated by a zod schema in `packages/shared`, plus recomputes favorites (D-065). The web app only loads these files; the engine receives the profile as a plain data object (golden rule 3).
   3. New SQLite tables `user_profiles`, `user_games`, `user_mastery` (DATA_MODEL.md); resumable like `matches` (D-018 pattern: a per-profile `last_game_creation` cursor).
   4. No new dependencies: `fetch`, `better-sqlite3` and zod are already used.
-- Assumptions (PROPOSED, open for owner): (a) queue 420 only, consistent with the main ingestion; other queues are a later option; (b) the match timeline is fetched for synced matches to get the item build order (~1 extra request per game — acceptable for a manual command, flagged as an open question in PROGRESS.md); (c) mastery uses `champion-masteries/by-puuid/{puuid}/top?count=200`.
+- Assumptions (PROPOSED, open for owner): (a) queue 420 only, consistent with the main ingestion; other queues are a later option; (b) the match timeline is fetched for synced matches to get the item build order (~1 extra request per game — acceptable for a manual command, flagged as an open question in the retired PROGRESS.md, git history); (c) mastery uses `champion-masteries/by-puuid/{puuid}/top?count=200`.
 - Alternatives: (a) browser-side fetch with a user-supplied key — rejected, puts a secret in the browser and burns the personal key's rate limit; (b) LCU/Live Client API for own stats — deferred to E6/E7 and only covers the current game, not history; (c) third-party stats sites — forbidden (golden rule 1).
 - Consequences: new shared schemas, new ETL tables/command, new RIOT_API.md endpoints; rate-limit cost is manual and bounded (~2-3 requests per game). The profile selector can only list profiles that were synced — adding a Riot ID requires running `user-sync` (documented limitation).
 
@@ -679,7 +681,7 @@ Owner decision 2026-11-08.
   5. **Trust blend**: `trust = (n_eff * levelFactor) / (n_eff * levelFactor + K_TRUST)`, `K_TRUST = 20`. `metaNorm(c)` is rank-normalized over the complete overall list: `1 - (rank - 1) / (N - 1)` for N > 1 (1 for N = 1) — chosen because `score(c) = sigmoid(x)` clusters near 0.5 and its absolute scale is uncalibrated, while rank position is stable. `personalScore(c)` = the shrunk personal win rate (fraction). `personalizedScore(c) = (1 - trust) * metaNorm(c) + trust * personalScore(c)`. "For you" sorts by `personalizedScore` desc, tie-break overall `rank`.
   6. **Reason badge** per entry: personal WR %, effective games at the matched level, the fallback level used, and `+d vs meta` where `d = round(100 * (p - score(c)))` percentage points against the champion's unchanged meta `score(c)`.
 - Alternatives: (a) min-max normalize `score(c)` — rejected, sensitive to outlier candidates; (b) fixed trust regardless of sample — rejected, a 1-game fluke would dominate; (c) shrink toward the population win rate — rejected, the point is the user's own skill; (d) log-odds blending — rejected, the personal term is a rate estimate, not a matchup logit term.
-- Consequences: new pure engine module + `PersonalConfig`; golden tests pin the arithmetic (TESTING.md); constants are priors pending a personalization backtest (open question, PROGRESS.md).
+- Consequences: new pure engine module + `PersonalConfig`; golden tests pin the arithmetic (TESTING.md); constants are priors pending a personalization backtest (open question tracked in the retired PROGRESS.md, git history).
 
 ### D-065 — Favorites definition and include/only/hide semantics — SUPERSEDED by D-074
 
@@ -1144,7 +1146,8 @@ list, excluding picks. `lane:` keys need role-tagged draft context
 (`ItemLaneContext`) because `GameState` carries no roles — the UI/draft
 layer supplies it; absent, lane levels are simply skipped. Remaining
 T-125 scope: W(state) win-probability model, quest-reward/path handling,
-starter bundles, build plans, modes — tracked in TICKETS.
+starter bundles, build plans, modes — the retired ticket backlog
+(`docs/TICKETS.md`) is in git history; current scope per GOALS.md.
 
 ### D-094 — Public repo + scheduled ETL cron — ACCEPTED (owner, 2026-11-13)
 

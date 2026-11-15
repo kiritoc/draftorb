@@ -457,7 +457,7 @@ Review notes that predate the bug log live in [Review history](#review-history) 
 ### B-011 — Shared reason and rank-bucket schemas diverge from SPECS §3/§7 (T-002.b scope expanded to include them) — FIXED
 
 - Severity / Area: S2 / shared
-- Steps to reproduce: compare `reasonSchema`, `manifestSchema.rankBuckets` and `supportPairEntrySchema` in `packages/shared/src/index.ts` with SPECS §3 and §7, then with the T-002.b scope in TICKETS.md.
+- Steps to reproduce: compare `reasonSchema`, `manifestSchema.rankBuckets` and `supportPairEntrySchema` in `packages/shared/src/index.ts` with SPECS §3 and §7, then with the T-002.b ticket scope (retired backlog, history: see git log).
 - Expected / Actual:
   - SPECS §7: `Reason.with` should be `ChampionId[]` (a `lane` reason references the lane-group champions, two for `lane_vs` and three for `lane_full`) and `Reason.lowData: boolean` should be present; the schema has a single optional `with: ChampionId` and no `lowData`.
   - SPECS §3: rank buckets merge MASTER, GRANDMASTER and CHALLENGER into one bucket; `rankBuckets` and the pair-entry bucket use the 10-value `rankSchema` instead of the 8 buckets.

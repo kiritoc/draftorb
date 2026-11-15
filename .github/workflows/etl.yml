@@ -51,7 +51,9 @@ env:
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 300
+    # 6h: backlog catch-up runs exceeded the old 5h cap once (B-070); a
+    # timeout cancel must never reach the snapshot step with a live writer.
+    timeout-minutes: 360
     steps:
       # The pipeline mutates the shared state released from this workflow; a
       # manual run on another branch would publish state the owner did not
@@ -177,6 +179,7 @@ jobs:
       # Order per D-078: wal_checkpoint(TRUNCATE) -> integrity_check must be
       # "ok" (otherwise nothing is uploaded) -> VACUUM -> gzip.
       - name: Compact and check database
+        id: compact
         if: always()
         run: |
           set -e
@@ -189,7 +192,11 @@ jobs:
             const Database = require("better-sqlite3");
             const db = new Database(process.env.DRAFTORB_DB_PATH);
             db.pragma("busy_timeout = 30000");
-            db.pragma("wal_checkpoint(TRUNCATE)");
+            const ckpt = db.pragma("wal_checkpoint(TRUNCATE)");
+            if (ckpt.length === 1 && ckpt[0].busy) {
+              console.error("wal_checkpoint(TRUNCATE) stayed busy");
+              process.exit(4);
+            }
             const rows = db.pragma("integrity_check");
             const ok = rows.length === 1 && rows[0].integrity_check === "ok";
             if (!ok) {
@@ -199,14 +206,38 @@ jobs:
             db.exec("VACUUM");
             db.close();
           '
-          gzip -9 -n -c "$DRAFTORB_DB_PATH" > "$RUNNER_TEMP/$DB_FILE"
+          # A cancelled pipeline step can leave a writer process alive past
+          # the cancellation; snapshotting then produces a torn DB (the
+          # corrupt state-20261114T0101Z release, B-070). Wait for any
+          # straggler to release the file, then refuse to proceed if one
+          # is still attached.
+          for _ in $(seq 1 12); do
+            lsof "$DRAFTORB_DB_PATH" >/dev/null 2>&1 || break
+            sleep 5
+          done
+          if lsof "$DRAFTORB_DB_PATH" >/dev/null 2>&1; then
+            echo "::error::Database still held by another process; refusing to snapshot"
+            exit 1
+          fi
+          # gzip warns "file size changed while zipping" (exit 0) when the
+          # file is modified mid-read — treat it as fatal: the upload step
+          # is gated on this step's outcome, so nothing bad is published.
+          if ! gzip -9 -n -c "$DRAFTORB_DB_PATH" > "$RUNNER_TEMP/$DB_FILE" \
+            2> "$RUNNER_TEMP/gzip.log"; then
+            echo "::error::gzip failed:"; cat "$RUNNER_TEMP/gzip.log"; exit 1
+          fi
+          if grep -q "file size changed" "$RUNNER_TEMP/gzip.log"; then
+            echo "::error::Database changed while gzipping; snapshot discarded"
+            exit 1
+          fi
 
       # The DB asset is uploaded even when the pipeline failed (if: always())
       # so partial progress is never lost; the exports asset below is
-      # success-only (D-078 point 3).
+      # success-only (D-078 point 3). It is skipped when the compact step
+      # failed: a failed snapshot must never reach the state repo (B-070).
       - name: Upload database state release
         id: upload
-        if: always()
+        if: always() && steps.compact.outcome == 'success'
         env:
           STATE_REPO_TOKEN: ${{ secrets.STATE_REPO_TOKEN }}
         run: |

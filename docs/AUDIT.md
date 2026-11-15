@@ -2,6 +2,12 @@
 
 Date: 2026-11-15. Scope: read-only audit of the monorepo against `docs/GOALS.md` and the approved decisions D-096..D-109. PROPOSED decisions (D-081..D-095, D-088..D-092a per D-109) were audited as code, not treated as requirements. Nothing in the repo was modified.
 
+> **Corrections (follow-up pass, same date):**
+>
+> - **§5i rewritten.** Champion ids are now resolved by name from `data/public/16.22/champions.json`: Shen=**98**, Nami=**267**, Maokai=**57**, Teemo=**17**. The first pass used wrong ids for Shen/Nami/Maokai (50=Swain, 145=Kai'Sa, 78=Poppy); every affected row was recomputed.
+> - **§5h extended** with a measured `gzip -1` size and a `dbstat` per-table breakdown.
+> - **§5j and §5k added**: Windows readiness checks (CI runner, `better-sqlite3` prebuilds) and the real backtest evidence found in `docs/reports/`.
+
 ## 1. Baseline results
 
 Environment: macOS (Darwin 27), Node v26.12.1, pnpm 12.15.0. The repo declares `engines.node >= 22` and CI runs Node 22; commands were run on Node 26 locally.
@@ -175,28 +181,48 @@ What must change for D-106 (patch 26.1 role quests):
 
 DB exists (see §2.1): 5,671,165,952 bytes (~5.28 GiB), 24,325 matches, 243,250 participants, 19,340 players, 559 rejects, 319 patch labels. Matches span only patches 16.10–16.22 despite a 20-patch retention window — earlier patches were pruned or never ingested (unverified which; `match_rejects` has only 559 rows so most absence is "never ingested", not tombstones).
 
+Compressed size (measured 2026-11-15, read-only stream, no copy): `gzip -1 -c data/DraftOrb.sqlite | wc -c` → **1,005,445,369 bytes (~0.94 GiB / 933 MiB)**. This is **under the 2 GiB GitHub release-asset limit** cited in D-091, so the whole DB could technically ship as one release asset — but it is ~2x the ~475 MiB figure in D-091 (which predates the timeline/challenge/lane-snapshot backfills). Per D-099 only the small `data/public` exports (~9.2 MB uncompressed) need to be public; the DB stays private either way.
+
+Table size dominance (`dbstat`, bytes of pages): `item_events` is the overwhelming majority — table 1,475,960,832 + `idx_item_events_puuid` 1,436,528,640 + autoindex 488,169,472 + `idx_item_events_match_ts` 407,810,048 ≈ **3.81 GB (~72% of the file)**. Next: `rune_ctx` ~627 MB (table + autoindex), `participants` 166 MB, `participant_challenges` 164 MB, `pair_enemy`/`pair_ally` ~104 MB combined, `kill_events` ~115 MB (table + indexes), `lane_snapshots` ~98 MB. Everything else is <60 MB each. Conclusion: the 5.28 GiB is almost entirely timeline item-event data — consistent with `backfill-timelines` having run on 10,633 matches; `entity_change_scores`/`data_breakpoints` are empty.
+
 ### 5i. Habit concentration for pool champions (SUPPORT/TOP/JUNGLE)
 
-Computed read-only over all stored `participants` rows (unweighted counts; champion ids Shen=50, Nami=145, Maokai=78, Teemo=17):
+Champion ids resolved **by name** from `data/public/16.22/champions.json` (`name` field → `id`): **Shen = 98, Nami = 267, Maokai = 57, Teemo = 17**. (Correction: the first pass of this audit queried ids 50/145/78/17, which are Swain/Kai'Sa/Poppy/Teemo — those rows were wrong and are replaced here. Teemo=17 was already correct.) `champions.json` role tags: Shen TOP/JUNGLE/SUPPORT, Maokai TOP/JUNGLE/SUPPORT, Teemo TOP/JUNGLE, Nami SUPPORT only.
+
+Computed read-only over all stored `participants` rows (unweighted counts; `champion_id` × `role` × `puuid`):
 
 | Champ  | Role    | Games | Distinct players | Top-3 players' share |
 | ------ | ------- | ----- | ---------------- | -------------------- |
 | Teemo  | TOP     | 590   | 228              | 37.1%                |
 | Teemo  | JUNGLE  | 113   | 31               | 59.3%                |
 | Teemo  | SUPPORT | 23    | 18               | 34.8%                |
-| Shen   | SUPPORT | 201   | 138              | 12.9%                |
-| Shen   | TOP     | 131   | 82               | 27.5%                |
-| Shen   | JUNGLE  | 0     | —                | —                    |
-| Maokai | SUPPORT | 580   | 329              | 20.3%                |
-| Maokai | TOP     | 163   | 120              | 11.0%                |
-| Maokai | JUNGLE  | 64    | 44               | 26.6%                |
-| Nami   | SUPPORT | 3     | 3                | 100% (n=3)           |
-| Nami   | TOP     | 37    | 32               | 18.9%                |
-| Nami   | JUNGLE  | 17    | 10               | 58.8%                |
+| Shen   | TOP     | 998   | 481              | 12.6%                |
+| Shen   | SUPPORT | 118   | 72               | 28.8%                |
+| Shen   | JUNGLE  | 112   | 70               | 19.6%                |
+| Maokai | TOP     | 83    | 51               | 28.9%                |
+| Maokai | JUNGLE  | 192   | 103              | 18.2%                |
+| Maokai | SUPPORT | 244   | 166              | 11.9%                |
+| Nami   | SUPPORT | 1,966 | 1,103            | 4.7%                 |
 
-Evidence for D-102's per-player cap: several pool-relevant cells are dominated by few players (Teemo/Jungle top-3 = 59.3% of 113 games; Nami/Support 100% of 3 games; Nami/Jungle 58.8% of 17). Even the best-covered cell (Maokai/Support, 580 games / 329 players) has top-3 share 20.3%. Caveat: raw unweighted counts over a Champion+-heavy seed population (players are top-ranked seeds, §5d), so shares measure seed-pool habits, not the general population.
+Nami has **no TOP or JUNGLE rows** (consistent with its SUPPORT-only role tag; participants only store observed role assignments, and Nami was never assigned TOP/JUNGLE in the seed population). No cell has zero games now — unlike the first pass, every queried champion×role pair has data, though Teemo/Support (23 games) remains thin.
 
-## 6. Language comparison for the Windows 11 program
+Evidence for D-102's per-player cap: several pool-relevant cells are dominated by few players — Teemo/Jungle top-3 = 59.3% of 113 games, Teemo/Top 37.1% of 590, Shen/Support 28.8% of 118, Maokai/Top 28.9% of 83. The best-covered cells are healthier: Nami/Support 1,966 games / 1,103 players / top-3 only 4.7%; Shen/Top 998 / 481 / 12.6%. Caveat: raw unweighted counts over a Champion+-heavy seed population (players are top-ranked seeds, §5d), so shares measure seed-pool habits, not the general population; `participants.puuid` is the dedup key used.
+
+### 5j. Windows readiness checks
+
+- **CI Windows runner: yes.** `.github/workflows/ci.yml` `test` job runs `runs-on: ${{ matrix.os }}` with `os: [ubuntu-latest, windows-latest]` on Node 22 — `pnpm install --frozen-lockfile` + `pnpm test` already execute on Windows in CI. The `lint`/`format` jobs and `etl.yml` are ubuntu-only.
+- **`better-sqlite3` Windows prebuilds for Node 22: yes.** Installed version `better-sqlite3@13.0.3` (`packages/etl/package.json:18`, `engines.node >= 22`) ships `prebuilds/win32-x64.node` and `prebuilds/win32-arm64.node` in the published package (verified in `node_modules/.pnpm/better-sqlite3@13.0.3/.../prebuilds/`), alongside linux/darwin variants — no compiler needed on Windows, matching AGENTS.md rule 4.
+- **Unverified on Windows:** (a) whether `pnpm etl` commands actually run end-to-end on Windows (ETL workflow is ubuntu-only; path handling uses `path.join` per convention but no Windows ETL CI exists); (b) `gh` CLI availability/behavior on Windows for `etl pull`/`publish` (§5e); (c) SQLite `immutable=1`/WAL behavior on Windows (the read-only open issue in §2.1 was hit on macOS); (d) the future desktop shell itself — nothing exists yet (`apps/desktop` absent, §3).
+
+### 5k. Real draft backtest evidence
+
+A real backtest **was** produced during the Phase-0 model review (2026-11-12), documented in `docs/reports/model-review-baseline.md` §(c): `pnpm etl backtest draft`, holdout = patch **16.22**, training = **10,379 games** on 11 earlier patches, holdout = **13,946 games**. Results: engine log-loss **0.6967** vs champion-baseline-only **0.6946** (engine _worse_ than baseline), Brier 0.2517 vs 0.2507; SUPPORT per-role log-loss 0.6981; predictions miscalibrated in the tails. The raw report was written to `/tmp/backtest-baseline.json` — **not committed**; only the summary survives in the report.
+
+The committed `data/public/backtest-draft.json` is an **empty placeholder** (`holdoutGames: 0`, all metrics null, `insufficientData: true`) — it does not reflect the real run above.
+
+`data/public/joint-model.json` does contain a `validation` block (evalPatch 16.22; train 10,379 / eval 14,946 matches; joint top1 0.0427, hybrid top1 0.0650 ≈ prior 0.0650) but `status: "unvalidated"` — consistent with §4.2 (D-092 gate failed; nothing consumes it).
+
+## 6. Language comparison
 
 Criteria: startup time, memory, engine reuse (backtest + ETL), Windows setup effort, risk when AI sessions write the code, rework cost. All timings are **estimates**, not measurements.
 
@@ -211,7 +237,7 @@ Criteria: startup time, memory, engine reuse (backtest + ETL), Windows setup eff
 | Data download at launch (D-099) | `fetch` in webview or Rust side; trivial                                                     | `reqwest`; trivial                                                          | `fetch`/Node; trivial                                                               |
 | Free/100% constraint            | All options free; Tauri/Rust and Electron both OSS                                           | Free                                                                        | Free                                                                                |
 
-**Recommendation: A — TypeScript with a Tauri shell.** The engine is pure TS with a strict test suite and the ETL/backtest already run it in Node; Tauri gives a native Windows binary with fast startup and low memory, keeps one language (D-001 spirit, D-098-compliant since the shell language is now open), and minimizes rework. B (full Rust) buys the smallest footprint but forces a port of ~4k lines of engine plus re-validation of the backtest — poor cost/benefit for a single-user tool. C (Electron) reuses everything but is the heaviest option on the exact criteria GOALS.md cares about ("starts in seconds, light on resources"). The owner decides (D-098/D-099 open item).
+**Recommendation: A — TypeScript with a Tauri shell.** The engine is pure TS with a strict test suite and the ETL/backtest already run it in Node; Tauri gives a native Windows binary with fast startup and low memory, keeps one language (D-001 spirit, D-098-compliant since the shell language is now open), and minimizes rework. B (full Rust) buys the smallest footprint but forces a port of ~4k lines of engine plus re-validation of the backtest — poor cost/benefit for a single-user tool. C (Electron) reuses everything but is the heaviest option on the exact criteria GOALS.md cares about ("starts in seconds, light on resources"). The owner decides (D-098/D-099 open item). Windows-specific evidence supporting A: CI already runs the test suite on `windows-latest` (§5j), and `better-sqlite3` ships Node-22 Windows prebuilds — the riskiest native dependency is already covered.
 
 ## 7. Doc hygiene — contradictions and stale statements
 

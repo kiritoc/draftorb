@@ -1,0 +1,57 @@
+# GLOSSARY
+
+Updated 2026-11-15 after the goal interview. Terms marked (new) or (changed) differ from the previous glossary.
+
+- **Draft / champ select**: pick & ban phase.
+- **Blind pick**: picking without seeing enemy picks.
+- **ADC / Bot / Support / Jungle / Mid / Top**: roles (`ADC`, `SUPPORT`, ... in code).
+- **Synergy**: how well two allied champions perform together.
+- **Counter**: matchup advantage vs an enemy champion. **Hard counter** = level 3.
+- **Level 1-3**: strength of a synergy/counter badge (SPECS §5).
+- **Delta (pp)** (changed): winrate difference in percentage points, computed on the log-odds scale after shrinkage. Only the _total_ delta is measured against the baseline; each reason's `deltaPp` is measured against the running prediction before that term was added, so it depends on term order (SPECS §5). The profile badge delta is measured against the rank-bucket baseline (D-080).
+- **Shrinkage**: pulling an estimate toward the baseline when sample is small (Bayesian).
+- **Influence**: weight of another slot (ally/enemy role) for the user's role and game phase (D-020).
+- **Back-off**: falling back from an exact context (the lane group) to broader ones when data is low (D-021). Pair terms are summed (correlated, scaled by `s`); only lane layers chain toward the running prediction.
+- **Effective sample size (n_eff)**: `(sum w)^2 / sum w^2` of weighted games; used for every threshold.
+- **Backtest**: predicting held-out recent games with older data to validate parameters (D-023).
+- **Baseline**: a champion's average winrate in a role/rank bucket.
+- **WPA**: win probability added (Coachless metric).
+- **Rank bucket** (changed): tier group used in data. Eight buckets: IRON, BRONZE, SILVER, GOLD, PLATINUM, EMERALD, DIAMOND, MASTER_PLUS (D-027).
+- **rank_known_count**: number of match participants with known ranks, including the seed player; 1 means only the seed's rank is known (D-019).
+- **Experts rule** (changed): runes, summoners and items use games from players at the user's rank or above who are experts on the champion (at least `minChampGames` in our data, or at least `minMasteryPoints` as a role-limited fallback, D-022). Each player's weight is capped and a minimum number of distinct players is required (D-102). "Master+ only" is an optional toggle, off by default.
+- **Fed**: enemy or ally with disproportionate kills/gold/items (threat score). The player can also mark a champion as fed to force counter or support item advice (D-105).
+- **Threat score**: numeric estimate of how dangerous an enemy is now.
+- **Ahead/even/behind** (changed): game state bucket from gold/kills difference. The interface offers it as three scenarios: win, lose, even.
+- **LCU**: League Client Update local API (champ select, etc.).
+- **Live Client Data API**: official local in-game API on port 2999.
+- **Data Dragon**: Riot's static data CDN (champions, items, runes, icons).
+- **PUUID**: Riot's player id, encrypted per API key (D-060).
+- **Patch** (changed): game version `major.minor`. Two names exist: the public name shown in the interface (for example 26.22) and Riot's data label used internally (for example 16.22). The offset rule is unverified (D-108).
+- **Golden test**: fixed scenario with expected output.
+- **Scale `s`**: global multiplier on summed pair terms, fit on the validation window (D-021, T-027.a).
+- **Equivalent counts**: weighted counts converted before shrinkage (`games_e = n_eff`, `wins_e = wins_w * n_eff / games_w`) so the prior `k` is in raw-game units.
+- **exportMinGames**: minimum `n_eff` for a row to be exported, always `<= minGames`. The default value is unverified in the docs; check the config.
+- **Expert fallback**: champion-mastery-v4 points used for the expert rule only for participants of the recommended role, once per (puuid, champion) pair (D-022).
+- **laneGroup**: per-role config naming the lane champions used by the `lane_vs`/`lane_full` layers (D-021).
+- **Role-generic**: model and tables keyed by `myRole`. Support, Top and Jungle are populated in full; ADC and Mid minimally (D-097).
+- **Champion pool** (changed): the user's personal per-role list of champions they play well, set as champion x roles and stored by the program. It highlights and groups results but never changes scores (D-101).
+- **Overall list**: the complete ranking of all scored candidates (`DraftResult.recommendations`), always shown.
+- **Pool list**: the pool champions of the overall ranking (`poolRecommendations`), shown above the overall list when the pool is non-empty.
+- **recommendationPageSize**: number of items shown first and added by each "Show more" click (default 5, UI config).
+- **Profile** (changed): a configured League account whose match history is synced by the pipeline (`data/profiles.config.json` -> `pnpm etl profile-sync`) and exported as anonymized JSON under `data/public/profiles/` (D-068/D-069). Only configured profiles exist; the default and only one is KiriToc#Toc (EUW1). Profile data stays private.
+- **Profile win rate**: the profile's own recency-weighted win rate on a champion in a given context, shrunk toward the profile's global win rate (D-073).
+- **Shrinkage (profile)**: `p = (wins_w + K_SHRINK * p_profile) / (games_w + K_SHRINK)`, `K_SHRINK = 15`, pulling small samples toward the profile's own global rate.
+- **Trust**: `n_eff * levelFactor / (n_eff * levelFactor + K_TRUST)` (`K_TRUST = 20`), how much the personalized score blends profile vs meta evidence (D-073).
+- **Favorites** (changed): champions derived at export, per role: top 15 by recency-weighted games in that role over 90 days, union top 5 by mastery. They can be imported into the player's pool, with `include`/`only`/`hide` display modes (D-074).
+- **Personal badge** (new): in version 1, a per-champion badge such as "You: 14 games, 64%" shown on a card, with "not enough data" below the minimum sample (D-075, D-100). It never changes the ranking.
+- **Personalized list** (changed): the profile-labeled recommendation list (for example "KiriToc's picks") produced by `personalize`. Planned for version 2; it never changes `score(c)` and is never called "For you" (D-072, D-100).
+- **Pipeline** (changed): the scheduled GitHub Actions ETL (`etl.yml`, every 12 hours, D-094) that restores the SQLite state from the newest `state-*` release of the private state repo, refreshes matches and configured profiles, re-aggregates and publishes the exports. Local runs remain supported (D-091). The desktop program downloads the exports at launch (D-099); `pnpm etl pull` does the same by hand (D-079).
+- **Unvalidated label** (new): visible notice that the draft ranking has not passed the backtest gate (D-023, D-092a, D-100).
+- **Per-player cap** (new): upper limit on how much one player's games count inside a context, so a habit repeated by a few players does not dominate a statistic (D-102).
+- **Distinct players** (new): number of different players behind a statistic; required alongside the game count (D-102).
+- **Pool-driven collection** (new): extra data collection for the champion-role pairs in the player's pool, used for runes and items (D-102).
+- **Broader-statistic fallback** (new): when data is thin, show a wider statistic such as the champion's win rate in that role, labeled (D-103).
+- **Rule fallback** (new): when item data is thin, show a labeled rule-based suggestion instead of a statistic (D-093, D-103).
+- **Starter bundle** (new): the net items bought in the first `starterWindowSeconds` (default 45 s) of the game (D-086).
+- **Role quest** (new): the per-role quest added in patch 26.1. ADC gets a seventh slot for boots; Mid gets free tier 3 boots; Support gets a slot for up to 2 Control Wards; Top's quest upgrades Teleport (D-106).
+- **Companion program** (new): the Windows 11 desktop program that replaces the web page (D-099).

@@ -4,15 +4,17 @@ Goal: any AI (Claude, ChatGPT, Gemini, Cursor, Copilot, local model...) can pick
 
 ## Roles
 
-- **Owner (human)**: chooses priorities, reviews, runs the app, pastes the session prompt (`PROMPTS.md`).
+- **Owner (human)**: chooses priorities, reviews, runs the app.
 - **AI**: implements ONE ticket per session, keeps docs in sync.
+
+`docs/BACKLOG.md` is the authoritative ticket tracker. GitHub issues are tracking snapshots; if a GitHub project board exists, it is a view only and must not diverge silently from `docs/BACKLOG.md`.
 
 ## Start of session
 
-1. Read `AGENTS.md`, `docs/PROGRESS.md` (latest handoff), then the chosen ticket in `TICKETS.md` and the matching `SPECS.md` section.
+1. Read `AGENTS.md`, `docs/PROGRESS.md` (latest handoff), then the chosen ticket in `docs/BACKLOG.md` and the matching `SPECS.md` section.
 2. Check `docs/BUGS.md` for open bugs related to the area.
 3. Run `pnpm install && pnpm test && pnpm typecheck`. If red BEFORE you start, log it in BUGS.md and tell the owner.
-4. Set ticket status `DOING` (one at a time). Restate the acceptance criteria in your own words.
+4. Set the ticket status to `DOING` in `docs/BACKLOG.md` (one at a time). Restate the acceptance criteria in your own words.
 
 ## During session
 
@@ -30,20 +32,20 @@ Goal: any AI (Claude, ChatGPT, Gemini, Cursor, Copilot, local model...) can pick
 - [ ] Works on Windows (paths, scripts)
 - [ ] No secrets, no generated junk committed
 - [ ] Docs updated if behavior/format changed (SPECS, DATA_MODEL, SETUP...)
-- [ ] TICKETS status set (`REVIEW` if owner must check, else `DONE`)
+- [ ] `docs/BACKLOG.md` status set (`REVIEW` if owner must check, else `DONE`; `BLOCKED` when waiting on owner input)
 - [ ] PROGRESS.md handoff written
 
 ## End of session (mandatory)
 
-1. Update `TICKETS.md` status.
+1. Update the ticket status in `docs/BACKLOG.md`.
 2. Add a **Session log entry** in `PROGRESS.md` (template inside): what was done, files touched, state of tests, what is next, pitfalls.
 3. Update `BUGS.md` (new bugs, fixed bugs).
-4. Commit with Conventional Commits: `feat(engine): add role inference (T-021)`. Types: feat, fix, test, docs, refactor, chore.
+4. Commit with Conventional Commits: `feat(engine): add bans to draft input (B-012)`. Types: feat, fix, test, docs, refactor, chore.
 5. Tell the owner a short summary + next recommended ticket (chat language follows the owner; anything written to files is English).
 
 ## Git
 
-- Branch per ticket: `t-021-role-inference`. Merge to `main` only when DoD is met.
+- Branch per ticket: `b-012-bans`. Merge to `main` only when DoD is met.
 - Commit often; never rewrite history on shared branches.
 - Data files: `data/public/` can be committed (small JSON); raw data / sqlite never.
 
@@ -59,4 +61,4 @@ The leaving AI must: commit WIP on the ticket branch, set status `DOING`, and wr
 
 ## Weekly (owner)
 
-Review PROGRESS and BUGS, reprioritize TICKETS, bump data to the new patch (`pnpm etl ...`), re-run golden tests.
+Review PROGRESS and BUGS, reprioritize `docs/BACKLOG.md`, bump data to the new patch (`pnpm etl ...`), re-run golden tests.

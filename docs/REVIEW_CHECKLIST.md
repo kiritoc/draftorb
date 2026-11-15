@@ -1,6 +1,6 @@
 # REVIEW CHECKLIST
 
-Use this for every PR in the rework. Source of truth: `docs/GOALS.md`, accepted decisions in `docs/DECISIONS.md` (D-096..D-109, D-114 plus anything the owner approves later), and the ticket in `docs/BACKLOG.md`.
+Use this for every PR in the rework. Source of truth: `docs/GOALS.md`, accepted decisions in `docs/DECISIONS.md` (D-096..D-109 plus anything the owner approves later; D-114 is ticketed in B-001 until written), and the ticket in `docs/BACKLOG.md`.
 
 ## Goal alignment
 
@@ -42,7 +42,7 @@ Use this for every PR in the rework. Source of truth: `docs/GOALS.md`, accepted 
 
 ## Windows impact
 
-- [ ] Paths use `path.join`; no bash-only scripts; no symlinks. `packages/shared`, `packages/engine`, `packages/etl` and tooling keep the no-compiler native-dependency rule (AGENTS.md rule 4); the Windows desktop shell may require the Rust toolchain for Tauri (D-110), recorded as a decision and scoped to `apps/desktop` build tooling only.
+- [ ] Paths use `path.join`; no bash-only scripts; no symlinks. `packages/shared`, `packages/engine`, `packages/etl` and tooling keep the no-compiler native-dependency rule (AGENTS.md rule 4); any future Rust toolchain exception for the Windows desktop shell must first be recorded by B-001/D-110 and scoped to `apps/desktop` build tooling only.
 - [ ] Windows CI job (`windows-latest`) stays green; Windows-specific behavior is called out in the PR.
 - [ ] better-sqlite3 continues to use prebuilt binaries on Windows Node 22.
 

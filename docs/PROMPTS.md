@@ -1,6 +1,6 @@
 # PROMPTS — copy/paste for any AI
 
-> **OBSOLETE: superseded by docs/GOALS.md and DECISIONS.md D-096..D-109. Do not follow.** Kept for history.
+> **OBSOLETE: superseded by docs/BACKLOG.md (with docs/GOALS.md and DECISIONS.md D-096..D-109). Do not follow.** Kept for history; scheduled for deletion after the rework backlog is accepted.
 
 ## A. Start a session (generic)
 

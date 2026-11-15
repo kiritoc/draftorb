@@ -16,7 +16,8 @@ Personal League of Legends draft & itemization companion for Windows 11 (one pla
 | `docs/ARCHITECTURE.md` | Stack, modules, data flow                         |
 | `docs/DATA_MODEL.md`   | SQLite schema + exported JSON formats             |
 | `docs/RIOT_API.md`     | Riot API usage, limits, ToS notes                 |
-| `docs/TICKETS.md`      | Backlog (one ticket per session)                  |
+| `docs/BACKLOG.md`      | Rework backlog (one B-xxx ticket per PR)          |
+| `docs/TICKETS.md`      | Obsolete pre-rework backlog (history only)        |
 | `docs/PROGRESS.md`     | Current status + session handoffs                 |
 | `docs/BUGS.md`         | Bug tracker                                       |
 | `docs/WORKFLOW.md`     | How to work, multi-AI handoff, definition of done |
@@ -25,6 +26,6 @@ Personal League of Legends draft & itemization companion for Windows 11 (one pla
 | `docs/DECISIONS.md`    | Decision log (ADR)                                |
 | `docs/GLOSSARY.md`     | Domain vocabulary                                 |
 | `docs/SETUP.md`        | Windows setup                                     |
-| `docs/PROMPTS.md`      | Ready-to-paste prompts for AI sessions            |
+| `docs/PROMPTS.md`      | Obsolete prompts (history only; see BACKLOG.md)   |
 
 Not affiliated with Riot Games.

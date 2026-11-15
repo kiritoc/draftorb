@@ -4,7 +4,13 @@
 
 Closes #___
 
-<!-- The issue title must start with the ticket id (BL-xxx). Copy the acceptance criteria from the issue into the checklist below and tick each one with evidence (command, test, screenshot). -->
+<!-- The issue title must start with the ticket id (BL-xxx). -->
+
+## Acceptance criteria
+
+<!-- Copy every acceptance criterion from the linked issue here and tick each one with evidence (command, test, screenshot). -->
+
+- [ ] criterion — evidence:
 
 ## Verified / Not verified
 
@@ -27,7 +33,7 @@ Needed: yes/no
 ## Checklist
 
 - [ ] PR title starts with the ticket id (BL-xxx) and the body links the issue with `Closes #n` (one task = one PR)
-- [ ] Acceptance criteria of the linked issue are copied above and each one is ticked with evidence (command, test, screenshot)
+- [ ] Acceptance criteria of the linked issue are copied into the "Acceptance criteria" section and each one is ticked with evidence (command, test, screenshot)
 - [ ] Tests added/updated and `pnpm check` is green (typecheck + lint + format + tests)
 - [ ] Works on Windows 11 (paths, scripts, shell-specific behavior)
 - [ ] `docs/SPECS.md` (or the relevant spec doc) updated in this PR if behavior changed

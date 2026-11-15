@@ -1263,6 +1263,6 @@ None is auto-approved; each needs an explicit owner OK when its phase starts.
 - Version 2: D-089.
 - Draft-model experiments, used only by the backtest until validated: D-088, D-090, D-092, D-092a.
 
-### D-110 — ETL state upload gated on snapshot integrity — PROPOSED
+### D-110 — ETL state upload gated on snapshot integrity — ACCEPTED (owner, 2026-11-15)
 
 Amends D-078 point 3: the `DraftOrb.sqlite.gz` upload now runs only when the "Compact and check database" step succeeds (`steps.compact.outcome == 'success'`). Pipeline-step failures still save partial progress (compact succeeds -> upload proceeds), but a failed/torn snapshot is never published (B-070). The compact step additionally refuses to snapshot while another process holds the DB and treats gzip's "file size changed while zipping" warning as fatal; `timeout-minutes` raised 300 -> 360 after a backlog run hit the cap.

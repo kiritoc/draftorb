@@ -51,7 +51,7 @@ The code can be shared. The data (profile, pool) is tied to one player.
 
 ## Platform and look
 
-Windows 11 desktop program (language decided after the code audit: TypeScript shell or Rust). Visual direction C from the style canvas: light, clean, large targets, with a dark mode toggle that remembers the last choice (first launch follows the Windows theme).
+Windows 11 desktop program: TypeScript engine with a Tauri shell (D-115, pending the Windows spike). Visual direction C from the style canvas: light, clean, large targets, with a dark mode toggle that remembers the last choice (first launch follows the Windows theme).
 
 ## Working rules
 
@@ -62,6 +62,6 @@ Windows 11 desktop program (language decided after the code audit: TypeScript sh
 ## Open items
 
 - Riot policy on in-game advice tools (first ticket of the live phase).
-- Language: TypeScript or Rust (after the audit).
-- Where the shared aggregate statistics are published for download at launch (recommended: public release asset, no token; profile data stays private).
 - Patch display: public name (26.x) versus Riot data label (16.x); the offset rule is unverified.
+
+Resolved: language = TypeScript engine with a Tauri shell, pending the Windows spike (D-115); shared aggregates published as a public release asset with no token, profile data private (D-111); champion pool versioned in the repo as `data/pool.config.json` (D-114).

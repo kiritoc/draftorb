@@ -42,7 +42,7 @@ Use this for every PR in the rework. Source of truth: `docs/GOALS.md`, accepted 
 
 ## Windows impact
 
-- [ ] Paths use `path.join`; no bash-only scripts; no symlinks. The native-dependency rule stays as is until D-110 is merged; the amendment (Rust toolchain allowed only for the Tauri desktop shell) is made by BL-001 — do not apply it earlier.
+- [ ] Paths use `path.join`; no bash-only scripts; no symlinks. The no-compiler native-dependency rule applies to the ETL, the engine, shared and tooling; the Windows desktop shell may require the Rust toolchain for Tauri (D-115).
 - [ ] Windows CI job (`windows-latest`) stays green; Windows-specific behavior is called out in the PR.
 - [ ] better-sqlite3 continues to use prebuilt binaries on Windows Node 22.
 

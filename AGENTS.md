@@ -1,6 +1,6 @@
 # AGENTS.md — Read this first (all AI assistants)
 
-Project: **DraftOrb** — a free League of Legends tool that (1) recommends a champion (+ runes) during draft with partial information, and (2) recommends items in-game depending on game state and who is fed. Phase 1 scope: **Support role, Diamond rank.**
+Project: **DraftOrb** — a personal Windows 11 companion for one player (KiriToc, Diamond, EUW): champion pick during draft, then runes/summoners/starters, then in-game item advice. Roles: Support, Top and Jungle in full; ADC and Mid minimal (D-097). Source of truth: `docs/GOALS.md`.
 
 ## Language rule
 
@@ -8,10 +8,11 @@ Project: **DraftOrb** — a free League of Legends tool that (1) recommends a ch
 
 ## Mandatory reading order (every session)
 
-1. `docs/PROGRESS.md` — current state and last session handoff
-2. `docs/TICKETS.md` — pick ONE ticket (status `TODO`, dependencies done)
-3. `docs/SPECS.md` — the relevant section for that ticket
-4. `docs/CONVENTIONS.md` and `docs/WORKFLOW.md` — rules of work
+1. `docs/GOALS.md` and `docs/DECISIONS_AMENDMENTS.md` — what we build and the latest approved decisions
+2. `docs/PROGRESS.md` — current state and last session handoff
+3. `docs/TICKETS.md` — pick ONE ticket (status `TODO`, dependencies done)
+4. `docs/SPECS.md` — the relevant section for that ticket
+5. `docs/CONVENTIONS.md` and `docs/WORKFLOW.md` — rules of work
    Other docs on demand: `ARCHITECTURE.md`, `DATA_MODEL.md`, `RIOT_API.md`, `TESTING.md`, `DECISIONS.md`, `GLOSSARY.md`, `BUGS.md`, `SETUP.md`, `PROMPTS.md`.
 
 ## Golden rules (never break)

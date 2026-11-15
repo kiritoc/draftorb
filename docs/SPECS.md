@@ -4,7 +4,7 @@ Status of this doc: v0.2 (ranking model D-020..D-023) — edit via `DECISIONS.md
 
 ## 1. Users & use cases
 
-- UC1 Draft: user (Diamond default) enters known champions (allies/enemies, roles optional) -> gets ranked champion picks for their slot with explanations. Phase 1: user is Support.
+- UC1 Draft: user (Diamond default) enters known champions (allies/enemies, roles optional) -> gets ranked champion picks for their slot with explanations. Roles in scope: Support, Top, Jungle in full; ADC and Mid minimal (D-097).
 - UC2 Blind pick: no/few enemies known -> picks ranked by safety.
 - UC3 Runes: after choosing, get best rune page for this context.
 - UC4 Items in game: given game state -> next item(s) to buy, with reason.
@@ -16,7 +16,7 @@ Status of this doc: v0.2 (ranking model D-020..D-023) — edit via `DECISIONS.md
 ```
 DraftInput {
   userRank: Rank            // default DIAMOND_IV..I -> bucket "DIAMOND"
-  userRole: Role            // phase 1: SUPPORT
+  userRole: Role            // v1: SUPPORT, TOP, JUNGLE (ADC/MID minimal, D-097)
   allies: Slot[]            // up to 4 others
   enemies: Slot[]           // up to 5
   blindPick: boolean
@@ -29,7 +29,7 @@ Any subset can be empty. Engine must never crash on missing info.
 
 ### 2.1 Champion pool (D-024)
 
-- A per-role list of champion ids owned by the user, stored only in the browser (`localStorage` key `draftorb.pool.v1`, versioned envelope `{ version: 1, pools: { <ROLE>: ChampionId[] } }`, zod-validated). No account, no server. Max `poolMaxSize` (UI config, default 40) per role. Phase 1 exposes SUPPORT only; storage is role-keyed.
+- A per-role list of champion ids owned by the user, stored by the program (not browser localStorage — D-101). The pool editor picks a champion once and ticks the roles it applies to (champion x roles). No account, no server. Max `poolMaxSize` (UI config, default 40) per role.
 - Resilience: unavailable, full or corrupted storage gives an empty pool plus a visible notice, never a crash; ids absent from the current `champions.json` are dropped with a notice.
 - Export/import as JSON text (validated before it replaces the stored pool), to back up or move devices.
 - The pool never changes scores: `score(c)` is identical with or without a pool. It is not a boost and not a hard filter. Pool champions join the §5 candidate set, so `recommendations` may gain extra rows (and global ranks may shift) without reordering the original roleProb subsequence. See §7.1.
@@ -57,7 +57,7 @@ Rank buckets for weighting (distinct from persisted `rank_score` in DATA_MODEL.m
 - If inference fails for a team, the engine keeps the largest greedily built resolvable subset (fixed slots first). If that fails too, only fixed slots are kept, and a fixed role used by two or more slots of the same team is dropped as ambiguous (D-030). Dropped slots lose only role-dependent effects (pairs, lane); they stay excluded from candidates and still count for comp.
 - The user's own role is reserved on the user's team: allies are never assigned `userRole`. An ally fixed to `userRole` is dropped from role-dependent layers (pairs, lane) but still counts for comp and stays excluded from candidates (D-050).
 
-## 5. Scoring a candidate `c` for `myRole` (Phase 1: `myRole` = SUPPORT)
+## 5. Scoring a candidate `c` for `myRole` (v1 roles: SUPPORT, TOP, JUNGLE; ADC/MID minimal)
 
 Candidate set: champions with `roleProb[c][myRole] >= roleProbThreshold` (config `RecommendConfig.roleProbThreshold`, default 0.05), plus every champion of the user pool (D-024). A pool champion below the threshold is still scored when it passes the baseline gate below and carries the warning `offRole`. The pool never changes any score.
 
@@ -79,7 +79,7 @@ x += W_blind * blindSafety(c)                               // only if blindPick
 P(c) = sigmoid(x);  score(c) = P(c)
 ```
 
-- `laneGroup(myRole)` (config, D-021): `SUPPORT`/`ADC` = the bot lane (me, ally lane partner, enemy support + enemy ADC); `TOP` = me vs enemy top; `MID` = me vs enemy mid; `JUNGLE` = me vs enemy jungle (1v1, `lane_full` skipped). A layer is skipped when one of its champions is unknown. `conf_lane` = product of the §4 confidences of the lane-group champions of that layer: enemies only for `lane_vs`, allies and enemies for `lane_full` (D-030). The engine is role-generic; Phase 1 data populates only `myRole = SUPPORT`, so other roles get lane layers only once T-017 exports their `lane_vs`/`lane_full` rows.
+- `laneGroup(myRole)` (config, D-021): `SUPPORT`/`ADC` = the bot lane (me, ally lane partner, enemy support + enemy ADC); `TOP` = me vs enemy top; `MID` = me vs enemy mid; `JUNGLE` = me vs enemy jungle (1v1, `lane_full` skipped). A layer is skipped when one of its champions is unknown. `conf_lane` = product of the §4 confidences of the lane-group champions of that layer: enemies only for `lane_vs`, allies and enemies for `lane_full` (D-030). The engine is role-generic; the v1 scope (D-097) populates `myRole` = SUPPORT, TOP and JUNGLE in full, with ADC and MID at champion-level statistics only, so other roles get lane layers only once their `lane_vs`/`lane_full` rows are exported.
 - Baseline gate: if the candidate's baseline `n_eff < minGames`, it gets no score and no rank: it goes to `insufficientData` (§7) with `nEff` and, when known, `rawGames` (golden rule 8; a 0 or missing raw count is treated as unknown and omitted, B-025), not to the ranked `recommendations`. The `k0` shrinkage only guards near-perfect records that already passed this gate.
 - Every probability passed to `logit` is clamped to `[eps, 1 - eps]` (eps = 1e-4), so a perfect or empty record can never produce an infinite or NaN score.
 - `pairTerm(c, s) = logit((wins_e + k*p0)/(games_e + k)) - logit(p0)`, k = prior strength (default 40 equivalent games). Pair terms are summed and correlated (several can describe the same matchups), so the global scale `s` absorbs systematic over-counting and is fit on the validation window (T-027.a).
@@ -102,7 +102,7 @@ P(c) = sigmoid(x);  score(c) = P(c)
 
 Rationale per row: support — bot lane (ally ADC, enemy support + ADC) first, then junglers, then mid, then top; top — the mirror (direct opponent first, then jungle, mid, bot); ADC — ally support and the enemy bot lane; mid — the enemy mid, then both junglers; jungle — the enemy jungle first, then mid, then top/support, then ADC. The enemy same-role cell (direct lane opponent) is the row maximum.
 Validation (T-020): every cell defined and in [0, 1]; the opponent cell is the row max; the table is validated by zod; a unit test fails on an incomplete row.
-`mid` phase (items only, §8.2), every role: enemy weight = `lambda * lane + (1 - lambda) * threatShare(e) * enemiesKnown`, lambda = 0.3; ally weights = the `lane` row. `draft` and `lane` rows share the defaults today and may diverge later; each role x phase is calibrated separately. Phase 1 uses only the SUPPORT rows; the other rows exist so later roles only need data, not code.
+`mid` phase (items only, §8.2), every role: enemy weight = `lambda * lane + (1 - lambda) * threatShare(e) * enemiesKnown`, lambda = 0.3; ally weights = the `lane` row. `draft` and `lane` rows share the defaults today and may diverge later; each role x phase is calibrated separately. v1 uses the SUPPORT, TOP and JUNGLE rows (D-097); the ADC/MID rows exist so later roles only need data, not code.
 
 - Reported deltas: each reason's `deltaPp = 100 * (sigmoid(x_before + term) - sigmoid(x_before))`, in the order the terms are added (pairs by descending influence, then `lane_vs`, `lane_full`, comp, blind); the total delta is `100 * (P(c) - p0)`.
 - **Levels 1-3** (like Karakal): from a reason's `deltaPp` — L1 >= +1.0pp, L2 >= +2.5pp, L3 >= +4.5pp. Positive L2/L3 need `n_eff >= highLevelMinGames` (config, default 100, validated `>= minGames`; a prior like every other parameter here); below that, a qualifying positive delta falls back to L1. Negative symmetric (counter-picked), without the `highLevelMinGames` gate. A lowData reason (`n_eff < minGames`) has level 0 for both signs. Show badge in UI.
@@ -174,27 +174,29 @@ Steps:
 7. Item scoring v2 (data, D-022): compare like for like — context = (champion, slot `k` with 0 = starting items, purchase time bucket of 5 min, state bucket at purchase, enemy profile bucket `AD|AP|mixed`, and in the `lane` phase the lane-context slots — top `contextSlots` by lane-phase influence, §8.1). Score = shrunk win rate of the item minus the average shrunk win rate of all items bought in that context; back-off order when data is low: lane champions (exact `laneKey`, then `laneArch` archetype level, D-086) -> enemy profile -> state -> time bucket -> (champion, k). Replaces the rule score only where `n_eff >= minGames`. Observational: phrased as "players who bought X here won Y %", never as cause. Phase B (D-082/D-083): contexts aggregate only `decision_kind='item'` rows — completed/boots items at their net-replayed slot and starter purchases at slot 0; quest rewards and jungle pet upgrades are exported separately as `build-paths/` rows so they inform path decisions without polluting item pick shares; enemy profile is computed at purchase time (`unknown` when kill events are unavailable).
 8. Output next 1-3 items with reasons ("enemy X is fed, AD heavy -> armor"), sample size, and what to skip.
 
-## 9. Auto-detection (Phase 2 / Epic E6-E7)
+Role quests (D-106, since public patch 26.1): the item-slot model of D-082/D-083 must be extended — ADC moves boots into a separate seventh slot (6 items plus boots) through its role quest; Mid gets free tier 3 boots; Support gets a role-quest slot for up to 2 Control Wards; Top's quest upgrades Teleport (relevant to summoner advice). Display rule: up to 6 inventory items including boots, plus the ADC boots slot after the quest.
 
-Order of preference:
+## 9. Auto-detection (live phase, Epic E6-E7)
 
-1. **LCU** (League client local API): champ select session -> fills draft.
-2. **Live Client Data API** (`https://127.0.0.1:2999/liveclientdata/allgamedata`): scores, items, champions of all players during game. (Gold not exposed; estimate from items.)
-3. **Image recognition** (fallback): capture screen -> portraits (template matching/embeddings vs Data Dragon icons), scoreboard: items (template matching) + K/D/A/CS (OCR). Always followed by a **correction UI**. No memory reading, no input injection.
-   Read Riot's third-party policy before shipping E6/E7; log result in DECISIONS.md.
+Order of preference (D-105):
+
+1. **LCU** (League client local API): champ select session -> fills draft; also bans.
+2. **Live Client Data API** (`https://127.0.0.1:2999/liveclientdata/allgamedata`): scores, items, champions of all players during game. (Gold not exposed for other players; win/lose/even is an estimate — the threat score uses kills, deaths, assists and items, D-105.)
+3. **Image recognition** (fallback only, if client access is not allowed or does not work): capture screen -> portraits (template matching/embeddings vs Data Dragon icons), scoreboard: items (template matching) + K/D/A/CS (OCR). Always followed by a **correction UI**. No memory reading, no input injection.
+   Read Riot's third-party policy before shipping E6/E7 (first ticket of the live phase); log result in DECISIONS.md (D-105).
 
 ## 10. Non-functional
 
 - Engine call < 50 ms for a full draft on a mid laptop.
-- Local static app, no hosting (D-079); JSON data files < 5 MB each (gzip), lazy loaded.
+- Windows 11 desktop program (D-099, language decided after the audit, D-098); JSON data files < 5 MB each (gzip), lazy loaded, downloaded at launch.
 - Works offline after first load (nice-to-have).
 - Accessible UI, keyboard champion search; the pool editor and the "Show more" buttons are keyboard accessible.
-- The pool stays in the browser (never sent anywhere).
+- The pool stays on the player's machine (never sent anywhere).
 - Show current patch + data freshness.
 
-## 11. Out of scope (Phase 1)
+## 11. Out of scope (v1)
 
-Non-support roles, accounts/login, pool sync across devices or auto-import of the pool from a Riot account, server-side code, paid anything, mobile app, replays. The engine and data model are role-generic (D-020/D-021); only the SUPPORT role is populated and exposed in Phase 1.
+v1 is the pick screen only (D-100): champion recommendations for SUPPORT, TOP and JUNGLE (ADC/MID minimal, D-097) with pool highlighting, manual draft and bans input, enemy role inference, thin-data fallback, the "unvalidated" label and the personal-record badge. Runes, summoners, starters and in-game items are v2/v3. Accounts/login, pool sync across devices or auto-import of the pool from a Riot account, server-side code, paid anything, mobile app, replays and screenshot recognition as a main input are out of scope. The engine and data model are role-generic (D-020/D-021).
 
 ## 12-17. Storage, retention, weights, change scoring, breakpoints (target model)
 
@@ -323,10 +325,10 @@ Personal recommendations use a **configured profile's** match history, synced by
 
 ### 18.1 Profile
 
-- Declared in the committed `data/profiles.config.json` (D-068): `{ id, riotId: { gameName, tagLine }, platform, label, options }`. Default and only entry: `KiriToc#Toc`, `EUW1`. Only configured profiles are ever synced — visitors cannot add one; adding another person's profile requires their consent.
+- Declared in the committed `data/profiles.config.json` (D-068): `{ id, riotId: { gameName, tagLine }, platform, label, options }`. Default and only entry: `KiriToc#Toc`, `EUW1`. Only configured profiles are ever synced — users cannot add one; adding another person's profile requires their consent.
 - Synced by `pnpm etl profile-sync` inside the scheduled `etl.yml` run (D-070): account-v1 resolves the Riot ID to a puuid (`europe` routing for EUW1), match-v5 fetches ranked solo/duo games (queue 420) incrementally (per-profile `last_game_creation` cursor, D-018 pattern), champion-mastery-v4 provides mastery. Stored in `profiles`/`profile_games`/`profile_mastery` (DATA_MODEL.md) and exported as `data/public/profiles/<id>.json` + `index.json`, anonymized per D-069 (no foreign names/Riot IDs/puuids/match ids; last 180 days, max `profileMaxGames` = 500). `data/public` is gitignored and local-only (D-079): the exports are packed into the `public-exports.tar.gz` asset of the newest `state-*` release in the private state repo (D-078) and reach the app via `pnpm etl pull`.
 - The web app loads the exported JSON statically and displays the profile label (e.g. "Profile: KiriToc#Toc (EUW)"); the personalized list is labeled "<gameName>'s picks" — never "For you" (D-072). No profile selector UI for now; a selector among exported profiles is future work.
-- Phase 1 uses Support games only; other roles are stored but ignored by the engine.
+- In-scope games: Support, Top and Jungle in full; ADC and Mid minimal (D-097). Games in other roles are stored but ignored by the engine until a later phase.
 
 ### 18.2 Profile win rate (champions)
 
@@ -334,7 +336,7 @@ For candidate `c` in the current draft, over the profile's in-scope games:
 
 - Recency weight `w = 0.5^(age_days / 60)` per game (`HALF_LIFE_DAYS = 60`); `n_eff = (sum w)^2 / sum w^2`.
 - Profile win rate at a context level: `p = (wins_w + K_SHRINK * p_profile) / (games_w + K_SHRINK)`, `K_SHRINK = 15`, `p_profile` = the profile's recency-weighted win rate over all in-scope games.
-- Fallback hierarchy — first level with `n_eff >= MIN_GAMES` (`MIN_GAMES` = 3). Every level is scoped to games the profile played ON the candidate champion in the SUPPORT role; the levels widen the matchup context instead (D-076): L1 same ally ADC + same enemy support; L2 same enemy support; L3 enemy composition signature (`champion-tags.json` `damageType:archetype` pairs, draft signature ⊆ game signature); L4 any context ("role overall"); L5 champion overall (identical to L4 while only SUPPORT games are in scope, kept distinct for later phases). `levelFactor` = 1.0/0.9/0.8/0.7/0.6 for L1..L5. The same hierarchy gives the profile's win rate "in the current matchup/setup".
+- Fallback hierarchy — first level with `n_eff >= MIN_GAMES` (`MIN_GAMES` = 3). Every level is scoped to games the profile played ON the candidate champion in the in-scope role (D-097); the levels widen the matchup context instead (D-076): L1 same ally ADC + same enemy support; L2 same enemy support; L3 enemy composition signature (`champion-tags.json` `damageType:archetype` pairs, draft signature ⊆ game signature); L4 any context ("role overall"); L5 champion overall (identical to L4 while only one role's games are in scope, kept distinct for later phases). `levelFactor` = 1.0/0.9/0.8/0.7/0.6 for L1..L5. The same hierarchy gives the profile's win rate "in the current matchup/setup".
 - Trust: `trust = (n_eff * levelFactor) / (n_eff * levelFactor + K_TRUST)`, `K_TRUST` = 20.
 - Meta normalization: `metaNorm(c) = 1 - (rank - 1) / (N - 1)` over the complete overall list (N > 1; 1 when N = 1) — `score(c) = sigmoid(x)` is uncalibrated in absolute terms, rank position is stable.
 - `personalizedScore(c) = (1 - trust) * metaNorm(c) + trust * p`. The personalized list sorts desc, tie-break overall `rank`. Entries with `n_eff < MIN_GAMES` at every level show "insufficient data" with `n_eff` (D-075), never a number.
@@ -346,7 +348,7 @@ For candidate `c` in the current draft, over the profile's in-scope games:
 
 ### 18.4 Favorites (D-074)
 
-- Computed at export: top 15 champions by recency-weighted Support games (last 90 days) union top 5 by mastery points.
+- Computed at export, per role: top 15 champions by recency-weighted games in that role (last 90 days) union top 5 by mastery points.
 - "Import favorites into pool" is explicit and respects `poolMaxSize`.
 - `favoritesMode`: `include` (default, star badge) / `only` (favorites only in the lists) / `hide` (favorites removed). Filters/flags displayed entries only; `score(c)` unchanged.
 

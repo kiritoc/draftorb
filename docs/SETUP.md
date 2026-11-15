@@ -83,7 +83,7 @@ The main repo is public, so **workflow logs are public** and secret masking does
 
 ## Profile sync (D-067..D-071, D-078, D-079)
 
-Personalization is fed by configured profiles declared in `data/profiles.config.json` (committed, no secrets). Default and only entry: `KiriToc#Toc` on `EUW1`. Only configured profiles are ever synced — visitors cannot add any, and adding another person's profile requires their consent.
+Personalization is fed by configured profiles declared in `data/profiles.config.json` (committed, no secrets). Default and only entry: `KiriToc#Toc` on `EUW1`. Only configured profiles are ever synced — users cannot add any, and adding another person's profile requires their consent.
 
 - Local: `pnpm etl profile-sync [profileId] [--publish]` uses `RIOT_API_KEY` from `.env` (same key as the other ETL commands; see "Riot key" above — a dev key expires every 24 h and cannot drive the schedule, use the personal key).
 - Actions runs (scheduled every 12h since D-094, plus `workflow_dispatch`): `etl.yml` runs `profile-sync` for every configured profile using the `RIOT_API_KEY` GitHub Actions secret; local syncs remain available via `pnpm etl profile-sync`. Profile tables live in the same database persisted in the state releases (D-078).

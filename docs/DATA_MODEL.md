@@ -228,7 +228,7 @@ Profiles are declared in the committed `data/profiles.config.json` (no secrets):
 }
 ```
 
-Only configured profiles are ever synced (visitors cannot add any; adding another person's profile requires their consent). Synced by `pnpm etl profile-sync` (locally or inside `etl.yml`, D-070); stored in `profiles`/`profile_games`/`profile_mastery` above and exported as anonymized JSON under `data/public/profiles/`. `data/public` is gitignored and local-only (D-079): exports are packed into the `public-exports.tar.gz` asset of the newest `state-*` release in the private state repo (D-078) and reach the app via `pnpm etl pull`.
+Only configured profiles are ever synced (users cannot add any; adding another person's profile requires their consent). Synced by `pnpm etl profile-sync` (locally or inside `etl.yml`, D-070); stored in `profiles`/`profile_games`/`profile_mastery` above and exported as anonymized JSON under `data/public/profiles/`. `data/public` is gitignored and local-only (D-079): exports are packed into the `public-exports.tar.gz` asset of the newest `state-*` release in the private state repo (D-078) and reach the app via `pnpm etl pull`.
 
 ### Exported JSON (`data/public/profiles/`)
 

@@ -21,6 +21,7 @@ DraftInput {
   enemies: Slot[]           // up to 5
   blindPick: boolean
   pool?: ChampionId[]       // pool of userRole (D-024): never changes scores, only fills poolRecommendations
+  bans?: ChampionId[]       // manual bans input (D-106, v1): banned champions are excluded from recommendations and from enemy role assignment
 }
 Slot { championId: ChampionId, role?: Role }   // role optional
 ```
@@ -40,7 +41,7 @@ Rank buckets for weighting (distinct from persisted `rank_score` in DATA_MODEL.m
 
 - **Draft probabilities** (pairs, matchups, baselines): weight per game `w = exp(-|gameRank - userRank| / tau)`, tau=1.25 (config). Never use data below userRank-2 tiers.
 - **Runes & items**: use games with `gameRank >= userRank` (up to Challenger). Weight `w = min(1 + alpha*(gameRank-userRank), wMax)`, alpha=0.25, wMax=2.0. Only expert players (D-022): `champion_games >= minChampGames` (default 30) in our data, with the champion-mastery-v4 fallback applied only to participants of the user's role (`is_expert` flag). Show both winrate and pick share among those players.
-- Optional UI toggle: "Master+ only".
+- Evidence rule (D-102): each player's weight inside a context is capped, and any shown number requires a minimum number of distinct players behind it; both values are set by the backtest (D-023). "Master+ only" is an optional UI toggle, off by default.
 - Recency: multiply by `decay^(currentPatchIndex - gamePatchIndex)` (decay=0.85). Indices come from the `patches` table (SPECS §12, T-019.b/D-043): gaps in collected patches count as real patch distance.
 - Patch window: ingestion keeps every patch >= `--since-patch` (D-017); recency is applied here, at aggregation time, never by dropping games at ingestion.
 - Rank reliability: games with `matches.rank_known_count = 1` (only the seed player's rank is known, D-019) are multiplied by `unknownRankFactor` (default 0.5, config).
@@ -138,6 +139,8 @@ DraftResult {
 
 Sorted desc. Always show why + sample sizes. Never show a % without sample size. A `Reason.n` and `Recommendation.reliability.nEff` carry the **effective sample size** `n_eff = (sum w)^2 / sum w^2` (a real number, not a raw game count), because every threshold and `lowData` flag in §5/§7 is evaluated against `n_eff`; `DraftResult.insufficientData` separately exposes `nEff`, `rawGames` and, when weighted baseline evidence exists, `winRate` for champions that fail the baseline gate. Reason type `lane`, `DraftResult.insufficientData` and the pool fields (`poolRank`, `poolRecommendations`, `poolUnavailable`) are added to the shared schemas by T-002.b.
 
+Thin-data fallback (D-103): when data is too thin, champion picks and runes show a broader statistic instead (for example the champion's win rate in that role or its pick share), clearly labeled as broader; items fall back to a rule-based suggestion (the analytic model), clearly labeled as a rule. A prior-only 50% is never shown (golden rule 8).
+
 ## 7.1 Recommendation lists (D-024)
 
 - Two lists: **From your pool** (`poolRecommendations`, shown first when the pool is non-empty; with an empty pool a one-line call to action to add champions) and **Best overall** (`recommendations`, always shown, even with an empty pool). When a profile is exported (§18), a third list labeled with the profile label (e.g. "KiriToc's picks") is shown beside them; it never changes `score(c)` or the other two lists (D-072).
@@ -192,7 +195,8 @@ Order of preference (D-105):
 - Works offline after first load (nice-to-have).
 - Accessible UI, keyboard champion search; the pool editor and the "Show more" buttons are keyboard accessible.
 - The pool stays on the player's machine (never sent anywhere).
-- Show current patch + data freshness.
+- Show current patch + data freshness. The interface displays the public patch name (for example 26.22) mapped from the internal data label (for example 16.22, `major.minor`); the offset rule is unverified and must be checked against Data Dragon before it is coded (D-108).
+- Light/dark theme toggle that remembers the last choice; the first launch follows the Windows theme (D-107).
 
 ## 11. Out of scope (v1)
 
@@ -323,6 +327,8 @@ Only edge cases not owned by sections 12-16; all other rules reference those sec
 
 Personal recommendations use a **configured profile's** match history, synced by the pipeline and shipped as static JSON — the app is local-only and never calls Riot; there is no login or server (D-002, D-067, D-079). `score(c)` and every existing list are **unchanged** by personalization (D-072, same invariant as D-024).
 
+Version split (D-100): **v1** shows only a per-champion personal-record badge on each recommendation card (games and win rate, or "not enough data" below the minimum sample, D-075). The personalized list, the rune/summoner columns and item personalization described below are **v2**.
+
 ### 18.1 Profile
 
 - Declared in the committed `data/profiles.config.json` (D-068): `{ id, riotId: { gameName, tagLine }, platform, label, options }`. Default and only entry: `KiriToc#Toc`, `EUW1`. Only configured profiles are ever synced — users cannot add one; adding another person's profile requires their consent.
@@ -342,7 +348,7 @@ For candidate `c` in the current draft, over the profile's in-scope games:
 - `personalizedScore(c) = (1 - trust) * metaNorm(c) + trust * p`. The personalized list sorts desc, tie-break overall `rank`. Entries with `n_eff < MIN_GAMES` at every level show "insufficient data" with `n_eff` (D-075), never a number.
 - Reason badge per entry: shrunk profile WR %, effective games, fallback level, and the delta vs the rank-bucket baseline `d = round(100 * (p - w0))` pp, where `w0` is the champion's baseline win rate (`p0` fraction of §5) for the rank bucket selected in the app — the same value `insufficientData.winRate` exposes (D-054). The delta is omitted when the baseline row has no weighted evidence (`games_e = 0`) or the champion fails the baseline gate; a prior-only 50% is never used. The label names the bucket, e.g. "+4 pp vs Diamond avg" (D-080).
 
-### 18.3 Personalized list UI
+### 18.3 Personalized list UI (v2)
 
 - List labeled with the profile label (e.g. "KiriToc's picks"), beside "Best overall" and "From your pool", same pagination (5 by 5, "Show more", independent state, resets on draft/profile change) and a11y rules as §7.1. Absent when no profile JSON is exported/loaded. Insufficient-data entries render the sample size, never a percentage.
 

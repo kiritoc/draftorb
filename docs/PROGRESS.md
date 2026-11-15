@@ -1,5 +1,7 @@
 # PROGRESS
 
+> **OBSOLETE: superseded by docs/GOALS.md and DECISIONS.md D-096..D-109. Do not follow.** Kept for history.
+
 ## Current status
 
 - Phase: 1 (Support / Diamond)

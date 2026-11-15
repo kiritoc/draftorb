@@ -594,7 +594,7 @@ Owner decision 2026-11-08.
 
 Update (2026-11-07, D-079): deploy.yml is retired; the main-only guard stays.
 
-Owner confirmation (2026-11-15, D-109): the assumptions marked PROPOSED in this entry are confirmed by the owner.
+Owner confirmation (2026-11-15, owner review of the DECISIONS_AMENDMENTS status table): the assumptions marked PROPOSED in this entry are confirmed by the owner.
 
 Owner decision 2026-11-07.
 
@@ -616,7 +616,7 @@ Owner decision 2026-11-08.
 
 Note: kRune = 40 and topPages = 3 are priors; calibrated in T-027.b through the D-023 gate.
 
-Owner confirmation (2026-11-15, D-109): the assumptions marked PROPOSED in this entry are confirmed by the owner.
+Owner confirmation (2026-11-15, owner review of the DECISIONS_AMENDMENTS status table): the assumptions marked PROPOSED in this entry are confirmed by the owner.
 
 Owner decision 2026-11-07.
 

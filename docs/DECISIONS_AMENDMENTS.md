@@ -1,5 +1,7 @@
 # DECISIONS AMENDMENTS (2026-11-15)
 
+> **Merged into DECISIONS.md on 2026-11-15; kept as a record only.** Do not edit or re-apply.
+
 Append the entries below to DECISIONS.md and apply the status changes in the last section. All entries are owner-approved in the goal interview of 2026-11-15.
 
 ### D-096 — Product audience: one player, shareable code — ACCEPTED (owner, 2026-11-15)

@@ -1,5 +1,7 @@
 # PROMPTS — copy/paste for any AI
 
+> **OBSOLETE: superseded by docs/GOALS.md and DECISIONS.md D-096..D-109. Do not follow.** Kept for history.
+
 ## A. Start a session (generic)
 
 ```

@@ -16,7 +16,7 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 ## Current handoff
 
 - Date: 2026-11-15
-- Branch/PR: `docs/github-issue-tracking` / this PR
+- Branch/PR: `docs/github-issue-tracking` / PR #115
 - State: REVIEW
 - Done: process docs and GitHub issues aligned after the backlog moved to GitHub issues + the Draftorb project board; ticket issue form added; missing plan issues created; project fields (Status/Milestone/Size/Owner decision needed) set up.
 - Files touched: `AGENTS.md`, `.github/ISSUE_TEMPLATE/ticket.yml`, `.github/pull_request_template.md`, `docs/{REVIEW_CHECKLIST,PROGRESS,TICKETS,PROMPTS,PROGRESS_ARCHIVE}.md`.

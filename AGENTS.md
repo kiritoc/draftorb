@@ -9,7 +9,7 @@ Project: **DraftOrb** — a personal Windows 11 companion for one player (KiriTo
 ## Mandatory reading order (every session)
 
 1. `docs/GOALS.md` and `docs/DECISIONS_AMENDMENTS.md` — what we build and the latest approved decisions
-2. `docs/SPECS.md` — the relevant section for the chosen task
+2. The chosen GitHub issue/project item and the matching `docs/SPECS.md` section
 3. `docs/CONVENTIONS.md` and `docs/WORKFLOW.md` — rules of work
    Other docs on demand: `ARCHITECTURE.md`, `DATA_MODEL.md`, `RIOT_API.md`, `TESTING.md`, `DECISIONS.md`, `GLOSSARY.md`, `BUGS.md`, `SETUP.md`.
 
@@ -24,7 +24,7 @@ Project: **DraftOrb** — a personal Windows 11 companion for one player (KiriTo
 7. **Tests first for the engine.** Every engine change needs/updates tests (see `docs/TESTING.md`).
 8. **Never invent data.** If stats are insufficient, return "insufficient data" (with sample size), not a fake number.
 9. **Spec unclear?** Do not guess silently: write the question + your assumption in `docs/DECISIONS.md` (status `PROPOSED`), then proceed with the assumption.
-10. **Before ending a session**: update `BUGS.md` and leave a clear commit message / PR description (see `docs/WORKFLOW.md` > End of session).
+10. **Before ending a session**: update `BUGS.md`, the linked GitHub issue/project status, and leave a clear commit message / PR description (see `docs/WORKFLOW.md` > End of session).
 
 ## Product invariants (D-024, apply to every UI/engine change)
 

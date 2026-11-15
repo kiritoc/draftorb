@@ -2,7 +2,7 @@
 
 Status of this doc: v0.2 (ranking model D-020..D-023) — edit via `DECISIONS.md` when changing behavior.
 
-> Ticket IDs (`T-xxx`) refer to the retired Stage-1 backlog (`docs/TICKETS.md`, deleted 2026-11-15); full ticket text: history: see git log (`git log --follow -- docs/TICKETS.md`). Current scope and backlog: `docs/GOALS.md`.
+> Ticket IDs (`T-xxx`) refer to the retired Stage-1 backlog (`docs/TICKETS.md`, deleted 2026-11-15); full ticket text: history: see git log (`git log --follow -- docs/TICKETS.md`). Current scope: `docs/GOALS.md`; task tracking: GitHub issues/project.
 
 ## 1. Users & use cases
 

@@ -6,10 +6,11 @@ Goal: any AI (Claude, ChatGPT, Gemini, Cursor, Copilot, local model...) can pick
 
 - **Owner (human)**: chooses priorities, reviews, runs the app.
 - **AI**: implements ONE task per session, keeps docs in sync.
+- **Task tracker**: GitHub issues and the Draftorb project board. Git docs hold specs and decisions, not ticket status.
 
 ## Start of session
 
-1. Read `AGENTS.md`, `docs/GOALS.md` and `docs/DECISIONS_AMENDMENTS.md`, then the matching `SPECS.md` section for the chosen task.
+1. Read `AGENTS.md`, `docs/GOALS.md` and `docs/DECISIONS_AMENDMENTS.md`, then the chosen GitHub issue/task and the matching `SPECS.md` section.
 2. Check `docs/BUGS.md` for open bugs related to the area.
 3. Run `pnpm install && pnpm test && pnpm typecheck`. If red BEFORE you start, log it in BUGS.md and tell the owner.
 4. Restate the acceptance criteria / goal of the task in your own words before coding.
@@ -55,4 +56,4 @@ The leaving AI must: commit WIP on the task branch and write a handoff in the co
 
 ## Weekly (owner)
 
-Review BUGS and GOALS, reprioritize the backlog, bump data to the new patch (`pnpm etl ...`), re-run golden tests.
+Review BUGS and GOALS, reprioritize GitHub issues/project, bump data to the new patch (`pnpm etl ...`), re-run golden tests.

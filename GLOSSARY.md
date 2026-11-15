@@ -8,7 +8,7 @@ Updated 2026-11-15 after the goal interview. Terms marked (new) or (changed) dif
 - **Synergy**: how well two allied champions perform together.
 - **Counter**: matchup advantage vs an enemy champion. **Hard counter** = level 3.
 - **Level 1-3**: strength of a synergy/counter badge (SPECS §5).
-- **Delta (pp)** (changed): winrate difference in percentage points, computed on the log-odds scale after shrinkage. Only the *total* delta is measured against the baseline; each reason's `deltaPp` is measured against the running prediction before that term was added, so it depends on term order (SPECS §5). The profile badge delta is measured against the rank-bucket baseline (D-080).
+- **Delta (pp)** (changed): winrate difference in percentage points, computed on the log-odds scale after shrinkage. Only the _total_ delta is measured against the baseline; each reason's `deltaPp` is measured against the running prediction before that term was added, so it depends on term order (SPECS §5). The profile badge delta is measured against the rank-bucket baseline (D-080).
 - **Shrinkage**: pulling an estimate toward the baseline when sample is small (Bayesian).
 - **Influence**: weight of another slot (ally/enemy role) for the user's role and game phase (D-020).
 - **Back-off**: falling back from an exact context (the lane group) to broader ones when data is low (D-021). Pair terms are summed (correlated, scaled by `s`); only lane layers chain toward the running prediction.

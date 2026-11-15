@@ -1,6 +1,6 @@
 # GOALS
 
-Status: approved by the owner on 2026-11-15 (goal interview). This is the single short source of truth for *what* we build. DECISIONS.md explains *why*; SPECS.md explains *how*. A pull request that conflicts with this file needs an owner-approved decision first.
+Status: approved by the owner on 2026-11-15 (goal interview). This is the single short source of truth for _what_ we build. DECISIONS.md explains _why_; SPECS.md explains _how_. A pull request that conflicts with this file needs an owner-approved decision first.
 
 ## Purpose
 
@@ -15,23 +15,23 @@ The code can be shared. The data (profile, pool) is tied to one player.
 ## The player
 
 - About 70% Support, 29.5% Top and Jungle (autofilled often), 0.5% ADC and Mid.
-- Plays a personal pool of champions (for example Shen everywhere, Teemo Top/Jungle, Maokai Jungle/Top/Support, Nami Support) and wants to *see* when a better pick exists, not be forced into it.
+- Plays a personal pool of champions (for example Shen everywhere, Teemo Top/Jungle, Maokai Jungle/Top/Support, Nami Support) and wants to _see_ when a better pick exists, not be forced into it.
 - Allies' roles are known in champ select. Enemy roles are guessed.
 
 ## Core flows
 
 - **Pick screen:** enter locked allies, enemies (no role needed) and bans. The tool infers enemy roles with a confidence the player can override. Shows "From your pool" above "Best overall"; pool champions are tagged in both lists. Champion portraits next to names.
-- **Setup screen:** runes and summoners in two modes the player can switch live: *top players* (experts, high rank, fresh patches) or *my data*. Starting items included.
+- **Setup screen:** runes and summoners in two modes the player can switch live: _top players_ (experts, high rank, fresh patches) or _my data_. Starting items included.
 - **Game screen:** after the game starts, data is read from the game client automatically (closable at any time). Item advice for win / lose / even, a "fed" option for enemies or allies, and sell advice. Only the player's own champion is mandatory; any missing field shows a warning border and can be filled later.
 
 ## Scope by version
 
-| Version | Contents |
-| --- | --- |
-| v1 | Pick screen for Support, Top, Jungle (ADC and Mid minimal). Per-role pool editor (champion x roles). Manual draft and bans input. "Unvalidated model" label. Personal record shown as a badge only. Light/dark toggle. |
-| v2 | Runes, summoners and starters (top players / my data). Blended "my results" ranking. |
-| v3 | In-game items with automatic game-client data (LCU and Live Client API). Sell advice, fed enemy/ally option. |
-| Later | Per-rune usefulness for the player ("is Grasp useless for me?"), hand-written counter notes, screenshot import as a fallback only. |
+| Version | Contents                                                                                                                                                                                                               |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| v1      | Pick screen for Support, Top, Jungle (ADC and Mid minimal). Per-role pool editor (champion x roles). Manual draft and bans input. "Unvalidated model" label. Personal record shown as a badge only. Light/dark toggle. |
+| v2      | Runes, summoners and starters (top players / my data). Blended "my results" ranking.                                                                                                                                   |
+| v3      | In-game items with automatic game-client data (LCU and Live Client API). Sell advice, fed enemy/ally option.                                                                                                           |
+| Later   | Per-rune usefulness for the player ("is Grasp useless for me?"), hand-written counter notes, screenshot import as a fallback only.                                                                                     |
 
 ## Principles
 

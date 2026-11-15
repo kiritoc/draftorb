@@ -127,7 +127,7 @@ pnpm etl profile-sync [id]     # sync configured profiles -> SQLite -> data/publ
 
 Database commands (`aggregate`, `derive-roles`, `export`, `status`, `matches`, `players`, `migrate`) resolve the SQLite path the same way (`DRAFTORB_DB_PATH` env or repo default). `aggregate` and `derive-roles` refuse to run on a database with pending migrations — run `pnpm etl migrate` first.
 
-Planned (target state, see `docs/BACKLOG.md`):
+Planned (target state):
 
 ```
 pnpm etl backtest              # offline validation (T-027.a, T-027.b)

@@ -1,10 +1,10 @@
 # REVIEW CHECKLIST
 
-Use this for every PR in the rework. Source of truth: `docs/GOALS.md`, accepted decisions in `docs/DECISIONS.md` (D-096..D-109 plus anything the owner approves later; D-114 is ticketed in B-001 until written), and the ticket in `docs/BACKLOG.md`.
+Use this for every PR in the rework. Source of truth: `docs/GOALS.md`, accepted decisions in `docs/DECISIONS.md` (D-096..D-109 plus anything the owner approves later), and the linked GitHub issue/project item for scope and status.
 
 ## Goal alignment
 
-- [ ] The PR delivers exactly one `docs/BACKLOG.md` ticket — no scope creep, no unrelated refactors.
+- [ ] The PR delivers exactly one linked GitHub issue/task — no scope creep, no unrelated refactors.
 - [ ] The change moves the product toward GOALS.md (pick screen → runes/summoners/starters → in-game items) and respects the version scope (D-100, D-097).
 - [ ] Product invariants hold (AGENTS.md): "Best overall" always shown; "From your pool" above it when the pool is non-empty; both lists paginated with "Show more"; pool never changes `score(c)`; champion portraits next to names; "unvalidated" label until the D-023 gate passes.
 
@@ -24,7 +24,7 @@ Use this for every PR in the rework. Source of truth: `docs/GOALS.md`, accepted 
 ## Evidence, live data and pipeline scope
 
 - [ ] PRs that change a parameter or any number cite a backtest report (D-023).
-- [ ] Live-data code (LCU / Live Client Data) lands only after the B-040 GO verdict and owner sign-off; no memory reading or input injection anywhere.
+- [ ] Live-data code (LCU / Live Client Data) lands only after the Riot policy GO verdict and owner sign-off; no memory reading or input injection anywhere.
 - [ ] No database schema/migration or pipeline changes outside the ticket's stated scope.
 
 ## Tests and specs
@@ -42,11 +42,11 @@ Use this for every PR in the rework. Source of truth: `docs/GOALS.md`, accepted 
 
 ## Windows impact
 
-- [ ] Paths use `path.join`; no bash-only scripts; no symlinks. `packages/shared`, `packages/engine`, `packages/etl` and tooling keep the no-compiler native-dependency rule (AGENTS.md rule 4); any future Rust toolchain exception for the Windows desktop shell must first be recorded by B-001/D-110 and scoped to `apps/desktop` build tooling only.
+- [ ] Paths use `path.join`; no bash-only scripts; no symlinks. `packages/shared`, `packages/engine`, `packages/etl` and tooling keep the no-compiler native-dependency rule (AGENTS.md rule 4); any future Rust toolchain exception for the Windows desktop shell must first be recorded as an accepted decision and scoped to `apps/desktop` build tooling only.
 - [ ] Windows CI job (`windows-latest`) stays green; Windows-specific behavior is called out in the PR.
 - [ ] better-sqlite3 continues to use prebuilt binaries on Windows Node 22.
 
 ## Process
 
-- [ ] Ticket status updated in `docs/BACKLOG.md`; `docs/PROGRESS.md` handoff written; `docs/BUGS.md` updated for new/fixed bugs.
-- [ ] Commit messages follow Conventional Commits and reference the ticket id.
+- [ ] Linked GitHub issue/project status updated; `docs/BUGS.md` updated for new/fixed bugs.
+- [ ] Commit messages follow Conventional Commits and reference the issue/ticket id.

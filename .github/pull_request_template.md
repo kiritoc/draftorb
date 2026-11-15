@@ -1,8 +1,8 @@
 ## Summary
 
-<!-- What does this PR do and why? Link the BACKLOG.md ticket id (B-xxx). -->
+<!-- What does this PR do and why? Link the GitHub issue/project item. -->
 
-Ticket: B-___
+Ticket/issue: B-___ (#___)
 
 ## Verified / Not verified
 
@@ -24,19 +24,18 @@ Needed: yes/no
 
 ## Checklist
 
-- [ ] PR title contains the `B-xxx` ticket id
-- [ ] Linked to a `docs/BACKLOG.md` ticket (one ticket = one PR)
-- [ ] Acceptance criteria of the ticket are met
+- [ ] PR title or body links the GitHub issue/project item (one task = one PR)
+- [ ] Acceptance criteria of the linked issue are met
 - [ ] Tests added/updated and `pnpm check` is green (typecheck + lint + format + tests)
 - [ ] Works on Windows 11 (paths, scripts, shell-specific behavior)
 - [ ] `docs/SPECS.md` (or the relevant spec doc) updated in this PR if behavior changed
 - [ ] Every new number shows its sample size; thin data is labeled, never invented
 - [ ] Parameter or number changes cite a backtest report (D-023)
-- [ ] Live-data code only after the B-040 GO verdict; no memory reading or input injection
-- [ ] No database schema/migration or pipeline changes outside the ticket's stated scope
+- [ ] Live-data code only after the Riot policy GO verdict; no memory reading or input injection
+- [ ] No database schema/migration or pipeline changes outside the linked issue's stated scope
 - [ ] No secrets, tokens, PUUIDs, match ids or profile data committed
 - [ ] No PROPOSED decision implemented without explicit owner approval (quote it if applicable)
-- [ ] `docs/PROGRESS.md` handoff and `docs/BACKLOG.md`/ticket status updated
+- [ ] Linked GitHub issue/project status updated; `docs/BUGS.md` updated for new/fixed bugs
 
 ## Notes for reviewers
 

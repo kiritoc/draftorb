@@ -68,4 +68,4 @@ Run ETL collection in the background as early as possible — data volume is the
 | Riot policy on in-game advice tools         | First ticket of the live phase; log result in DECISIONS.md (D-105)                                                                     |
 | Implementation language for the shell       | Decided after the Stage-1 audit (TypeScript shell vs Rust vs Electron)                                                                 |
 | Data download at launch without a token     | Open: shared aggregates as a public release asset recommended (D-099); `pnpm etl pull` currently needs the gh CLI + private state repo |
-| AI drift between sessions                   | AGENTS.md rules, small tickets, tests, PROGRESS handoff                                                                                |
+| AI drift between sessions                   | AGENTS.md rules, small tasks, tests, commit/PR handoff                                                                                 |

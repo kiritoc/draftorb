@@ -2,6 +2,8 @@
 
 Status of this doc: v0.2 (ranking model D-020..D-023) — edit via `DECISIONS.md` when changing behavior.
 
+> Ticket IDs (`T-xxx`) refer to the retired Stage-1 backlog (`docs/TICKETS.md`, deleted 2026-11-15); full ticket text: history: see git log (`git log --follow -- docs/TICKETS.md`). Current scope: `docs/GOALS.md`; task tracking: GitHub issues/project.
+
 ## 1. Users & use cases
 
 - UC1 Draft: user (Diamond default) enters known champions (allies/enemies, roles optional) -> gets ranked champion picks for their slot with explanations. Roles in scope: Support, Top, Jungle in full; ADC and Mid minimal (D-097).
@@ -299,7 +301,7 @@ Fallback (stated once here): missing/unreadable/incomplete source, or no previou
 
 Fixtures (arithmetic shown): cooldown scalar 10->9 = 0.05 ([0,0.1) x1.0); armor 30->36 (0.1) + cooldown 10->9 (0.05) = 0.15 ([0.1,0.3) x0.9); damage array [10,9,8,7,6]->[9,8,7,6,5] ≈ 0.065 ([0,0.1) x1.0); AP ratio 0.5->0.55 = 0.05 ([0,0.1) x1.0); root spell replaced = 0.6 ([0.6,1] suggested); identical = 0; skin/VFX-only change = 0; child missile added = 0; hash resolved to a name = 0; ARAM-only item = 0; ARAM-only perk override = 0. Real-JSON fixtures: trimmed CommunityDragon files of two consecutive real patches under `packages/etl/test/fixtures`.
 
-Verification (2026-11-04, prototype on 16.20 -> 16.21 and 16.21 -> 16.22, see PROGRESS.md): of 173 champions, 145 and 53 raw files changed but only 21 and 15 champions have allowlisted changes, all of them balance values (e.g. 16.21 Caitlyn Q base damage, Varus W, Sion R ratio; 16.22 Mel base stats, Smolder, Naafiri). Items: 15 and 2 changed catalog items before the Summoner's Rift filter. Runes: no value changes in either pair. Remaining known false-positive class: internal data refactors with the same in-game effect (16.22 Orianna: `ReducedDamagePercent` 30 -> 0.7 with recalculated formulas, scored 1); these surface as `suggested` breakpoints and are rejected in review (§16). Still to do before the allowlist is frozen: compare these lists with the official patch notes. Manual breakpoints (§16, T-019.e) ship first.
+Verification (2026-11-04, prototype on 16.20 -> 16.21 and 16.21 -> 16.22): of 173 champions, 145 and 53 raw files changed but only 21 and 15 champions have allowlisted changes, all of them balance values (e.g. 16.21 Caitlyn Q base damage, Varus W, Sion R ratio; 16.22 Mel base stats, Smolder, Naafiri). Items: 15 and 2 changed catalog items before the Summoner's Rift filter. Runes: no value changes in either pair. Remaining known false-positive class: internal data refactors with the same in-game effect (16.22 Orianna: `ReducedDamagePercent` 30 -> 0.7 with recalculated formulas, scored 1); these surface as `suggested` breakpoints and are rejected in review (§16). Still to do before the allowlist is frozen: compare these lists with the official patch notes. Manual breakpoints (§16, T-019.e) ship first.
 
 ## 16. Breakpoints (D-047)
 

@@ -2,7 +2,9 @@
 
 <!-- What does this PR do and why? Link the GitHub issue/project item. -->
 
-Ticket/issue: B-___ (#___)
+Closes #___
+
+<!-- The issue title must start with the ticket id (B-xxx). Copy the acceptance criteria from the issue into the checklist below and tick each one with evidence (command, test, screenshot). -->
 
 ## Verified / Not verified
 
@@ -24,8 +26,8 @@ Needed: yes/no
 
 ## Checklist
 
-- [ ] PR title or body links the GitHub issue/project item (one task = one PR)
-- [ ] Acceptance criteria of the linked issue are met
+- [ ] PR title starts with the ticket id (B-xxx) and the body links the issue with `Closes #n` (one task = one PR)
+- [ ] Acceptance criteria of the linked issue are copied above and each one is ticked with evidence (command, test, screenshot)
 - [ ] Tests added/updated and `pnpm check` is green (typecheck + lint + format + tests)
 - [ ] Works on Windows 11 (paths, scripts, shell-specific behavior)
 - [ ] `docs/SPECS.md` (or the relevant spec doc) updated in this PR if behavior changed

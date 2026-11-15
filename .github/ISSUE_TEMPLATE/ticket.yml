@@ -1,0 +1,83 @@
+name: Ticket
+description: A rework ticket (B-xxx). One ticket = one PR.
+title: 'B-xxx — '
+labels: ['ticket']
+body:
+  - type: input
+    id: ticket-id
+    attributes:
+      label: Ticket ID
+      description: B-xxx — must also be at the start of the issue title.
+      placeholder: B-000
+    validations:
+      required: true
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: 1-3 sentences.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: >-
+        Checklist; each item checkable by someone who did not write the ticket
+        (a command, a test name or an observable behavior). No number without a
+        source. Estimates marked as estimates.
+      placeholder: |
+        - [ ] `pnpm check` is green
+        - [ ] ...
+    validations:
+      required: true
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
+    validations:
+      required: true
+  - type: input
+    id: decisions
+    attributes:
+      label: Decision IDs
+      description: Link to docs/DECISIONS.md entries; do not copy their text.
+      placeholder: D-101, D-102
+    validations:
+      required: true
+  - type: input
+    id: specs
+    attributes:
+      label: SPECS sections to update
+      description: Section numbers, or "none".
+      placeholder: SPECS §2.1, §7.1 — or "none"
+    validations:
+      required: true
+  - type: input
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: '"Depends on #n" for each blocking issue, or "none".'
+      placeholder: Depends on #68 — or "none"
+    validations:
+      required: true
+  - type: dropdown
+    id: size
+    attributes:
+      label: Size
+      description: S or M. L must be split into smaller tickets first.
+      options:
+        - S
+        - M
+    validations:
+      required: true
+  - type: dropdown
+    id: owner-decision
+    attributes:
+      label: Owner decision needed
+      description: If "yes", also add the needs-owner-decision label to the issue.
+      options:
+        - 'no'
+        - 'yes'
+    validations:
+      required: true

@@ -1259,3 +1259,7 @@ None is auto-approved; each needs an explicit owner OK when its phase starts.
 - Fold into the items rewrite: D-082, D-087, D-095.
 - Version 2: D-089.
 - Draft-model experiments, used only by the backtest until validated: D-088, D-090, D-092, D-092a.
+
+### D-114 — Public versioned champion pool file — ACCEPTED (owner, 2026-11-15)
+
+The player's champion pool is versioned in the public repo as `data/pool.config.json`. The file is secret-free, zod-validated, carries a `schemaVersion`, and stores champion ids per role with an optional display name. The program remains the source of truth for the screen: an "Export to repo file" action writes `data/pool.config.json` and the user commits it; the program warns when its pool and the repo file differ. The scheduled pipeline reads only the repo copy. The pool never changes scores (D-101). Amends D-101 (pool storage/sync mechanics) and feeds D-102 pool-driven collection.

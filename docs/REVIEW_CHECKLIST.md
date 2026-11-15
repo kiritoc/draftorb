@@ -1,6 +1,6 @@
 # REVIEW CHECKLIST
 
-Use this for every PR in the rework. Source of truth: `docs/GOALS.md`, accepted decisions in `docs/DECISIONS.md` (D-096..D-109 plus anything the owner approves later), and the ticket in `docs/BACKLOG.md`.
+Use this for every PR in the rework. Source of truth: `docs/GOALS.md`, accepted decisions in `docs/DECISIONS.md` (D-096..D-109, D-114 plus anything the owner approves later), and the ticket in `docs/BACKLOG.md`.
 
 ## Goal alignment
 
@@ -10,7 +10,7 @@ Use this for every PR in the rework. Source of truth: `docs/GOALS.md`, accepted 
 
 ## Decisions
 
-- [ ] Only ACCEPTED decisions are implemented. Any PROPOSED decision (D-081..D-095, D-088..D-092a and future PROPOSED entries) is either untouched or explicitly approved by the owner — approval is quoted in the PR.
+- [ ] Only ACCEPTED decisions are implemented. Any PROPOSED decision — exact current list: D-081..D-090, D-092, D-092a, D-093, D-095, plus any future PROPOSED entries — is either untouched or explicitly approved by the owner; approval is quoted in the PR.
 - [ ] New dependencies are recorded in `docs/DECISIONS.md` (name, why, size, license, free).
 - [ ] Spec gaps were logged as PROPOSED in `docs/DECISIONS.md` with the assumption used, not silently guessed.
 
@@ -20,6 +20,12 @@ Use this for every PR in the rework. Source of truth: `docs/GOALS.md`, accepted 
 - [ ] Thin data falls back to a broader labeled statistic (picks/runes) or a labeled rule (items) — never an invented or prior-only number (golden rule 8, D-103).
 - [ ] Win rate and pick share are shown separately where D-102 applies; "Master+ only" is off by default.
 - [ ] Rankings remain deterministic: same input → same output.
+
+## Evidence, live data and pipeline scope
+
+- [ ] PRs that change a parameter or any number cite a backtest report (D-023).
+- [ ] Live-data code (LCU / Live Client Data) lands only after the B-040 GO verdict and owner sign-off; no memory reading or input injection anywhere.
+- [ ] No database schema/migration or pipeline changes outside the ticket's stated scope.
 
 ## Tests and specs
 
@@ -36,7 +42,7 @@ Use this for every PR in the rework. Source of truth: `docs/GOALS.md`, accepted 
 
 ## Windows impact
 
-- [ ] Paths use `path.join`; no bash-only scripts; no symlinks; no native deps needing a compiler (AGENTS.md rule 4).
+- [ ] Paths use `path.join`; no bash-only scripts; no symlinks. `packages/shared`, `packages/engine`, `packages/etl` and tooling keep the no-compiler native-dependency rule (AGENTS.md rule 4); the Windows desktop shell may require the Rust toolchain for Tauri (D-110), recorded as a decision and scoped to `apps/desktop` build tooling only.
 - [ ] Windows CI job (`windows-latest`) stays green; Windows-specific behavior is called out in the PR.
 - [ ] better-sqlite3 continues to use prebuilt binaries on Windows Node 22.
 

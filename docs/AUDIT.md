@@ -6,13 +6,13 @@ Date: 2026-11-15. Scope: read-only audit of the monorepo against `docs/GOALS.md`
 
 Environment: macOS (Darwin 27), Node v26.12.1, pnpm 12.15.0. The repo declares `engines.node >= 22` and CI runs Node 22; commands were run on Node 26 locally.
 
-| Command             | Result                                                                                                                        |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm install`      | PASS — "Already up to date", 5 workspace projects                                                                            |
-| `pnpm typecheck`    | PASS — `tsc --build && tsc -p packages/engine/test && tsc -p packages/shared/test`, 0 errors                                  |
-| `pnpm lint`         | PASS — 0 errors, 120 warnings (all `@typescript-eslint/no-non-null-assertion` warnings, mostly in ETL tests)                  |
-| `pnpm format:check` | PASS — "All matched files use Prettier code style!"                                                                           |
-| `pnpm test`         | PASS — 111 test files, 1237 tests, 0 failures (vitest run, ~9 s)                                                              |
+| Command             | Result                                                                                                       |
+| ------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `pnpm install`      | PASS — "Already up to date", 5 workspace projects                                                            |
+| `pnpm typecheck`    | PASS — `tsc --build && tsc -p packages/engine/test && tsc -p packages/shared/test`, 0 errors                 |
+| `pnpm lint`         | PASS — 0 errors, 120 warnings (all `@typescript-eslint/no-non-null-assertion` warnings, mostly in ETL tests) |
+| `pnpm format:check` | PASS — "All matched files use Prettier code style!"                                                          |
+| `pnpm test`         | PASS — 111 test files, 1237 tests, 0 failures (vitest run, ~9 s)                                             |
 
 `pnpm check` was not run as a single command; its four components were run individually with the results above. No command required the Riot API; no `.env` was read.
 
@@ -43,13 +43,13 @@ Purpose: single source of truth — types + zod schemas, zero logic. ~178 export
 
 ### 2.5 `packages/engine` (pure; verified no Node/DOM imports — enforced by tsconfig `"types": []` + ESLint)
 
-| Module                                    | Purpose                                                                    | Callers                                          | Tests (rough coverage)                                                | Verdict  | Reason                                                                                          |
-| ----------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------ | --------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------- |
-| `recommend*.ts`, `roles*.ts`, `weighting.ts`, `levels.ts`, `comp.ts`, `influence-config.ts`, `config.ts` | Draft scoring, role inference, rank kernel, levels, comp needs            | web `DraftScreen` (`recommend`), etl aggregation/backtest/derive-roles | `recommend-*.test.ts` (~15 files), `roles.test.ts`, `weighting.test.ts` (40), `golden.test.ts`, `comp.test.ts`, `levels.test.ts` | **keep** | Core of the v1 pick screen; role-generic already. Gaps vs GOALS: bans not modeled, pool is per-role-id list not champion×roles, no distinct-player cap (D-102). |
-| `runes.ts`, `runes-context.ts` (in shared `rune-context.ts`) | Rune page recommender (SPECS §8.1, D-059)                                  | web `RunesPanel`/`recommendRunes`; etl `aggregate-runes` | `runes.test.ts`                                                       | **keep (v2)** | Needed for v2; only SUPPORT rune data exported today. |
-| `personalize.ts`, `profile-setup.ts`      | Profile-labeled list + "profile's best" runes/spells (D-072..D-080, D-089) | web `PersonalizedList`, `personalized.ts`        | `personalize.test.ts`, `profile-setup.test.ts`                        | **keep (v2), revisit** | Hardcoded `role !== 'SUPPORT'` filters (personalize.ts:183,270; profile-setup.ts:120,152) conflict with D-097's widened profile scope; D-089 blendMode is PROPOSED. |
-| `threat.ts`, `item-context.ts`, `items/*` | Threat score, item context derivation, item recommender + analytic fallback (D-081..D-087, D-093, D-095 — all PROPOSED) | etl `aggregate-items`/`export/builds` (context helpers); **no runtime consumer of `recommendItems`/`computeThreatScores`** | `threat.test.ts`, `item-context.test.ts` (21), `items.test.ts`        | **rewrite for v3** | Item-slot model predates the 2026 role quests (D-106); nothing in the app calls it yet. |
-| `joint/*`                                 | Joint regularized draft model (D-092/D-092a — PROPOSED)                    | etl `fit-model` only; export `joint-model.json` "for inspection" | `joint.test.ts` (5, incl. planted-effect)                             | **delete candidate** | Both validation gates failed (D-092/D-092a); no consumer. See §4. |
+| Module                                                                                                   | Purpose                                                                                                                 | Callers                                                                                                                    | Tests (rough coverage)                                                                                                           | Verdict                | Reason                                                                                                                                                              |
+| -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `recommend*.ts`, `roles*.ts`, `weighting.ts`, `levels.ts`, `comp.ts`, `influence-config.ts`, `config.ts` | Draft scoring, role inference, rank kernel, levels, comp needs                                                          | web `DraftScreen` (`recommend`), etl aggregation/backtest/derive-roles                                                     | `recommend-*.test.ts` (~15 files), `roles.test.ts`, `weighting.test.ts` (40), `golden.test.ts`, `comp.test.ts`, `levels.test.ts` | **keep**               | Core of the v1 pick screen; role-generic already. Gaps vs GOALS: bans not modeled, pool is per-role-id list not champion×roles, no distinct-player cap (D-102).     |
+| `runes.ts`, `runes-context.ts` (in shared `rune-context.ts`)                                             | Rune page recommender (SPECS §8.1, D-059)                                                                               | web `RunesPanel`/`recommendRunes`; etl `aggregate-runes`                                                                   | `runes.test.ts`                                                                                                                  | **keep (v2)**          | Needed for v2; only SUPPORT rune data exported today.                                                                                                               |
+| `personalize.ts`, `profile-setup.ts`                                                                     | Profile-labeled list + "profile's best" runes/spells (D-072..D-080, D-089)                                              | web `PersonalizedList`, `personalized.ts`                                                                                  | `personalize.test.ts`, `profile-setup.test.ts`                                                                                   | **keep (v2), revisit** | Hardcoded `role !== 'SUPPORT'` filters (personalize.ts:183,270; profile-setup.ts:120,152) conflict with D-097's widened profile scope; D-089 blendMode is PROPOSED. |
+| `threat.ts`, `item-context.ts`, `items/*`                                                                | Threat score, item context derivation, item recommender + analytic fallback (D-081..D-087, D-093, D-095 — all PROPOSED) | etl `aggregate-items`/`export/builds` (context helpers); **no runtime consumer of `recommendItems`/`computeThreatScores`** | `threat.test.ts`, `item-context.test.ts` (21), `items.test.ts`                                                                   | **rewrite for v3**     | Item-slot model predates the 2026 role quests (D-106); nothing in the app calls it yet.                                                                             |
+| `joint/*`                                                                                                | Joint regularized draft model (D-092/D-092a — PROPOSED)                                                                 | etl `fit-model` only; export `joint-model.json` "for inspection"                                                           | `joint.test.ts` (5, incl. planted-effect)                                                                                        | **delete candidate**   | Both validation gates failed (D-092/D-092a); no consumer. See §4.                                                                                                   |
 
 ### 2.6 `packages/etl`
 
@@ -61,20 +61,20 @@ Vite + React 19 + Tailwind static app. Features (from `App.tsx`/`DraftScreen.tsx
 
 ## 3. Module verdict table (summary)
 
-| Module                                   | Verdict        | One-line reason                                                                 |
-| ---------------------------------------- | -------------- | ------------------------------------------------------------------------------- |
-| `packages/shared`                        | keep           | Contract layer; cheap to keep whole.                                            |
-| `packages/engine` draft core             | keep           | Implements the v1 pick screen; needs bans + D-102 cap + role-scope work.        |
-| `packages/engine` runes                  | keep (v2)      | SPECS §8.1 implemented and tested.                                              |
-| `packages/engine` personalize/profile    | keep (v2), rework | SUPPORT-only filters vs D-097; D-089 pending.                                |
-| `packages/engine` threat/items           | rewrite (v3)   | PROPOSED decisions only; predates D-106 role quests.                            |
-| `packages/engine` joint                  | delete         | Failed both gates (D-092a); zero consumers.                                     |
-| `packages/etl` (all but joint-fit)       | keep           | D-098 keeps the pipeline; scheduled cron live (D-094).                          |
-| `packages/etl` `fit-model`/`joint-fit`   | delete         | Same as joint model.                                                            |
-| `packages/etl` `breakpoint` + tables     | keep (optional)| Manual breakpoints accepted (D-047); auto `changes` command never implemented.  |
-| `apps/web`                               | rewrite        | Wrong shell (browser vs Windows program), SUPPORT-only, localStorage pool.      |
-| `data/DraftOrb.sqlite` + migrations      | keep           | D-098 keeps the database; schema already role-generic.                          |
-| `data/public` export format              | keep           | Role-keyed JSON works; needs TOP/JUNGLE exports added (§5c).                    |
+| Module                                 | Verdict           | One-line reason                                                                |
+| -------------------------------------- | ----------------- | ------------------------------------------------------------------------------ |
+| `packages/shared`                      | keep              | Contract layer; cheap to keep whole.                                           |
+| `packages/engine` draft core           | keep              | Implements the v1 pick screen; needs bans + D-102 cap + role-scope work.       |
+| `packages/engine` runes                | keep (v2)         | SPECS §8.1 implemented and tested.                                             |
+| `packages/engine` personalize/profile  | keep (v2), rework | SUPPORT-only filters vs D-097; D-089 pending.                                  |
+| `packages/engine` threat/items         | rewrite (v3)      | PROPOSED decisions only; predates D-106 role quests.                           |
+| `packages/engine` joint                | delete            | Failed both gates (D-092a); zero consumers.                                    |
+| `packages/etl` (all but joint-fit)     | keep              | D-098 keeps the pipeline; scheduled cron live (D-094).                         |
+| `packages/etl` `fit-model`/`joint-fit` | delete            | Same as joint model.                                                           |
+| `packages/etl` `breakpoint` + tables   | keep (optional)   | Manual breakpoints accepted (D-047); auto `changes` command never implemented. |
+| `apps/web`                             | rewrite           | Wrong shell (browser vs Windows program), SUPPORT-only, localStorage pool.     |
+| `data/DraftOrb.sqlite` + migrations    | keep              | D-098 keeps the database; schema already role-generic.                         |
+| `data/public` export format            | keep              | Role-keyed JSON works; needs TOP/JUNGLE exports added (§5c).                   |
 
 ## 4. Cut candidates
 
@@ -126,14 +126,14 @@ Vite + React 19 + Tailwind static app. Features (from `App.tsx`/`DraftScreen.tsx
 
 Aggregate tables contain rows for **all five roles** (verified by `GROUP BY my_role`):
 
-| Table       | ADC     | JUNGLE  | MID     | SUPPORT  | TOP     |
-| ----------- | ------- | ------- | ------- | -------- | ------- |
-| baseline    | 1,112   | 928     | 1,232   | 1,128    | 1,296   |
-| pair_ally   | 146,312 | 163,104 | 183,208 | 148,480  | 197,488 |
-| lane_vs     | 184,160 | 37,536  | 51,536  | 184,816  | 65,472  |
-| lane_full   | 335,632 | —       | —       | 335,632  | —       |
-| item_build  | 15,923  | 16,005  | 17,372  | 100,919  | 19,649  |
-| rune_ctx    | 95,058  | 38,047  | 55,340  | 866,578  | 67,020  |
+| Table      | ADC     | JUNGLE  | MID     | SUPPORT | TOP     |
+| ---------- | ------- | ------- | ------- | ------- | ------- |
+| baseline   | 1,112   | 928     | 1,232   | 1,128   | 1,296   |
+| pair_ally  | 146,312 | 163,104 | 183,208 | 148,480 | 197,488 |
+| lane_vs    | 184,160 | 37,536  | 51,536  | 184,816 | 65,472  |
+| lane_full  | 335,632 | —       | —       | 335,632 | —       |
+| item_build | 15,923  | 16,005  | 17,372  | 100,919 | 19,649  |
+| rune_ctx   | 95,058  | 38,047  | 55,340  | 866,578 | 67,020  |
 
 (lane_full only exists for 2v2 lane groups — SUPPORT/ADC.) Raw participant games per role: 48,650 each (24,325 matches × 2 sides). **However `data/public/16.22/` exports only `roles/SUPPORT/`** — `manifest.roles = ["SUPPORT"]`. Re-running `pnpm etl export` with TOP/JUNGLE added to the role list would produce their files from existing aggregates; no re-aggregation is needed. Caveat from PROGRESS (2026-11-06, SUPPORT data): below `minGames` almost all pair/lane rows fail the n_eff gate — TOP/JUNGLE will be thinner still; sample sizes must be checked per file before relying on them (golden rule 8).
 
@@ -179,20 +179,20 @@ DB exists (see §2.1): 5,671,165,952 bytes (~5.28 GiB), 24,325 matches, 243,250 
 
 Computed read-only over all stored `participants` rows (unweighted counts; champion ids Shen=50, Nami=145, Maokai=78, Teemo=17):
 
-| Champ   | Role     | Games | Distinct players | Top-3 players' share |
-| ------- | -------- | ----- | ---------------- | -------------------- |
-| Teemo   | TOP      | 590   | 228              | 37.1%                |
-| Teemo   | JUNGLE   | 113   | 31               | 59.3%                |
-| Teemo   | SUPPORT  | 23    | 18               | 34.8%                |
-| Shen    | SUPPORT  | 201   | 138              | 12.9%                |
-| Shen    | TOP      | 131   | 82               | 27.5%                |
-| Shen    | JUNGLE   | 0     | —                | —                    |
-| Maokai  | SUPPORT  | 580   | 329              | 20.3%                |
-| Maokai  | TOP      | 163   | 120              | 11.0%                |
-| Maokai  | JUNGLE   | 64    | 44               | 26.6%                |
-| Nami    | SUPPORT  | 3     | 3                | 100% (n=3)           |
-| Nami    | TOP      | 37    | 32               | 18.9%                |
-| Nami    | JUNGLE   | 17    | 10               | 58.8%                |
+| Champ  | Role    | Games | Distinct players | Top-3 players' share |
+| ------ | ------- | ----- | ---------------- | -------------------- |
+| Teemo  | TOP     | 590   | 228              | 37.1%                |
+| Teemo  | JUNGLE  | 113   | 31               | 59.3%                |
+| Teemo  | SUPPORT | 23    | 18               | 34.8%                |
+| Shen   | SUPPORT | 201   | 138              | 12.9%                |
+| Shen   | TOP     | 131   | 82               | 27.5%                |
+| Shen   | JUNGLE  | 0     | —                | —                    |
+| Maokai | SUPPORT | 580   | 329              | 20.3%                |
+| Maokai | TOP     | 163   | 120              | 11.0%                |
+| Maokai | JUNGLE  | 64    | 44               | 26.6%                |
+| Nami   | SUPPORT | 3     | 3                | 100% (n=3)           |
+| Nami   | TOP     | 37    | 32               | 18.9%                |
+| Nami   | JUNGLE  | 17    | 10               | 58.8%                |
 
 Evidence for D-102's per-player cap: several pool-relevant cells are dominated by few players (Teemo/Jungle top-3 = 59.3% of 113 games; Nami/Support 100% of 3 games; Nami/Jungle 58.8% of 17). Even the best-covered cell (Maokai/Support, 580 games / 329 players) has top-3 share 20.3%. Caveat: raw unweighted counts over a Champion+-heavy seed population (players are top-ranked seeds, §5d), so shares measure seed-pool habits, not the general population.
 
@@ -200,33 +200,33 @@ Evidence for D-102's per-player cap: several pool-relevant cells are dominated b
 
 Criteria: startup time, memory, engine reuse (backtest + ETL), Windows setup effort, risk when AI sessions write the code, rework cost. All timings are **estimates**, not measurements.
 
-| Criterion                              | A. TypeScript + light shell (Tauri)      | B. Full Rust                            | C. Electron                            |
-| -------------------------------------- | ---------------------------------------- | --------------------------------------- | -------------------------------------- |
-| Startup time                           | Fast (~1-3 s est.: native shell + V8/JIT)| Fastest (~100-500 ms est.)              | Slowest (~2-5 s est., Chromium boot)    |
-| Memory                                 | Low (~150-400 MB est.)                   | Lowest (~50-150 MB est.)                | Highest (~400-800 MB est.)             |
-| Engine reuse in backtest/ETL           | Direct — same TS package runs in Node/vitest today | Port required (rewrite or FFI/WASM bridge) | Direct — same as A                   |
-| Windows setup effort                   | Node+pnpm+Rust(Tauri build) or prebuilt; moderate | Rust toolchain; cargo is heavier for AI sessions | Node+pnpm only; heaviest runtime deps |
-| AI-session code risk                   | Lowest — existing strict TS + 1237 tests + zod contracts reuse | Medium — new language, new test harness, no existing Rust code | Low-medium — same TS, but Electron IPC/main-process bugs are a classic failure mode |
-| Rework cost                             | Lowest — `packages/engine`/`shared`/`etl` reused as-is; web UI largely portable to a webview | Highest — engine port or dual implementation; backtest must be re-validated | Medium — engine reusable; UI portable; shell is throwaway-ish |
-| Data download at launch (D-099)        | `fetch` in webview or Rust side; trivial | `reqwest`; trivial | `fetch`/Node; trivial |
-| Free/100% constraint                   | All options free; Tauri/Rust and Electron both OSS | Free | Free |
+| Criterion                       | A. TypeScript + light shell (Tauri)                                                          | B. Full Rust                                                                | C. Electron                                                                         |
+| ------------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Startup time                    | Fast (~1-3 s est.: native shell + V8/JIT)                                                    | Fastest (~100-500 ms est.)                                                  | Slowest (~2-5 s est., Chromium boot)                                                |
+| Memory                          | Low (~150-400 MB est.)                                                                       | Lowest (~50-150 MB est.)                                                    | Highest (~400-800 MB est.)                                                          |
+| Engine reuse in backtest/ETL    | Direct — same TS package runs in Node/vitest today                                           | Port required (rewrite or FFI/WASM bridge)                                  | Direct — same as A                                                                  |
+| Windows setup effort            | Node+pnpm+Rust(Tauri build) or prebuilt; moderate                                            | Rust toolchain; cargo is heavier for AI sessions                            | Node+pnpm only; heaviest runtime deps                                               |
+| AI-session code risk            | Lowest — existing strict TS + 1237 tests + zod contracts reuse                               | Medium — new language, new test harness, no existing Rust code              | Low-medium — same TS, but Electron IPC/main-process bugs are a classic failure mode |
+| Rework cost                     | Lowest — `packages/engine`/`shared`/`etl` reused as-is; web UI largely portable to a webview | Highest — engine port or dual implementation; backtest must be re-validated | Medium — engine reusable; UI portable; shell is throwaway-ish                       |
+| Data download at launch (D-099) | `fetch` in webview or Rust side; trivial                                                     | `reqwest`; trivial                                                          | `fetch`/Node; trivial                                                               |
+| Free/100% constraint            | All options free; Tauri/Rust and Electron both OSS                                           | Free                                                                        | Free                                                                                |
 
 **Recommendation: A — TypeScript with a Tauri shell.** The engine is pure TS with a strict test suite and the ETL/backtest already run it in Node; Tauri gives a native Windows binary with fast startup and low memory, keeps one language (D-001 spirit, D-098-compliant since the shell language is now open), and minimizes rework. B (full Rust) buys the smallest footprint but forces a port of ~4k lines of engine plus re-validation of the backtest — poor cost/benefit for a single-user tool. C (Electron) reuses everything but is the heaviest option on the exact criteria GOALS.md cares about ("starts in seconds, light on resources"). The owner decides (D-098/D-099 open item).
 
 ## 7. Doc hygiene — contradictions and stale statements
 
-| Location | Statement | Problem |
-| -------- | --------- | ------- |
-| `docs/ARCHITECTURE.md:3` | "apps/web is a scaffold (stub app, T-030 not started)" | Stale — the web app is functional (draft screen, pool, runes panel). |
-| `docs/ARCHITECTURE.md:66,72` | "`latest.json` is not yet written by export" | Stale — `data/public/latest.json` exists (written 2026-11-13, D-051 implemented). |
-| `docs/DATA_MODEL.md:159` | "Phase 1 populates only `my_role = 'SUPPORT'`" | Stale vs D-097 — TOP/JUNGLE are in scope; aggregates already exist for all roles (§5c). |
-| `docs/GLOSSARY.md:33` | "exportMinGames … default value is unverified" | Resolved — default is 10 (`engine/src/config.ts:121`). |
-| `docs/SPECS.md:24` vs `packages/shared/src/schemas/draft.ts` | `bans?: ChampionId[]` in spec | Not implemented anywhere (schema is `.strict()` without `bans`); v1 requires it (D-106). |
-| `docs/SPECS.md` §18 / `personalize.ts:183,270`, `profile-setup.ts:120,152` | Profile scope "Support, Top and Jungle" (D-097) | Engine still filters `role !== 'SUPPORT'` — personalization is SUPPORT-only in code. |
-| `docs/PROGRESS.md:67` | "etl.yml cron DISABLED — workflow_dispatch only" | Stale vs `.github/workflows/etl.yml:32` (`cron: '37 */12 * * *'`, re-enabled by D-094). PROGRESS.md already carries an OBSOLETE banner, but the newest session entries postdate it. |
-| `docs/TICKETS.md`, `docs/PROGRESS.md` | Whole files | Already bannered OBSOLETE (superseded by GOALS.md/D-096..D-109) — fine as history, but the Stage-2 backlog referenced by the banner does not exist yet. |
-| `docs/DECISIONS_AMENDMENTS.md` | "Merged into DECISIONS.md … kept as a record only" | Correct — no action. |
-| Broken links | — | None found: all `docs/` cross-references checked resolve; `PROGRESS_ARCHIVE.md`, `reports/`, `proposed-etl-schedule.md` exist. |
+| Location                                                                   | Statement                                              | Problem                                                                                                                                                                             |
+| -------------------------------------------------------------------------- | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/ARCHITECTURE.md:3`                                                   | "apps/web is a scaffold (stub app, T-030 not started)" | Stale — the web app is functional (draft screen, pool, runes panel).                                                                                                                |
+| `docs/ARCHITECTURE.md:66,72`                                               | "`latest.json` is not yet written by export"           | Stale — `data/public/latest.json` exists (written 2026-11-13, D-051 implemented).                                                                                                   |
+| `docs/DATA_MODEL.md:159`                                                   | "Phase 1 populates only `my_role = 'SUPPORT'`"         | Stale vs D-097 — TOP/JUNGLE are in scope; aggregates already exist for all roles (§5c).                                                                                             |
+| `docs/GLOSSARY.md:33`                                                      | "exportMinGames … default value is unverified"         | Resolved — default is 10 (`engine/src/config.ts:121`).                                                                                                                              |
+| `docs/SPECS.md:24` vs `packages/shared/src/schemas/draft.ts`               | `bans?: ChampionId[]` in spec                          | Not implemented anywhere (schema is `.strict()` without `bans`); v1 requires it (D-106).                                                                                            |
+| `docs/SPECS.md` §18 / `personalize.ts:183,270`, `profile-setup.ts:120,152` | Profile scope "Support, Top and Jungle" (D-097)        | Engine still filters `role !== 'SUPPORT'` — personalization is SUPPORT-only in code.                                                                                                |
+| `docs/PROGRESS.md:67`                                                      | "etl.yml cron DISABLED — workflow_dispatch only"       | Stale vs `.github/workflows/etl.yml:32` (`cron: '37 */12 * * *'`, re-enabled by D-094). PROGRESS.md already carries an OBSOLETE banner, but the newest session entries postdate it. |
+| `docs/TICKETS.md`, `docs/PROGRESS.md`                                      | Whole files                                            | Already bannered OBSOLETE (superseded by GOALS.md/D-096..D-109) — fine as history, but the Stage-2 backlog referenced by the banner does not exist yet.                             |
+| `docs/DECISIONS_AMENDMENTS.md`                                             | "Merged into DECISIONS.md … kept as a record only"     | Correct — no action.                                                                                                                                                                |
+| Broken links                                                               | —                                                      | None found: all `docs/` cross-references checked resolve; `PROGRESS_ARCHIVE.md`, `reports/`, `proposed-etl-schedule.md` exist.                                                      |
 
 ## 8. Questions for the owner
 

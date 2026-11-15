@@ -9,6 +9,7 @@ Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATI
 | B-067 | S4  | etl  | `check-key` prints `undefined` for the league name                                                                                                                                 | OPEN   | Devin/2026-11-12           | –      |
 | B-068 | S4  | docs | "512 MiB release-asset cap" was a self-imposed 25% headroom rule, not a GitHub limit (real cap: 2 GiB/file)                                                                        | FIXED  | external review/2026-11-12 | –      |
 | B-069 | S2  | etl  | `profile-sync` marked every match `invalid`: Riot renamed `spell1Id`/`spell2Id` to `summoner1Id`/`summoner2Id` in newer game versions; `extractProfileGame` required the old names | FIXED  | Devin/2026-11-13           | –      |
+| B-070 | S1  | etl  | Corrupt `DraftOrb.sqlite.gz` published by a timeout-cancelled run broke every ETL refresh (`integrity_check` errors)                                                              | FIXED  | Devin/2026-11-15           | –      |
 
 ## Duplicate bug IDs (not renumbered)
 
@@ -34,6 +35,16 @@ Review notes that predate the bug log live in [Review history](#review-history) 
 ```
 
 ## Fixed
+
+### B-070 — Corrupt `DraftOrb.sqlite.gz` published by a timeout-cancelled run broke every ETL refresh — FIXED
+
+- Severity / Area: S1 / etl (CI state pipeline, D-078)
+- Steps to reproduce: run 43497354082 exceeded `timeout-minutes: 300` while `pnpm etl matches euw1 --limit 100` was still writing; the `if: always()` "Compact and check database" step then ran `wal_checkpoint`/`integrity_check`/`VACUUM` while the killed step's writer process was still alive, and `gzip` streamed the file mid-write.
+- Expected / Actual: expected only integrity-checked snapshots to reach the state repo; actual `gzip` logged `file size changed while zipping` (warning, exit 0), the upload step (`if: always()`) published the torn snapshot as `state-20261114T0101Z`, and every later run failed `PRAGMA integrity_check` on restore (exit 3, nothing uploaded).
+- Environment (OS, Node version, patch): GitHub `ubuntu-latest` runner, better-sqlite3, gzip 1.12.
+- Logs / screenshot: run 43497354082 log — `gzip: .../DraftOrb.sqlite: file size changed while zipping` at 01:01:12, then `Published state-20261114T0101Z`; runs 43568889087/43626745340/43688584213 fail with `Tree 59 page 59 cell 130: Rowid 54083 out of order`, `invalid page number 385647`, etc.
+- Suspected cause: two gaps — (1) no guard against snapshotting while a cancelled step's writer process still holds the DB, and (2) the upload step uploaded whatever `$RUNNER_TEMP/DraftOrb.sqlite.gz` existed even when the compact step failed or gzip warned.
+- Fix (commit/ticket): deleted the corrupt `state-20261114T0101Z` release (verified `state-20261112T1035Z` passes `integrity_check`); `etl.yml` compact step now checks `wal_checkpoint` busy, waits up to 60s for `lsof` to show no holder, and treats gzip's "file size changed" warning as fatal; upload step is gated on `steps.compact.outcome == 'success'`; `timeout-minutes` raised to 360. See D-110.
 
 ### B-066 — `etl pull` aborted on tar directory entries ending with `/` — FIXED
 

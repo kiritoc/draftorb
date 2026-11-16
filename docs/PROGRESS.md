@@ -18,7 +18,7 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 - Date: 2026-11-16
 - Branch/PR: `feat/bl-002-tauri-spike` / BL-002 PR (this PR)
 - State: REVIEW
-- Done: BL-002 Windows Tauri spike — new `apps/desktop/` (Tauri v2 shell + Vite/TS frontend running a real `recommend()` on the `full_draft_support` golden fixture), `scripts/bench.ts` benchmark, `scripts/gen-icon.ts` icon generator, report `docs/reports/bl-002-tauri-spike.md` (median cold start 338 ms external / 313 ms Rust-side, engine call 0.081 ms avg, idle memory 351 MB — all inside the AUDIT §6 estimates; GO recommendation for D-115, owner confirmation lines left blank), dependency decision D-116, project board BL-001 moved to Done.
+- Done: BL-002 Windows Tauri spike — new `apps/desktop/` (Tauri v2 shell + Vite/TS frontend running a real `recommend()` on the `full_draft_support` golden fixture), `scripts/bench.ts` benchmark, `scripts/gen-icon.ts` icon generator, report `docs/reports/bl-002-tauri-spike.md` (median cold start 362 ms external / 330 ms Rust-side after paint, engine call 0.089 ms avg, idle memory 349 MB — all inside the AUDIT §6 estimates; GO recommendation for D-115, owner confirmation lines left blank), dependency decision D-116, project board BL-001 moved to Done.
 - Files touched: `apps/desktop/**`, `docs/{DECISIONS,PROGRESS,reports/bl-002-tauri-spike}.md`, `eslint.config.mjs`, `tsconfig.json`, `.gitignore`, `pnpm-lock.yaml`; project board.
 - Tests: `pnpm check` green (1237 tests); benchmark numbers in the report.
 - Blockers / next step: owner reviews the PR and fills the confirmation lines in the spike report (thresholds + GO/NO-GO for D-115); then BL-003 (#69) Windows CI job and BL-004 (#70) public aggregates.
@@ -31,7 +31,7 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 - Done:
   - Scaffolded `apps/desktop/`: `src-tauri/` minimal Tauri v2 app (two commands: `process_uptime_ms`, `report_metrics`), `ui/` Vite + vanilla TS frontend importing `@draftorb/engine` + `@draftorb/shared`, zod-validating `ui/src/fixture.json` (input+data of golden `full_draft_support`) and rendering top-10 `recommend()` output; `scripts/bench.ts` (5-run cold-start/engine-latency/idle-memory benchmark) and `scripts/gen-icon.ts` (PNG-in-ICO generator, tauri-build requirement).
   - Installed Rust toolchain (rustup 1.100.0, MSVC via VS 2022 Community already present); release exe ~9 MB, frontend bundle 128 kB JS / 37.6 kB gzip.
-  - Measurements (median of 5): external cold start 338 ms, Rust-reported start→interactive 313 ms, `recommend()` avg 0.081 ms (200 iters), idle memory 351 MB across 7 processes (draftorb.exe + WebView2 children).
+  - Measurements (median of 5): external cold start 362 ms, Rust-reported start→interactive 330 ms (paint-aware via double rAF), `recommend()` avg 0.089 ms (200 iters), idle memory 349 MB across 7 processes (draftorb.exe + WebView2 children).
   - Wrote `docs/reports/bl-002-tauri-spike.md` with methodology, proposed thresholds (cold start <1.5 s, recommend <5 ms, memory <450 MB on real data), GO recommendation for D-115, and blank owner-confirmation lines; added D-116 (Tauri/vite deps) to DECISIONS.md.
   - Fixed lint/typecheck integration: desktop scripts are `.ts` via `tsx`, `**/target/**` eslint-ignored, `apps/desktop` added to root tsconfig references.
 - Files touched: `apps/desktop/**`, `docs/{DECISIONS,PROGRESS,reports/bl-002-tauri-spike}.md`, `eslint.config.mjs`, `tsconfig.json`, `.gitignore`, `pnpm-lock.yaml`; GitHub project board (BL-001 → Done).

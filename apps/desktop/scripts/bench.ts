@@ -13,6 +13,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { performance } from 'node:perf_hooks';
 
 const args = process.argv.slice(2);
@@ -22,11 +23,7 @@ const opt = (name: string, fallback: string): string => {
 };
 
 const RUNS = Number(opt('--runs', '5'));
-const repoRoot = resolve(
-  new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'),
-  '..',
-  '..',
-);
+const repoRoot = resolve(fileURLToPath(new URL('..', import.meta.url)), '..', '..');
 const defaultExe = join(
   repoRoot,
   'apps',
@@ -173,7 +170,10 @@ function killTreeByName() {
 
 const median = (xs: Array<number | null>): number | null => {
   const s = xs.filter((x): x is number => x !== null).sort((a, b) => a - b);
-  return s.length ? (s[Math.floor(s.length / 2)] ?? null) : null;
+  if (s.length === 0) return null;
+  const mid = Math.floor(s.length / 2);
+  if (s.length % 2 === 1) return s[mid] ?? null;
+  return ((s[mid - 1] ?? 0) + (s[mid] ?? 0)) / 2;
 };
 
 const summary = {

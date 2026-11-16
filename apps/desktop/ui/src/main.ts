@@ -82,8 +82,14 @@ async function main(): Promise<void> {
     </table>
   `;
 
+  // Wait for an actual paint (two animation frames) so the cold-start number
+  // marks visible content, not just DOM readiness.
+  await new Promise<void>((resolvePaint) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolvePaint()));
+  });
+
   // Cold-start numbers as seen by the Rust process: JS boot time and the
-  // wall-clock time until this content is on screen.
+  // wall-clock time until this content is painted.
   const [jsBootMs, interactiveMs] = await Promise.all([
     jsBootPromise,
     invoke<number>('process_uptime_ms').catch(() => NaN),

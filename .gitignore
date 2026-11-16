@@ -4,6 +4,8 @@ node_modules
 coverage
 .vite
 dist/
+target/
+**/src-tauri/gen/
 .vscode
 *.tsbuildinfo
 .DS_Store

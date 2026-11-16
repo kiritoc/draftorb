@@ -259,6 +259,6 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ['**/dist/**', '**/node_modules/**', 'coverage/**', 'data/**'],
+    ignores: ['**/dist/**', '**/node_modules/**', 'coverage/**', 'data/**', '**/target/**'],
   },
 );

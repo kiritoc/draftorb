@@ -7,7 +7,7 @@ Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATI
 | ID    | Sev | Area | Title                                                                                                                                                                              | Status | Found by/date              | Ticket |
 | ----- | --- | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | -------------------------- | ------ |
 | B-071 | S1  | etl  | Scheduled ETL refresh never saves progress: the unbudgeted `matches --refresh` step hits the 360-minute timeout and the B-070 guard refuses the snapshot                           | FIXED  | Devin/2026-11-17           | –      |
-| B-067 | S4  | etl  | `check-key` prints `undefined` for the league name                                                                                                                                 | OPEN   | Devin/2026-11-12           | –      |
+| B-067 | S4  | etl  | `check-key` prints `undefined` for the league name                                                                                                                                 | FIXED  | Devin/2026-11-12           | –      |
 | B-068 | S4  | docs | "512 MiB release-asset cap" was a self-imposed 25% headroom rule, not a GitHub limit (real cap: 2 GiB/file)                                                                        | FIXED  | external review/2026-11-12 | –      |
 | B-069 | S2  | etl  | `profile-sync` marked every match `invalid`: Riot renamed `spell1Id`/`spell2Id` to `summoner1Id`/`summoner2Id` in newer game versions; `extractProfileGame` required the old names | FIXED  | Devin/2026-11-13           | –      |
 | B-070 | S1  | etl  | Corrupt `DraftOrb.sqlite.gz` published by a timeout-cancelled run broke every ETL refresh (`integrity_check` errors)                                                               | FIXED  | Devin/2026-11-15           | –      |
@@ -36,6 +36,16 @@ Review notes that predate the bug log live in [Review history](#review-history) 
 ```
 
 ## Fixed
+
+### B-067 — `check-key` prints `undefined` for the league name — FIXED
+
+- Severity / Area: S4 / etl
+- Steps to reproduce: `pnpm etl check-key euw1` with a valid key.
+- Expected / Actual: expected a success line without missing values; actual `... Challenger league ("undefined").` because league-v4 no longer always returns `name` (already `optional()` in `riotLeagueListSchema`).
+- Environment (OS, Node version, patch): any; seen in the scheduled ETL logs.
+- Logs / screenshot: `Riot API key is valid! Successfully reached euw1 Challenger league ("undefined").`
+- Suspected cause: the message interpolated `challenger.name` unconditionally.
+- Fix (commit/ticket): `formatKeyCheckSuccess` omits the name when absent; regression test `packages/etl/src/commands/check-key.test.ts`.
 
 ### B-071 — Scheduled ETL refresh never saves progress (timeout livelock) — FIXED
 

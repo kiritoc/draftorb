@@ -21,12 +21,10 @@ export type Platform = (typeof PLATFORMS)[number];
 export const REGIONAL_ROUTINGS = ['europe', 'americas', 'asia', 'sea'] as const;
 export type RegionalRouting = (typeof REGIONAL_ROUTINGS)[number];
 
-function shortenPuuids(value: string): string {
-  // Riot PUUIDs are 78-character base64url strings
-  return value.replace(
-    /(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{78}(?![A-Za-z0-9_-])/g,
-    (match) => `${match.slice(0, 8)}…`,
-  );
+function redactPuuids(value: string): string {
+  // Riot PUUIDs are 78-character base64url strings; no prefix is kept because
+  // workflow logs are public (D-078 point 9).
+  return value.replace(/(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{78}(?![A-Za-z0-9_-])/g, '[REDACTED]');
 }
 
 function redactMatchIds(value: string): string {
@@ -37,8 +35,8 @@ function redactMatchIds(value: string): string {
 }
 
 function redactSensitiveText(value: string): string {
-  // Redact API keys first, then shorten PUUIDs, then match IDs
-  return redactMatchIds(shortenPuuids(value.replace(/RGAPI-[A-Za-z0-9_-]+/g, '[REDACTED]')));
+  // Redact API keys first, then PUUIDs, then match IDs
+  return redactMatchIds(redactPuuids(value.replace(/RGAPI-[A-Za-z0-9_-]+/g, '[REDACTED]')));
 }
 
 function redactSensitiveValue(value: unknown): unknown {

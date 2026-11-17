@@ -6,6 +6,7 @@ Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATI
 
 | ID    | Sev | Area | Title                                                                                                                                                                              | Status | Found by/date              | Ticket |
 | ----- | --- | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | -------------------------- | ------ |
+| B-072 | S3  | etl  | Riot API error redaction kept an 8-character PUUID prefix in public workflow logs (D-078 point 9)                                                                                  | FIXED  | review/2026-11-17          | –      |
 | B-071 | S1  | etl  | Scheduled ETL refresh never saves progress: the unbudgeted `matches --refresh` step hits the 360-minute timeout and the B-070 guard refuses the snapshot                           | FIXED  | Devin/2026-11-17           | –      |
 | B-067 | S4  | etl  | `check-key` prints `undefined` for the league name                                                                                                                                 | FIXED  | Devin/2026-11-12           | –      |
 | B-068 | S4  | docs | "512 MiB release-asset cap" was a self-imposed 25% headroom rule, not a GitHub limit (real cap: 2 GiB/file)                                                                        | FIXED  | external review/2026-11-12 | –      |
@@ -36,6 +37,15 @@ Review notes that predate the bug log live in [Review history](#review-history) 
 ```
 
 ## Fixed
+
+### B-072 — Riot API error redaction kept an 8-character PUUID prefix — FIXED
+
+- Severity / Area: S3 / etl (privacy, D-078 point 9)
+- Steps to reproduce: any ETL run whose Riot API error body contains a PUUID (e.g. a 400 "Player not found") prints the error to the public `etl.yml` workflow logs.
+- Expected / Actual: expected no PUUID material in public logs; actual `redactSensitiveText` in `packages/etl/src/riot/types.ts` shortened the 78-character PUUID to its first 8 characters plus an ellipsis.
+- Environment (OS, Node version, patch): any; visible in scheduled ETL logs.
+- Suspected cause: `shortenPuuids` kept a prefix for debuggability, but D-078 point 9 forbids PUUIDs in public logs; owner decision 2026-11-17 requires full redaction like match ids.
+- Fix (commit/ticket): `redactPuuids` replaces the whole token with `[REDACTED]`; regression test `packages/etl/src/riot/client.test.ts` ("fully redacts 78-character PUUIDs in error bodies"). Decision recorded as a D-078 update in `docs/DECISIONS.md`.
 
 ### B-067 — `check-key` prints `undefined` for the league name — FIXED
 

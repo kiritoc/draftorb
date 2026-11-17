@@ -228,7 +228,7 @@ describe('RiotClient', () => {
       expect(bodyStr).not.toContain('def012345678');
     });
 
-    it('shortens 78-character PUUIDs in error bodies (B-010 regression)', async () => {
+    it('fully redacts 78-character PUUIDs in error bodies (B-010 regression, D-078 point 9)', async () => {
       // Real Riot PUUIDs are 78-character base64url strings (split so the committed
       // file never contains a contiguous PUUID-like token, scripts/check-secrets.mjs)
       const realPuuid =
@@ -243,9 +243,10 @@ describe('RiotClient', () => {
         .catch((reason: unknown) => reason);
       expect(error).toBeInstanceOf(RiotApiError);
       if (!(error instanceof RiotApiError)) throw new Error('Expected RiotApiError');
-      // PUUID should be shortened to first 8 chars + ellipsis
-      expect(error.message).toContain('AbCdEfGh…');
-      expect(error.message).not.toContain(realPuuid.slice(8));
+      // No part of the PUUID may reach public logs, not even a prefix (D-078 point 9)
+      expect(error.message).toContain('[REDACTED]');
+      expect(error.message).not.toContain(realPuuid.slice(0, 8));
+      expect(JSON.stringify(error.responseBody)).not.toContain(realPuuid.slice(0, 8));
     });
 
     it('waits Retry-After and retries on 429 Rate Limit response', async () => {

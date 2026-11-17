@@ -901,6 +901,8 @@ Owner decision 2026-11-07.
 
 Owner decision 2026-11-08.
 
+Update (2026-11-17, owner decision): point 9 is applied literally to error messages: Riot API errors redact PUUIDs completely (`[REDACTED]`, like match ids); the former 8-character prefix is no longer logged.
+
 ### D-079 — Local-only app: no hosting, no deploy workflow — ACCEPTED, amended by D-099, amended by D-111
 
 - Context: the owner wants the app private and only needs the database refreshed automatically. GitHub Pages on the free plan requires a public repo; Cloudflare Access requires payment details even on its free plan.

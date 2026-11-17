@@ -1,3 +1,5 @@
+> **Note (D-094, owner decision 2026-11-13):** the scheduled `etl.yml` workflow (every 12h) is the primary ingestion path again. This file is the manual/local runbook.
+
 # Local ETL runbook — primary ingestion path (D-091, owner decision 2026-11-12)
 
 The GitHub Actions schedule is **disabled** (`etl.yml` keeps only

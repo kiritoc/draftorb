@@ -15,6 +15,17 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 
 ## Current handoff
 
+- Date: 2026-11-17
+- Branch/PR: `chore/bl-005-delete-joint-model` (local only, not pushed) / BL-005 (#71)
+- State: REVIEW
+- Done: deleted the joint draft model per D-112 (gates D-092/D-092a failed, no consumer): `packages/engine/src/joint/` and its index re-export, `packages/etl/src/joint-fit.ts`, `commands/fit-model.ts` and its CLI registration, `packages/engine/test/joint.test.ts`. Fixed stale docs: ARCHITECTURE.md (status, `latest.json`, Electron -> Tauri D-115), DATA_MODEL.md (aggregates for all roles), GLOSSARY.md (`exportMinGames` default 10), PLAN_SUMMARY.md (shell language resolved by D-115), CONVENTIONS.md (theme D-107, storage D-101/D-114), proposed-etl-schedule.md (D-094 note).
+- Files touched: `packages/engine/src/{index.ts,joint/}`, `packages/engine/test/joint.test.ts`, `packages/etl/src/{cli.ts,joint-fit.ts,commands/fit-model.ts}`, `docs/{ARCHITECTURE,DATA_MODEL,GLOSSARY,PLAN_SUMMARY,CONVENTIONS,proposed-etl-schedule,PROGRESS}.md`.
+- Tests: `pnpm check`.
+- Blockers / next step: owner review; branch is local only.
+- Pitfalls: historical mentions of joint/`fit-model` remain on purpose in DECISIONS.md, AUDIT.md, PROGRESS_ARCHIVE.md, TICKETS.md, PROMPTS.md and docs/reports/.
+
+### Previous handoff (BL-002)
+
 - Date: 2026-11-16
 - Branch/PR: `feat/bl-002-tauri-spike` / BL-002 PR (this PR)
 - State: REVIEW

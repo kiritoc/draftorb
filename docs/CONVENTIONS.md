@@ -27,8 +27,8 @@ All code, comments, docs, commit messages, tickets, bug reports, logs, error mes
 
 - Function components + hooks, Tailwind utility classes, no business logic in components (call engine).
 - State: React state/Zustand if needed. Keep champion pickers keyboard accessible.
-- Dark theme by default (gaming context), responsive.
-- Browser storage: keys prefixed `draftorb.` and versioned (`.v1`), every access in try/catch, every read validated with a shared zod schema, never trust stored data (D-024).
+- Light/dark toggle remembering the last choice; first launch follows the Windows theme; light direction C (D-107). Responsive.
+- Browser storage (legacy web app only): keys prefixed `draftorb.` and versioned (`.v1`), every access in try/catch, every read validated with a shared zod schema, never trust stored data (D-024). The desktop program stores the champion pool itself, not in browser localStorage (D-101/D-114); the same validation rules apply: versioned, zod-validated reads, never trust stored data.
 
 ## ETL
 

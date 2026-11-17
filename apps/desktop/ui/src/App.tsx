@@ -3,7 +3,17 @@ import type { Role } from '@draftorb/shared';
 import { AppShell } from './components/AppShell';
 import type { ScreenId } from './components/Nav';
 import type { DataStatus } from './data-status';
-import { DEFAULT_SETTINGS, loadSettings, persistThemeChoice, type Settings } from './settings';
+import { loadPool } from './pool/pool-store';
+import { poolSyncStatus, type PoolSyncStatus } from './pool/pool-sync';
+import { readRepoPool } from './pool/repo-pool';
+import {
+  DEFAULT_SETTINGS,
+  loadSettings,
+  persistThemeChoice,
+  saveRepoFolder,
+  type Settings,
+} from './settings';
+import { isTauri } from './tauri';
 import { resolveTheme, toggledTheme, type ThemeSetting } from './theme';
 
 const DARK_QUERY = '(prefers-color-scheme: dark)';
@@ -25,6 +35,8 @@ export function App() {
   const [role, setRole] = useState<Role>('SUPPORT');
   const [settings, setSettings] = useState<Settings | null>(null);
   const [notice, setNotice] = useState<string | undefined>();
+  const [poolNotice, setPoolNotice] = useState<string | undefined>();
+  const [poolSync, setPoolSync] = useState<PoolSyncStatus>({ kind: 'noFolder' });
   const prefersDark = usePrefersDark();
   const resolvedTheme = settings === null ? null : resolveTheme(settings.theme, prefersDark);
 
@@ -34,6 +46,32 @@ export function App() {
       setNotice(loaded.notice);
     });
   }, []);
+
+  const repoFolder = settings?.repoFolder;
+  const settingsLoaded = settings !== null;
+  useEffect(() => {
+    if (!settingsLoaded) return;
+    let cancelled = false;
+    void (async () => {
+      const program = await loadPool();
+      const repo = repoFolder === undefined ? null : await readRepoPool(repoFolder);
+      if (cancelled) return;
+      setPoolNotice(program.notice);
+      setPoolSync(poolSyncStatus(program.pool, repo));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [settingsLoaded, repoFolder]);
+
+  const saveFolder = useCallback(
+    async (value: string): Promise<string | undefined> => {
+      const result = await saveRepoFolder(settings ?? DEFAULT_SETTINGS, value);
+      setSettings(result.settings);
+      return result.error;
+    },
+    [settings],
+  );
 
   useEffect(() => {
     if (resolvedTheme === null) return;
@@ -63,7 +101,11 @@ export function App() {
       onToggleTheme={() => changeTheme(toggledTheme(resolvedTheme))}
       role={role}
       onRoleChange={setRole}
-      notice={notice}
+      notice={notice ?? poolNotice}
+      poolSync={poolSync}
+      repoFolder={settings.repoFolder}
+      onSaveRepoFolder={saveFolder}
+      repoFolderAvailable={isTauri()}
     />
   );
 }

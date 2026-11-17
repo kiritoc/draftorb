@@ -34,5 +34,13 @@ export const strings = {
   poolReset: 'Your pool was reset: the file was unreadable',
   repoPoolInvalid: 'The repo pool file is invalid and was ignored',
   repoUnavailable: 'The repo pool file is only available in the desktop program',
+  repoFolderLabel: 'Repo folder',
+  repoFolderHelp:
+    'The root of your DraftOrb clone. The program reads data/public/profiles/ and reads and writes data/pool.config.json there.',
+  repoFolderSave: 'Save',
+  repoFolderClear: 'Clear',
+  repoFolderDesktopOnly: 'Available in the desktop program only',
+  poolDiffers:
+    'Your pool differs from data/pool.config.json in the repo folder. Import or export from the pool editor.',
   settingsReset: 'Settings were reset: the file was unreadable',
 } as const;

@@ -6,6 +6,7 @@ Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATI
 
 | ID    | Sev | Area | Title                                                                                                                                                                              | Status | Found by/date              | Ticket |
 | ----- | --- | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | -------------------------- | ------ |
+| B-071 | S1  | etl  | Scheduled ETL refresh never saves progress: the unbudgeted `matches --refresh` step hits the 360-minute timeout and the B-070 guard refuses the snapshot                           | FIXED  | Devin/2026-11-17           | –      |
 | B-067 | S4  | etl  | `check-key` prints `undefined` for the league name                                                                                                                                 | OPEN   | Devin/2026-11-12           | –      |
 | B-068 | S4  | docs | "512 MiB release-asset cap" was a self-imposed 25% headroom rule, not a GitHub limit (real cap: 2 GiB/file)                                                                        | FIXED  | external review/2026-11-12 | –      |
 | B-069 | S2  | etl  | `profile-sync` marked every match `invalid`: Riot renamed `spell1Id`/`spell2Id` to `summoner1Id`/`summoner2Id` in newer game versions; `extractProfileGame` required the old names | FIXED  | Devin/2026-11-13           | –      |
@@ -35,6 +36,16 @@ Review notes that predate the bug log live in [Review history](#review-history) 
 ```
 
 ## Fixed
+
+### B-071 — Scheduled ETL refresh never saves progress (timeout livelock) — FIXED
+
+- Severity / Area: S1 / etl (CI state pipeline, D-094, D-110)
+- Steps to reproduce: any scheduled `etl.yml` run after the B-070 fix, starting from `state-20261112T1035Z`. Runs 43750407943 (2026-11-15), 43822257667 and 43970458153 (2026-11-16) all ran `pnpm etl matches euw1 --refresh` (or the following `--limit 100` step) until the 360-minute job timeout.
+- Expected / Actual: expected each run to ingest what it can and save the database state; actual the timeout cancelled the ingest step, its writer process stayed alive, the "Compact and check database" step failed with `Database still held by another process; refusing to snapshot` (B-070 guard), and nothing was uploaded. Each run restarted from the same 2026-11-12 snapshot with a larger backlog (run 43970458153 reached player 1408/1650 of the refresh), so no data was published after 2026-11-12 10:35 UTC.
+- Environment (OS, Node version, patch): GitHub `ubuntu-latest` runner, Node 22, patch 16.22.
+- Logs / screenshot: run 43970458153 log — `[ETL] [1408/1650] ...` then `##[error]The operation was canceled.` at 04:29:08, then `Database still held by another process; refusing to snapshot` at 04:30:35.
+- Suspected cause: `etl.yml` never passed the `--time-budget` / `--call-budget` options that `etl matches` supports since commit b8c6e86 (the local runbook `docs/proposed-etl-schedule.md` uses them). With a multi-day backlog the unbounded refresh outlives the job.
+- Fix (commit/ticket): `etl.yml` passes `--time-budget 240` to the refresh step and `--time-budget 60` to the pending-player step, so both exit cleanly (budgets are checked at player boundaries, cursors saved) before the job timeout and the compact/upload steps save progress. Verification pending: the first scheduled run after merge must upload a new `state-*` release; the backlog may need several runs to drain. Follow-up idea (not done): make the CLI close the DB on SIGINT/SIGTERM so a cancelled step cannot leave a live writer.
 
 ### B-070 — Corrupt `DraftOrb.sqlite.gz` published by a timeout-cancelled run broke every ETL refresh — FIXED
 

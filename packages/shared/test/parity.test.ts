@@ -24,7 +24,7 @@ describe('shared schema parity (D-011)', () => {
     expect(shared.championRangeSchema).toBeDefined();
     expect(shared.SHARED_VERSION).toBeDefined();
     expect(shared.MANIFEST_SCHEMA_VERSION).toBe(4);
-    expect(shared.DRAFT_RESULT_SCHEMA_VERSION).toBe(1);
+    expect(shared.DRAFT_RESULT_SCHEMA_VERSION).toBe(2);
   });
 
   it('exports rankBucketSchema with exactly the 8 SPECS §3 buckets', () => {
@@ -92,7 +92,7 @@ describe('shared schema parity (D-011)', () => {
   it('exports DraftResult with insufficientData, poolRecommendations, poolUnavailable', () => {
     expect(shared.draftResultSchema).toBeDefined();
     const minimal = shared.draftResultSchema.safeParse({
-      schemaVersion: 1,
+      schemaVersion: 2,
       recommendations: [],
       insufficientData: [{ championId: 41, nEff: 12.5, rawGames: 20 }],
     });
@@ -111,7 +111,7 @@ describe('shared schema parity (D-011)', () => {
     ).toBe(false);
 
     const full = shared.draftResultSchema.safeParse({
-      schemaVersion: 1,
+      schemaVersion: 2,
       recommendations: [
         {
           championId: 41,

@@ -30,6 +30,8 @@ Slot { championId: ChampionId, role?: Role }   // role optional
 
 Any subset can be empty. Engine must never crash on missing info.
 
+Validation (`draftInputSchema`): `bans` holds at most 10 unique champion ids, and a champion cannot be both banned and picked (`allies`/`enemies`); the error names the champion id and is surfaced to the UI. The engine never throws on unvalidated input: when a champion is both banned and picked, the pick wins and the ban is ignored for that champion.
+
 ### 2.1 Champion pool (D-024)
 
 - A per-role list of champion ids owned by the user, stored by the program (not browser localStorage — D-101). The pool editor picks a champion once and ticks the roles it applies to (champion x roles). No account, no server. Max `poolMaxSize` (UI config, default 40) per role.
@@ -58,11 +60,12 @@ Rank buckets for weighting (distinct from persisted `rank_score` in DATA_MODEL.m
 - Output also the **confidence** of each assignment (probability mass of the best assignment vs alternatives). Confidence scales how much that champion's synergy/counter terms count.
 - UI lets the user override a role; override = confidence 1.
 - If inference fails for a team, the engine keeps the largest greedily built resolvable subset (fixed slots first). If that fails too, only fixed slots are kept, and a fixed role used by two or more slots of the same team is dropped as ambiguous (D-030). Dropped slots lose only role-dependent effects (pairs, lane); they stay excluded from candidates and still count for comp.
+- Banned champions (§2) are unavailable: they are never assigned to a slot (they cannot be on the board) and are excluded from the unseen-opponent distribution used by `blindSafety` (§5). A champion that is both banned and picked counts as picked.
 - The user's own role is reserved on the user's team: allies are never assigned `userRole`. An ally fixed to `userRole` is dropped from role-dependent layers (pairs, lane) but still counts for comp and stays excluded from candidates (D-050).
 
 ## 5. Scoring a candidate `c` for `myRole` (v1 roles: SUPPORT, TOP, JUNGLE; ADC/MID minimal)
 
-Candidate set: champions with `roleProb[c][myRole] >= roleProbThreshold` (config `RecommendConfig.roleProbThreshold`, default 0.05), plus every champion of the user pool (D-024). A pool champion below the threshold is still scored when it passes the baseline gate below and carries the warning `offRole`. The pool never changes any score.
+Candidate set: champions with `roleProb[c][myRole] >= roleProbThreshold` (config `RecommendConfig.roleProbThreshold`, default 0.05), plus every champion of the user pool (D-024). Banned champions (§2, minus any already on the board) are never candidates, including pool champions. A pool champion below the threshold is still scored when it passes the baseline gate below and carries the warning `offRole`. The pool never changes any score.
 
 All effects are combined on the log-odds scale (`logit(p) = ln(p / (1 - p))`, `sigmoid` = its inverse) and every context layer is shrunk toward the layer below it (D-021). Weighted counts are converted to _equivalent counts_ before shrinkage (weights are <= 1, so `k` is in raw-game units): `games_e = n_eff`, `wins_e = wins_w * n_eff / games_w`.
 
@@ -110,7 +113,7 @@ Validation (T-020): every cell defined and in [0, 1]; the opponent cell is the r
 - Reported deltas: each reason's `deltaPp = 100 * (sigmoid(x_before + term) - sigmoid(x_before))`, in the order the terms are added (pairs by descending influence, then `lane_vs`, `lane_full`, comp, blind); the total delta is `100 * (P(c) - p0)`.
 - **Levels 1-3** (like Karakal): from a reason's `deltaPp` — L1 >= +1.0pp, L2 >= +2.5pp, L3 >= +4.5pp. Positive L2/L3 need `n_eff >= highLevelMinGames` (config, default 100, validated `>= minGames`; a prior like every other parameter here); below that, a qualifying positive delta falls back to L1. Negative symmetric (counter-picked), without the `highLevelMinGames` gate. A lowData reason (`n_eff < minGames`) has level 0 for both signs. Show badge in UI.
 - `compNeed`: from champion tags (see 6): reward filling missing needs (e.g. team has no engage, damage all AD...). Small weight in log-odds units, explained in UI. Only tagged board allies count as evidence (including allies whose role could not be inferred); with no tagged ally no need is reported. Enemies are ignored until T-025.
-- `blindSafety(c)`: expected term against the distribution of likely _unseen_ enemy lane opponents weighted by pick rate: `sum_e pickShare(e) * pairTerm(c, e)`, plus penalty for worst-case matchup (`blindWorstCaseFactor * min(0, min term)`: a penalty only, never a bonus when every matchup is favorable), both per unseen lane-group role and summed. Known enemies are excluded (the pair layer scores them); missing or lowData matchups count as neutral (term 0) with their full share. Used when blindPick = true or any role of `laneGroup(myRole).enemies` is unknown. `pickShare(e)` is the per-role pick share from `pick-rate.json` (D-052), counting only champions with share `>= blindOpponentMinShare` (config, default 0.05, independent of `roleProbThreshold`). Until a pick-rate export is loaded (legacy exports), `pickShare(e)` falls back to the normalized `roleProb[e][role]` approximation (B-026).
+- `blindSafety(c)`: expected term against the distribution of likely _unseen_ enemy lane opponents weighted by pick rate: `sum_e pickShare(e) * pairTerm(c, e)`, plus penalty for worst-case matchup (`blindWorstCaseFactor * min(0, min term)`: a penalty only, never a bonus when every matchup is favorable), both per unseen lane-group role and summed. Known enemies and banned champions are excluded (the pair layer scores known enemies); missing or lowData matchups count as neutral (term 0) with their full share. Used when blindPick = true or any role of `laneGroup(myRole).enemies` is unknown. `pickShare(e)` is the per-role pick share from `pick-rate.json` (D-052), counting only champions with share `>= blindOpponentMinShare` (config, default 0.05, independent of `roleProbThreshold`). Until a pick-rate export is loaded (legacy exports), `pickShare(e)` falls back to the normalized `roleProb[e][role]` approximation (B-026).
 - Comp and blind reasons have no sample (`n = 0`, never lowData): their level comes from `deltaPp` alone, positive levels capped at L1, negative levels unrestricted.
 - Hard-counter warning (code `counteredBy:<ROLE>:<championId>`, rendered by the web `strings` module): when the layer-1 `counter` reason `deltaPp` of a known, non-lowData enemy pair is `<= hardCounterDeltaPp` (config, default -4.5; D-030). The comparison uses the deltaPp rounded to `DELTA_PP_DECIMALS` (the value shown in the reason), so a raw -4.497 (shown -4.5) warns.
 - Validation (D-023/T-027.a): every parameter in this section is a prior until a backtest passes — frozen temporal holdout, rolling validation for tuning, paired-bootstrap gate on log-loss vs the baseline-only model.
@@ -132,10 +135,10 @@ Recommendation {
 }
 DraftResult {
   recommendations: Recommendation[]                    // overall ranking: ALL scored candidates, never truncated by the engine (D-024)
-  schemaVersion: 1   // DRAFT_RESULT_SCHEMA_VERSION, bumped on every breaking output change (D-030)
+  schemaVersion: 2   // DRAFT_RESULT_SCHEMA_VERSION, bumped on every breaking output change (D-030)
   insufficientData: { championId, nEff: number, rawGames?: number, winRate?: number }[]  // baseline n_eff < minGames (§5), unscored; rawGames omitted when unknown (B-033); winRate = baseline p0 fraction when weighted evidence exists (D-054)
   poolRecommendations?: Recommendation[]               // only when input.pool is non-empty: scored pool champions in overall order (`rank` = overall rank, `poolRank` = rank in the pool)
-  poolUnavailable?: { championId, reason: 'insufficientData' | 'unknownChampion' | 'picked' }[]  // pool champions without a score (numbers live in insufficientData); 'picked' = already on the board
+  poolUnavailable?: { championId, reason: 'insufficientData' | 'unknownChampion' | 'picked' | 'banned' }[]  // pool champions without a score (numbers live in insufficientData); 'picked' = already on the board, 'banned' = in `bans` and not picked
 }
 ```
 
@@ -148,7 +151,7 @@ Thin-data fallback (D-103): when data is too thin, champion picks and runes show
 - Two lists: **From your pool** (`poolRecommendations`, shown first when the pool is non-empty; with an empty pool a one-line call to action to add champions) and **Best overall** (`recommendations`, always shown, even with an empty pool). When a profile is exported (§18), a third list labeled with the profile label (e.g. "KiriToc's picks") is shown beside them; it never changes `score(c)` or the other two lists (D-072).
 - All lists are the engine's complete output, sliced client-side: the first `recommendationPageSize` items (default 5, `apps/web/src/config.ts`), then a "Show N more" button reveals the next N (N = page size) each time until the list is exhausted. A "Showing X of Y" label is always visible and the button disappears when nothing remains. The lists are paginated independently.
 - The overall list also contains pool champions, tagged "In your pool". A UI-only toggle "Hide my pool" (default off) lets the user focus on champions to learn. Ranks always stay global, so gaps are expected when the toggle is on.
-- Pool cards show both ranks ("#2 in your pool · #14 overall"). Pool champions without a score are listed after the ranked ones as unavailable cards with a "Not recommended" badge, the reason (insufficient data with `n_eff`/raw games and baseline win rate when available, already picked, or not in the champion catalogue); they are never hidden.
+- Pool cards show both ranks ("#2 in your pool · #14 overall"). Pool champions without a score are listed after the ranked ones as unavailable cards with a "Not recommended" badge, the reason (insufficient data with `n_eff`/raw games and baseline win rate when available, already picked, banned, or not in the champion catalogue); they are never hidden.
 - Visible counts reset to the page size when the draft input changes (and the pool list when the pool changes). The "Show more" control is a real `<button>`, keyboard reachable, and the count label is an `aria-live="polite"` region.
 - Determinism: the same draft input gives the same lists in the same order. The pool never changes `score(c)` or reasons. Pool-only candidates can appear in `recommendations` (SPECS §5), which may insert extra rows and shift global `rank` numbers; the relative order of champions that were already in the roleProb set stays the same. `poolRecommendations` is the subsequence of scored pool champions.
 

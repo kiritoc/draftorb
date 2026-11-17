@@ -22,8 +22,9 @@ export const MANIFEST_SCHEMA_VERSION = 4;
  * Version of the engine output contract (`DraftResult`, SPECS §7). Bumped on every
  * breaking change so consumers fail loudly instead of misreading fields.
  * v1: `reliability.nEff`, optional `rawGames`, `picked` pool reason, level 0 (D-030).
+ * v2: `banned` pool reason (D-106, BL-012).
  */
-export const DRAFT_RESULT_SCHEMA_VERSION = 1;
+export const DRAFT_RESULT_SCHEMA_VERSION = 2;
 
 /**
  * Version of the engine rune-recommendation output contract (SPECS §8.1).

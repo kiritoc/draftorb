@@ -14,9 +14,7 @@ export function Header({ dataStatus, resolvedTheme, onToggleTheme }: HeaderProps
     <header className="flex flex-wrap items-center gap-4 border-b border-slate-200 bg-white px-6 py-4 dark:border-slate-700 dark:bg-slate-800">
       <h1 className="text-2xl font-semibold">{strings.appName}</h1>
       <div className="text-base text-slate-600 dark:text-slate-300" data-testid="data-status">
-        <span>
-          {strings.patchLabel} {patch}
-        </span>
+        <span>{patch}</span>
         <span className="mx-2">·</span>
         <span>{freshness}</span>
       </div>

@@ -2,8 +2,9 @@
 
 export const strings = {
   appName: 'DraftOrb',
-  patchLabel: 'Patch',
-  patchUnknown: '—',
+  patchNone: 'Patch —',
+  patchBoth: (publicLabel: string, internal: string) => `Patch ${publicLabel} · data ${internal}`,
+  patchInternalOnly: (internal: string) => `Patch ${internal} (data label; public name unknown)`,
   dataNone: 'No data loaded yet',
   dataLoaded: (generatedAt: string) => `Data generated ${generatedAt}`,
   unvalidatedLabel: 'Unvalidated model',

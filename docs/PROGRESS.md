@@ -16,6 +16,34 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 ## Current handoff
 
 - Date: 2026-11-17
+- Branch/PR: `feat/bl-020-theme-toggle` (local only, not pushed, stacked on `feat/bl-010a-desktop-scaffold`) / BL-020 (#85)
+- State: REVIEW
+- Done: the app renders nothing until the stored settings are loaded, so a stored light choice on a dark OS no longer flashes dark (`system` still follows the OS live). `persistThemeChoice` (settings.ts) is the single path for saving a choice. New `theme-persistence.test.ts` (mocked IPC): fresh profile follows a dark/light OS, a stored choice wins over the OS, a saved choice reloads identically (restart). Every component already carries dark-mode classes (header, nav, role selector, settings screen, notice and badge); text inherits the themed body colors.
+- Files touched: `apps/desktop/ui/src/{App.tsx,settings.ts,theme-persistence.test.ts}`, `docs/PROGRESS.md`.
+- Tests: `pnpm check`; `pnpm --filter @draftorb/desktop build:ui`.
+- Contrast (WCAG, computed from Tailwind palette hex values, NOT visually verified on Windows; all >= 4.5:1, nothing adjusted):
+
+| Theme | Pair                                            | Ratio |
+| ----- | ----------------------------------------------- | ----- |
+| light | body text slate-900 on slate-50                 | 17.06 |
+| light | muted slate-600 on white (header)               | 7.58  |
+| light | muted slate-600 on slate-50 (pick placeholder)  | 7.24  |
+| light | badge amber-900 on amber-100                    | 8.15  |
+| light | notice amber-900 on amber-50                    | 8.75  |
+| light | selected white on indigo-600                    | 6.29  |
+| dark  | body text slate-100 on slate-900                | 16.30 |
+| dark  | muted slate-300 on slate-800 (header)           | 9.85  |
+| dark  | muted slate-300 on slate-900 (pick placeholder) | 12.02 |
+| dark  | badge amber-200 on amber-900/40 over slate-800  | 10.19 |
+| dark  | notice amber-100 on amber-900/30 over slate-900 | 13.96 |
+| dark  | selected white on indigo-600                    | 6.29  |
+
+- Blockers / next step: verify on Windows 11 (real OS theme switch, first paint). Disabled controls use opacity-50 (exempt from contrast).
+- Pitfalls: the window background is native until the page paints; a brief blank frame is expected.
+
+### Previous handoff (BL-010a)
+
+- Date: 2026-11-17
 - Branch/PR: `feat/bl-010a-desktop-scaffold` (local only, not pushed) / BL-010a (#72), skeleton part
 - State: REVIEW
 - Done: `apps/desktop` is now the app skeleton: React 19 + Tailwind 3 frontend (`ui/src`), header with patch/data status placeholder, "Unvalidated model" label and theme toggle, navigation (Pick enabled, Setup/Game disabled, Settings), SUPPORT-only role selector driven by `roleAvailability`, D-107 theme plumbing, zod-validated settings stored by the program (`load_settings`/`save_settings` Rust commands, atomic write in the app config dir). Restrictive CSP in `tauri.conf.json`. `report_metrics`/`process_uptime_ms` kept for `scripts/bench.ts`. `@tauri-apps/api` recorded in D-116.

@@ -3,7 +3,7 @@ import type { Role } from '@draftorb/shared';
 import { AppShell } from './components/AppShell';
 import type { ScreenId } from './components/Nav';
 import type { DataStatus } from './data-status';
-import { DEFAULT_SETTINGS, loadSettings, saveSettings, type Settings } from './settings';
+import { loadSettings, persistThemeChoice, type Settings } from './settings';
 import { resolveTheme, toggledTheme, type ThemeSetting } from './theme';
 
 const DARK_QUERY = '(prefers-color-scheme: dark)';
@@ -23,10 +23,10 @@ function usePrefersDark(): boolean {
 export function App() {
   const [screen, setScreen] = useState<ScreenId>('pick');
   const [role, setRole] = useState<Role>('SUPPORT');
-  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState<Settings | null>(null);
   const [notice, setNotice] = useState<string | undefined>();
   const prefersDark = usePrefersDark();
-  const resolvedTheme = resolveTheme(settings.theme, prefersDark);
+  const resolvedTheme = settings === null ? null : resolveTheme(settings.theme, prefersDark);
 
   useEffect(() => {
     void loadSettings().then((loaded) => {
@@ -36,14 +36,17 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    if (resolvedTheme === null) return;
     document.documentElement.classList.toggle('dark', resolvedTheme === 'dark');
   }, [resolvedTheme]);
 
   const changeTheme = useCallback((theme: ThemeSetting) => {
-    const next: Settings = { version: 1, theme };
-    setSettings(next);
-    void saveSettings(next).catch(() => {});
+    setSettings({ version: 1, theme });
+    void persistThemeChoice(theme).catch(() => {});
   }, []);
+
+  // Render nothing until the stored theme is known: no wrong-theme flash.
+  if (settings === null || resolvedTheme === null) return null;
 
   return (
     <AppShell

@@ -35,6 +35,10 @@ function runCheck(args: string[], env: NodeJS.ProcessEnv = {}): ReturnType<typeo
 // Split so this committed file never contains a contiguous RGAPI- token.
 const PLANTED_KEY = 'RGAPI-' + 'abcdef1234567890abcdef1234567890abcdef12';
 
+// Split so this committed file never contains a contiguous PUUID-like token.
+const PLANTED_PUUID =
+  'AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-' + 'AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-ABCD';
+
 describe('check-secrets', () => {
   it('fails on a planted RGAPI- key in a scanned file', () => {
     const root = tempDir();
@@ -114,5 +118,41 @@ describe('check-secrets', () => {
     expect(findings).toHaveLength(1);
     expect(findings[0]).toContain('a.txt');
     expect(findings[0]).not.toContain(PLANTED_KEY);
+  });
+
+  describe('PUUID-like identifiers', () => {
+    function plant(text: string): ReturnType<typeof spawnSync> {
+      const root = tempDir();
+      writeFileSync(join(root, 'a.txt'), text);
+      return runCheck(['--root', root, '--dist', 'off']);
+    }
+
+    it('fails on a planted PUUID without printing it', () => {
+      expect(PLANTED_PUUID).toHaveLength(78);
+      const result = plant(`puuid: ${PLANTED_PUUID}\n`);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('a.txt: contains PUUID-like identifier');
+      expect(result.stderr).not.toContain(PLANTED_PUUID);
+    });
+
+    it('passes on a 64-character sha256 hex digest', () => {
+      expect(plant(`sha256: ${'0123456789abcdef'.repeat(4)}\n`).status).toBe(0);
+    });
+
+    it('passes on a 78-dash Markdown table rule', () => {
+      expect(plant(`| ${'-'.repeat(78)} |\n`).status).toBe(0);
+    });
+
+    it('passes on a 78-char segment inside a base64 integrity hash', () => {
+      const segment = 'Ab1' + 'x'.repeat(75);
+      expect(plant(`integrity: sha512-QQ/${segment}+RR==\n`).status).toBe(0);
+      expect(plant(`integrity: sha512-${segment}/RR==\n`).status).toBe(0);
+    });
+
+    it('passes on 77- and 79-character runs', () => {
+      expect(plant(`https://x/?puuid=${PLANTED_PUUID}&a=1\n`).status).toBe(1);
+      expect(plant(`${PLANTED_PUUID.slice(1)}\n`).status).toBe(0);
+      expect(plant(`${PLANTED_PUUID}Z\n`).status).toBe(0);
+    });
   });
 });

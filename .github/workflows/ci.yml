@@ -170,6 +170,28 @@ jobs:
       - run: node scripts/check-secrets.mjs
         if: ${{ !cancelled() }}
 
+  # BL-008: public-repo safety rules. Node built-ins only, no install.
+  safety:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.user.login != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: node scripts/check-pr-title.mjs
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+      - run: node scripts/check-public-paths.mjs
+        if: ${{ !cancelled() }}
+
   test:
     needs: [format, commit-format]
     if: ${{ !cancelled() && needs.commit-format.result != 'success' }}

@@ -7,7 +7,13 @@
  *   - `RGAPI-` followed by 16+ consecutive alphanumerics (real keys are long
  *     unbroken tokens; the repo's placeholders and test fixtures use short
  *     runs or dashes, e.g. `RGAPI-xxxx-...`, `RGAPI-test-api-key-12345`),
- *   - the literal value of $RIOT_API_KEY when the variable is set.
+ *   - the literal value of $RIOT_API_KEY when the variable is set,
+ *   - PUUID-like identifiers (BL-008): a run of exactly 78 base64url characters
+ *     with at least one letter and one digit. The boundaries exclude `+/` (and
+ *     `=` on the right: base64 padding only trails) so segments of base64
+ *     integrity hashes (pnpm-lock.yaml) never match, while `puuid=<id>` query
+ *     strings still do; the letter+digit rule skips 78-dash Markdown table
+ *     rules; 64-char sha256 hex digests are too short to match.
  *
  * Scans `git ls-files` (committed files; falls back to a recursive walk when
  * the root is not a git checkout, e.g. tests), `data/public` when it exists
@@ -24,6 +30,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const RIOT_KEY_PATTERN = /RGAPI-[A-Za-z0-9]{16,}/;
+const PUUID_PATTERN = /(?<![A-Za-z0-9_+/-])[A-Za-z0-9_-]{78}(?![A-Za-z0-9_+/=-])/g;
 const MAX_FILE_BYTES = 4 * 1024 * 1024;
 const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', '.turbo', 'coverage']);
 
@@ -50,13 +57,24 @@ export function parseArgs(argv, root = repoRoot) {
   return options;
 }
 
+/** @param {string} text */
+function hasPuuidLike(text) {
+  for (const [token] of text.matchAll(PUUID_PATTERN)) {
+    if (/[A-Za-z]/.test(token) && /[0-9]/.test(token)) return true;
+  }
+  return false;
+}
+
 /**
  * @param {NodeJS.ProcessEnv} [env]
  * @returns {{ name: string, test: (text: string) => boolean }[]}
  */
 export function secretNeedles(env = process.env) {
   /** @type {{ name: string, test: (text: string) => boolean }[]} */
-  const needles = [{ name: 'RGAPI- key pattern', test: (text) => RIOT_KEY_PATTERN.test(text) }];
+  const needles = [
+    { name: 'RGAPI- key pattern', test: (text) => RIOT_KEY_PATTERN.test(text) },
+    { name: 'PUUID-like identifier', test: hasPuuidLike },
+  ];
   const key = env.RIOT_API_KEY;
   if (typeof key === 'string' && key.length >= 8) {
     needles.push({ name: 'RIOT_API_KEY value', test: (text) => text.includes(key) });

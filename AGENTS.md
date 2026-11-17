@@ -54,8 +54,8 @@ pnpm etl <command>  # data pipeline (see docs/SETUP.md)
 packages/shared   types + zod schemas (single source of truth)
 packages/engine   pure scoring/recommendation logic
 packages/etl      Riot API client, SQLite, aggregation, JSON export
-apps/web          Vite + React + Tailwind (static site)
-apps/desktop      Tauri shell around the TypeScript engine (D-115; not created yet)
+apps/web          legacy Vite + React static site, frozen until deleted (D-121)
+apps/desktop      Tauri shell around the TypeScript engine (D-115)
 data/             generated JSON (public), hand-written tags (manual) + raw/sqlite (gitignored)
 docs/             all project docs
 ```

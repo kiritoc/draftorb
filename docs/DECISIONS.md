@@ -1327,3 +1327,7 @@ Owner delegated the choice ("choose, best practice"; translated from French). Am
 - Rule: a pull request title must carry exactly one work item id: a backlog ticket `BL-<n>` (optionally one lowercase letter, GitHub issue) or a bug `B-<nnn>` (`docs/BUGS.md`). Repeating the same id is fine; two different ids fail (one work item = one PR). Enforced by `scripts/check-pr-title.mjs` in the CI `safety` job.
 - Why: every change stays traceable to one tracked item, and bug fixes keep their single source of truth in `docs/BUGS.md` instead of a duplicate GitHub issue per bug.
 - Bug PRs reference their `docs/BUGS.md` entry in the body instead of `Closes #n`; the entry records the fix and the regression test (TESTING.md).
+
+### D-121 — Legacy web app frozen until deletion — ACCEPTED (owner, 2026-11-17)
+
+`apps/web` is frozen until it is deleted: no new features and no alignment with new contracts or decisions (e.g. the `banned` pool reason label, the D-117 dual patch label, the 300-line convention for `DraftScreen.tsx`). The only allowed changes are the minimum needed to keep `pnpm check` green when shared contracts change. All product work goes to `apps/desktop` (D-115). Review findings on `apps/web` are closed as "frozen" unless they are security issues.

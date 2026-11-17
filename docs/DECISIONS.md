@@ -1317,3 +1317,11 @@ Implements the v1 badge of D-100/SPECS §18 within D-075 (sample size always vis
 - Scope: the profile's games on the champion **in the role being drafted** (champion + role, consistent with the per-role pool of D-101), from the profile export read per SPECS §19.2 (already bounded to the last 180 days and at most `profileMaxGames` games, D-069).
 - Counting: raw games and raw win rate (no recency weighting, no shrinkage). The badge always shows the game count; the win rate is shown only from **5 games** up (same threshold as D-075 point 2 for "profile's best" runes and spells); below that it shows "Not enough data" with the count; no profile export loaded → "No data".
 - The badge never changes `score(c)` or ranks (D-072, D-101). The v2 personalized list keeps its own weighted rules (D-073).
+
+### D-120 — PR titles carry exactly one work item id: BL-xxx or B-xxx — ACCEPTED (owner, 2026-11-17)
+
+Owner delegated the choice ("choose, best practice"; translated from French). Amends the BL-008 (issue #111) acceptance criterion "PR titles without a BL-xxx ticket id fail".
+
+- Rule: a pull request title must carry exactly one work item id: a backlog ticket `BL-<n>` (optionally one lowercase letter, GitHub issue) or a bug `B-<nnn>` (`docs/BUGS.md`). Repeating the same id is fine; two different ids fail (one work item = one PR). Enforced by `scripts/check-pr-title.mjs` in the CI `safety` job.
+- Why: every change stays traceable to one tracked item, and bug fixes keep their single source of truth in `docs/BUGS.md` instead of a duplicate GitHub issue per bug.
+- Bug PRs reference their `docs/BUGS.md` entry in the body instead of `Closes #n`; the entry records the fix and the regression test (TESTING.md).

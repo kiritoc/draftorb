@@ -4,7 +4,7 @@
 
 Closes #___
 
-<!-- The issue title must start with the ticket id (BL-xxx). -->
+<!-- Backlog ticket: link the issue (BL-xxx). Bug fix without an issue: replace the line above with `Fixes B-xxx (docs/BUGS.md)`. -->
 
 ## Acceptance criteria
 
@@ -32,7 +32,7 @@ Needed: yes/no
 
 ## Checklist
 
-- [ ] PR title starts with the ticket id (BL-xxx) and the body links the issue with `Closes #n` (one task = one PR)
+- [ ] PR title carries exactly one work item id, `BL-xxx` (body: `Closes #n`) or `B-xxx` (body: the `docs/BUGS.md` entry) — one work item = one PR (D-120)
 - [ ] Acceptance criteria of the linked issue are copied into the "Acceptance criteria" section and each one is ticked with evidence (command, test, screenshot)
 - [ ] Tests added/updated and `pnpm check` is green (typecheck + lint + format + tests)
 - [ ] Works on Windows 11 (paths, scripts, shell-specific behavior)

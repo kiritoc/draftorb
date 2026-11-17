@@ -26,3 +26,18 @@ describe('parseSettings', () => {
     expect(parseSettings(serializeSettings(settings))).toEqual({ settings });
   });
 });
+
+describe('repoFolder setting', () => {
+  it('stays valid without it and accepts it when present', () => {
+    expect(parseSettings('{"version":1,"theme":"dark"}').settings.repoFolder).toBeUndefined();
+    const parsed = parseSettings(
+      '{"version":1,"theme":"dark","repoFolder":"C:\\\\dev\\\\draftorb"}',
+    );
+    expect(parsed.notice).toBeUndefined();
+    expect(parsed.settings.repoFolder).toBe('C:\\dev\\draftorb');
+  });
+
+  it('rejects an empty folder string', () => {
+    expect(parseSettings('{"version":1,"theme":"dark","repoFolder":""}').notice).toBeTruthy();
+  });
+});

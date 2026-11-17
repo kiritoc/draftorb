@@ -209,6 +209,10 @@ Manual files (committed, hand-written, zod-validated): `data/manual/champion-tag
 
 Core scoring and engine contracts are unchanged (SPECS §14, D-045). The exported JSON format changes described above do not alter `n_eff` thresholds or D-021..D-027 semantics.
 
+## Pool file (BL-016a, D-114, D-118)
+
+The committed `data/pool.config.json` holds the user's champion pool per role: `{ "schemaVersion": 1, "pools": { "<ROLE>": [{ "championId", "name"? }] } }`, validated by `poolConfigSchema` in `packages/shared`. Public preference data only (ids and optional names). Contract and rules: SPECS §19.3.
+
 ## Configured profiles (T-090/T-091, D-068/D-069)
 
 Profiles are declared in the committed `data/profiles.config.json` (no secrets):

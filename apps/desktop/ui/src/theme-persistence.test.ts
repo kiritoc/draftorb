@@ -31,10 +31,23 @@ describe('theme at startup (D-107)', () => {
   it('a choice survives a restart', async () => {
     invokeCommand.mockResolvedValueOnce(undefined);
     await persistThemeChoice('light');
-    expect(invokeCommand).toHaveBeenCalledWith('save_settings', {
+    expect(invokeCommand).toHaveBeenCalledWith('save_app_file', {
+      name: 'settings.json',
       json: '{"version":1,"theme":"light"}',
     });
     const saved = (invokeCommand.mock.calls[0]?.[1] as { json: string }).json;
     expect(await startupTheme(saved, true)).toBe('light');
+  });
+});
+
+describe('repoFolder preservation', () => {
+  it('keeps repoFolder when the theme changes', async () => {
+    invokeCommand.mockReset();
+    invokeCommand.mockResolvedValueOnce(undefined);
+    await persistThemeChoice('dark', { version: 1, theme: 'light', repoFolder: '/repo' });
+    expect(invokeCommand).toHaveBeenCalledWith('save_app_file', {
+      name: 'settings.json',
+      json: '{"version":1,"theme":"dark","repoFolder":"/repo"}',
+    });
   });
 });

@@ -31,5 +31,8 @@ export const strings = {
   settingsTitle: 'Settings',
   themeSettingLabel: 'Theme',
   themeOptions: { system: 'Follow Windows', light: 'Light', dark: 'Dark' },
+  poolReset: 'Your pool was reset: the file was unreadable',
+  repoPoolInvalid: 'The repo pool file is invalid and was ignored',
+  repoUnavailable: 'The repo pool file is only available in the desktop program',
   settingsReset: 'Settings were reset: the file was unreadable',
 } as const;

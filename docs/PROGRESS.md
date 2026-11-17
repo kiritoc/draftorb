@@ -16,6 +16,17 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 ## Current handoff
 
 - Date: 2026-11-17
+- Branch/PR: `feat/bl-016a-pool-backend` (local only, not pushed, stacked on `docs/bl-006-data-handoff`) / BL-016a (#80), backend half
+- State: REVIEW
+- Done: shared `poolConfigSchema` (SPECS §19.3; `.strict()`, unique ids per role, max 40, optional `name`) with tests and a DATA_MODEL entry. Desktop pure pool model (`ui/src/pool/pool-model.ts`: `setChampionRoles`, `poolDiffers`, `serializePoolConfig`, `parsePoolConfig`, `dropUnknownChampions`) using the same shape as the file, so export is serialization and import is parsing. Rust: `load_settings`/`save_settings` replaced by `load_app_file`/`save_app_file` with an allowlist (`settings.json`, `pool.json`), plus `read_repo_pool`/`write_repo_pool` for `<repoFolder>/data/pool.config.json` (never creates folders, atomic write). Frontend `pool-store.ts`, `repo-pool.ts`; `settingsSchema` gains optional `repoFolder`; `persistThemeChoice` now keeps other settings fields (it would have dropped `repoFolder`).
+- Files touched: `packages/shared/src/{index.ts,schemas/pool-config.ts}`, `packages/shared/test/pool-config.test.ts`, `apps/desktop/src-tauri/src/{main.rs,app_files.rs,repo_pool.rs}`, `apps/desktop/ui/src/{settings.ts,App.tsx,strings.ts,pool/*}`, tests, `docs/{DATA_MODEL,PROGRESS}.md`.
+- Tests: `pnpm check`; `cargo test` in `apps/desktop/src-tauri` (9 tests); `build:ui`.
+- Blockers / next step: remaining for BL-016a: pool editor UI (champion x roles), difference banner UI, folder picker (needs a dialog dependency decision), drop-unknown notice wiring once the catalog arrives with BL-010b, UI tests. SPECS §19 needed no change.
+- Pitfalls: `pool.json` (program pool) and `data/pool.config.json` (repo copy) are different files; `load_app_file` returns `""` for a missing file, which `loadPool` maps to a silent empty pool.
+
+### Previous handoff
+
+- Date: 2026-11-17
 - Branch/PR: `docs/bl-006-data-handoff` (local only, not pushed, stacked on `feat/bl-019-patch-labels`) / BL-006 (#109)
 - State: REVIEW
 - Done: SPECS §19 data hand-off contract (repo folder setting, private profile export read-only, public `data/pool.config.json` format/write/read/difference warning, privacy checklist) and a §2.1 pointer; D-118 records the owner's three design choices (one repo-folder setting, first profile of `index.json`, warning-only on pool difference); SETUP.md "Desktop app data folders" section.

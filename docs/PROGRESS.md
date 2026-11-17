@@ -16,6 +16,17 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 ## Current handoff
 
 - Date: 2026-11-17
+- Branch/PR: `docs/bl-006-data-handoff` (local only, not pushed, stacked on `feat/bl-019-patch-labels`) / BL-006 (#109)
+- State: REVIEW
+- Done: SPECS §19 data hand-off contract (repo folder setting, private profile export read-only, public `data/pool.config.json` format/write/read/difference warning, privacy checklist) and a §2.1 pointer; D-118 records the owner's three design choices (one repo-folder setting, first profile of `index.json`, warning-only on pool difference); SETUP.md "Desktop app data folders" section.
+- Files touched: `docs/{SPECS,DECISIONS,SETUP,PROGRESS}.md`.
+- Tests: docs-only; `pnpm format:check`.
+- Blockers / next step: owner signed off SPECS §19 on 2026-11-17 (recorded in D-118); next BL-016a implements the pool storage + repo-file actions and BL-018 the badge loader. The `pool.config.json` zod schema is specified here but not yet written (BL-016a).
+- Pitfalls: the program never runs git and never reads the SQLite DB; `profiles/` must never reach a public artifact (`scripts/check-public-paths.mjs`).
+
+### Previous handoff (BL-019)
+
+- Date: 2026-11-17
 - Branch/PR: `feat/bl-019-patch-labels` (local only, not pushed, stacked on `feat/bl-021-champion-portraits`) / BL-019 (#84)
 - State: REVIEW
 - Done: D-117 appended verbatim to `docs/DECISIONS.md`. New pure `patch-labels.ts` (`16.N` -> `26.N`, a one-line table for future verified majors; full versions and anything else give no public name). `DataStatus.loaded` now carries the internal `patch` label (renamed from `patchPublic`); the header shows `Patch 26.22 · data 16.22`, `Patch 17.3 (data label; public name unknown)` or the unchanged `Patch —` / `No data loaded yet`. GOALS open item moved to Resolved; SPECS §12 sentence added.

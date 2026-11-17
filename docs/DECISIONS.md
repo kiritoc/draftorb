@@ -1300,3 +1300,12 @@ Implements D-108 as amended by the owner on 2026-11-16 (issue #84: the UI shows 
 - Method: two anchors checked against primary sources on 2026-11-17. (1) Current patch: Data Dragon `api/versions.json` newest entry `16.22.1` and the official "Patch 26.22" notes (AUDIT §5b). (2) Season start: the official "Patch 26.1 Notes" (leagueoflegends.com, published 2026-01-07) introduce the items Bandlepipes, Protoplasm Harness and Bastionbreaker; these names are present in Data Dragon `16.1.1/data/en_US/item.json` and absent from `15.24.1`. Data Dragon lists exactly `16.1.1` … `16.22.1` (22 versions) and the public series runs 26.1 … 26.22, so both series are contiguous and aligned at both ends.
 - Rule: internal major 16 ↔ public major 26 with the same minor (`16.N` → `26.N`). Any other major (15.x and older, 17.x and later) is unverified: the UI shows the internal label only and marks the public name as unknown. 2025 (15.x) public names used a different scheme and are not mapped.
 - No code path compares version strings for ordering (SPECS §12); the mapping is a pure label transform.
+
+### D-118 — Desktop data hand-off choices (BL-006) — ACCEPTED (owner, 2026-11-17)
+
+Implements D-114 and D-101 for the desktop program; the full contract is SPECS §19. Owner choices from the 2026-11-17 interview:
+
+- One setting, the local repo folder: the program derives `<repo>/data/public/profiles/` (private profile export, read-only) and `<repo>/data/pool.config.json` (public pool file) from it, instead of two separate settings.
+- When `index.json` lists several profiles, v1 always uses the first entry (no profile setting).
+- When the program pool and `data/pool.config.json` differ, the program only shows a warning; import from and export to the repo file stay manual actions in the pool editor (no automatic import, even when the program pool is empty).
+- Sign-off: the owner validated SPECS §19 as a whole on 2026-11-17 ("Validée telle quelle"); BL-016a and BL-018 may build on it.

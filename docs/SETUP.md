@@ -20,6 +20,15 @@ pnpm dev
 
 The app is **local-only** (D-079): there is no hosting and no deploy workflow. `data/public` is gitignored; get the current exports with `pnpm etl pull` (downloads the newest state release — see "State repo and token" below) or generate them locally with `pnpm etl static` / `pnpm etl export`.
 
+## Desktop app (dev) (D-115, BL-010a)
+
+Needs the Rust toolchain (rustup; MSVC build tools on Windows) on top of Node + pnpm. The desktop app lives in `apps/desktop` (`ui/` is the React frontend, `src-tauri/` the thin Rust shell).
+
+- `pnpm --filter @draftorb/desktop tauri dev` runs the app with Vite hot reload.
+- `pnpm --filter @draftorb/desktop tauri build --no-bundle` builds the frontend and the release binary (`src-tauri/target/release/draftorb`); installers come with BL-025.
+- A plain `cargo build` produces a dev-mode binary that loads the Vite dev URL and shows a connection error without a dev server; use `tauri build` for a production binary.
+- Settings live in the program's config directory as `settings.json` (not in the webview storage).
+
 ## Riot key
 
 1. Sign in at https://developer.riotgames.com, copy the Development API Key (expires every 24h) or your Personal key (no expiry — recommended).

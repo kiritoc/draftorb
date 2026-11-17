@@ -8,6 +8,7 @@ export default defineConfig({
       'packages/*/src/**/*.test.ts',
       'packages/*/test/**/*.test.ts',
       'apps/web/src/**/*.test.ts',
+      'apps/desktop/ui/src/**/*.test.ts',
       'scripts/**/*.test.ts',
     ],
   },

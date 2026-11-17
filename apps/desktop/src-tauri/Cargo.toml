@@ -1,7 +1,7 @@
 [package]
 name = "draftorb"
 version = "0.0.1"
-description = "DraftOrb Windows spike (BL-002)"
+description = "DraftOrb desktop app: Tauri shell around the TypeScript engine"
 edition = "2021"
 rust-version = "1.77.2"
 

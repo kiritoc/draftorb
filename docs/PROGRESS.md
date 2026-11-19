@@ -16,6 +16,17 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 ## Current handoff
 
 - Date: 2026-11-17
+- Branch/PR: `feat/bl-010a-desktop-scaffold` (local only, not pushed) / BL-010a (#72), skeleton part
+- State: REVIEW
+- Done: `apps/desktop` is now the app skeleton: React 19 + Tailwind 3 frontend (`ui/src`), header with patch/data status placeholder, "Unvalidated model" label and theme toggle, navigation (Pick enabled, Setup/Game disabled, Settings), SUPPORT-only role selector driven by `roleAvailability`, D-107 theme plumbing, zod-validated settings stored by the program (`load_settings`/`save_settings` Rust commands, atomic write in the app config dir). Restrictive CSP in `tauri.conf.json`. `report_metrics`/`process_uptime_ms` kept for `scripts/bench.ts`. `@tauri-apps/api` recorded in D-116.
+- Files touched: `apps/desktop/**`, `vitest.config.ts`, `pnpm-lock.yaml`, `docs/{SETUP,ARCHITECTURE,DECISIONS,PROGRESS}.md`.
+- Tests: `pnpm check`; `cargo test` in `apps/desktop/src-tauri`.
+- Blockers / next step: remaining for BL-010a: Windows 11 launch and threshold re-measure with the real app, data status and download/cache/stale notice (BL-010b, needs the BL-004 host and a `connect-src` CSP entry), BL-014 pick-screen behavior, Windows CI job (BL-003).
+- Pitfalls: `gen:icon` now also writes `icons/icon.png` (non-Windows builds need it). The bench script is Windows-only (taskkill, PowerShell).
+
+### Previous handoff
+
+- Date: 2026-11-17
 - Branch/PR: `chore/bl-008-ci-safety` (local only, not pushed) / BL-008 (#111)
 - State: REVIEW
 - Done: `scripts/check-secrets.mjs` gains a `PUUID-like identifier` needle (78 base64url chars with a letter and a digit, `+/=` excluded at the boundaries); the synthetic PUUID in `packages/etl/src/riot/client.test.ts` is split by concatenation. New `scripts/check-public-paths.mjs` (`profiles/` directories and SQLite files; git ls-files or `--dir`) and `scripts/check-pr-title.mjs` (`BL-<n>[a-z]` from `PR_TITLE`). New CI job `safety` (pull_request only, not Dependabot). Documented in WORKFLOW.md and TESTING.md.

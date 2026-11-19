@@ -1,6 +1,7 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "jsx": "react-jsx",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "noEmit": true,
     "composite": false,
@@ -10,5 +11,5 @@
     "rootDir": ".",
     "types": ["vite/client", "node"]
   },
-  "include": ["ui", "scripts", "vite.config.ts"]
+  "include": ["ui", "scripts", "vite.config.ts", "tailwind.config.ts"]
 }

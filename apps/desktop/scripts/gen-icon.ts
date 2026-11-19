@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * Generates src-tauri/icons/icon.ico for the BL-002 spike.
+ * Generates the placeholder src-tauri/icons/icon.ico and icon.png (the PNG is
+ * needed by non-Windows builds; real branding is a later ticket).
  * Writes a 256x256 solid-color PNG wrapped in an ICO container
  * (PNG-in-ICO is valid since Windows Vista).
  *
@@ -86,4 +87,5 @@ entry.writeUInt32LE(22, 12); // data offset (6 + 16)
 
 mkdirSync(dirname(outPath), { recursive: true });
 writeFileSync(outPath, Buffer.concat([header, entry, png]));
+writeFileSync(join(dirname(outPath), 'icon.png'), png);
 console.log(`wrote ${outPath} (${png.length} bytes PNG in ICO)`);

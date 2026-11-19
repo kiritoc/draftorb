@@ -1,6 +1,6 @@
 # ARCHITECTURE
 
-Status: `packages/shared` (types + zod schemas), `packages/engine` (role-generic recommendation engine) and `packages/etl` (Riot client, SQLite ingestion, aggregation, JSON export) exist. `apps/web` is a functional app (draft screen, pool, runes panel); it is to be rewritten as the Tauri desktop app (D-115). `apps/desktop` is not created yet (pending the BL-002 spike).
+Status: `packages/shared` (types + zod schemas), `packages/engine` (role-generic recommendation engine) and `packages/etl` (Riot client, SQLite ingestion, aggregation, JSON export) exist. `apps/web` is a functional app (draft screen, pool, runes panel); it is to be rewritten as the Tauri desktop app (D-115). `apps/desktop` is the Tauri app skeleton (BL-010a: React shell, SUPPORT-only role selector, theme and program-stored settings); data download (BL-010b) and the pick screen (BL-011+) are not built yet.
 
 Update (2026-11-08, D-078/D-079): the app is **local-only** — no hosting, no deploy workflow. ETL state lives in release assets of a private repo; `data/public` is gitignored and reaches the app via `pnpm etl pull`.
 

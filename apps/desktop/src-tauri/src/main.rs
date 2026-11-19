@@ -1,6 +1,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod settings_file;
+
 use std::sync::OnceLock;
+use tauri::Manager;
 use std::time::Instant;
 
 static START: OnceLock<Instant> = OnceLock::new();
@@ -16,6 +19,22 @@ fn process_uptime_ms() -> f64 {
         .unwrap_or(-1.0)
 }
 
+/// Settings JSON from the app config dir; `""` when missing or unreadable.
+#[tauri::command]
+fn load_settings(app: tauri::AppHandle) -> String {
+    app.path()
+        .app_config_dir()
+        .map(|dir| settings_file::load_from(&dir))
+        .unwrap_or_default()
+}
+
+/// Atomically replaces the settings file in the app config dir.
+#[tauri::command]
+fn save_settings(app: tauri::AppHandle, json: String) -> Result<(), String> {
+    let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
+    settings_file::save_to(&dir, &json)
+}
+
 /// Receives the frontend metrics JSON and writes it to a temp file so an
 /// external benchmark script can measure wall-clock cold start and read the
 /// engine latency numbers without any IPC back-channel.
@@ -28,7 +47,12 @@ fn report_metrics(payload: String) {
 fn main() {
     START.set(Instant::now()).ok();
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![process_uptime_ms, report_metrics])
+        .invoke_handler(tauri::generate_handler![
+            process_uptime_ms,
+            report_metrics,
+            load_settings,
+            save_settings
+        ])
         .run(tauri::generate_context!())
-        .expect("error while running DraftOrb spike");
+        .expect("error while running DraftOrb");
 }

@@ -60,6 +60,28 @@ export async function persistThemeChoice(
   return next;
 }
 
+/** Validates and stores the repo folder; an empty value clears it. The old value is kept on error. */
+export async function saveRepoFolder(
+  current: Settings,
+  input: string,
+): Promise<{ settings: Settings; error?: string }> {
+  const folder = input.trim();
+  if (folder === '') {
+    const { repoFolder: _removed, ...rest } = current;
+    await saveSettings(rest);
+    return { settings: rest };
+  }
+  if (!isTauri()) return { settings: current, error: strings.repoFolderDesktopOnly };
+  try {
+    await invokeCommand('check_repo_folder', { repoFolder: folder });
+  } catch (error) {
+    return { settings: current, error: typeof error === 'string' ? error : String(error) };
+  }
+  const next: Settings = { ...current, repoFolder: folder };
+  await saveSettings(next);
+  return { settings: next };
+}
+
 export async function saveSettings(settings: Settings): Promise<void> {
   const raw = serializeSettings(settings);
   if (!isTauri()) {

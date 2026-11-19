@@ -34,6 +34,12 @@ fn save_app_file(app: tauri::AppHandle, name: String, json: String) -> Result<()
     app_files::save_to(&dir, &name, &json)
 }
 
+/// Ok when `<repo_folder>/data` is a directory.
+#[tauri::command]
+fn check_repo_folder(repo_folder: String) -> Result<(), String> {
+    repo_pool::check(&repo_folder)
+}
+
 /// `<repo_folder>/data/pool.config.json`, or `None` when it does not exist.
 #[tauri::command]
 fn read_repo_pool(repo_folder: String) -> Result<Option<String>, String> {
@@ -63,6 +69,7 @@ fn main() {
             report_metrics,
             load_app_file,
             save_app_file,
+            check_repo_folder,
             read_repo_pool,
             write_repo_pool
         ])

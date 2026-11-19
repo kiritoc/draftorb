@@ -17,6 +17,11 @@ fn data_dir(repo_folder: &str) -> Result<PathBuf, String> {
     }
 }
 
+/// Ok when `<repo>/data` is a directory (the repo folder setting check).
+pub fn check(repo_folder: &str) -> Result<(), String> {
+    data_dir(repo_folder).map(|_| ())
+}
+
 /// `Ok(None)` when the file does not exist.
 pub fn read(repo_folder: &str) -> Result<Option<String>, String> {
     let dir = data_dir(repo_folder)?;
@@ -46,6 +51,12 @@ mod tests {
 
     fn s(p: &Path) -> &str {
         p.to_str().unwrap()
+    }
+
+    #[test]
+    fn check_accepts_a_folder_with_data_and_rejects_one_without() {
+        assert!(check(s(&repo("check-ok", true))).is_ok());
+        assert_eq!(check(s(&repo("check-no", false))).unwrap_err(), NOT_A_REPO);
     }
 
     #[test]

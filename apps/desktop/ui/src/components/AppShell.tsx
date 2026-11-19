@@ -4,6 +4,8 @@ import { strings } from '../strings';
 import type { ResolvedTheme, ThemeSetting } from '../theme';
 import { Header } from './Header';
 import { Nav, type ScreenId } from './Nav';
+import { PoolSyncBanner } from './PoolSyncBanner';
+import type { PoolSyncStatus } from '../pool/pool-sync';
 import { RoleSelector } from './RoleSelector';
 import { SettingsScreen } from './SettingsScreen';
 
@@ -19,6 +21,10 @@ export interface AppShellProps {
   onRoleChange: (role: Role) => void;
   enabledRoles?: readonly Role[];
   notice?: string;
+  poolSync?: PoolSyncStatus;
+  repoFolder?: string;
+  onSaveRepoFolder?: (value: string) => Promise<string | undefined>;
+  repoFolderAvailable?: boolean;
 }
 
 export function AppShell(props: AppShellProps) {
@@ -37,10 +43,17 @@ export function AppShell(props: AppShellProps) {
           {props.notice}
         </p>
       )}
+      {props.poolSync !== undefined && <PoolSyncBanner status={props.poolSync} />}
       <Nav active={props.screen} onSelect={props.onScreenChange} />
       <main className="space-y-6 px-6 py-6">
         {props.screen === 'settings' ? (
-          <SettingsScreen theme={props.theme} onThemeChange={props.onThemeChange} />
+          <SettingsScreen
+            theme={props.theme}
+            onThemeChange={props.onThemeChange}
+            repoFolder={props.repoFolder}
+            onSaveRepoFolder={props.onSaveRepoFolder}
+            repoFolderAvailable={props.repoFolderAvailable}
+          />
         ) : (
           <section className="space-y-6">
             <RoleSelector

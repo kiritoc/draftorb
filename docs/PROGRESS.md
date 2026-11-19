@@ -16,6 +16,17 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 ## Current handoff
 
 - Date: 2026-11-17
+- Branch/PR: `feat/bl-016a-pool-ui` (local only, not pushed, stacked on `feat/bl-016a-pool-backend`) / BL-016a (#80), limited UI part
+- State: REVIEW
+- Done: Settings screen "Repo folder" text field with Save/Clear and help text (SPECS §19.1); the folder is validated by the new Rust command `check_repo_folder` (`<repo>/data` must be a directory) before `repoFolder` is stored, the old value is kept on error, an empty value clears it; plain browser shows "available in the desktop program only". Pure `poolSyncStatus` (noFolder / missingFile / invalid / inSync / differs) computed after settings load and whenever `repoFolder` changes; `PoolSyncBanner` warns only for `differs` and shows a small notice for `invalid` (warning only, no import/export, D-118). The pool load notice is shown when there is no settings notice.
+- Files touched: `apps/desktop/src-tauri/src/{main.rs,repo_pool.rs}`, `apps/desktop/ui/src/{App.tsx,settings.ts,strings.ts,components/{AppShell,SettingsScreen,PoolSyncBanner}.tsx,pool/pool-sync.ts}`, tests, `docs/PROGRESS.md`.
+- Tests: `pnpm check`; `cargo test`; `build:ui`.
+- Blockers / next step: remaining for BL-016a: champion x roles editor and import/export buttons, both waiting for the exported catalog from BL-010b (owner choice); folder picker deferred by owner; drop-unknown notice wiring. SPECS needed no change.
+- Pitfalls: `check_repo_folder` only proves `data/` exists, not that it is a DraftOrb clone.
+
+### Previous handoff (BL-016a backend)
+
+- Date: 2026-11-17
 - Branch/PR: `feat/bl-016a-pool-backend` (local only, not pushed, stacked on `docs/bl-006-data-handoff`) / BL-016a (#80), backend half
 - State: REVIEW
 - Done: shared `poolConfigSchema` (SPECS §19.3; `.strict()`, unique ids per role, max 40, optional `name`) with tests and a DATA_MODEL entry. Desktop pure pool model (`ui/src/pool/pool-model.ts`: `setChampionRoles`, `poolDiffers`, `serializePoolConfig`, `parsePoolConfig`, `dropUnknownChampions`) using the same shape as the file, so export is serialization and import is parsing. Rust: `load_settings`/`save_settings` replaced by `load_app_file`/`save_app_file` with an allowlist (`settings.json`, `pool.json`), plus `read_repo_pool`/`write_repo_pool` for `<repoFolder>/data/pool.config.json` (never creates folders, atomic write). Frontend `pool-store.ts`, `repo-pool.ts`; `settingsSchema` gains optional `repoFolder`; `persistThemeChoice` now keeps other settings fields (it would have dropped `repoFolder`).

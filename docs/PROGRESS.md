@@ -21,7 +21,7 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 - Done: the app renders nothing until the stored settings are loaded, so a stored light choice on a dark OS no longer flashes dark (`system` still follows the OS live). `persistThemeChoice` (settings.ts) is the single path for saving a choice. New `theme-persistence.test.ts` (mocked IPC): fresh profile follows a dark/light OS, a stored choice wins over the OS, a saved choice reloads identically (restart). Every component already carries dark-mode classes (header, nav, role selector, settings screen, notice and badge); text inherits the themed body colors.
 - Files touched: `apps/desktop/ui/src/{App.tsx,settings.ts,theme-persistence.test.ts}`, `docs/PROGRESS.md`.
 - Tests: `pnpm check`; `pnpm --filter @draftorb/desktop build:ui`.
-- Contrast (WCAG, computed from Tailwind palette hex values, NOT visually verified on Windows; all >= 4.5:1, nothing adjusted):
+- Contrast (WCAG, rendered-DOM audit on Windows via headless Edge — every text element on Pick + Settings screens in both themes measured with computed styles; all >= 4.5:1, minimum 6.29 white-on-indigo-600, nothing adjusted):
 
 | Theme | Pair                                            | Ratio |
 | ----- | ----------------------------------------------- | ----- |

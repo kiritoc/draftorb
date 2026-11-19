@@ -16,6 +16,17 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 ## Current handoff
 
 - Date: 2026-11-17
+- Branch/PR: `feat/bl-021-champion-portraits` (local only, not pushed, stacked on `feat/bl-020-theme-toggle`) / BL-021 (#86)
+- State: REVIEW
+- Done: `ui/src/data/champion-icons.ts` (copied and adapted from `apps/web`: `resolveIconVersion`, `championIconUrl`, once-per-session `loadDDragonVersions`, `loadChampionIconVersion`, all degrading to null) and `ui/src/components/ChampionPortrait.tsx` (`<img alt>` with a switch to an initials fallback on `onError`, `championInitials`, sm/md/lg, dark-mode classes). `connect-src` in `csp` and `devCsp` now includes `https://ddragon.leagueoflegends.com`. Tests for version resolution, URL encoding, initials and both render paths.
+- Files touched: `apps/desktop/ui/src/{data/champion-icons.ts,data/champion-icons.test.ts,components/ChampionPortrait.tsx,components/ChampionPortrait.test.ts}`, `apps/desktop/src-tauri/tauri.conf.json`, `docs/PROGRESS.md`.
+- Tests: `pnpm check`; `pnpm --filter @draftorb/desktop build:ui`.
+- Blockers / next step: not wired into any screen: no champion catalog exists in the desktop app until BL-010b, and no fake list was added. Recommendation cards, draft slots, pool editor and ban list (BL-016b/BL-022) use the component.
+- Pitfalls: offline behavior is the `onError` fallback; icon caching relies on the webview HTTP cache (not verified). The `onError` fallback state sticks for the component instance (a reused instance with a new `iconUrl` would keep the fallback; key the component by URL when wiring lists).
+
+### Previous handoff (BL-020)
+
+- Date: 2026-11-17
 - Branch/PR: `feat/bl-020-theme-toggle` (local only, not pushed, stacked on `feat/bl-010a-desktop-scaffold`) / BL-020 (#85)
 - State: REVIEW
 - Done: the app renders nothing until the stored settings are loaded, so a stored light choice on a dark OS no longer flashes dark (`system` still follows the OS live). `persistThemeChoice` (settings.ts) is the single path for saving a choice. New `theme-persistence.test.ts` (mocked IPC): fresh profile follows a dark/light OS, a stored choice wins over the OS, a saved choice reloads identically (restart). Every component already carries dark-mode classes (header, nav, role selector, settings screen, notice and badge); text inherits the themed body colors.

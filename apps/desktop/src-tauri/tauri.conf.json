@@ -1,0 +1,30 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "DraftOrb Spike",
+  "version": "0.0.1",
+  "identifier": "com.kiritoc.draftorb.spike",
+  "build": {
+    "beforeDevCommand": "pnpm --filter @draftorb/desktop dev:ui",
+    "devUrl": "http://127.0.0.1:1420",
+    "beforeBuildCommand": "pnpm --filter @draftorb/desktop build:ui",
+    "frontendDist": "../ui/dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "DraftOrb Spike",
+        "width": 900,
+        "height": 700,
+        "resizable": true
+      }
+    ],
+    "withGlobalTauri": true,
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": false,
+    "icon": ["icons/icon.ico"]
+  }
+}

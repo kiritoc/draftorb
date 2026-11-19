@@ -1,0 +1,12 @@
+[package]
+name = "draftorb"
+version = "0.0.1"
+description = "DraftOrb Windows spike (BL-002)"
+edition = "2021"
+rust-version = "1.77.2"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }

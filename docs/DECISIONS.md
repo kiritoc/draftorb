@@ -1308,4 +1308,4 @@ Implements D-114 and D-101 for the desktop program; the full contract is SPECS �
 - One setting, the local repo folder: the program derives `<repo>/data/public/profiles/` (private profile export, read-only) and `<repo>/data/pool.config.json` (public pool file) from it, instead of two separate settings.
 - When `index.json` lists several profiles, v1 always uses the first entry (no profile setting).
 - When the program pool and `data/pool.config.json` differ, the program only shows a warning; import from and export to the repo file stay manual actions in the pool editor (no automatic import, even when the program pool is empty).
-- Sign-off: the owner validated SPECS §19 as a whole on 2026-11-17 ("Validée telle quelle"); BL-016a and BL-018 may build on it.
+- Sign-off: the owner validated SPECS §19 as a whole on 2026-11-17 ("Approved as written"); BL-016a and BL-018 may build on it.

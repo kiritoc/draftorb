@@ -44,6 +44,13 @@ export async function loadSettings(): Promise<ParsedSettings> {
   }
 }
 
+/** Persists an explicit theme choice and returns the stored settings. */
+export async function persistThemeChoice(theme: ThemeSetting): Promise<Settings> {
+  const next: Settings = { version: 1, theme };
+  await saveSettings(next);
+  return next;
+}
+
 export async function saveSettings(settings: Settings): Promise<void> {
   const raw = serializeSettings(settings);
   if (!isTauri()) {

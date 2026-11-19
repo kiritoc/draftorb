@@ -229,3 +229,11 @@ export type {
   ProfileIndexEntry,
   ProfileIndex,
 } from './schemas/profiles.js';
+
+export {
+  POOL_CONFIG_SCHEMA_VERSION,
+  POOL_CONFIG_MAX_PER_ROLE,
+  poolConfigEntrySchema,
+  poolConfigSchema,
+} from './schemas/pool-config.js';
+export type { PoolConfigEntry, PoolConfig } from './schemas/pool-config.js';

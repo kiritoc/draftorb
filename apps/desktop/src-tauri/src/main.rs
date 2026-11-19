@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod settings_file;
+mod app_files;
+mod repo_pool;
 
 use std::sync::OnceLock;
 use tauri::Manager;
@@ -19,20 +20,30 @@ fn process_uptime_ms() -> f64 {
         .unwrap_or(-1.0)
 }
 
-/// Settings JSON from the app config dir; `""` when missing or unreadable.
+/// Allowlisted file from the app config dir; `""` when missing or unreadable.
 #[tauri::command]
-fn load_settings(app: tauri::AppHandle) -> String {
-    app.path()
-        .app_config_dir()
-        .map(|dir| settings_file::load_from(&dir))
-        .unwrap_or_default()
+fn load_app_file(app: tauri::AppHandle, name: String) -> Result<String, String> {
+    let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
+    app_files::load_from(&dir, &name)
 }
 
-/// Atomically replaces the settings file in the app config dir.
+/// Atomically replaces an allowlisted file in the app config dir.
 #[tauri::command]
-fn save_settings(app: tauri::AppHandle, json: String) -> Result<(), String> {
+fn save_app_file(app: tauri::AppHandle, name: String, json: String) -> Result<(), String> {
     let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
-    settings_file::save_to(&dir, &json)
+    app_files::save_to(&dir, &name, &json)
+}
+
+/// `<repo_folder>/data/pool.config.json`, or `None` when it does not exist.
+#[tauri::command]
+fn read_repo_pool(repo_folder: String) -> Result<Option<String>, String> {
+    repo_pool::read(&repo_folder)
+}
+
+/// Atomically writes `<repo_folder>/data/pool.config.json` (the folder must exist).
+#[tauri::command]
+fn write_repo_pool(repo_folder: String, json: String) -> Result<(), String> {
+    repo_pool::write(&repo_folder, &json)
 }
 
 /// Receives the frontend metrics JSON and writes it to a temp file so an
@@ -50,8 +61,10 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             process_uptime_ms,
             report_metrics,
-            load_settings,
-            save_settings
+            load_app_file,
+            save_app_file,
+            read_repo_pool,
+            write_repo_pool
         ])
         .run(tauri::generate_context!())
         .expect("error while running DraftOrb");

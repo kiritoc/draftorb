@@ -191,7 +191,7 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 - Tests: docs-only change; `pnpm check` run before merge.
 - State left: REVIEW — awaiting owner review.
 - Next step: owner merges the PR; then BL-002 (#68) Windows Tauri spike and the aggregates-publishing ticket (D-111 host).
-- Pitfalls / notes for next AI: D-110 is the ETL snapshot-integrity decision (PR #116, B-070); the language decision is D-115 — older entries saying "BL-001 writes D-110..D-114" are outdated, the real range is D-111..D-115. D-114 records the owner quote "Oui, on peut versionner le pool"; D-115 records "Les perfs uniquement, mais je serai toujours à temps de changer plus tard."
+- Pitfalls / notes for next AI: D-110 is the ETL snapshot-integrity decision (PR #116, B-070); the language decision is D-115 — older entries saying "BL-001 writes D-110..D-114" are outdated, the real range is D-111..D-115. D-114 records the owner quote "Yes, we can version the pool" (translated from French); D-115 records "Performance only, but I can still change it later." (translated from French)
 
 ### 2026-11-15 — Devin — Backlog ticket prefix `B-` → `BL-`
 

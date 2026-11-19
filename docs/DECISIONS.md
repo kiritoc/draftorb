@@ -901,6 +901,8 @@ Owner decision 2026-11-07.
 
 Owner decision 2026-11-08.
 
+Update (2026-11-17, owner decision): point 9 is applied literally to error messages: Riot API errors redact PUUIDs completely (`[REDACTED]`, like match ids); the former 8-character prefix is no longer logged.
+
 ### D-079 — Local-only app: no hosting, no deploy workflow — ACCEPTED, amended by D-099, amended by D-111
 
 - Context: the owner wants the app private and only needs the database refreshed automatically. GitHub Pages on the free plan requires a public repo; Cloudflare Access requires payment details even on its free plan.
@@ -1281,11 +1283,11 @@ Keep the raw data and the ETL timeline extraction (`item_events`, `kill_events`,
 
 ### D-114 — Public versioned champion pool file — ACCEPTED (owner, 2026-11-15)
 
-Amends D-101 (storage and sync mechanics) and feeds D-102 (pool-driven collection). Owner approval, verbatim: "Oui, on peut versionner le pool". The player's champion pool is versioned in the public repo as `data/pool.config.json` (secret-free, zod-validated, `schemaVersion`, champion ids per role with an optional display name), following the pattern of `data/profiles.config.json` (D-068). The program stays the source of truth for the screen; an "Export to repo file" action writes the file and the user commits it; the program warns when its pool and the repo file differ; the scheduled pipeline reads only the repo copy; the pool never changes scores (D-101). The repo is public, so the pool list is public.
+Amends D-101 (storage and sync mechanics) and feeds D-102 (pool-driven collection). Owner approval (translated from French): "Yes, we can version the pool". The player's champion pool is versioned in the public repo as `data/pool.config.json` (secret-free, zod-validated, `schemaVersion`, champion ids per role with an optional display name), following the pattern of `data/profiles.config.json` (D-068). The program stays the source of truth for the screen; an "Export to repo file" action writes the file and the user commits it; the program warns when its pool and the repo file differ; the scheduled pipeline reads only the repo copy; the pool never changes scores (D-101). The repo is public, so the pool list is public.
 
 ### D-115 — Language and shell: TypeScript engine with a Tauri shell — ACCEPTED (owner, 2026-11-15)
 
-Amends D-001, D-098 and D-099. TypeScript engine with a Tauri shell for the Windows 11 program. The Windows spike (issue #68) validates it against owner-confirmed thresholds; the starting thresholds from AUDIT.md section 6 (start under about 3 s, idle memory under about 400 MB) are estimates and need owner confirmation after measurement. The owner's criterion is performance and changing later stays possible (full Rust once the ranking is validated, or Electron as fallback). Owner approval, verbatim: "Les perfs uniquement, mais je serai toujours à temps de changer plus tard." AGENTS.md rule 4 amendment: the no-compiler native-dependency rule stays for `packages/shared`, `packages/engine`, `packages/etl` and tooling; the Windows desktop shell may require the Rust toolchain for Tauri.
+Amends D-001, D-098 and D-099. TypeScript engine with a Tauri shell for the Windows 11 program. The Windows spike (issue #68) validates it against owner-confirmed thresholds; the starting thresholds from AUDIT.md section 6 (start under about 3 s, idle memory under about 400 MB) are estimates and need owner confirmation after measurement. The owner's criterion is performance and changing later stays possible (full Rust once the ranking is validated, or Electron as fallback). Owner approval, verbatim: "Performance only, but I can still change it later." (owner quote, translated from French) AGENTS.md rule 4 amendment: the no-compiler native-dependency rule stays for `packages/shared`, `packages/engine`, `packages/etl` and tooling; the Windows desktop shell may require the Rust toolchain for Tauri.
 
 ### D-116 — Desktop spike dependencies: Tauri v2 + Vite — ACCEPTED (owner, 2026-11-16)
 
@@ -1317,3 +1319,15 @@ Implements the v1 badge of D-100/SPECS §18 within D-075 (sample size always vis
 - Scope: the profile's games on the champion **in the role being drafted** (champion + role, consistent with the per-role pool of D-101), from the profile export read per SPECS §19.2 (already bounded to the last 180 days and at most `profileMaxGames` games, D-069).
 - Counting: raw games and raw win rate (no recency weighting, no shrinkage). The badge always shows the game count; the win rate is shown only from **5 games** up (same threshold as D-075 point 2 for "profile's best" runes and spells); below that it shows "Not enough data" with the count; no profile export loaded → "No data".
 - The badge never changes `score(c)` or ranks (D-072, D-101). The v2 personalized list keeps its own weighted rules (D-073).
+
+### D-120 — PR titles carry exactly one work item id: BL-xxx or B-xxx — ACCEPTED (owner, 2026-11-17)
+
+Owner delegated the choice ("choose, best practice"; translated from French). Amends the BL-008 (issue #111) acceptance criterion "PR titles without a BL-xxx ticket id fail".
+
+- Rule: a pull request title must carry exactly one work item id: a backlog ticket `BL-<n>` (optionally one lowercase letter, GitHub issue) or a bug `B-<nnn>` (`docs/BUGS.md`). Repeating the same id is fine; two different ids fail (one work item = one PR). Enforced by `scripts/check-pr-title.mjs` in the CI `safety` job.
+- Why: every change stays traceable to one tracked item, and bug fixes keep their single source of truth in `docs/BUGS.md` instead of a duplicate GitHub issue per bug.
+- Bug PRs reference their `docs/BUGS.md` entry in the body instead of `Closes #n`; the entry records the fix and the regression test (TESTING.md).
+
+### D-121 — Legacy web app frozen until deletion — ACCEPTED (owner, 2026-11-17)
+
+`apps/web` is frozen until it is deleted: no new features and no alignment with new contracts or decisions (e.g. the `banned` pool reason label, the D-117 dual patch label, the 300-line convention for `DraftScreen.tsx`). The only allowed changes are the minimum needed to keep `pnpm check` green when shared contracts change. All product work goes to `apps/desktop` (D-115). Review findings on `apps/web` are closed as "frozen" unless they are security issues.

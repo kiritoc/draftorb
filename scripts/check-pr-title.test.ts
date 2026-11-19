@@ -1,5 +1,6 @@
 /**
- * PR title check tests (BL-008): a backlog ticket id `BL-<digits>[a-z]` is required.
+ * PR title check tests (BL-008, D-120): exactly one tracked work item id is
+ * required, a backlog ticket `BL-<digits>[a-z]` or a bug `B-<3+ digits>`.
  */
 
 import { spawnSync } from 'node:child_process';
@@ -18,14 +19,24 @@ describe('checkPrTitle', () => {
     'feat(engine): bans (BL-012)',
     'BL-013a — Evidence rule',
     'chore: BL-008',
+    'fix(etl): torn snapshot (B-070)',
+    'fix(etl): time-budget the ingest steps (B-071)',
+    'BL-012: bans (BL-012 follow-up)',
   ])('accepts %s', (title) => {
     expect(checkPrTitle(title)).toBeNull();
   });
 
-  it.each(['fix(etl): torn snapshot (B-070)', 'XBL-012', 'BL-', 'BL-12ab', 'bl-012', ''])(
-    'rejects %j',
+  it.each(['XBL-012', 'BL-', 'BL-12ab', 'bl-012', '', 'B-70', 'XB-070', 'b-070', 'D-117 only'])(
+    'rejects %j (no work item id)',
     (title) => {
       expect(checkPrTitle(title)).toContain('BL-012');
+    },
+  );
+
+  it.each(['BL-012 and BL-013a', 'fix: B-067 and B-071', 'BL-016a (B-071)'])(
+    'rejects %j (more than one work item)',
+    (title) => {
+      expect(checkPrTitle(title)).toContain('exactly one');
     },
   );
 });
@@ -45,7 +56,7 @@ describe('check-pr-title CLI', () => {
   it('exits 1 with the rule for an invalid title', () => {
     const result = run('no ticket here');
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain('PR title must contain a backlog ticket id');
+    expect(result.stderr).toContain('PR title must contain');
   });
 
   it('exits 2 when PR_TITLE is not set', () => {

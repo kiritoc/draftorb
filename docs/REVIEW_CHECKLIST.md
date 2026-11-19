@@ -4,7 +4,7 @@ Use this for every PR in the rework. Source of truth: `docs/GOALS.md`, accepted 
 
 ## Goal alignment
 
-- [ ] The PR delivers exactly one issue, and the PR description links it with `Closes #n`; every acceptance criterion is ticked with evidence.
+- [ ] The PR delivers exactly one work item (D-120): a backlog issue linked with `Closes #n`, every acceptance criterion ticked with evidence; or a bug `B-xxx` whose `docs/BUGS.md` entry gives the fix and its regression test.
 - [ ] The change moves the product toward GOALS.md (pick screen → runes/summoners/starters → in-game items) and respects the version scope (D-100, D-097).
 - [ ] Product invariants hold (AGENTS.md): "Best overall" always shown; "From your pool" above it when the pool is non-empty; both lists paginated with "Show more"; pool never changes `score(c)`; champion portraits next to names; "unvalidated" label until the D-023 gate passes.
 

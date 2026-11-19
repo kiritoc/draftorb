@@ -4,7 +4,7 @@ Project: **DraftOrb** — a personal Windows 11 companion for one player (KiriTo
 
 ## Language rule
 
-**Everything in the repository is in English**: code, identifiers, comments, commit messages, docs, tickets, bug reports, test names, log messages, error messages and UI text. Never write French (or any other language) in files. In the chat, reply in the language the owner uses, but anything that is written to a file stays in English.
+**Everything in the repository is in English**: code, identifiers, comments, commit messages, docs, tickets, bug reports, test names, log messages, error messages and UI text. Never write French (or any other language) in files. Owner quotes are recorded translated into English and marked "translated from French". In the chat, reply in the language the owner uses, but anything that is written to a file stays in English.
 
 ## Mandatory reading order (every session)
 
@@ -54,8 +54,8 @@ pnpm etl <command>  # data pipeline (see docs/SETUP.md)
 packages/shared   types + zod schemas (single source of truth)
 packages/engine   pure scoring/recommendation logic
 packages/etl      Riot API client, SQLite, aggregation, JSON export
-apps/web          Vite + React + Tailwind (static site)
-apps/desktop      Tauri shell around the TypeScript engine (D-115; not created yet)
+apps/web          legacy Vite + React static site, frozen until deleted (D-121)
+apps/desktop      Tauri shell around the TypeScript engine (D-115)
 data/             generated JSON (public), hand-written tags (manual) + raw/sqlite (gitignored)
 docs/             all project docs
 ```

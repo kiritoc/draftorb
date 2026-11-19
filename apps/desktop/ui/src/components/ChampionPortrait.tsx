@@ -19,6 +19,11 @@ export function championInitials(name: string): string {
   return letters === '' ? '?' : letters;
 }
 
+/** Whether to render the image: a URL exists and it has not failed to load. */
+export function shouldShowImage(iconUrl: string | null, failedUrl: string | null): boolean {
+  return iconUrl !== null && iconUrl !== failedUrl;
+}
+
 export interface ChampionPortraitProps {
   name: string;
   iconUrl: string | null;
@@ -31,15 +36,16 @@ export interface ChampionPortraitProps {
  * and the ban list will use it (BL-016b/BL-022).
  */
 export function ChampionPortrait({ name, iconUrl, size = 'md' }: ChampionPortraitProps) {
-  const [failed, setFailed] = useState(false);
+  // Track the URL that failed (not a boolean) so a new iconUrl is retried.
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const box = `${SIZE_CLASS[size]} shrink-0 rounded-lg`;
-  if (iconUrl !== null && !failed) {
+  if (iconUrl !== null && shouldShowImage(iconUrl, failedUrl)) {
     return (
       <img
         src={iconUrl}
         alt={name}
         loading="lazy"
-        onError={() => setFailed(true)}
+        onError={() => setFailedUrl(iconUrl)}
         className={`${box} bg-slate-200 object-cover dark:bg-slate-700`}
       />
     );

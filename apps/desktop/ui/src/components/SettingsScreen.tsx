@@ -9,6 +9,7 @@ export interface SettingsScreenProps {
   /** Resolves to an error message, or undefined when saved. */
   onSaveRepoFolder?: (value: string) => Promise<string | undefined>;
   repoFolderAvailable?: boolean;
+  profileStatus?: string;
 }
 
 export function SettingsScreen({
@@ -17,6 +18,7 @@ export function SettingsScreen({
   repoFolder,
   onSaveRepoFolder,
   repoFolderAvailable = true,
+  profileStatus,
 }: SettingsScreenProps) {
   const [draft, setDraft] = useState(repoFolder ?? '');
   const [error, setError] = useState<string | undefined>();
@@ -86,6 +88,12 @@ export function SettingsScreen({
           </p>
         )}
       </div>
+      {profileStatus !== undefined && (
+        <div className="space-y-1">
+          <h3 className="text-lg">{strings.personalRecordLabel}</h3>
+          <p className="text-base text-slate-600 dark:text-slate-300">{profileStatus}</p>
+        </div>
+      )}
     </section>
   );
 }

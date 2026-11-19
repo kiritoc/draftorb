@@ -1309,3 +1309,11 @@ Implements D-114 and D-101 for the desktop program; the full contract is SPECS �
 - When `index.json` lists several profiles, v1 always uses the first entry (no profile setting).
 - When the program pool and `data/pool.config.json` differ, the program only shows a warning; import from and export to the repo file stay manual actions in the pool editor (no automatic import, even when the program pool is empty).
 - Sign-off: the owner validated SPECS §19 as a whole on 2026-11-17 ("Approved as written"); BL-016a and BL-018 may build on it.
+
+### D-119 — Personal-record badge counts raw games, minimum 5 (BL-018) — ACCEPTED (owner, 2026-11-17)
+
+Implements the v1 badge of D-100/SPECS §18 within D-075 (sample size always visible, never an invented number).
+
+- Scope: the profile's games on the champion **in the role being drafted** (champion + role, consistent with the per-role pool of D-101), from the profile export read per SPECS §19.2 (already bounded to the last 180 days and at most `profileMaxGames` games, D-069).
+- Counting: raw games and raw win rate (no recency weighting, no shrinkage). The badge always shows the game count; the win rate is shown only from **5 games** up (same threshold as D-075 point 2 for "profile's best" runes and spells); below that it shows "Not enough data" with the count; no profile export loaded → "No data".
+- The badge never changes `score(c)` or ranks (D-072, D-101). The v2 personalized list keeps its own weighted rules (D-073).

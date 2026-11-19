@@ -16,6 +16,17 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 ## Current handoff
 
 - Date: 2026-11-17
+- Branch/PR: `feat/bl-018-record-badge` (local only, not pushed, stacked on `feat/bl-016a-pool-ui`) / BL-018 (#83)
+- State: REVIEW
+- Done: D-119 rule implemented. Rust `read_profile_file` (validated plain `.json` names, reads `<repo>/data/public/profiles/<file>`, missing = `None`). Frontend `loadProfileExport` (index.json, first entry per D-118, validated with the shared schemas, never throws), pure `personalRecord` (champion + role, raw win rate from `RECORD_MIN_GAMES` = 5), `RecordBadge` component (`N games · X%`, `Not enough data (N game(s))`, `No data`, tooltip with label, synced date and export game count). The app loads the export after settings load and when `repoFolder` changes; Settings shows a "Personal record" status line. `syncedAt` is unix SECONDS (`Math.floor(ms / 1000)` in `packages/etl/src/profile-export.ts`), formatted as `YYYY-MM-DD` (UTC).
+- Files touched: `apps/desktop/src-tauri/src/{main.rs,repo_pool.rs,profile_file.rs}`, `apps/desktop/ui/src/{App.tsx,config.ts,strings.ts,components/*,profile/*}`, tests, `docs/{SPECS,PROGRESS}.md`.
+- Tests: `pnpm check`; `cargo test`; `build:ui`.
+- Blockers / next step: the badge is not rendered on any screen yet (no cards): wiring onto recommendation cards comes with BL-016b, including the test that the badge does not alter `recommendations` order. Windows check pending.
+- Pitfalls: the profile export covers at most 180 days and `profileMaxGames` games (D-069), so the badge counts only those.
+
+### Previous handoff (BL-016a UI)
+
+- Date: 2026-11-17
 - Branch/PR: `feat/bl-016a-pool-ui` (local only, not pushed, stacked on `feat/bl-016a-pool-backend`) / BL-016a (#80), limited UI part
 - State: REVIEW
 - Done: Settings screen "Repo folder" text field with Save/Clear and help text (SPECS §19.1); the folder is validated by the new Rust command `check_repo_folder` (`<repo>/data` must be a directory) before `repoFolder` is stored, the old value is kept on error, an empty value clears it; plain browser shows "available in the desktop program only". Pure `poolSyncStatus` (noFolder / missingFile / invalid / inSync / differs) computed after settings load and whenever `repoFolder` changes; `PoolSyncBanner` warns only for `differs` and shows a small notice for `invalid` (warning only, no import/export, D-118). The pool load notice is shown when there is no settings notice.

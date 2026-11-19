@@ -333,7 +333,7 @@ Only edge cases not owned by sections 12-16; all other rules reference those sec
 
 Personal recommendations use a **configured profile's** match history, synced by the pipeline and shipped as static JSON — the app is local-only and never calls Riot; there is no login or server (D-002, D-067, D-079). `score(c)` and every existing list are **unchanged** by personalization (D-072, same invariant as D-024).
 
-Version split (D-100): **v1** shows only a per-champion personal-record badge on each recommendation card (games and win rate, or "not enough data" below the minimum sample, D-075). The personalized list, the rune/summoner columns and item personalization described below are **v2**.
+Version split (D-100): **v1** shows only a per-champion personal-record badge on each recommendation card (games and win rate, or "not enough data" below the minimum sample, D-075; D-119: champion + drafted role, raw games, win rate from 5 games). The personalized list, the rune/summoner columns and item personalization described below are **v2**.
 
 ### 18.1 Profile
 

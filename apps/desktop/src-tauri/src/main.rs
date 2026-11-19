@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod app_files;
+mod profile_file;
 mod repo_pool;
 
 use std::sync::OnceLock;
@@ -32,6 +33,12 @@ fn load_app_file(app: tauri::AppHandle, name: String) -> Result<String, String> 
 fn save_app_file(app: tauri::AppHandle, name: String, json: String) -> Result<(), String> {
     let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
     app_files::save_to(&dir, &name, &json)
+}
+
+/// `<repo_folder>/data/public/profiles/<file_name>`, or `None` when missing.
+#[tauri::command]
+fn read_profile_file(repo_folder: String, file_name: String) -> Result<Option<String>, String> {
+    profile_file::read(&repo_folder, &file_name)
 }
 
 /// Ok when `<repo_folder>/data` is a directory.
@@ -70,6 +77,7 @@ fn main() {
             load_app_file,
             save_app_file,
             check_repo_folder,
+            read_profile_file,
             read_repo_pool,
             write_repo_pool
         ])

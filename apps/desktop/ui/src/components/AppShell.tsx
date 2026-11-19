@@ -25,6 +25,7 @@ export interface AppShellProps {
   repoFolder?: string;
   onSaveRepoFolder?: (value: string) => Promise<string | undefined>;
   repoFolderAvailable?: boolean;
+  profileStatus?: string;
 }
 
 export function AppShell(props: AppShellProps) {
@@ -53,6 +54,7 @@ export function AppShell(props: AppShellProps) {
             repoFolder={props.repoFolder}
             onSaveRepoFolder={props.onSaveRepoFolder}
             repoFolderAvailable={props.repoFolderAvailable}
+            profileStatus={props.profileStatus}
           />
         ) : (
           <section className="space-y-6">

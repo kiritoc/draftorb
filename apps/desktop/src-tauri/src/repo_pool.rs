@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 const FILE_NAME: &str = "pool.config.json";
 const NOT_A_REPO: &str = "not a DraftOrb repo folder: data/ missing";
 
-fn data_dir(repo_folder: &str) -> Result<PathBuf, String> {
+pub(crate) fn data_dir(repo_folder: &str) -> Result<PathBuf, String> {
     let dir = Path::new(repo_folder).join("data");
     if dir.is_dir() {
         Ok(dir)

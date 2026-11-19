@@ -42,5 +42,20 @@ export const strings = {
   repoFolderDesktopOnly: 'Available in the desktop program only',
   poolDiffers:
     'Your pool differs from data/pool.config.json in the repo folder. Import or export from the pool editor.',
+  recordNoData: 'No data',
+  recordNotEnough: (games: number) =>
+    `Not enough data (${games} ${games === 1 ? 'game' : 'games'})`,
+  recordWithRate: (games: number, percent: number) => `${games} games · ${percent}%`,
+  recordTooltip: (label: string, date: string, gameCount: number) =>
+    `${label} · synced ${date} · ${gameCount} games in the export`,
+  profileLoaded: (label: string, gameCount: number, date: string) =>
+    `${label} · ${gameCount} games · synced ${date}`,
+  profileMissing: 'No profile export found in data/public/profiles/ (run pnpm etl pull)',
+  profileNoFolder: 'Set the repo folder to load your personal record',
+  profileInvalid: (file: string, reason: string) => `Profile export ${file} is unusable: ${reason}`,
+  profileReasonRead: 'cannot be read',
+  profileReasonJson: 'not valid JSON',
+  profileReasonSchema: 'unexpected format',
+  personalRecordLabel: 'Personal record',
   settingsReset: 'Settings were reset: the file was unreadable',
 } as const;

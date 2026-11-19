@@ -3,6 +3,7 @@ import type { Role } from '@draftorb/shared';
 import { AppShell } from './components/AppShell';
 import type { ScreenId } from './components/Nav';
 import type { DataStatus } from './data-status';
+import { describeProfileLoad, loadProfileExport, type ProfileLoad } from './profile/profile-export';
 import { loadPool } from './pool/pool-store';
 import { poolSyncStatus, type PoolSyncStatus } from './pool/pool-sync';
 import { readRepoPool } from './pool/repo-pool';
@@ -37,6 +38,7 @@ export function App() {
   const [notice, setNotice] = useState<string | undefined>();
   const [poolNotice, setPoolNotice] = useState<string | undefined>();
   const [poolSync, setPoolSync] = useState<PoolSyncStatus>({ kind: 'noFolder' });
+  const [profileLoad, setProfileLoad] = useState<ProfileLoad>({ kind: 'none', reason: 'noFolder' });
   const prefersDark = usePrefersDark();
   const resolvedTheme = settings === null ? null : resolveTheme(settings.theme, prefersDark);
 
@@ -59,6 +61,17 @@ export function App() {
       setPoolNotice(program.notice);
       setPoolSync(poolSyncStatus(program.pool, repo));
     })();
+    return () => {
+      cancelled = true;
+    };
+  }, [settingsLoaded, repoFolder]);
+
+  useEffect(() => {
+    if (!settingsLoaded) return;
+    let cancelled = false;
+    void loadProfileExport(repoFolder).then((load) => {
+      if (!cancelled) setProfileLoad(load);
+    });
     return () => {
       cancelled = true;
     };
@@ -106,6 +119,7 @@ export function App() {
       repoFolder={settings.repoFolder}
       onSaveRepoFolder={saveFolder}
       repoFolderAvailable={isTauri()}
+      profileStatus={describeProfileLoad(profileLoad)}
     />
   );
 }

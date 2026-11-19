@@ -54,6 +54,16 @@ The leaving AI must: commit WIP on the task branch and write a handoff in the co
 - Never fabricate stats, API fields or URLs: check `RIOT_API.md` / real responses; if unsure, say so and log it.
 - If a task is too large for one session, split it and stop at a clean state.
 
+## CI safety checks (BL-008)
+
+Three Node scripts enforce the public-repo rules; run them locally before pushing.
+
+| Check                                                            | Fails when                                                                                                                                                                  | How to fix                                                                                                                                                                                 |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `node scripts/check-secrets.mjs` (CI `lint` job)                 | A tracked file, `data/public` or the web build contains an `RGAPI-` key, the `RIOT_API_KEY` value or a PUUID-like identifier (78 base64url chars with a letter and a digit) | Remove the value. For a synthetic test literal, split it with string concatenation so the file has no contiguous token. Never paste real PUUIDs                                            |
+| `node scripts/check-public-paths.mjs` (CI `safety` job)          | A tracked file lives under a `profiles/` directory or is a SQLite file (`*.sqlite`, `*.sqlite3`, `*.db`, `-wal`, `-shm`, or any of them `.gz`)                              | Remove the file from git or exclude it from the artifact. `--dir DIR` checks a tree; BL-004 (public aggregates release, D-111) must run it on its tree. Never on the private state tarball |
+| `PR_TITLE=... node scripts/check-pr-title.mjs` (CI `safety` job) | The pull request title has no backlog ticket id `BL-<n>` (optionally one lowercase letter, e.g. `BL-013a`)                                                                  | Rename the PR, e.g. `feat(engine): bans (BL-012)` (one ticket = one PR)                                                                                                                    |
+
 ## Weekly (owner)
 
 Review BUGS and GOALS, reprioritize GitHub issues/project, bump data to the new patch (`pnpm etl ...`), re-run golden tests.

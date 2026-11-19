@@ -16,6 +16,17 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 ## Current handoff
 
 - Date: 2026-11-17
+- Branch/PR: `chore/bl-008-ci-safety` (local only, not pushed) / BL-008 (#111)
+- State: REVIEW
+- Done: `scripts/check-secrets.mjs` gains a `PUUID-like identifier` needle (78 base64url chars with a letter and a digit, `+/=` excluded at the boundaries); the synthetic PUUID in `packages/etl/src/riot/client.test.ts` is split by concatenation. New `scripts/check-public-paths.mjs` (`profiles/` directories and SQLite files; git ls-files or `--dir`) and `scripts/check-pr-title.mjs` (`BL-<n>[a-z]` from `PR_TITLE`). New CI job `safety` (pull_request only, not Dependabot). Documented in WORKFLOW.md and TESTING.md.
+- Files touched: `scripts/check-{secrets,public-paths,pr-title}.{mjs,test.ts}`, `packages/etl/src/riot/client.test.ts`, `.github/workflows/ci.yml`, `docs/{WORKFLOW,TESTING,PROGRESS}.md`.
+- Tests: `pnpm check`; each script has fixture-violation tests.
+- Blockers / next step: the `safety` job can only be proven green once pushed. BL-004 must run `check-public-paths.mjs --dir` on the public aggregates tree. Bug-fix PRs titled only with `B-xxx` fail the title check by design of the ticket criterion; raise with the owner.
+- Pitfalls: do not wire `--dir` into `etl.yml`: the state tarball (private) intentionally contains `profiles/`.
+
+### Previous handoff (BL-012)
+
+- Date: 2026-11-17
 - Branch/PR: `feat/bl-012-bans-engine` (local only, not pushed) / BL-012 (#75), schema + engine part
 - State: REVIEW
 - Done: `draftInputSchema.bans` (max 10, unique, banned-and-picked rejected with the champion id), `poolUnavailable` reason `banned`, `DRAFT_RESULT_SCHEMA_VERSION` 1 -> 2. Engine: `buildCandidateSet` excludes banned champions (picked wins over banned) and exposes `banned`; pool entries report `banned`; the unseen blind opponents exclude picked and banned champions. No scoring math or config change. SPECS §2/§4/§5/§7/§7.1 updated.

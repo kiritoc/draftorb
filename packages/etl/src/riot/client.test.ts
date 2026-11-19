@@ -229,9 +229,10 @@ describe('RiotClient', () => {
     });
 
     it('shortens 78-character PUUIDs in error bodies (B-010 regression)', async () => {
-      // Real Riot PUUIDs are 78-character base64url strings
+      // Real Riot PUUIDs are 78-character base64url strings (split so the committed
+      // file never contains a contiguous PUUID-like token, scripts/check-secrets.mjs)
       const realPuuid =
-        'AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-ABCD';
+        'AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-' + 'AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-ABCD';
       const client = new RiotClient({
         apiKey: dummyApiKey,
         fetchFn: vi.fn(async () => createMockResponse(400, `Player not found: ${realPuuid}`)),

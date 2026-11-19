@@ -134,15 +134,21 @@ jobs:
       - name: Check champion tags drift
         run: pnpm etl check-tags
 
+      # Time budgets (B-071): both ingest steps must exit on their own well
+      # before the 360-minute job timeout. A timeout-cancelled step leaves its
+      # writer alive, the compact step then refuses to snapshot (B-070) and the
+      # whole run's progress is lost. Budgets are checked at player boundaries
+      # and cursors are saved, so a backlog drains over several runs.
+      # 240 + 60 min of ingest leaves ~60 min for the other steps.
       - name: Refresh already-ingested players
         env:
           RIOT_API_KEY: ${{ secrets.RIOT_API_KEY }}
-        run: pnpm etl matches euw1 --refresh
+        run: pnpm etl matches euw1 --refresh --time-budget 240
 
       - name: Ingest pending players (bounded)
         env:
           RIOT_API_KEY: ${{ secrets.RIOT_API_KEY }}
-        run: pnpm etl matches euw1 --limit 100
+        run: pnpm etl matches euw1 --limit 100 --time-budget 60
 
       # Non-fatal like `status`: a failed profile must not block the match
       # pipeline, and writeProfileExports only runs on the success path so

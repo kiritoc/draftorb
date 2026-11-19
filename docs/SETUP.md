@@ -57,7 +57,7 @@ gh release create state-$(date -u +%Y%m%dT%H%MZ) DraftOrb.sqlite.gz public-expor
 The cron schedule is ENABLED again (owner decision 2026-11-13): the repo is public so Actions minutes are unlimited, and the database stays in the private state repo — see D-094. `.github/workflows/etl.yml` runs every 12h (`37 */12 * * *`) plus on `workflow_dispatch` (Actions → ETL refresh → Run workflow); it performs the same pipeline:
 
 1. Downloads the newest `state-*` release from the state repo and restores `data/DraftOrb.sqlite` (fails early if there is no release or the token is rejected).
-2. `migrate` → `check-key` → `static` → `matches euw1 --refresh` → `matches euw1 --limit 100` (bounded pending-player ingest) → `profile-sync --publish` (configured profiles only, non-fatal) → `prune` → `aggregate` → `derive-roles` → `export` → `status`.
+2. `migrate` → `check-key` → `static` → `matches euw1 --refresh --time-budget 240` → `matches euw1 --limit 100 --time-budget 60` (bounded pending-player ingest; the time budgets keep both steps under the 360-minute job timeout, B-071) → `profile-sync --publish` (configured profiles only, non-fatal) → `prune` → `aggregate` → `derive-roles` → `export` → `status`.
 3. `wal_checkpoint(TRUNCATE)` → `PRAGMA integrity_check` must return `ok` (otherwise nothing is uploaded) → `VACUUM` → gzip → uploads `DraftOrb.sqlite.gz` with `if: always()` so partial progress (cursors, stored matches) is saved even when a step fails; `public-exports.tar.gz` is uploaded only on success. After a successful upload the workflow prunes to the newest 7 `state-*` releases.
 4. It no longer commits `data/public` to `main` and no longer dispatches a deploy workflow — the app is local-only (D-079).
 

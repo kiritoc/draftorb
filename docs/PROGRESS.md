@@ -16,6 +16,17 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 ## Current handoff
 
 - Date: 2026-11-17
+- Branch/PR: `feat/bl-019-patch-labels` (local only, not pushed, stacked on `feat/bl-021-champion-portraits`) / BL-019 (#84)
+- State: REVIEW
+- Done: D-117 appended verbatim to `docs/DECISIONS.md`. New pure `patch-labels.ts` (`16.N` -> `26.N`, a one-line table for future verified majors; full versions and anything else give no public name). `DataStatus.loaded` now carries the internal `patch` label (renamed from `patchPublic`); the header shows `Patch 26.22 · data 16.22`, `Patch 17.3 (data label; public name unknown)` or the unchanged `Patch —` / `No data loaded yet`. GOALS open item moved to Resolved; SPECS §12 sentence added.
+- Files touched: `apps/desktop/ui/src/{patch-labels.ts,patch-labels.test.ts,data-status.ts,data-status.test.ts,strings.ts,components/Header.tsx}`, `docs/{DECISIONS,GOALS,SPECS,PROGRESS}.md`.
+- Tests: `pnpm check`; `pnpm --filter @draftorb/desktop build:ui`.
+- Blockers / next step: BL-019 UI is complete; the app still produces only `none` until real data arrives with BL-010b.
+- Pitfalls: `patchLabels` accepts only `major.minor`; pass the export patch label, never a full Data Dragon version.
+
+### Previous handoff (BL-021)
+
+- Date: 2026-11-17
 - Branch/PR: `feat/bl-021-champion-portraits` (local only, not pushed, stacked on `feat/bl-020-theme-toggle`) / BL-021 (#86)
 - State: REVIEW
 - Done: `ui/src/data/champion-icons.ts` (copied and adapted from `apps/web`: `resolveIconVersion`, `championIconUrl`, once-per-session `loadDDragonVersions`, `loadChampionIconVersion`, all degrading to null) and `ui/src/components/ChampionPortrait.tsx` (`<img alt>` with a switch to an initials fallback on `onError`, `championInitials`, sm/md/lg, dark-mode classes). `connect-src` in `csp` and `devCsp` now includes `https://ddragon.leagueoflegends.com`. Tests for version resolution, URL encoding, initials and both render paths.

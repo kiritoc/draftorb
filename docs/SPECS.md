@@ -215,7 +215,7 @@ v1 is the pick screen only (D-100): champion recommendations for SUPPORT, TOP an
 
 Table `patches(patch_index INTEGER PRIMARY KEY, version_label TEXT NOT NULL UNIQUE)` (`released_at` was dropped by migration 014, D-055 — no release-date source exists):
 
-- `version_label` = `major.minor`, identical to `matches.patch` (RIOT_API.md).
+- `version_label` = `major.minor`, identical to `matches.patch` (RIOT_API.md). The UI shows both the public and the internal label (`Patch 26.22 · data 16.22`); the public name is derived only for verified majors (16 ↔ 26, D-117), otherwise the internal label is shown with the public name marked unknown.
 - `patch_index` assigned once, gap-free starting at 1, ordered NUMERICALLY by (major, minor) — never string order (`14.10` > `14.9`) — and append-only, never reassigned or renumbered. Ordering source: Data Dragon `versions.json` deduplicated to `major.minor` labels and sorted numerically (D-055); unparseable entries are skipped with a warning. Refresh verifies the stored table is gap-free and numerically ordered and that every new label sorts after the newest stored one, then appends; it refuses to renumber or misorder. Version strings are never compared for age, windows, or breakpoints; one parse (`gameVersion` -> `major.minor` label) is allowed, defined once. All age/window/breakpoint logic uses `patch_index` only.
 - Hotfixes: all source versions sharing the same `major.minor` label collapse to one `patch_index`; one patch = one `patch_index`.
 - A match whose label is absent from `patches`: refresh `patches` from the source first; if still absent, record an `invalid` reject. This is distinct from `patch` and `pruned` rejects.

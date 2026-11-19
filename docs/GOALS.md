@@ -62,6 +62,5 @@ Windows 11 desktop program: TypeScript engine with a Tauri shell (D-115, pending
 ## Open items
 
 - Riot policy on in-game advice tools (first ticket of the live phase).
-- Patch display: public name (26.x) versus Riot data label (16.x); the offset rule is unverified.
 
-Resolved: language = TypeScript engine with a Tauri shell, pending the Windows spike (D-115); shared aggregates published as a public release asset with no token, profile data private (D-111); champion pool versioned in the repo as `data/pool.config.json` (D-114).
+Resolved: language = TypeScript engine with a Tauri shell, pending the Windows spike (D-115); shared aggregates published as a public release asset with no token, profile data private (D-111); champion pool versioned in the repo as `data/pool.config.json` (D-114); patch labels: both shown, 16.N ↔ 26.N verified (D-117).

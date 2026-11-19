@@ -156,7 +156,7 @@ Patch catalog rules (D-055): `patch_index` is gap-free from 1, ordered NUMERICAL
 
 `champions.json.roles` is kept (D-034). `pnpm etl derive-roles` rewrites it with the roles observed for that patch's participants (probability >= `roleProbThreshold` (default 0.05), canonical order). Champions with no observations keep the Data Dragon tag roles, read from an untouched `champions.bootstrap.json` snapshot. Re-run `derive-roles` after `static`, because `static` restores the tag roles.
 
-## Aggregated tables (SQLite) — recomputed on every `aggregate` run; weights baked into `wins_w`, `games_w`, `games_w2` (SPECS §14, D-045); role-generic (Phase 1 populates only `my_role = 'SUPPORT'`)
+## Aggregated tables (SQLite) — recomputed on every `aggregate` run; weights baked into `wins_w`, `games_w`, `games_w2` (SPECS §14, D-045); role-generic (aggregates are computed for all five roles; exports currently ship SUPPORT only, TOP/JUNGLE exports are BL-011)
 
 Rank buckets: every `rank_bucket` column and every exported `bucket` field uses the 8 SPECS §3 rank buckets (IRON, BRONZE, SILVER, GOLD, PLATINUM, EMERALD, DIAMOND, MASTER_PLUS), not the 10 raw rank tiers. `MANIFEST.rankBuckets` mirrors this same 8-value list.
 

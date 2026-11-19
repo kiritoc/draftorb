@@ -29,7 +29,7 @@ Our approach = **hybrid**: stats-driven engine + thin manual layer (champion tag
 ## Constraints
 
 - 100% free (no paid API/LLM/hosting). Riot API only (free personal key, D-091/D-094).
-- TypeScript everywhere for engine/ETL/shared (strict); the Windows desktop shell language is decided after the code audit (D-098/D-099).
+- TypeScript everywhere for engine/ETL/shared (strict); the Windows desktop shell is a Tauri shell around the TypeScript engine (D-115), validated by the BL-002 spike.
 - Windows 11 first, minimal setup; the program starts in seconds and downloads the latest data at launch.
 - Vibe-coded with several different AIs -> docs-driven workflow (`docs/WORKFLOW.md`).
 - No runtime AI; scoring is deterministic stats + manual tags (D-006).
@@ -66,6 +66,6 @@ Run ETL collection in the background as early as possible — data volume is the
 | Expert (Master+) stats biased by one-tricks | Per-player cap + distinct-player minimum (D-102); show pick share separately                                                           |
 | Patch changes invalidate data               | Patch-tagged data, recency decay, manifest with patch; public-name mapping unverified (D-108)                                          |
 | Riot policy on in-game advice tools         | First ticket of the live phase; log result in DECISIONS.md (D-105)                                                                     |
-| Implementation language for the shell       | Decided after the Stage-1 audit (TypeScript shell vs Rust vs Electron)                                                                 |
+| Implementation language for the shell       | Resolved by D-115: TypeScript engine + Tauri shell, validated by the BL-002 spike                                                      |
 | Data download at launch without a token     | Open: shared aggregates as a public release asset recommended (D-099); `pnpm etl pull` currently needs the gh CLI + private state repo |
 | AI drift between sessions                   | AGENTS.md rules, small tasks, tests, commit/PR handoff                                                                                 |

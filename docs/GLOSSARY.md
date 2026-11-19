@@ -30,7 +30,7 @@ Updated 2026-11-15 after the goal interview. Terms marked (new) or (changed) dif
 - **Golden test**: fixed scenario with expected output.
 - **Scale `s`**: global multiplier on summed pair terms, fit on the validation window (D-021, T-027.a).
 - **Equivalent counts**: weighted counts converted before shrinkage (`games_e = n_eff`, `wins_e = wins_w * n_eff / games_w`) so the prior `k` is in raw-game units.
-- **exportMinGames**: minimum `n_eff` for a row to be exported, always `<= minGames`. The default value is unverified in the docs; check the config.
+- **exportMinGames**: minimum `n_eff` for a row to be exported, always `<= minGames`. Default 10 (`packages/engine/src/config.ts`).
 - **Expert fallback**: champion-mastery-v4 points used for the expert rule only for participants of the recommended role, once per (puuid, champion) pair (D-022).
 - **laneGroup**: per-role config naming the lane champions used by the `lane_vs`/`lane_full` layers (D-021).
 - **Role-generic**: model and tables keyed by `myRole`. Support, Top and Jungle are populated in full; ADC and Mid minimally (D-097).

@@ -29,6 +29,12 @@ Needs the Rust toolchain (rustup; MSVC build tools on Windows) on top of Node + 
 - A plain `cargo build` produces a dev-mode binary that loads the Vite dev URL and shows a connection error without a dev server; use `tauri build` for a production binary.
 - Settings live in the program's config directory as `settings.json` (not in the webview storage).
 
+## Desktop app data folders (BL-006, SPECS §19)
+
+- In the program's Settings, choose your local clone of this repository as the repo folder. Nothing else is configured; the program stores no token.
+- Personal record (badge): run `pnpm etl pull` (or `pnpm etl profile-sync` when you have a Riot key) so `data/public/profiles/` exists in that clone. The folder is gitignored and stays private.
+- Champion pool: use "Export to repo file" in the pool editor, then review and commit `data/pool.config.json` yourself. The repository is public, so the pool list is public; the scheduled pipeline reads only the committed copy.
+
 ## Riot key
 
 1. Sign in at https://developer.riotgames.com, copy the Development API Key (expires every 24h) or your Personal key (no expiry — recommended).

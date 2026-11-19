@@ -37,6 +37,7 @@ Validation (`draftInputSchema`): `bans` holds at most 10 unique champion ids, an
 - A per-role list of champion ids owned by the user, stored by the program (not browser localStorage — D-101). The pool editor picks a champion once and ticks the roles it applies to (champion x roles). No account, no server. Max `poolMaxSize` (UI config, default 40) per role.
 - Resilience: unavailable, full or corrupted storage gives an empty pool plus a visible notice, never a crash; ids absent from the current `champions.json` are dropped with a notice.
 - Export/import as JSON text (validated before it replaces the stored pool), to back up or move devices.
+- Repo copy (D-114, §19): "Export to repo file" writes `data/pool.config.json` in the repo folder chosen in settings; the user commits it. The program stays the source of truth for the screen.
 - The pool never changes scores: `score(c)` is identical with or without a pool. It is not a boost and not a hard filter. Pool champions join the §5 candidate set, so `recommendations` may gain extra rows (and global ranks may shift) without reordering the original roleProb subsequence. See §7.1.
 
 ## 3. Rank logic
@@ -372,3 +373,46 @@ For candidate `c` in the current draft, over the profile's in-scope games:
 
 - Personalized items reuse the GameState model (§8.2, T-052+) and the profile's own purchase outcomes per state/context. Open questions (recorded before implementation): which state-bucket dimensions profile games can reproduce offline (gold diff needs timeline data — confirm `profile_games` timeline coverage), whether item personalization waits for T-056 data-driven scoring, and minimum sample sizes per item context.
 - One normative statement per rule; cross-references (§14, §15, §16) used elsewhere.
+
+## 19. Data hand-off: profile export and pool file (BL-006, D-114, D-118)
+
+The desktop program reads two local files and writes one. It stores no Riot token or any other credential and never calls Riot (D-099, D-111). It never reads the SQLite database.
+
+### 19.1 Repo folder setting
+
+- One setting, `repoFolder`: the root of the user's local clone of the DraftOrb repository, chosen in Settings (D-118). Unset by default.
+- Derived paths: profile exports `<repoFolder>/data/public/profiles/`, pool file `<repoFolder>/data/pool.config.json`. Paths are built with the OS path API, never by string concatenation with `/`.
+- Unset, missing or unreadable folder: the personal-record badge shows "no data" (§18, D-075), the pool file actions are disabled with a one-line explanation, and the rest of the program works.
+
+### 19.2 Profile export (private, read-only)
+
+- Producers: `pnpm etl profile-sync` (refresh) or `pnpm etl pull` (download from the private state repo) write `data/public/profiles/index.json` and `<id>.json` (§18.1, D-069). `data/public` is gitignored: the files stay on the user's machine.
+- The program reads `index.json` (validated with `profileIndexSchema`) and uses the **first** entry (v1, D-118); it then reads that entry's `file` from the same folder (validated with `profileExportSchema`; `file` is a plain file name, never a path).
+- Missing file, invalid JSON or a schema failure: personal-record UI shows "no data", a notice in Settings names the file and the reason, nothing crashes, nothing is written.
+- Freshness: the badge tooltip shows `syncedAt` (date) and `gameCount` from the export.
+
+### 19.3 Pool file `data/pool.config.json` (public)
+
+- Format (zod schema in `packages/shared`, `.strict()`):
+
+```
+{
+  "schemaVersion": 1,
+  "pools": {                       // partial record over Role; omitted role = empty pool
+    "SUPPORT": [{ "championId": 267, "name": "Nami" }],
+    "TOP": [{ "championId": 98, "name": "Shen" }]
+  }
+}
+```
+
+- Rules: champion ids unique within a role; at most `poolMaxSize` (40) per role; `name` is optional display text only (the id is authoritative); a champion may appear under several roles (champion x roles, D-101).
+- Writing: "Export to repo file" serializes the program's pool with roles in the `roleSchema` order, champions in the program's order, 2-space indentation and a trailing newline, so diffs stay small. It writes a temporary file then renames it over the target. The program never runs git; the user reviews and commits the file.
+- Reading: on launch and when the repo folder changes, the program reads the file (validated). A missing file is normal (no warning); an invalid file shows a notice and is ignored.
+- Difference warning (D-118): when the file is valid and its per-role champion-id sets differ from the program's pool (order and names ignored), a warning banner is shown. The program never overwrites either side automatically: import from the repo file and export to it are manual actions in the pool editor.
+- Consumers: the scheduled pipeline reads only the committed repo copy (pool-driven collection, D-102, BL-023). The pool never changes `score(c)` (D-101, §2.1).
+
+### 19.4 Privacy checklist
+
+- Profile export: stays local and private (gitignored `data/public`, private state repo); never committed, never part of a public artifact (D-111; `scripts/check-public-paths.mjs` blocks `profiles/` paths).
+- `data/pool.config.json`: public preference data only. The repository is public, so the pool list is public (D-114). It contains champion ids and optional champion names only: no PUUIDs, no Riot IDs, no match ids, no player names, no timestamps of games.
+- No token, key or credential is stored by the program; the settings file holds only UI preferences and `repoFolder`.

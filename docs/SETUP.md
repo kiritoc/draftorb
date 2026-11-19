@@ -154,5 +154,6 @@ pnpm etl pull                  # download newest state-* release exports into da
 - `better-sqlite3` install or load fails -> use Node 22 (prebuilt binaries; `better-sqlite3` 13.x requires Node >=22 and segfaults on Node 20, B-015); log anything new in BUGS.md.
 - 401/403 from Riot -> key expired. `400 Exception decrypting <puuid>` -> the key changed since the DB was built; run `pnpm etl rekey` (B-062/D-060).
 - `pnpm etl pull` / workflow fails with an auth error -> `STATE_REPO_TOKEN` missing, expired or lacks Contents read/write on the state repo (D-078).
+- Verify the state repo is still private (the no-leak guarantee rests on it, D-122): `node scripts/check-state-repo-private.mjs` — fails unless `gh repo view` reports `PRIVATE`.
 - 429 -> normal, the client waits for `Retry-After` and retries (up to 5 times).
 - PowerShell script policy errors -> use `pnpm` commands only, avoid `.ps1` scripts.

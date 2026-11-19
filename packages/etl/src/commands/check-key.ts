@@ -1,5 +1,15 @@
 import { RiotClient } from '../riot';
+import type { RiotLeagueList } from '../riot/schemas';
 import { log, parsePlatform, parsePositionals, type Command, DEFAULT_PLATFORM } from './shared';
+
+/** Success line for `check-key`; Riot no longer always returns the league `name` (B-067). */
+export function formatKeyCheckSuccess(
+  platform: string,
+  league: Pick<RiotLeagueList, 'name'>,
+): string {
+  const name = league.name ? ` ("${league.name}")` : '';
+  return `Riot API key is valid! Successfully reached ${platform} Challenger league${name}.`;
+}
 
 async function runCheckKey(args: string[]): Promise<void> {
   const [platformArg] = parsePositionals(args, 1, 'check-key [platform]');
@@ -9,9 +19,7 @@ async function runCheckKey(args: string[]): Promise<void> {
   const client = new RiotClient();
   const challenger = await client.getChallengerLeague(platform);
 
-  log.info(
-    `Riot API key is valid! Successfully reached ${platform} Challenger league ("${challenger.name}").`,
-  );
+  log.info(formatKeyCheckSuccess(platform, challenger));
   log.detail(`Entries: ${challenger.entries.length} players found`);
   log.detail('Active App Limits:', client.getRateLimiter().getAppLimits());
 }

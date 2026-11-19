@@ -19,6 +19,8 @@ import { toRecommendation } from './recommend-reasons.js';
 export interface CandidateSet {
   /** Champions already on the board (allies or enemies), independent of role inference. */
   readonly picked: ReadonlySet<ChampionId>;
+  /** Input bans minus champions already on the board (a pick wins over a ban). */
+  readonly banned: ReadonlySet<ChampionId>;
   readonly poolSet: ReadonlySet<ChampionId>;
   readonly championIdSet: ReadonlySet<ChampionId>;
   readonly candidates: ReadonlySet<ChampionId>;
@@ -37,7 +39,7 @@ export function isBelowRoleThreshold(
 
 /**
  * Candidates = champions with `roleProb[c][myRole] >= roleProbThreshold`
- * plus every known pool champion; board picks are never candidates.
+ * plus every known pool champion; board picks and bans are never candidates.
  */
 export function buildCandidateSet(
   input: DraftInput,
@@ -49,19 +51,20 @@ export function buildCandidateSet(
     ...input.allies.map((s) => s.championId),
     ...input.enemies.map((s) => s.championId),
   ]);
+  const banned = new Set<ChampionId>((input.bans ?? []).filter((id) => !picked.has(id)));
   const poolSet = new Set<ChampionId>(input.pool ?? []);
   const championIdSet = new Set<ChampionId>(championIds);
   const candidates = new Set<ChampionId>();
   for (const id of championIds) {
-    if (picked.has(id)) continue;
+    if (picked.has(id) || banned.has(id)) continue;
     if (!isBelowRoleThreshold(id, input.userRole, roleProb, threshold)) candidates.add(id);
   }
   for (const id of poolSet) {
     // Unknown ids are reported as poolUnavailable/unknownChampion, never scored.
-    if (picked.has(id) || !championIdSet.has(id)) continue;
+    if (picked.has(id) || banned.has(id) || !championIdSet.has(id)) continue;
     candidates.add(id);
   }
-  return { picked, poolSet, championIdSet, candidates };
+  return { picked, banned, poolSet, championIdSet, candidates };
 }
 
 export interface PoolOutput {
@@ -86,6 +89,8 @@ export function buildPoolOutput(
       poolUnavailable.push({ championId: pid, reason: 'picked' });
     } else if (!set.championIdSet.has(pid)) {
       poolUnavailable.push({ championId: pid, reason: 'unknownChampion' });
+    } else if (set.banned.has(pid)) {
+      poolUnavailable.push({ championId: pid, reason: 'banned' });
     }
   }
   for (const pid of set.poolSet) {

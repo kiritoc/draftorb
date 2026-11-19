@@ -30,8 +30,27 @@ export const draftInputSchema = z
     enemies: z.array(slotSchema).max(5),
     blindPick: z.boolean(),
     pool: z.array(championIdSchema).optional(),
+    bans: z
+      .array(championIdSchema)
+      .max(10)
+      .refine((ids) => new Set(ids).size === ids.length, {
+        message: 'duplicate champion ids are not allowed in bans',
+      })
+      .optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((input, ctx) => {
+    const picked = new Set([...input.allies, ...input.enemies].map((s) => s.championId));
+    input.bans?.forEach((id, i) => {
+      if (picked.has(id)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['bans', i],
+          message: `champion ${id} cannot be both banned and picked`,
+        });
+      }
+    });
+  });
 export type DraftInput = z.infer<typeof draftInputSchema>;
 
 const poolChampionsSchema = z
@@ -65,7 +84,7 @@ export type InsufficientDataEntry = z.infer<typeof insufficientDataEntrySchema>;
 export const poolUnavailableEntrySchema = z
   .object({
     championId: championIdSchema,
-    reason: z.enum(['insufficientData', 'unknownChampion', 'picked']),
+    reason: z.enum(['insufficientData', 'unknownChampion', 'picked', 'banned']),
   })
   .strict();
 export type PoolUnavailableEntry = z.infer<typeof poolUnavailableEntrySchema>;

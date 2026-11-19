@@ -16,6 +16,17 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 ## Current handoff
 
 - Date: 2026-11-17
+- Branch/PR: `feat/bl-012-bans-engine` (local only, not pushed) / BL-012 (#75), schema + engine part
+- State: REVIEW
+- Done: `draftInputSchema.bans` (max 10, unique, banned-and-picked rejected with the champion id), `poolUnavailable` reason `banned`, `DRAFT_RESULT_SCHEMA_VERSION` 1 -> 2. Engine: `buildCandidateSet` excludes banned champions (picked wins over banned) and exposes `banned`; pool entries report `banned`; the unseen blind opponents exclude picked and banned champions. No scoring math or config change. SPECS §2/§4/§5/§7/§7.1 updated.
+- Files touched: `packages/shared/src/schemas/{core,draft}.ts`, `packages/shared/test/{index,parity}.test.ts`, `packages/engine/src/{recommend,recommend-pool,recommend-test-utils}.ts`, `packages/engine/test/recommend-bans.test.ts`, `docs/{SPECS,PROGRESS}.md`.
+- Tests: `pnpm check`; new `recommend-bans.test.ts` written red first.
+- Blockers / next step: the UI part of BL-012 (manual bans input, UI test) remains for after BL-010a; legacy `apps/web` has no bans UI.
+- Pitfalls: any consumer pinning `DraftResult.schemaVersion` to 1 must move to 2.
+
+### Previous handoff (BL-005)
+
+- Date: 2026-11-17
 - Branch/PR: `chore/bl-005-delete-joint-model` (local only, not pushed) / BL-005 (#71)
 - State: REVIEW
 - Done: deleted the joint draft model per D-112 (gates D-092/D-092a failed, no consumer): `packages/engine/src/joint/` and its index re-export, `packages/etl/src/joint-fit.ts`, `commands/fit-model.ts` and its CLI registration, `packages/engine/test/joint.test.ts`. Fixed stale docs: ARCHITECTURE.md (status, `latest.json`, Electron -> Tauri D-115), DATA_MODEL.md (aggregates for all roles), GLOSSARY.md (`exportMinGames` default 10), PLAN_SUMMARY.md (shell language resolved by D-115), CONVENTIONS.md (theme D-107, storage D-101/D-114), proposed-etl-schedule.md (D-094 note).

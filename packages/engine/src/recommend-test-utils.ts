@@ -166,6 +166,7 @@ export function makeInput(
     enemies: Array<{ championId: ChampionId; role?: Role }>;
     blindPick: boolean;
     pool: ChampionId[];
+    bans: ChampionId[];
     userRank: Rank;
     userRole: Role;
   }> = {},
@@ -177,6 +178,7 @@ export function makeInput(
     enemies: overrides.enemies ?? [],
     blindPick: overrides.blindPick ?? false,
     pool: overrides.pool,
+    ...(overrides.bans !== undefined ? { bans: overrides.bans } : {}),
   };
 }
 

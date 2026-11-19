@@ -12,6 +12,7 @@
 
 import { DRAFT_RESULT_SCHEMA_VERSION } from '@draftorb/shared';
 import type {
+  ChampionId,
   DraftInput,
   DraftResult,
   InsufficientDataEntry,
@@ -127,9 +128,10 @@ export function recommend(
     (role) => !laneGroupInfo.enemiesKnown.includes(role),
   );
   const blindApplies = input.blindPick || !laneEnemiesKnown;
+  const unavailableChampionSet = new Set<ChampionId>([...knownChampionSet, ...candidateSet.banned]);
   const opponents = blindOpponents(
     blindApplies ? unknownLaneRoles : [],
-    knownChampionSet,
+    unavailableChampionSet,
     data.championIds,
     data.roleProb,
     rc.blindOpponentMinShare,

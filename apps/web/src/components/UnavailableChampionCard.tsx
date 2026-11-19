@@ -18,6 +18,7 @@ export interface UnavailableChampionCardProps {
 const BADGE_CLASS: Record<PoolUnavailableItem['reason'], string> = {
   insufficientData: 'bg-amber-900/50 text-amber-300 border-amber-600/30',
   picked: 'bg-gray-800 text-gray-400 border-gray-600/30',
+  banned: 'bg-gray-800 text-gray-400 border-gray-600/30',
   unknownChampion: 'bg-red-900/50 text-red-400 border-red-500/30',
 };
 

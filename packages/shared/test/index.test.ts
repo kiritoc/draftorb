@@ -18,6 +18,7 @@ import {
   damageTypeSchema,
   draftInputSchema,
   draftResultSchema,
+  poolUnavailableEntrySchema,
   enemyPairEntrySchema,
   gameStateSchema,
   itemIdSchema,
@@ -84,6 +85,53 @@ describe('shared schemas', () => {
     };
 
     expect(draftInputSchema.parse(input)).toEqual(input);
+  });
+
+  describe('draft input bans', () => {
+    const base = {
+      userRank: 'DIAMOND',
+      userRole: 'SUPPORT',
+      allies: [{ championId: 18 }],
+      enemies: [{ championId: 34 }],
+      blindPick: false,
+    };
+
+    it('accepts bans, an empty list and an omitted field', () => {
+      expect(draftInputSchema.parse({ ...base, bans: [1, 2, 3] }).bans).toEqual([1, 2, 3]);
+      expect(draftInputSchema.parse({ ...base, bans: [] }).bans).toEqual([]);
+      expect(draftInputSchema.parse(base).bans).toBeUndefined();
+    });
+
+    it('accepts exactly 10 bans and rejects 11', () => {
+      const ten = Array.from({ length: 10 }, (_, i) => 100 + i);
+      expect(draftInputSchema.safeParse({ ...base, bans: ten }).success).toBe(true);
+      expect(draftInputSchema.safeParse({ ...base, bans: [...ten, 110] }).success).toBe(false);
+    });
+
+    it('rejects duplicate bans', () => {
+      const r = draftInputSchema.safeParse({ ...base, bans: [5, 5] });
+      expect(r.success).toBe(false);
+    });
+
+    it('rejects a champion that is both banned and picked, naming the id', () => {
+      const ally = draftInputSchema.safeParse({ ...base, bans: [18] });
+      expect(ally.success).toBe(false);
+      expect(JSON.stringify(ally.error?.issues)).toContain('18');
+      const enemy = draftInputSchema.safeParse({ ...base, bans: [34] });
+      expect(enemy.success).toBe(false);
+      expect(JSON.stringify(enemy.error?.issues)).toContain('34');
+    });
+
+    it('stays strict about unknown keys', () => {
+      expect(draftInputSchema.safeParse({ ...base, ban: [1] }).success).toBe(false);
+    });
+  });
+
+  it('accepts the banned reason in poolUnavailable', () => {
+    expect(poolUnavailableEntrySchema.parse({ championId: 5, reason: 'banned' })).toEqual({
+      championId: 5,
+      reason: 'banned',
+    });
   });
 
   it('rejects invalid slots and invalid ranks', () => {
@@ -383,7 +431,7 @@ describe('shared schemas', () => {
 
   it('validates DraftResult with insufficientData and pool recommendations', () => {
     const result: DraftResult = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       recommendations: [
         {
           championId: 41,
@@ -412,7 +460,7 @@ describe('shared schemas', () => {
 
     expect(() =>
       draftResultSchema.parse({
-        schemaVersion: 1,
+        schemaVersion: 2,
         recommendations: [],
         insufficientData: [{ championId: 54, nEff: 12.5, rawGames: 20 }],
       }),
@@ -420,7 +468,7 @@ describe('shared schemas', () => {
 
     expect(() =>
       draftResultSchema.parse({
-        schemaVersion: 1,
+        schemaVersion: 2,
         recommendations: [],
         insufficientData: [{ championId: 54, nEff: 12.5, rawGames: 20 }],
         poolUnavailable: [{ championId: 999, reason: 'bogus' }],

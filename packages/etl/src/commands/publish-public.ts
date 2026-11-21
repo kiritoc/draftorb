@@ -1,6 +1,7 @@
 /**
  * @draftorb/etl — `publish-public` command (BL-004, D-111): packs the shared
- * aggregates (`data/public/latest.json` + `data/public/<patch>/`) into a
+ * aggregates (`data/public/latest.json` + `data/public/<patch>/` plus the
+ * manual `data/manual/champion-tags.json` at the archive root) into a
  * single tar.gz and publishes it as a release asset on the PUBLIC repo, so
  * the desktop app can download data at launch with no token.
  *
@@ -233,6 +234,17 @@ async function runPublishPublic(args: string[]): Promise<void> {
   }
 
   const files = collectPublishFiles(publicDir);
+  // Manual champion tags are public curated data the engine needs
+  // (`RecommendData.tags`); they live outside data/public, at the archive root.
+  const tagsPath = join(resolveRepoRoot(), 'data', 'manual', 'champion-tags.json');
+  if (!existsSync(tagsPath)) {
+    throw new CliError(`Missing manual champion tags at ${tagsPath}.`);
+  }
+  files.push({
+    rel: 'champion-tags.json',
+    abs: tagsPath,
+    size: statSync(tagsPath).size,
+  });
   const violations = scanPublishSet(files);
   if (violations.length > 0) {
     throw new CliError(

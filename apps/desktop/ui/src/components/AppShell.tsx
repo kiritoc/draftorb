@@ -6,8 +6,10 @@ import { Header } from './Header';
 import { Nav, type ScreenId } from './Nav';
 import { PoolSyncBanner } from './PoolSyncBanner';
 import type { PoolSyncStatus } from '../pool/pool-sync';
+import type { ProfileLoad } from '../profile/profile-export';
 import { RoleSelector } from './RoleSelector';
 import { SettingsScreen } from './SettingsScreen';
+import { PickScreen } from '../screens/PickScreen';
 
 export interface AppShellProps {
   screen: ScreenId;
@@ -26,6 +28,7 @@ export interface AppShellProps {
   onSaveRepoFolder?: (value: string) => Promise<string | undefined>;
   repoFolderAvailable?: boolean;
   profileStatus?: string;
+  profileLoad?: ProfileLoad;
 }
 
 export function AppShell(props: AppShellProps) {
@@ -56,6 +59,18 @@ export function AppShell(props: AppShellProps) {
             repoFolderAvailable={props.repoFolderAvailable}
             profileStatus={props.profileStatus}
           />
+        ) : props.screen === 'pick' ? (
+          <section className="space-y-6">
+            <RoleSelector
+              selected={props.role}
+              enabledRoles={props.enabledRoles}
+              onSelect={props.onRoleChange}
+            />
+            <PickScreen
+              role={props.role}
+              profileLoad={props.profileLoad ?? { kind: 'none', reason: 'noFolder' }}
+            />
+          </section>
         ) : (
           <section className="space-y-6">
             <RoleSelector

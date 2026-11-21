@@ -123,6 +123,7 @@ export function App() {
       onSaveRepoFolder={saveFolder}
       repoFolderAvailable={isTauri()}
       profileStatus={describeProfileLoad(profileLoad)}
+      profileLoad={profileLoad}
     />
   );
 }

@@ -1331,3 +1331,12 @@ Owner delegated the choice ("choose, best practice"; translated from French). Am
 ### D-121 — Legacy web app frozen until deletion — ACCEPTED (owner, 2026-11-17)
 
 `apps/web` is frozen until it is deleted: no new features and no alignment with new contracts or decisions (e.g. the `banned` pool reason label, the D-117 dual patch label, the 300-line convention for `DraftScreen.tsx`). The only allowed changes are the minimum needed to keep `pnpm check` green when shared contracts change. All product work goes to `apps/desktop` (D-115). Review findings on `apps/web` are closed as "frozen" unless they are security issues.
+
+### D-123 — Public aggregates host: rolling `data-latest` release on the main repo — PROPOSED (BL-004)
+
+D-111 delegated the host choice to this ticket. Proposal (awaiting owner veto at PR review):
+
+- **Host**: the public main repo (`kiritoc/draftorb`, i.e. the `origin` remote), not a dedicated repo — no new infrastructure, `gh release` works today, and release noise is minimal (one rolling tag).
+- **Tag/asset**: rolling tag `data-latest` (override `--tag`) with a single asset `aggregates.tar.gz`; each publish uses `gh release upload --clobber`, giving a stable URL `releases/download/data-latest/aggregates.tar.gz` for the app. Patch history is not kept as releases (the data is regenerable; the private state repo keeps the audit trail).
+- **Contents**: `latest.json` + `<patch>/` tree only; `profiles/` and SQLite excluded by path rule and verified by a content scan (PUUID-like + `RGAPI-`) before packing.
+- **Command**: `pnpm etl publish-public` (`--dry-run` builds and scans without uploading). `pnpm etl pull`/`publish` (private state repo) are unchanged.

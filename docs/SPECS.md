@@ -416,3 +416,10 @@ The desktop program reads two local files and writes one. It stores no Riot toke
 - Profile export: stays local and private (gitignored `data/public`, private state repo); never committed, never part of a public artifact (D-111; `scripts/check-public-paths.mjs` blocks `profiles/` paths).
 - `data/pool.config.json`: public preference data only. The repository is public, so the pool list is public (D-114). It contains champion ids and optional champion names only: no PUUIDs, no Riot IDs, no match ids, no player names, no timestamps of games.
 - No token, key or credential is stored by the program; the settings file holds only UI preferences and `repoFolder`.
+
+## 20. Public aggregates release (BL-004, D-111)
+
+- Producer: `pnpm etl publish-public [--repo=owner/name] [--tag=data-latest] [--dry-run]`. It packs `data/public/latest.json` + `data/public/<patch>/` into `aggregates.tar.gz` and publishes it on the **public** repo (default: the `origin` repo) under a rolling release tag (default `data-latest`); each publish replaces the asset, so `releases/download/data-latest/aggregates.tar.gz` is a stable download URL needing no token.
+- The publishable set excludes `profiles/` and SQLite files and is scanned for PUUID-like identifiers and `RGAPI-` patterns before packing; any violation aborts the publish. `profiles/` and the SQLite DB stay private (D-111).
+- Archive layout mirrors `data/public` minus the excluded paths: `latest.json` at the root, patch files under `<patch>/`.
+- Consumer: the desktop app downloads the tarball at launch, verifies each file against the manifest sha256, caches it for offline use (BL-010b).

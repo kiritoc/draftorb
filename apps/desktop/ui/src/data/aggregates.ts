@@ -197,9 +197,13 @@ export async function ensureData(url = PUBLIC_DATA_URL): Promise<DataLoad> {
     const meta = await downloadAggregates(url);
     return { kind: 'loaded', patch: meta.patch, generatedAt: meta.generatedAt, stale: false };
   } catch {
-    const meta = await readCachedMeta();
-    if (meta !== null) {
-      return { kind: 'loaded', patch: meta.patch, generatedAt: meta.generatedAt, stale: true };
+    try {
+      const meta = await readCachedMeta();
+      if (meta !== null) {
+        return { kind: 'loaded', patch: meta.patch, generatedAt: meta.generatedAt, stale: true };
+      }
+    } catch {
+      // Cache unreadable: report no data rather than reject the launch flow.
     }
     return { kind: 'none' };
   }

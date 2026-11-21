@@ -1,0 +1,17 @@
+{
+  "$schema": "../gen/schemas/capabilities.json",
+  "identifier": "default",
+  "description": "Default capabilities for the main window",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    {
+      "identifier": "http:default",
+      "allow": [
+        "https://github.com/kiritoc/draftorb/releases/download/data-latest/*",
+        "https://release-assets.githubusercontent.com/*",
+        "https://objects.githubusercontent.com/*"
+      ]
+    }
+  ]
+}

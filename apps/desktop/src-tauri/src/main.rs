@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod app_files;
+mod data_cache;
 mod profile_file;
 mod repo_pool;
 
@@ -33,6 +34,27 @@ fn load_app_file(app: tauri::AppHandle, name: String) -> Result<String, String> 
 fn save_app_file(app: tauri::AppHandle, name: String, json: String) -> Result<(), String> {
     let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
     app_files::save_to(&dir, &name, &json)
+}
+
+/// `<config>/data-cache/<name>` content, or `None` when missing.
+#[tauri::command]
+fn data_cache_read(app: tauri::AppHandle, name: String) -> Result<Option<String>, String> {
+    let dir = app.path().app_config_dir().map_err(|e| e.to_string())?.join("data-cache");
+    data_cache::read(&dir, &name)
+}
+
+/// Atomically writes `<config>/data-cache/<name>`.
+#[tauri::command]
+fn data_cache_write(app: tauri::AppHandle, name: String, content: String) -> Result<(), String> {
+    let dir = app.path().app_config_dir().map_err(|e| e.to_string())?.join("data-cache");
+    data_cache::write(&dir, &name, &content)
+}
+
+/// Removes every cached aggregate file.
+#[tauri::command]
+fn data_cache_clear(app: tauri::AppHandle) -> Result<(), String> {
+    let dir = app.path().app_config_dir().map_err(|e| e.to_string())?.join("data-cache");
+    data_cache::clear(&dir)
 }
 
 /// `<repo_folder>/data/public/profiles/<file_name>`, or `None` when missing.
@@ -71,6 +93,7 @@ fn report_metrics(payload: String) {
 fn main() {
     START.set(Instant::now()).ok();
     tauri::Builder::default()
+        .plugin(tauri_plugin_http::init())
         .invoke_handler(tauri::generate_handler![
             process_uptime_ms,
             report_metrics,
@@ -79,7 +102,10 @@ fn main() {
             check_repo_folder,
             read_profile_file,
             read_repo_pool,
-            write_repo_pool
+            write_repo_pool,
+            data_cache_read,
+            data_cache_write,
+            data_cache_clear
         ])
         .run(tauri::generate_context!())
         .expect("error while running DraftOrb");

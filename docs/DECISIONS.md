@@ -1340,3 +1340,11 @@ D-111 delegated the host choice to this ticket. Proposal (awaiting owner veto at
 - **Tag/asset**: rolling tag `data-latest` (override `--tag`) with a single asset `aggregates.tar.gz`; each publish uses `gh release upload --clobber`, giving a stable URL `releases/download/data-latest/aggregates.tar.gz` for the app. Patch history is not kept as releases (the data is regenerable; the private state repo keeps the audit trail).
 - **Contents**: `latest.json` + `<patch>/` tree only; `profiles/` and SQLite excluded by path rule and verified by a content scan (PUUID-like + `RGAPI-`) before packing.
 - **Command**: `pnpm etl publish-public` (`--dry-run` builds and scans without uploading). `pnpm etl pull`/`publish` (private state repo) are unchanged.
+
+### D-124 — Desktop aggregate download uses `tauri-plugin-http` (BL-010b) — PROPOSED
+
+GitHub release assets (`release-assets.githubusercontent.com`) do not send `Access-Control-Allow-Origin`, so the webview's `fetch` is CORS-blocked even though the URL is public. Options weighed: a custom Rust download command (more bespoke code), a CORS-enabled mirror (extra hosting), or the official plugin.
+
+- npm `@tauri-apps/plugin-http` 2.x and Cargo `tauri-plugin-http` 2.9 (MIT/Apache-2.0, free): requests run in Rust, no CORS. `apps/desktop/ui/src/data/aggregates.ts` uses its `fetch` only when `isTauri()`; the plain-browser path keeps the native `fetch` (dev/tests).
+- Capability `http:default` scoped to `github.com/.../data-latest/*`, `release-assets.githubusercontent.com/*` and `objects.githubusercontent.com/*` in `src-tauri/capabilities/default.json`; `core:default` added for the window.
+- Plain `fetch` stays for ddragon images (img-src, no CORS needed) and any future CORS-enabled endpoints.

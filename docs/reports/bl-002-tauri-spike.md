@@ -56,5 +56,5 @@ Caveats / follow-ups:
 
 ## Owner confirmation
 
-- Thresholds confirmed / adjusted: ____________________
-- GO / NO-GO for D-115: ____________________
+- Thresholds confirmed / adjusted: **confirmed as proposed** — start < 3 s, idle memory < 400 MB (measured 362 ms / 349 MB).
+- GO / NO-GO for D-115: **GO** — confirmed by the owner on 2026-11-21.

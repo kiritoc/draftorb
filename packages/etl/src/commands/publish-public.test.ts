@@ -102,7 +102,8 @@ describe('findSecretViolations', () => {
   });
 
   it('flags an RGAPI- key pattern', () => {
-    expect(findSecretViolations('key RGAPI-abcdefghijklmnop here')).toContain('RGAPI- key pattern');
+    const key = `RGAPI-${'a'.repeat(16)}`;
+    expect(findSecretViolations(`key ${key} here`)).toContain('RGAPI- key pattern');
   });
 
   it('passes clean JSON and sha256-length hashes', () => {

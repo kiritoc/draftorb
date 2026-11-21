@@ -1332,17 +1332,17 @@ Owner delegated the choice ("choose, best practice"; translated from French). Am
 
 `apps/web` is frozen until it is deleted: no new features and no alignment with new contracts or decisions (e.g. the `banned` pool reason label, the D-117 dual patch label, the 300-line convention for `DraftScreen.tsx`). The only allowed changes are the minimum needed to keep `pnpm check` green when shared contracts change. All product work goes to `apps/desktop` (D-115). Review findings on `apps/web` are closed as "frozen" unless they are security issues.
 
-### D-122 — DB size alert thresholds and raw-timeline retention plan — PROPOSED (BL-007, owner thresholds approved 2026-11-16)
+### D-122 — DB size alert thresholds and raw-timeline retention plan — ACCEPTED (owner, 2026-11-21)
 
 Report: `docs/reports/bl-007-db-size.md` (state release `state-20261112T1035Z`, DB 1.208 GiB / 209 MiB gzipped, ~99% derived aggregate tables, all raw timeline tables empty).
 
-Owner-approved thresholds (issue #110 comment, 2026-11-16): two levels — **1 GiB = alert, 1.5 GiB = retention decision required** — plus a **growth-rate trigger**: months until the 2 GiB release-asset limit (D-091) at the current pace matters more than absolute size. This proposal reads the thresholds against the **published gzip asset** (the constrained resource); the DB file size is kept as a secondary signal. File size is already ~1.2 GiB, so a file-based reading would fire the alert immediately — confirm the asset-based reading at approval.
+Thresholds (issue #110 comment, 2026-11-16, confirmed 2026-11-21): two levels — **1 GiB = alert, 1.5 GiB = retention decision required** — measured on the **published gzip asset** (the constrained resource, ~10% of the 2 GiB limit today), plus a **growth-rate trigger**: months until the 2 GiB release-asset limit (D-091) at the current pace matters more than absolute size. The DB file size is a secondary signal only (already ~1.2 GiB). Growth pace is computed as the delta between two consecutive `state-*` release assets; until two post-backfill snapshots exist, the backlog-bounded projection in the report (~350–450 MiB expected) is the substitute pace.
 
 Retention/prune plan for the raw timeline tables (`item_events`, `kill_events`, `lane_snapshots`, `participant_challenges`, `participant_starters`, `item_build` inputs):
 
-- Keep raw events for a **rolling window of the last 8 patches** (~2 months at the current 2-week patch cadence), aligned with the D-044 match-retention window (`--keep-patches`, currently 20 — reconcile the two windows at approval).
+- Keep raw events for a **rolling window aligned with the D-044 match-retention window** (`--keep-patches`, currently 20 patches) — owner choice 2026-11-21 over a shorter 8-patch window.
 - Prune only **after** the derived aggregates that consume them (`item_build`, `entity_change_scores`, lane/item contexts) have been rebuilt for the retained window; pruning raw rows never changes `data/public` exports, which come from aggregate tables.
 - **Personal-data minimization**: `item_events`/`kill_events`/`lane_snapshots`/`participant_challenges` carry `puuid` columns — the largest PII surface in the DB. A rolling window bounds it; `participants.puuid` (encrypted) stays as the aggregation input.
-- **Conflict to resolve at approval**: D-113 says "do not delete the raw tables". This plan proposes windowed pruning of raw _rows_ (tables kept), which amends D-113 — explicit owner approval required before any deletion, per the ticket.
+- **Amends D-113** (owner-approved 2026-11-21): windowed pruning of raw _rows_ is allowed (tables kept, rolling window above). No row is deleted until the pruning command exists and the owner triggers it; D-113's "do not delete the raw tables" still holds for the tables themselves.
 - VACUUM needs up to 2× free space on the runner; schedule compaction inside the existing time budgets.
 - Follow-up (not in this PR): wire `scripts/check-state-repo-private.mjs` into a scheduled workflow using the state-repo token already present in `etl.yml`, so the private-repo guarantee is enforced automatically.

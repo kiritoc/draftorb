@@ -38,6 +38,7 @@ import { statusCommand } from './commands/status';
 import { rekeyCommand } from './commands/rekey';
 import { profileSyncCommand } from './commands/profile-sync';
 import { pullCommand } from './commands/pull';
+import { checkStatePrivateCommand } from './commands/check-state-private';
 import { publishCommand } from './commands/publish';
 import { publishPublicCommand } from './commands/publish-public';
 import { breakpointCommand } from './commands/breakpoint';
@@ -66,6 +67,7 @@ const COMMANDS: readonly Command[] = [
   rekeyCommand,
   profileSyncCommand,
   pullCommand,
+  checkStatePrivateCommand,
   publishCommand,
   publishPublicCommand,
   breakpointCommand,

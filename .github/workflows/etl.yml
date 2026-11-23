@@ -228,7 +228,7 @@ jobs:
           # gzip warns "file size changed while zipping" (exit 0) when the
           # file is modified mid-read — treat it as fatal: the upload step
           # is gated on this step's outcome, so nothing bad is published.
-          if ! gzip -9 -n -c "$DRAFTORB_DB_PATH" > "$RUNNER_TEMP/$DB_FILE" \
+          if ! gzip -6 -n -c "$DRAFTORB_DB_PATH" > "$RUNNER_TEMP/$DB_FILE" \
             2> "$RUNNER_TEMP/gzip.log"; then
             echo "::error::gzip failed:"; cat "$RUNNER_TEMP/gzip.log"; exit 1
           fi

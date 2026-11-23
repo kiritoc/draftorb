@@ -131,7 +131,7 @@ async function backupDatabase(dbPath: string, vacuum: boolean, dest: string): Pr
   } finally {
     db.close();
   }
-  await pipeline(createReadStream(dbPath), createGzip({ level: 9 }), createWriteStream(dest));
+  await pipeline(createReadStream(dbPath), createGzip({ level: 6 }), createWriteStream(dest));
 }
 
 async function runPublish(args: string[]): Promise<void> {

@@ -60,7 +60,7 @@ From a local checkout with the database at `data/DraftOrb.sqlite`:
 sqlite3 data/DraftOrb.sqlite "PRAGMA wal_checkpoint(TRUNCATE); PRAGMA integrity_check;"
 # integrity_check must print "ok"; stop otherwise
 sqlite3 data/DraftOrb.sqlite "VACUUM;"
-gzip -9 -c data/DraftOrb.sqlite > DraftOrb.sqlite.gz
+gzip -6 -n -c data/DraftOrb.sqlite > DraftOrb.sqlite.gz
 tar -czf public-exports.tar.gz -C data public
 gh release create state-$(date -u +%Y%m%dT%H%MZ) DraftOrb.sqlite.gz public-exports.tar.gz --repo <owner>/draftorb-state
 ```
@@ -154,6 +154,6 @@ pnpm etl pull                  # download newest state-* release exports into da
 - `better-sqlite3` install or load fails -> use Node 22 (prebuilt binaries; `better-sqlite3` 13.x requires Node >=22 and segfaults on Node 20, B-015); log anything new in BUGS.md.
 - 401/403 from Riot -> key expired. `400 Exception decrypting <puuid>` -> the key changed since the DB was built; run `pnpm etl rekey` (B-062/D-060).
 - `pnpm etl pull` / workflow fails with an auth error -> `STATE_REPO_TOKEN` missing, expired or lacks Contents read/write on the state repo (D-078).
-- Verify the state repo is still private (the no-leak guarantee rests on it, D-122): `node scripts/check-state-repo-private.mjs` — fails unless `gh repo view` reports `PRIVATE`.
+- Verify the state repo is still private (the no-leak guarantee rests on it, D-122): `pnpm etl check-state-private` — fails unless `gh repo view` reports `PRIVATE`.
 - 429 -> normal, the client waits for `Retry-After` and retries (up to 5 times).
 - PowerShell script policy errors -> use `pnpm` commands only, avoid `.ps1` scripts.

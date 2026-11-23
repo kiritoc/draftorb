@@ -1334,7 +1334,7 @@ Owner delegated the choice ("choose, best practice"; translated from French). Am
 
 ### D-122 — DB size alert thresholds and raw-timeline retention plan — ACCEPTED (owner, 2026-11-21)
 
-Report: `docs/reports/bl-007-db-size.md` (state release `state-20261112T1035Z`, DB 1.208 GiB / 209 MiB gzipped, ~99% derived aggregate tables, all raw timeline tables empty).
+Report: `docs/reports/bl-007-db-size.md` (state release `state-20261112T1035Z`, DB 1.208 GiB / ~209 MiB gzipped (local `gzip -6` estimate; the published asset size is authoritative), ~81% derived aggregate tables + ~19% raw `participants`, all raw timeline tables empty).
 
 Thresholds (issue #110 comment, 2026-11-16, confirmed 2026-11-21): two levels — **1 GiB = alert, 1.5 GiB = retention decision required** — measured on the **published gzip asset** (the constrained resource, ~10% of the 2 GiB limit today), plus a **growth-rate trigger**: months until the 2 GiB release-asset limit (D-091) at the current pace matters more than absolute size. The DB file size is a secondary signal only (already ~1.2 GiB). Growth pace is computed as the delta between two consecutive `state-*` release assets; until two post-backfill snapshots exist, the backlog-bounded projection in the report (~350–450 MiB expected) is the substitute pace.
 
@@ -1345,4 +1345,4 @@ Retention/prune plan for the raw timeline tables (`item_events`, `kill_events`, 
 - **Personal-data minimization**: `item_events`/`kill_events`/`lane_snapshots`/`participant_challenges` carry `puuid` columns — the largest PII surface in the DB. A rolling window bounds it; `participants.puuid` (encrypted) stays as the aggregation input.
 - **Amends D-113** (owner-approved 2026-11-21): windowed pruning of raw _rows_ is allowed (tables kept, rolling window above). No row is deleted until the pruning command exists and the owner triggers it; D-113's "do not delete the raw tables" still holds for the tables themselves.
 - VACUUM needs up to 2× free space on the runner; schedule compaction inside the existing time budgets.
-- Follow-up (not in this PR): wire `scripts/check-state-repo-private.mjs` into a scheduled workflow using the state-repo token already present in `etl.yml`, so the private-repo guarantee is enforced automatically.
+- Follow-up (not in this PR): wire `pnpm etl check-state-private` into a scheduled workflow using the state-repo token already present in `etl.yml`, so the private-repo guarantee is enforced automatically.

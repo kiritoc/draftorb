@@ -127,6 +127,19 @@ function runGh(args: readonly string[]): string {
   }
 }
 
+/** Visibility (`PRIVATE`, `PUBLIC`, `INTERNAL`) reported by `gh repo view` (BL-007, D-122). */
+export function fetchRepoVisibility(repo: string): string {
+  const parsed: unknown = JSON.parse(runGh(['repo', 'view', repo, '--json', 'visibility']));
+  const visibility =
+    typeof parsed === 'object' && parsed !== null && 'visibility' in parsed
+      ? (parsed as { visibility?: unknown }).visibility
+      : undefined;
+  if (typeof visibility !== 'string') {
+    throw new CliError(`gh repo view ${repo} returned no visibility field.`);
+  }
+  return visibility;
+}
+
 /** True when the `gh` binary exists and is authenticated. */
 export function ghReady(): { ok: boolean; problem?: string } {
   try {

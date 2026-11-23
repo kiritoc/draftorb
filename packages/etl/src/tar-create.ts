@@ -82,5 +82,5 @@ export function createTarGz(entries: readonly TarFileEntry[]): Buffer {
     if (pad > 0) chunks.push(Buffer.alloc(pad));
   }
   chunks.push(Buffer.alloc(BLOCK * 2)); // end-of-archive marker
-  return gzipSync(Buffer.concat(chunks), { level: 9 });
+  return gzipSync(Buffer.concat(chunks), { level: 6 });
 }

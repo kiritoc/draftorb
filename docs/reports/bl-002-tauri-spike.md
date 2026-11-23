@@ -56,5 +56,5 @@ Caveats / follow-ups:
 
 ## Owner confirmation
 
-- Thresholds confirmed / adjusted: **confirmed as proposed** — start < 3 s, idle memory < 400 MB (measured 362 ms / 349 MB).
+- Thresholds confirmed / adjusted: **adjusted** — the owner kept the AUDIT.md §6 estimates instead of the proposed values: cold start < 3 s, idle memory < 400 MB, plus the proposed `recommend()` latency target < 5 ms per call on real data (measured on the fixture: 362 ms / 349 MB / 0.089 ms).
 - GO / NO-GO for D-115: **GO** — confirmed by the owner on 2026-11-21.

@@ -35,8 +35,6 @@ describe('assertPrivate', () => {
   });
 
   it.each(['PUBLIC', 'INTERNAL', ''])('fails on %s', (visibility) => {
-    expect(() => assertPrivate('octo/draftorb-state', visibility)).toThrow(
-      'expected "PRIVATE"',
-    );
+    expect(() => assertPrivate('octo/draftorb-state', visibility)).toThrow('expected "PRIVATE"');
   });
 });

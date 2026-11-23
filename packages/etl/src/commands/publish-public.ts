@@ -17,6 +17,7 @@
 
 import { execFileSync } from 'node:child_process';
 import {
+  copyFileSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -29,6 +30,8 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, sep } from 'node:path';
 import { parseArgs } from 'node:util';
+
+import { latestSchema, manifestSchema } from '@draftorb/shared';
 
 import { CliError, UsageError } from '../cli-args';
 import { defaultPublicDataDir, resolveRepoRoot } from '../config/paths';
@@ -129,31 +132,45 @@ function* walkFiles(dir: string): Generator<string> {
 }
 
 /**
- * Lists the publishable set under `publicDir`: `latest.json` plus the patch
- * tree, minus forbidden paths. Throws when `latest.json` or its patch dir
- * is missing.
+ * Lists the publishable set under `publicDir`: `latest.json` plus the tree
+ * of the patch it selects (other patches and root-level reports are not
+ * packed), minus forbidden paths. Throws when `latest.json` is invalid, the
+ * patch dir is missing, or the manifest it points to is missing, invalid or
+ * for another patch (e.g. invalidated by a same-patch `pnpm etl static`).
  */
 export function collectPublishFiles(publicDir: string): PublishFile[] {
   const latestPath = join(publicDir, 'latest.json');
   if (!existsSync(latestPath)) {
     throw new CliError(`No latest.json at ${publicDir}; run \`pnpm etl export\` first.`);
   }
-  const latest = JSON.parse(readFileSync(latestPath, 'utf8')) as { patch?: string };
-  if (typeof latest.patch !== 'string' || latest.patch === '') {
-    throw new CliError(`latest.json has no patch label: ${latestPath}`);
+  const latestResult = latestSchema.safeParse(JSON.parse(readFileSync(latestPath, 'utf8')));
+  if (!latestResult.success) {
+    throw new CliError(`latest.json is invalid: ${latestPath}; run \`pnpm etl export\`.`);
   }
-  const files: PublishFile[] = [];
-  for (const abs of walkFiles(publicDir)) {
+  const latest = latestResult.data;
+  const patchDir = join(publicDir, latest.patch);
+  if (!existsSync(patchDir)) {
+    throw new CliError(
+      `Patch dir ${latest.patch}/ missing from ${publicDir}; run \`pnpm etl export ${latest.patch}\`.`,
+    );
+  }
+  const files: PublishFile[] = [
+    { rel: 'latest.json', abs: latestPath, size: statSync(latestPath).size },
+  ];
+  for (const abs of walkFiles(patchDir)) {
     const rel = relative(publicDir, abs).split(sep).join('/');
     if (isForbiddenPublishPath(rel)) continue;
     files.push({ rel, abs, size: statSync(abs).size });
   }
-  if (!files.some((f) => f.rel === 'latest.json')) {
-    throw new CliError(`latest.json missing from the publishable set: ${publicDir}`);
+  const manifestFile = files.find((f) => f.rel === latest.manifest);
+  const rerun = `run \`pnpm etl export ${latest.patch}\``;
+  if (manifestFile === undefined) {
+    throw new CliError(`Manifest ${latest.manifest} missing from ${publicDir}; ${rerun}.`);
   }
-  if (!files.some((f) => f.rel.startsWith(`${latest.patch}/`))) {
+  const manifest = manifestSchema.safeParse(JSON.parse(readFileSync(manifestFile.abs, 'utf8')));
+  if (!manifest.success || manifest.data.patch !== latest.patch) {
     throw new CliError(
-      `Patch dir ${latest.patch}/ missing from ${publicDir}; run \`pnpm etl export ${latest.patch}\`.`,
+      `Manifest ${latest.manifest} is invalid or not for ${latest.patch}; ${rerun}.`,
     );
   }
   return files;
@@ -187,9 +204,9 @@ export function toTarEntries(files: readonly PublishFile[]): TarFileEntry[] {
   return files.map((file) => ({ name: file.rel, data: readFileSync(file.abs) }));
 }
 
-function gh(args: readonly string[]): void {
+function gh(args: readonly string[], cwd?: string): void {
   try {
-    execFileSync('gh', [...args], { stdio: ['ignore', 'pipe', 'pipe'] });
+    execFileSync('gh', [...args], { stdio: ['ignore', 'pipe', 'pipe'], cwd });
   } catch (error: unknown) {
     const stderr =
       error instanceof Error && 'stderr' in error
@@ -264,22 +281,51 @@ async function runPublishPublic(args: string[]): Promise<void> {
     log.detail(`${f.rel}: ${(f.size / 1048576).toFixed(2)} MiB`);
   }
 
-  let tempDir: string | undefined;
-  const dest =
-    options.out ??
-    (() => {
-      tempDir = mkdtempSync(join(tmpdir(), 'draftorb-public-'));
-      return join(tempDir, PUBLIC_ASSET_NAME);
-    })();
-  if (options.out !== undefined) mkdirSync(dirname(options.out), { recursive: true });
-  writeFileSync(dest, tarball);
-  log.info(`Artifact written to ${dest}`);
+  // Stage under a fresh temp dir: the uploaded file is always the literal
+  // `aggregates.tar.gz` (gh runs with cwd=stagingDir), so --out can neither
+  // rename the asset nor smuggle a `#label` suffix into gh's path parsing.
+  const stagingDir = mkdtempSync(join(tmpdir(), 'draftorb-public-'));
+  try {
+    const treeDir = join(stagingDir, 'tree');
+    for (const file of files) {
+      const target = join(treeDir, ...file.rel.split('/'));
+      mkdirSync(dirname(target), { recursive: true });
+      copyFileSync(file.abs, target);
+    }
+    runPublicPathsCheck(treeDir);
 
-  if (options.dryRun) {
-    log.info('Dry run: nothing uploaded.');
-    return;
+    writeFileSync(join(stagingDir, PUBLIC_ASSET_NAME), tarball);
+    if (options.out !== undefined) {
+      mkdirSync(dirname(options.out), { recursive: true });
+      writeFileSync(options.out, tarball);
+      log.info(`Artifact written to ${options.out}`);
+    }
+
+    if (options.dryRun) {
+      log.info('Dry run: nothing uploaded.');
+      return;
+    }
+    publishStaged(stagingDir, options);
+  } finally {
+    rmSync(stagingDir, { recursive: true, force: true });
   }
+}
 
+/** Mandatory privacy gate (WORKFLOW.md): scripts/check-public-paths.mjs --dir. */
+function runPublicPathsCheck(dir: string): void {
+  const script = join(resolveRepoRoot(), 'scripts', 'check-public-paths.mjs');
+  try {
+    execFileSync(process.execPath, [script, '--dir', dir], { stdio: ['ignore', 'pipe', 'pipe'] });
+  } catch (error: unknown) {
+    const out =
+      error instanceof Error && 'stderr' in error
+        ? String((error as { stderr?: unknown }).stderr ?? '').trim()
+        : '';
+    throw new CliError(`check-public-paths failed; refusing to publish.${out ? `\n${out}` : ''}`);
+  }
+}
+
+function publishStaged(stagingDir: string, options: PublishPublicOptions): void {
   const ready = ghReady();
   if (!ready.ok) throw new CliError(ready.problem ?? 'gh CLI is not ready.');
   const repo = options.repo ?? originRepo();
@@ -293,24 +339,29 @@ async function runPublishPublic(args: string[]): Promise<void> {
     'Public shared aggregates for DraftOrb (D-111): latest.json + the patch export tree. ' +
     'No profiles/, no SQLite, no credentials. Regenerate with `pnpm etl publish-public`.';
   if (releaseExists(repo, options.tag)) {
-    gh(['release', 'upload', options.tag, dest, '--repo', repo, '--clobber']);
+    gh(
+      ['release', 'upload', options.tag, PUBLIC_ASSET_NAME, '--repo', repo, '--clobber'],
+      stagingDir,
+    );
     log.info(`Updated asset ${PUBLIC_ASSET_NAME} on release ${options.tag} in ${repo}`);
   } else {
-    gh([
-      'release',
-      'create',
-      options.tag,
-      dest,
-      '--repo',
-      repo,
-      '--title',
-      'Public aggregates',
-      '--notes',
-      notes,
-    ]);
+    gh(
+      [
+        'release',
+        'create',
+        options.tag,
+        PUBLIC_ASSET_NAME,
+        '--repo',
+        repo,
+        '--title',
+        'Public aggregates',
+        '--notes',
+        notes,
+      ],
+      stagingDir,
+    );
     log.info(`Created release ${options.tag} in ${repo}`);
   }
-  if (tempDir !== undefined) rmSync(tempDir, { recursive: true, force: true });
 }
 
 export const publishPublicCommand: Command = {

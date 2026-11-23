@@ -8,6 +8,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { MANIFEST_SCHEMA_VERSION } from '@draftorb/shared';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
@@ -35,14 +36,31 @@ function touch(root: string, rel: string, content = '{}'): void {
   writeFileSync(abs, content);
 }
 
+function latestJson(patch = '16.22'): string {
+  return JSON.stringify({
+    schemaVersion: 1,
+    patch,
+    manifest: `${patch}/manifest.json`,
+    generatedAt: 'x',
+  });
+}
+
+function manifestJson(patch = '16.22'): string {
+  return JSON.stringify({
+    patch,
+    generatedAt: 'x',
+    region: 'EUW1',
+    rankBuckets: [],
+    roles: [],
+    files: [],
+    schemaVersion: MANIFEST_SCHEMA_VERSION,
+  });
+}
+
 function makePublicDir(): string {
   const dir = tempDir();
-  touch(
-    dir,
-    'latest.json',
-    '{"schemaVersion":1,"patch":"16.22","manifest":"16.22/manifest.json","generatedAt":"x"}',
-  );
-  touch(dir, '16.22/manifest.json', '{}');
+  touch(dir, 'latest.json', latestJson());
+  touch(dir, '16.22/manifest.json', manifestJson());
   touch(dir, '16.22/champions.json', '[]');
   touch(dir, 'profiles/index.json', '{}');
   touch(dir, 'profiles/kirito.json', '{}');
@@ -126,9 +144,38 @@ describe('collectPublishFiles', () => {
 
   it('fails when the patch dir is missing', () => {
     const dir = tempDir();
-    touch(dir, 'latest.json', '{"patch":"16.22"}');
+    touch(dir, 'latest.json', latestJson());
     touch(dir, '16.21/x.json');
     expect(() => collectPublishFiles(dir)).toThrow('Patch dir 16.22/ missing');
+  });
+
+  it('fails on an invalid latest.json', () => {
+    const dir = tempDir();
+    touch(dir, 'latest.json', '{"patch":"16.22"}');
+    expect(() => collectPublishFiles(dir)).toThrow('latest.json is invalid');
+  });
+
+  it('fails when the manifest is missing (e.g. after a static refresh)', () => {
+    const dir = tempDir();
+    touch(dir, 'latest.json', latestJson());
+    touch(dir, '16.22/champions.json', '[]');
+    expect(() => collectPublishFiles(dir)).toThrow('Manifest 16.22/manifest.json missing');
+  });
+
+  it('fails when the manifest is for another patch', () => {
+    const dir = tempDir();
+    touch(dir, 'latest.json', latestJson());
+    touch(dir, '16.22/manifest.json', manifestJson('16.21'));
+    expect(() => collectPublishFiles(dir)).toThrow('invalid or not for 16.22');
+  });
+
+  it('excludes older patches and root-level reports', () => {
+    const dir = makePublicDir();
+    touch(dir, '16.21/manifest.json', manifestJson('16.21'));
+    touch(dir, 'backtest-report.json', '{}');
+    const rels = collectPublishFiles(dir).map((f) => f.rel);
+    expect(rels.some((r) => r.startsWith('16.21/'))).toBe(false);
+    expect(rels).not.toContain('backtest-report.json');
   });
 });
 
@@ -139,7 +186,8 @@ describe('scanPublishSet', () => {
 
   it('flags PUUID-like content inside a publishable file', () => {
     const dir = tempDir();
-    touch(dir, 'latest.json', '{"patch":"16.22"}');
+    touch(dir, 'latest.json', latestJson());
+    touch(dir, '16.22/manifest.json', manifestJson());
     const puuid = 'Qw1_'.repeat(19) + 'Qw';
     touch(dir, '16.22/leak.json', `{"id":"${puuid}"}`);
     const violations = scanPublishSet(collectPublishFiles(dir));

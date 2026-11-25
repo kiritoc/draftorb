@@ -1,7 +1,11 @@
+import { execFileSync } from 'node:child_process';
+import { readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { PLATFORMS, type Platform } from '../riot';
-import { EXIT, UsageError } from '../cli-args';
+import { CliError, EXIT, UsageError } from '../cli-args';
+import { resolveRepoRoot } from '../config/paths';
 
 export const DEFAULT_PLATFORM: Platform = 'euw1';
 
@@ -76,6 +80,59 @@ export function parseVersion(value: string | undefined): string | undefined {
     throw new UsageError(`Invalid version "${value}". Expected a format like "14.5.1".`);
   }
   return value;
+}
+
+/**
+ * Runs the `gh` CLI (the user's own auth — no token handling), throwing a
+ * `CliError` with the last stderr line on failure. `cwd` sets the working
+ * directory for callers that pass relative asset paths to `gh release`.
+ */
+export function execGh(args: readonly string[], cwd?: string): void {
+  try {
+    execFileSync('gh', [...args], { stdio: ['ignore', 'pipe', 'pipe'], cwd });
+  } catch (error: unknown) {
+    const stderr =
+      error instanceof Error && 'stderr' in error
+        ? String((error as { stderr?: unknown }).stderr ?? '')
+        : '';
+    const detail = stderr.trim().split('\n').pop() ?? '';
+    throw new CliError(
+      `gh CLI call failed: gh ${args.slice(0, 2).join(' ')}` + (detail ? ` — ${detail}` : ''),
+    );
+  }
+}
+
+/** Recursively yields every file path under `dir`. */
+export function* walkFiles(dir: string): Generator<string> {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) yield* walkFiles(full);
+    else if (entry.isFile()) yield full;
+  }
+}
+
+/** `git remote get-url origin`, trimmed; '' when unavailable. */
+export function originRemoteUrl(): string {
+  try {
+    return execFileSync('git', ['remote', 'get-url', 'origin'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+      cwd: resolveRepoRoot(),
+    }).trim();
+  } catch {
+    return '';
+  }
+}
+
+/** `owner/name` from an https or ssh git remote URL. */
+export function parseOriginRepo(remoteUrl: string): string | undefined {
+  const match = /[:/]([^/\s:]+)\/([^/\s:]+?)(?:\.git)?\/?$/.exec(remoteUrl.trim());
+  return match ? `${match[1]}/${match[2]}` : undefined;
+}
+
+/** `owner/name` of the origin remote, or undefined when it cannot be resolved. */
+export function originRepoSlug(): string | undefined {
+  return parseOriginRepo(originRemoteUrl());
 }
 
 export const PLANNED_COMMANDS = [

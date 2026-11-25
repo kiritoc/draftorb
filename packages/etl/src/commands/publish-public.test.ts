@@ -15,10 +15,10 @@ import {
   collectPublishFiles,
   findSecretViolations,
   isForbiddenPublishPath,
-  parseOriginRepo,
   parsePublishPublicArgs,
   scanPublishSet,
 } from './publish-public';
+import { parseOriginRepo } from './shared';
 
 const tempDirs: string[] = [];
 function tempDir(): string {
@@ -119,6 +119,12 @@ describe('findSecretViolations', () => {
     expect(findSecretViolations(`{"puuid":"${puuid}"}`)).toContain('PUUID-like identifier');
   });
 
+  it('flags a dashed UUID (canonical PUUID form)', () => {
+    expect(findSecretViolations('{"puuid":"0123abcd-4567-89ab-cdef-0123456789ab"}')).toContain(
+      'PUUID-like identifier',
+    );
+  });
+
   it('flags an RGAPI- key pattern', () => {
     const key = `RGAPI-${'a'.repeat(16)}`;
     expect(findSecretViolations(`key ${key} here`)).toContain('RGAPI- key pattern');
@@ -152,6 +158,12 @@ describe('collectPublishFiles', () => {
   it('fails on an invalid latest.json', () => {
     const dir = tempDir();
     touch(dir, 'latest.json', '{"patch":"16.22"}');
+    expect(() => collectPublishFiles(dir)).toThrow('latest.json is invalid');
+  });
+
+  it('fails cleanly on malformed JSON instead of a raw SyntaxError', () => {
+    const dir = tempDir();
+    touch(dir, 'latest.json', '{not json');
     expect(() => collectPublishFiles(dir)).toThrow('latest.json is invalid');
   });
 

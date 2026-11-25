@@ -1347,11 +1347,11 @@ Retention/prune plan for the raw timeline tables (`item_events`, `kill_events`, 
 - VACUUM needs up to 2× free space on the runner; schedule compaction inside the existing time budgets.
 - Follow-up (not in this PR): wire `pnpm etl check-state-private` into a scheduled workflow using the state-repo token already present in `etl.yml`, so the private-repo guarantee is enforced automatically.
 
-### D-123 — Public aggregates host: rolling `data-latest` release on the main repo — PROPOSED (BL-004)
+### D-123 — Public aggregates host: rolling `data-latest` release on the main repo — ACCEPTED (owner, 2026-11-25, BL-004)
 
-D-111 delegated the host choice to this ticket. Proposal (awaiting owner veto at PR review):
+D-111 delegated the host choice to this ticket. Accepted contents (confirmed at PR #140 review):
 
 - **Host**: the public main repo (`kiritoc/draftorb`, i.e. the `origin` remote), not a dedicated repo — no new infrastructure, `gh release` works today, and release noise is minimal (one rolling tag).
 - **Tag/asset**: rolling tag `data-latest` (override `--tag`) with a single asset `aggregates.tar.gz`; each publish uses `gh release upload --clobber`, giving a stable URL `releases/download/data-latest/aggregates.tar.gz` for the app. Patch history is not kept as releases (the data is regenerable; the private state repo keeps the audit trail).
-- **Contents**: `latest.json` + `<patch>/` tree only; `profiles/` and SQLite excluded by path rule and verified by a content scan (PUUID-like + `RGAPI-`) before packing.
-- **Command**: `pnpm etl publish-public` (`--dry-run` builds and scans without uploading). `pnpm etl pull`/`publish` (private state repo) are unchanged.
+- **Contents**: `latest.json` + the `<patch>/` tree selected by `latest.json` (other patch dirs are not packed) + `champion-tags.json` at the archive root (public curated data the engine needs for `RecommendData.tags`); `profiles/` and SQLite excluded by path rule and verified by a content scan (PUUID-like + `RGAPI-`) before packing.
+- **Command**: `pnpm etl publish-public` (`--dry-run` builds and scans without uploading, `--out=path` writes the tarball locally). `pnpm etl pull`/`publish` (private state repo) are unchanged.

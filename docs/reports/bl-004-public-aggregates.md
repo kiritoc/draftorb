@@ -16,6 +16,11 @@ Artifact built with `pnpm etl publish-public --dry-run`.
 | SPECS §10 per-file rule (< 5 MB gzip) |                    max 0.64 MiB — **12× under** | same                                                          |
 | Gzipped DB (private, for the record)  |                                        ~209 MiB | BL-007 report, `state-20261112T1035Z`                         |
 
+Per-file sizes: every collected file carries its byte size (`PublishFile.size`)
+and the command logs the largest entries at pack time; the full per-file
+listing is reproducible with `pnpm etl publish-public --dry-run`. The manifest
+(`16.22/manifest.json`) lists each published path with its sha256 for integrity.
+
 Download budget: the whole dataset is a **single 1.47 MiB tarball** — trivially
 within a launch-time download budget; per-file JSON stays lazy-loaded inside
 the app as SPECS §10 requires.
@@ -35,6 +40,7 @@ the app as SPECS §10 requires.
 
 ```
 pnpm etl publish-public --dry-run   # build + scan, no upload
+pnpm etl publish-public --out /tmp/aggregates.tar.gz  # also write the tarball locally
 pnpm etl publish-public             # publish to <origin repo> release data-latest
 pnpm etl publish-public --repo owner/name --tag data-2026-11
 ```

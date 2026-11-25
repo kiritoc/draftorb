@@ -59,3 +59,13 @@ apps/desktop      Tauri shell around the TypeScript engine (D-115)
 data/             generated JSON (public), hand-written tags (manual) + raw/sqlite (gitignored)
 docs/             all project docs
 ```
+
+## Agent skills
+
+### Issue tracker
+
+Issues live as GitHub issues in `kiritoc/draftorb`, managed via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Single-context layout. Domain vocabulary lives in `docs/GLOSSARY.md`, decisions in `docs/DECISIONS.md` + `docs/DECISIONS_AMENDMENTS.md`. See `docs/agents/domain.md`.

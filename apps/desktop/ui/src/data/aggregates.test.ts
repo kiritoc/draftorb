@@ -1,11 +1,12 @@
 /**
  * Aggregates download tests (BL-010b): tar.gz parsing, sha256 verification,
- * cache fallback and stale flag — fetch/invoke are mocked.
+ * cache fallback, stale flag and patch pruning — fetch/invoke are mocked.
  */
 
 import { gzipSync } from 'node:zlib';
 import { createHash } from 'node:crypto';
 
+import { MANIFEST_SCHEMA_VERSION } from '@draftorb/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../tauri', () => ({
@@ -14,7 +15,14 @@ vi.mock('../tauri', () => ({
 }));
 
 import { invokeCommand, isTauri } from '../tauri';
-import { cacheRead, clearDataCache, downloadAggregates, ensureData, readCachedMeta } from './aggregates';
+import {
+  cacheRead,
+  cacheWrite,
+  clearDataCache,
+  downloadAggregates,
+  ensureData,
+  readCachedMeta,
+} from './aggregates';
 
 // Minimal ustar writer mirroring packages/etl/src/tar-create.ts output.
 function tarEntry(name: string, data: string | Uint8Array): Buffer {
@@ -45,13 +53,42 @@ function makeTarball(files: Record<string, string>): ArrayBuffer {
 
 const sha = (s: string) => createHash('sha256').update(s, 'utf8').digest('hex');
 
-function manifestFor(files: Record<string, string>, patch = '16.22'): string {
+function latestJson(patch: string): string {
+  return JSON.stringify({
+    schemaVersion: 1,
+    patch,
+    manifest: `${patch}/manifest.json`,
+    generatedAt: '2026-11-21T00:00:00Z',
+  });
+}
+
+const TAGS = '{"tags":{}}';
+
+/** Manifest as `publish-public` ships it inside the tarball: patch-relative
+ * paths for `<patch>/` files plus `/name` archive-root entries. */
+function manifestFor(
+  files: Record<string, string>,
+  patch: string,
+  opts: { omitSha?: string[] } = {},
+): string {
   const dir = `${patch}`;
+  const entries = Object.keys(files)
+    .filter((n) => n.startsWith(`${dir}/`) && n !== `${dir}/manifest.json`)
+    .map((n) => ({
+      path: n.slice(dir.length + 1),
+      sha256: opts.omitSha?.includes(n) ? undefined : sha(files[n]!),
+    }));
+  for (const name of ['latest.json', 'champion-tags.json']) {
+    entries.push({ path: `/${name}`, sha256: sha(files[name]!) });
+  }
   return JSON.stringify({
     patch,
-    files: Object.keys(files)
-      .filter((n) => n.startsWith(`${dir}/`))
-      .map((n) => ({ path: n.slice(dir.length + 1), sha256: sha(files[n]!) })),
+    generatedAt: '2026-11-21T00:00:00Z',
+    region: 'EUW1',
+    rankBuckets: [],
+    roles: [],
+    files: entries,
+    schemaVersion: MANIFEST_SCHEMA_VERSION,
   });
 }
 
@@ -62,21 +99,18 @@ function mockFetch(tarball: ArrayBuffer) {
   );
 }
 
-const FILES = {
-  'latest.json': JSON.stringify({
-    schemaVersion: 1,
-    patch: '16.22',
-    manifest: '16.22/manifest.json',
-    generatedAt: '2026-11-21T00:00:00Z',
-  }),
-  '16.22/manifest.json': '', // filled per test
-  '16.22/champions.json': '[]',
-};
-
-function fixture(): Record<string, string> {
-  const files = { ...FILES };
-  files['16.22/manifest.json'] = manifestFor({ '16.22/champions.json': '[]' });
+function fixture(patch = '16.22'): Record<string, string> {
+  const files: Record<string, string> = {
+    'latest.json': latestJson(patch),
+    'champion-tags.json': TAGS,
+    [`${patch}/champions.json`]: '[]',
+  };
+  files[`${patch}/manifest.json`] = manifestFor(files, patch);
   return files;
+}
+
+function offline() {
+  vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new Error('offline'))));
 }
 
 beforeEach(async () => {
@@ -91,9 +125,11 @@ describe('downloadAggregates', () => {
     const meta = await downloadAggregates('https://example.test/x.tar.gz');
     expect(meta.patch).toBe('16.22');
     expect(meta.generatedAt).toBe('2026-11-21T00:00:00Z');
+    expect(meta.schemaVersion).toBe(1);
     expect(await cacheRead('latest.json')).toContain('16.22');
     expect(await cacheRead('16.22/champions.json')).toBe('[]');
-    expect(await readCachedMeta()).toMatchObject({ patch: '16.22' });
+    expect(await cacheRead('champion-tags.json')).toBe(TAGS);
+    expect(await readCachedMeta()).toMatchObject({ patch: '16.22', schemaVersion: 1 });
   });
 
   it('rejects a sha256 mismatch and caches nothing', async () => {
@@ -104,6 +140,51 @@ describe('downloadAggregates', () => {
       'sha256 mismatch',
     );
     expect(await cacheRead('16.22/champions.json')).toBeNull();
+  });
+
+  it('rejects a tampered archive-root file (latest.json)', async () => {
+    const files = fixture();
+    // Same patch/manifest pointers, different generatedAt: schema-valid but
+    // no longer matching the manifest sha256.
+    files['latest.json'] = latestJson('16.22').replace('2026-11-21', '2026-11-22');
+    mockFetch(makeTarball(files));
+    await expect(downloadAggregates('https://example.test/x.tar.gz')).rejects.toThrow(
+      'sha256 mismatch',
+    );
+  });
+
+  it('rejects a manifest entry without sha256', async () => {
+    const files = fixture();
+    files['16.22/manifest.json'] = manifestFor(files, '16.22', {
+      omitSha: ['16.22/champions.json'],
+    });
+    mockFetch(makeTarball(files));
+    await expect(downloadAggregates('https://example.test/x.tar.gz')).rejects.toThrow(
+      'has no sha256',
+    );
+  });
+
+  it('rejects a tar entry the manifest does not cover', async () => {
+    const files = fixture();
+    files['16.22/smuggled.json'] = '{}';
+    mockFetch(makeTarball(files));
+    await expect(downloadAggregates('https://example.test/x.tar.gz')).rejects.toThrow(
+      'not covered by the manifest',
+    );
+  });
+
+  it('rejects when latest.json points at a missing manifest', async () => {
+    const files = fixture();
+    files['latest.json'] = JSON.stringify({
+      schemaVersion: 1,
+      patch: '16.22',
+      manifest: '16.22/gone.json',
+      generatedAt: '2026-11-21T00:00:00Z',
+    });
+    mockFetch(makeTarball(files));
+    await expect(downloadAggregates('https://example.test/x.tar.gz')).rejects.toThrow(
+      'missing 16.22/gone.json',
+    );
   });
 
   it('rejects a non-200 response', async () => {
@@ -125,24 +206,47 @@ describe('ensureData', () => {
   });
 
   it('falls back to the cache with stale=true when offline', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new Error('offline'))));
-    // seed cache via a successful download first
     mockFetch(makeTarball(fixture()));
     await downloadAggregates('https://example.test/x.tar.gz');
-    vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new Error('offline'))));
+    offline();
     const load = await ensureData('https://example.test/x.tar.gz');
     expect(load).toMatchObject({ kind: 'loaded', patch: '16.22', stale: true });
   });
 
+  it('returns none when the cached latest.json disagrees with the meta', async () => {
+    mockFetch(makeTarball(fixture()));
+    await downloadAggregates('https://example.test/x.tar.gz');
+    // Simulate a crash between the latest.json write and the meta write.
+    await cacheWrite('latest.json', latestJson('17.3'));
+    offline();
+    const load = await ensureData('https://example.test/x.tar.gz');
+    expect(load).toEqual({ kind: 'none' });
+  });
+
   it('returns none when download fails and cache is empty', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new Error('offline'))));
+    offline();
     const load = await ensureData('https://example.test/x.tar.gz');
     expect(load).toEqual({ kind: 'none' });
   });
 });
 
+describe('cache pruning', () => {
+  it('drops old patch directories after a successful download', async () => {
+    mockFetch(makeTarball(fixture('15.1')));
+    await downloadAggregates('https://example.test/x.tar.gz');
+    expect(await cacheRead('15.1/champions.json')).toBe('[]');
+
+    mockFetch(makeTarball(fixture('16.22')));
+    await downloadAggregates('https://example.test/x.tar.gz');
+    expect(await cacheRead('16.22/champions.json')).toBe('[]');
+    expect(await cacheRead('15.1/champions.json')).toBeNull();
+    expect(await cacheRead('latest.json')).toContain('16.22');
+    expect(await readCachedMeta()).toMatchObject({ patch: '16.22' });
+  });
+});
+
 describe('tauri cache path', () => {
-  it('routes reads/writes through invokeCommand when in Tauri', async () => {
+  it('routes reads/writes/prune through invokeCommand when in Tauri', async () => {
     vi.mocked(isTauri).mockReturnValue(true);
     vi.mocked(invokeCommand).mockImplementation(async (cmd: string, args?: Record<string, unknown>) => {
       if (cmd === 'data_cache_read') return (args?.name as string) === 'latest.json' ? '{}' : null;

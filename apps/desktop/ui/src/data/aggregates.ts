@@ -3,7 +3,8 @@
  *
  * Fetches `aggregates.tar.gz` from the public `data-latest` release, gunzips
  * it (DecompressionStream), parses the ustar entries our ETL writer produces,
- * verifies every file against the manifest sha256, then caches each file via
+ * verifies every file against the manifest sha256 (fail-closed: a missing
+ * hash or an uncovered entry rejects the archive), then caches each file via
  * the `data_cache_*` Tauri commands. Offline fallback: the cached
  * `latest.json` still loads and the UI shows a stale-data notice.
  *
@@ -12,21 +13,32 @@
  */
 
 import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
+import { z } from 'zod';
+
+import { latestSchema, manifestSchema, type Manifest } from '@draftorb/shared';
+
 import { invokeCommand, isTauri } from '../tauri';
 import { PUBLIC_DATA_URL } from '../config';
 
-export interface CacheMeta {
-  patch: string;
-  generatedAt: string;
-  downloadedAt: string;
-}
+const cacheMetaSchema = z.object({
+  schemaVersion: z.literal(1),
+  patch: z.string().min(1),
+  generatedAt: z.string().min(1),
+  downloadedAt: z.string().min(1),
+});
+export type CacheMeta = z.infer<typeof cacheMetaSchema>;
 
 export type DataLoad =
   | { kind: 'none' }
-  | { kind: 'loaded'; patch: string; generatedAt: string; stale: boolean };
+  | { kind: 'loaded'; patch: string; generatedAt: string; stale?: boolean };
 
 const META_NAME = 'cache-meta.json';
 const FETCH_TIMEOUT_MS = 15_000;
+/** Archive-root files written last so a mid-download crash leaves either the
+ * old consistent cache or a detectable latest/meta mismatch. */
+const ROOT_FILES = new Set(['latest.json', 'champion-tags.json']);
+/** Top-level cache entries kept across patch upgrades. */
+const CACHE_KEEP = new Set([META_NAME, ...ROOT_FILES]);
 
 // ---------- tar.gz parsing (ustar, entries our createTarGz writes) ----------
 
@@ -86,7 +98,8 @@ async function sha256Hex(data: Uint8Array): Promise<string> {
 
 const memoryCache = new Map<string, string>();
 
-async function cacheWrite(name: string, content: string): Promise<void> {
+/** Writes one cache entry (exported for tests seeding partial states). */
+export async function cacheWrite(name: string, content: string): Promise<void> {
   if (isTauri()) {
     await invokeCommand('data_cache_write', { name, content });
   } else {
@@ -101,39 +114,66 @@ export async function cacheRead(name: string): Promise<string | null> {
   return memoryCache.get(name) ?? null;
 }
 
+/** Drops cached top-level entries outside `keep` (old patch dirs, stray tmp). */
+async function cachePrune(keepPatch: string): Promise<void> {
+  const keep = new Set([...CACHE_KEEP, keepPatch]);
+  if (isTauri()) {
+    await invokeCommand('data_cache_prune', { keep: [...keep] });
+    return;
+  }
+  for (const key of [...memoryCache.keys()]) {
+    const top = key.split('/')[0] ?? key;
+    if (!keep.has(top)) memoryCache.delete(key);
+  }
+}
+
 export async function readCachedMeta(): Promise<CacheMeta | null> {
   const raw = await cacheRead(META_NAME);
   if (raw === null) return null;
   try {
-    const meta = JSON.parse(raw) as CacheMeta;
-    return typeof meta.patch === 'string' ? meta : null;
+    const parsed = cacheMetaSchema.safeParse(JSON.parse(raw));
+    return parsed.success ? parsed.data : null;
   } catch {
     return null;
   }
 }
 
+/** Cached meta is only trusted when the cached `latest.json` agrees on the
+ * patch — a crash between the two writes must not serve a mixed cache. */
+async function readConsistentMeta(): Promise<CacheMeta | null> {
+  const meta = await readCachedMeta();
+  if (meta === null) return null;
+  const raw = await cacheRead('latest.json');
+  if (raw === null) return null;
+  try {
+    const latest = latestSchema.safeParse(JSON.parse(raw));
+    if (!latest.success || latest.data.patch !== meta.patch) return null;
+  } catch {
+    return null;
+  }
+  return meta;
+}
+
 // ---------- download ----------
 
-interface ManifestFile {
-  path: string;
-  sha256?: string;
+async function withTimeout<T>(promise: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error('download timed out')), FETCH_TIMEOUT_MS);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function fetchWithTimeout(url: string): Promise<Response> {
   // GitHub release assets do not send CORS headers, so inside the Tauri
-  // webview the request must go through the http plugin (Rust-side fetch).
+  // webview the request must go through the http plugin (Rust-side fetch,
+  // which the webview cannot abort — the timeout is a race there).
   if (isTauri()) {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    try {
-      return await Promise.race([
-        tauriFetch(url) as Promise<Response>,
-        new Promise<never>((_, reject) => {
-          timer = setTimeout(() => reject(new Error('download timed out')), FETCH_TIMEOUT_MS);
-        }),
-      ]);
-    } finally {
-      clearTimeout(timer);
-    }
+    return withTimeout(tauriFetch(url) as Promise<Response>);
   }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -141,6 +181,45 @@ async function fetchWithTimeout(url: string): Promise<Response> {
     return await fetch(url, { signal: controller.signal });
   } finally {
     clearTimeout(timer);
+  }
+}
+
+/**
+ * Verifies the archive against the manifest, fail-closed: every manifest
+ * entry must carry a sha256, every listed file must exist and match, and no
+ * tar entry may go unlisted (the manifest itself is the trust root).
+ * Manifest paths are patch-relative (`champions.json`) or archive-root
+ * absolute (`/latest.json`, added by `publish-public`).
+ */
+async function verifyArchive(
+  byName: Map<string, Uint8Array>,
+  manifestName: string,
+  manifest: Manifest,
+): Promise<void> {
+  const manifestDir = manifestName.includes('/')
+    ? manifestName.slice(0, manifestName.lastIndexOf('/'))
+    : '';
+  const covered = new Set<string>([manifestName]);
+  for (const file of manifest.files) {
+    const archivePath = file.path.startsWith('/')
+      ? file.path.slice(1)
+      : manifestDir === ''
+        ? file.path
+        : `${manifestDir}/${file.path}`;
+    const entry = byName.get(archivePath);
+    if (entry === undefined) throw new Error(`archive missing ${archivePath}`);
+    if (file.sha256 === undefined) {
+      throw new Error(`manifest entry ${file.path} has no sha256`);
+    }
+    if ((await sha256Hex(entry)) !== file.sha256) {
+      throw new Error(`sha256 mismatch for ${archivePath}`);
+    }
+    covered.add(archivePath);
+  }
+  for (const name of byName.keys()) {
+    if (!covered.has(name)) {
+      throw new Error(`archive file not covered by the manifest: ${name}`);
+    }
   }
 }
 
@@ -153,38 +232,40 @@ export async function downloadAggregates(url = PUBLIC_DATA_URL): Promise<CacheMe
 
   const byName = new Map(tar.map((e) => [e.name, e.data]));
   const latestEntry = byName.get('latest.json');
-  const manifestEntry = [...byName.keys()].find((n) => n.endsWith('/manifest.json'));
-  if (latestEntry === undefined || manifestEntry === undefined) {
-    throw new Error('archive is missing latest.json or a manifest');
-  }
-  const manifestBytes = byName.get(manifestEntry);
-  if (manifestBytes === undefined) throw new Error('archive is missing the manifest');
-  const manifest = JSON.parse(new TextDecoder().decode(manifestBytes)) as {
-    files?: ManifestFile[];
-  };
-  const manifestDir = manifestEntry.slice(0, manifestEntry.lastIndexOf('/'));
+  if (latestEntry === undefined) throw new Error('archive is missing latest.json');
+  const latest = latestSchema.safeParse(JSON.parse(new TextDecoder().decode(latestEntry)));
+  if (!latest.success) throw new Error('latest.json is invalid');
 
-  // Verify every manifest-listed file against its sha256 before caching.
-  for (const file of manifest.files ?? []) {
-    const entry = byName.get(`${manifestDir}/${file.path}`);
-    if (entry === undefined) throw new Error(`archive missing ${file.path}`);
-    if (file.sha256 !== undefined && (await sha256Hex(entry)) !== file.sha256) {
-      throw new Error(`sha256 mismatch for ${file.path}`);
-    }
+  const manifestName = latest.data.manifest;
+  const manifestEntry = byName.get(manifestName);
+  if (manifestEntry === undefined) {
+    throw new Error(`archive is missing ${manifestName}`);
   }
+  const manifest = manifestSchema.safeParse(
+    JSON.parse(new TextDecoder().decode(manifestEntry)),
+  );
+  if (!manifest.success || manifest.data.patch !== latest.data.patch) {
+    throw new Error(`invalid manifest ${manifestName}`);
+  }
+  await verifyArchive(byName, manifestName, manifest.data);
 
   const decoder = new TextDecoder();
-  for (const entry of tar) {
+  const ordered = [...tar].sort(
+    (a, b) => Number(ROOT_FILES.has(a.name)) - Number(ROOT_FILES.has(b.name)),
+  );
+  for (const entry of ordered) {
     await cacheWrite(entry.name, decoder.decode(entry.data));
   }
-  const latest = JSON.parse(decoder.decode(latestEntry)) as { patch?: string; generatedAt?: string };
-  if (typeof latest.patch !== 'string') throw new Error('latest.json has no patch');
   const meta: CacheMeta = {
-    patch: latest.patch,
-    generatedAt: typeof latest.generatedAt === 'string' ? latest.generatedAt : '',
+    schemaVersion: 1,
+    patch: latest.data.patch,
+    generatedAt: latest.data.generatedAt,
     downloadedAt: new Date().toISOString(),
   };
   await cacheWrite(META_NAME, JSON.stringify(meta));
+  // Best-effort: stale patch dirs are dropped after the consistent state is
+  // already durable; a prune failure must not fail the download.
+  await cachePrune(latest.data.patch).catch(() => {});
   return meta;
 }
 
@@ -198,7 +279,7 @@ export async function ensureData(url = PUBLIC_DATA_URL): Promise<DataLoad> {
     return { kind: 'loaded', patch: meta.patch, generatedAt: meta.generatedAt, stale: false };
   } catch {
     try {
-      const meta = await readCachedMeta();
+      const meta = await readConsistentMeta();
       if (meta !== null) {
         return { kind: 'loaded', patch: meta.patch, generatedAt: meta.generatedAt, stale: true };
       }
@@ -207,11 +288,6 @@ export async function ensureData(url = PUBLIC_DATA_URL): Promise<DataLoad> {
     }
     return { kind: 'none' };
   }
-}
-
-/** Reads one cached aggregate file (`latest.json`, `<patch>/x.json`). */
-export async function readDataFile(name: string): Promise<string | null> {
-  return cacheRead(name);
 }
 
 /** Drops every cached aggregate file (Tauri `data_cache_clear` or memory). */

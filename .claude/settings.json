@@ -1,0 +1,25 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/hooks/session-start.mjs"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "exec",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/hooks/check-pr-create.mjs"
+          }
+        ]
+      }
+    ]
+  }
+}

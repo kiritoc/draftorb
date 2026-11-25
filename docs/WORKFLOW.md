@@ -64,6 +64,17 @@ Three Node scripts enforce the public-repo rules; run them locally before pushin
 | `node scripts/check-public-paths.mjs` (CI `safety` job)          | A tracked file lives under a `profiles/` directory or is a SQLite file (`*.sqlite`, `*.sqlite3`, `*.db`, `-wal`, `-shm`, or any of them `.gz`)                                           | Remove the file from git or exclude it from the artifact. `--dir DIR` checks a tree; BL-004 (public aggregates release, D-111) must run it on its tree. Never on the private state tarball |
 | `PR_TITLE=... node scripts/check-pr-title.mjs` (CI `safety` job) | The pull request title has no work item id, or more than one: a backlog ticket `BL-<n>` (optionally one lowercase letter, e.g. `BL-013a`) or a bug `B-<nnn>` from `docs/BUGS.md` (D-120) | Rename the PR, e.g. `feat(engine): bans (BL-012)` or `fix(etl): time budgets (B-071)`; split a PR that covers two work items                                                               |
 
+## Agent hooks (BL-049)
+
+Devin reads `.claude/settings.json` for Claude-format hooks; both scripts are plain Node and fail-open on malformed payloads.
+
+| Hook                                  | Script                            | Effect                                                                                                                                                        |
+| ------------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SessionStart`                        | `scripts/hooks/session-start.mjs` | Prints the mandatory reading order and PR rules into the session context                                                                                      |
+| `PreToolUse` (matcher `exec`)         | `scripts/hooks/check-pr-create.mjs` | Blocks `gh pr create` (exit 2) when the title fails `check-pr-title.mjs` or the body misses the PR template sections / work item link; all other commands pass |
+
+The repo PR process also lives in `.devin/skills/create-pr/SKILL.md`, which takes precedence over the generic `pr` skill.
+
 ## Weekly (owner)
 
 Review BUGS and GOALS, reprioritize GitHub issues/project, bump data to the new patch (`pnpm etl ...`), re-run golden tests.

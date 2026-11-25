@@ -6,12 +6,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./aggregates', () => ({
-  readDataFile: vi.fn(),
+  cacheRead: vi.fn(),
 }));
 
 import type { ChampionTagsMap } from '@draftorb/shared';
 
-import { readDataFile } from './aggregates';
+import { cacheRead as readDataFile } from './aggregates';
 import { createRecommendData, loadPickData } from './export-data';
 
 const mockRead = vi.mocked(readDataFile);

@@ -79,6 +79,7 @@ export function PickScreen({ role, profileLoad, dataReadyNonce }: PickScreenProp
           setLoadError(strings.pickNoData);
           return;
         }
+        setLoadError(null);
         setPickData(loaded);
         void loadChampionIconVersion(loaded.patch)
           .then((version) => {

@@ -27,7 +27,7 @@ import {
   type RecommendData,
   type Role,
 } from '@draftorb/shared';
-import { readDataFile } from './aggregates';
+import { cacheRead as readDataFile } from './aggregates';
 
 export interface PickData {
   patch: string;

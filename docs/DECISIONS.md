@@ -1364,6 +1364,13 @@ GitHub release assets (`release-assets.githubusercontent.com`) do not send `Acce
 - Capability `http:default` scoped to `github.com/.../data-latest/*`, `release-assets.githubusercontent.com/*` and `objects.githubusercontent.com/*` in `src-tauri/capabilities/default.json`; `core:default` added for the window. The CSP `connect-src` hosts stay broader than the allowlist on purpose: plugin requests bypass webview CSP anyway, and tightening is deferred to the same spike check.
 - Plain `fetch` stays for ddragon images (img-src, no CORS needed) and any future CORS-enabled endpoints.
 
+- Integrity: the tarball's manifest copy lists every archive entry with sha256 — including the root files `latest.json` and `champion-tags.json` as `/name` entries added by `publish-public` (`augmentManifestWithRootFiles`). The desktop loader is fail-closed: a missing hash, a hash mismatch or an uncovered tar entry rejects the archive. `manifest.json` itself is the trust root (it travels inside the same HTTPS asset); whole-asset replacement is bounded by GitHub release integrity, not by this scheme.
+- Cache: files land under `<config>/data-cache/` via `data_cache_*` commands; root files and `cache-meta.json` are written last and old patch dirs are pruned after commit, so a mid-download crash leaves either the previous consistent cache or a detectable `latest.json`/meta mismatch (treated as no cache).
+
+Consequences: the artifact and the app must ship together — an archive built before this decision lacks the `/name` manifest entries and is rejected by the new loader, so `pnpm etl publish-public` must be re-run before release. In a plain browser (vite dev, tests) the native `fetch` is still CORS-blocked against release assets; tests mock it and dev uses the in-memory cache. The plugin holds the whole tarball in memory before JS sees it (~1.5 MiB today — fine).
+
+Reevaluate if: the artifact grows past ~25–50 MiB (then a Rust-side download command wins on memory/progress/atomicity), a web version of the app returns (then `raw.githubusercontent.com`/GitHub Pages send `Access-Control-Allow-Origin: *` and could replace the plugin path, within the 100 MiB/file and git-history costs), or GitHub changes release-asset hosting/CDN.
+
 ### D-125 — `blindPick` input semantics: manual override vs automatic trigger — PROPOSED (BL-009, PR #142 review)
 
 `recommend.ts` computes `blindApplies = input.blindPick || !laneEnemiesKnown`, matching SPECS §5. Consequence: a UI toggle can never change the output — when a lane-group enemy role is unknown blind safety already applies, and when all are known `blindOpponents` gets an empty role list so the term is 0. The desktop pick screen therefore ships without the control (B-074, PR #142); `apps/web` still renders the same dead toggle (frozen, D-121).
@@ -1375,10 +1382,3 @@ Question for the owner: what should `blindPick: true` mean?
 - (c) Keep the field but document it as reserved for a future mode.
 
 Recommendation: (b) if a manual blind-pick mode is wanted for live drafts; otherwise (a).
-
-- Integrity: the tarball's manifest copy lists every archive entry with sha256 — including the root files `latest.json` and `champion-tags.json` as `/name` entries added by `publish-public` (`augmentManifestWithRootFiles`). The desktop loader is fail-closed: a missing hash, a hash mismatch or an uncovered tar entry rejects the archive. `manifest.json` itself is the trust root (it travels inside the same HTTPS asset); whole-asset replacement is bounded by GitHub release integrity, not by this scheme.
-- Cache: files land under `<config>/data-cache/` via `data_cache_*` commands; root files and `cache-meta.json` are written last and old patch dirs are pruned after commit, so a mid-download crash leaves either the previous consistent cache or a detectable `latest.json`/meta mismatch (treated as no cache).
-
-Consequences: the artifact and the app must ship together — an archive built before this decision lacks the `/name` manifest entries and is rejected by the new loader, so `pnpm etl publish-public` must be re-run before release. In a plain browser (vite dev, tests) the native `fetch` is still CORS-blocked against release assets; tests mock it and dev uses the in-memory cache. The plugin holds the whole tarball in memory before JS sees it (~1.5 MiB today — fine).
-
-Reevaluate if: the artifact grows past ~25–50 MiB (then a Rust-side download command wins on memory/progress/atomicity), a web version of the app returns (then `raw.githubusercontent.com`/GitHub Pages send `Access-Control-Allow-Origin: *` and could replace the plugin path, within the 100 MiB/file and git-history costs), or GitHub changes release-asset hosting/CDN.

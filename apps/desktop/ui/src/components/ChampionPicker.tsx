@@ -38,6 +38,7 @@ export function ChampionPicker({
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const listboxId = useId();
+  const valueId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
@@ -88,7 +89,7 @@ export function ChampionPicker({
         disabled={disabled}
         aria-expanded={open}
         aria-haspopup="listbox"
-        aria-labelledby={labelledBy}
+        aria-labelledby={labelledBy !== undefined ? `${labelledBy} ${valueId}` : undefined}
         className="flex w-full items-center justify-between gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-slate-900 hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
       >
         <span className="flex min-w-0 items-center gap-2">
@@ -99,7 +100,7 @@ export function ChampionPicker({
               size="sm"
             />
           )}
-          <span className="truncate">
+          <span id={valueId} className="truncate">
             {selected ? `${selected.name} · ${selected.roles.join(', ')}` : placeholder}
           </span>
         </span>

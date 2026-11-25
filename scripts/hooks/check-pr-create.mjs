@@ -83,7 +83,9 @@ if (missing.length > 0) {
   );
 }
 if (!/Closes\s+#\d+|Fixes\s+B-\d{3,}/.test(bodyText)) {
-  block('PR body must link the work item: "Closes #<issue>" for a BL ticket or "Fixes B-xxx" for a bug.');
+  block(
+    'PR body must link the work item: "Closes #<issue>" for a BL ticket or "Fixes B-xxx" for a bug.',
+  );
 }
 
 process.exit(0);

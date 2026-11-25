@@ -68,10 +68,10 @@ Three Node scripts enforce the public-repo rules; run them locally before pushin
 
 Devin reads `.claude/settings.json` for Claude-format hooks; both scripts are plain Node and fail-open on malformed payloads.
 
-| Hook                                  | Script                            | Effect                                                                                                                                                        |
-| ------------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SessionStart`                        | `scripts/hooks/session-start.mjs` | Prints the mandatory reading order and PR rules into the session context                                                                                      |
-| `PreToolUse` (matcher `exec`)         | `scripts/hooks/check-pr-create.mjs` | Blocks `gh pr create` (exit 2) when the title fails `check-pr-title.mjs` or the body misses the PR template sections / work item link; all other commands pass |
+| Hook                          | Script                              | Effect                                                                                                                                                         |
+| ----------------------------- | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SessionStart`                | `scripts/hooks/session-start.mjs`   | Prints the mandatory reading order and PR rules into the session context                                                                                       |
+| `PreToolUse` (matcher `exec`) | `scripts/hooks/check-pr-create.mjs` | Blocks `gh pr create` (exit 2) when the title fails `check-pr-title.mjs` or the body misses the PR template sections / work item link; all other commands pass |
 
 The repo PR process also lives in `.devin/skills/create-pr/SKILL.md`, which takes precedence over the generic `pr` skill.
 

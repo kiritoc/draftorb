@@ -1,11 +1,11 @@
 /**
  * Pick screen (BL-009, v1a SUPPORT-only): draft slots for the user's pick,
- * four allies and five enemies, a blind-pick toggle and a rank selector.
+ * four allies and five enemies, and a rank selector.
  * The engine's `recommend` output renders as "From your pool" above
  * "Best overall" (D-024 invariants, 5-per-page "Show more").
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 
 import { recommend } from '@draftorb/engine';
 import {
@@ -41,12 +41,16 @@ function isFilled(slot: DraftSlotState): slot is { championId: number; role?: Ro
   return slot.championId != null;
 }
 
+type SlotSetter = Dispatch<SetStateAction<DraftSlotState[]>>;
+
 export interface PickScreenProps {
   role: Role;
   profileLoad: ProfileLoad;
+  /** Bumped each time the launch data download settles; triggers a cache reload. */
+  dataReadyNonce: number;
 }
 
-export function PickScreen({ role, profileLoad }: PickScreenProps) {
+export function PickScreen({ role, profileLoad, dataReadyNonce }: PickScreenProps) {
   const [pickData, setPickData] = useState<PickData | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [iconVersion, setIconVersion] = useState<string | null>(null);
@@ -58,7 +62,6 @@ export function PickScreen({ role, profileLoad }: PickScreenProps) {
   const [enemies, setEnemies] = useState<DraftSlotState[]>(
     Array.from({ length: ENEMY_COUNT }, emptySlot),
   );
-  const [blindPick, setBlindPick] = useState(false);
   const [userRank, setUserRank] = useState<Rank>(DEFAULT_RANK);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [poolRecommendations, setPoolRecommendations] = useState<Recommendation[]>([]);
@@ -94,7 +97,7 @@ export function PickScreen({ role, profileLoad }: PickScreenProps) {
     return () => {
       cancelled = true;
     };
-  }, [role]);
+  }, [role, dataReadyNonce]);
 
   const champions: Champion[] = useMemo(() => pickData?.champions ?? [], [pickData]);
   const poolSet = useMemo(() => new Set(poolIds), [poolIds]);
@@ -111,10 +114,12 @@ export function PickScreen({ role, profileLoad }: PickScreenProps) {
         championId: slot.championId,
         role: slot.role,
       })),
-      blindPick,
+      // No manual toggle: the engine applies blind safety whenever a lane-group
+      // enemy role is unknown (SPECS §5); a forced flag cannot change output.
+      blindPick: false,
       pool: poolIds,
     }),
-    [userRank, role, allies, enemies, blindPick, poolIds],
+    [userRank, role, allies, enemies, poolIds],
   );
 
   useEffect(() => {
@@ -135,20 +140,10 @@ export function PickScreen({ role, profileLoad }: PickScreenProps) {
     }
   }, [draftInput, pickData]);
 
-  const setAlly = (index: number, slot: DraftSlotState) => {
-    setAllies((current) => {
-      const next = [...current];
-      next[index] = slot;
-      return next;
-    });
-  };
-  const setEnemy = (index: number, slot: DraftSlotState) => {
-    setEnemies((current) => {
-      const next = [...current];
-      next[index] = slot;
-      return next;
-    });
-  };
+  const slotUpdater = (setter: SlotSetter) => (index: number, slot: DraftSlotState) =>
+    setter((current) => current.map((entry, i) => (i === index ? slot : entry)));
+  const setAlly = slotUpdater(setAllies);
+  const setEnemy = slotUpdater(setEnemies);
 
   const usedChampionIds = useMemo(
     () => new Set([user, ...allies, ...enemies].filter(isFilled).map((slot) => slot.championId)),
@@ -181,21 +176,6 @@ export function PickScreen({ role, profileLoad }: PickScreenProps) {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-4">
-        <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-          {strings.blindPick}
-          <button
-            type="button"
-            role="switch"
-            aria-checked={blindPick}
-            onClick={() => setBlindPick((current) => !current)}
-            className={`relative inline-block h-6 w-10 rounded-full transition-colors ${blindPick ? 'bg-indigo-500' : 'bg-slate-300 dark:bg-slate-600'}`}
-          >
-            <span
-              className={`block h-5 w-5 rounded-full bg-white transition-transform ${blindPick ? 'translate-x-4' : 'translate-x-0.5'}`}
-              aria-hidden="true"
-            />
-          </button>
-        </label>
         <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
           {strings.rankLabel}
           <select

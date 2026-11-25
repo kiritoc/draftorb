@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
 import type { Champion, ChampionId } from '@draftorb/shared';
+import { PICKER_RESULT_LIMIT } from '../config';
 import { strings } from '../strings';
 import { ChampionPortrait } from './ChampionPortrait';
 import { championIconUrl } from '../data/champion-icons';
@@ -18,6 +19,10 @@ export interface ChampionPickerProps {
   disabled?: boolean;
   /** Data Dragon version for portraits; null falls back to initials. */
   iconVersion?: string | null;
+  /** ID of the element naming this picker (e.g. the slot label). */
+  labelledBy?: string;
+  /** Accessible name of the search input; defaults to `placeholder`. */
+  searchLabel?: string;
 }
 
 export function ChampionPicker({
@@ -27,6 +32,8 @@ export function ChampionPicker({
   placeholder = strings.championSearch,
   disabled = false,
   iconVersion = null,
+  labelledBy,
+  searchLabel,
 }: ChampionPickerProps) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
@@ -60,13 +67,14 @@ export function ChampionPicker({
   const selected = champions.find((champion) => champion.id === value);
   const filtered = champions
     .filter((champion) => champion.name.toLowerCase().includes(query.toLowerCase()))
-    .slice(0, 20);
+    .slice(0, PICKER_RESULT_LIMIT);
 
   const handleSelect = useCallback(
     (id: ChampionId | null) => {
       onChange(id);
       setQuery('');
       setOpen(false);
+      buttonRef.current?.focus();
     },
     [onChange],
   );
@@ -80,6 +88,7 @@ export function ChampionPicker({
         disabled={disabled}
         aria-expanded={open}
         aria-haspopup="listbox"
+        aria-labelledby={labelledBy}
         className="flex w-full items-center justify-between gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-slate-900 hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
       >
         <span className="flex min-w-0 items-center gap-2">
@@ -111,6 +120,7 @@ export function ChampionPicker({
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder={strings.championSearch}
+            aria-label={searchLabel ?? placeholder}
             className="w-full border-b border-slate-300 bg-white px-3 py-2 text-slate-900 focus:outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
           />
           {selected ? (

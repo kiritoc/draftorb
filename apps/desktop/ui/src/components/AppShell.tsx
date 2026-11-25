@@ -15,6 +15,8 @@ export interface AppShellProps {
   screen: ScreenId;
   onScreenChange: (screen: ScreenId) => void;
   dataStatus: DataStatus;
+  /** Bumped each time the launch data download settles (see App). */
+  dataReadyNonce: number;
   theme: ThemeSetting;
   resolvedTheme: ResolvedTheme;
   onThemeChange: (theme: ThemeSetting) => void;
@@ -50,7 +52,20 @@ export function AppShell(props: AppShellProps) {
       {props.poolSync !== undefined && <PoolSyncBanner status={props.poolSync} />}
       <Nav active={props.screen} onSelect={props.onScreenChange} />
       <main className="space-y-6 px-6 py-6">
-        {props.screen === 'settings' ? (
+        {/* Pick stays mounted (hidden) so draft state survives tab switches. */}
+        <section hidden={props.screen !== 'pick'} className="space-y-6">
+          <RoleSelector
+            selected={props.role}
+            enabledRoles={props.enabledRoles}
+            onSelect={props.onRoleChange}
+          />
+          <PickScreen
+            role={props.role}
+            profileLoad={props.profileLoad ?? { kind: 'none', reason: 'noFolder' }}
+            dataReadyNonce={props.dataReadyNonce}
+          />
+        </section>
+        {props.screen === 'settings' && (
           <SettingsScreen
             theme={props.theme}
             onThemeChange={props.onThemeChange}
@@ -59,19 +74,8 @@ export function AppShell(props: AppShellProps) {
             repoFolderAvailable={props.repoFolderAvailable}
             profileStatus={props.profileStatus}
           />
-        ) : props.screen === 'pick' ? (
-          <section className="space-y-6">
-            <RoleSelector
-              selected={props.role}
-              enabledRoles={props.enabledRoles}
-              onSelect={props.onRoleChange}
-            />
-            <PickScreen
-              role={props.role}
-              profileLoad={props.profileLoad ?? { kind: 'none', reason: 'noFolder' }}
-            />
-          </section>
-        ) : (
+        )}
+        {(props.screen === 'setup' || props.screen === 'game') && (
           <section className="space-y-6">
             <RoleSelector
               selected={props.role}

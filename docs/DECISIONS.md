@@ -1348,3 +1348,15 @@ GitHub release assets (`release-assets.githubusercontent.com`) do not send `Acce
 - npm `@tauri-apps/plugin-http` 2.x and Cargo `tauri-plugin-http` 2.9 (MIT/Apache-2.0, free): requests run in Rust, no CORS. `apps/desktop/ui/src/data/aggregates.ts` uses its `fetch` only when `isTauri()`; the plain-browser path keeps the native `fetch` (dev/tests).
 - Capability `http:default` scoped to `github.com/.../data-latest/*`, `release-assets.githubusercontent.com/*` and `objects.githubusercontent.com/*` in `src-tauri/capabilities/default.json`; `core:default` added for the window.
 - Plain `fetch` stays for ddragon images (img-src, no CORS needed) and any future CORS-enabled endpoints.
+
+### D-125 — `blindPick` input semantics: manual override vs automatic trigger — PROPOSED (BL-009, PR #142 review)
+
+`recommend.ts` computes `blindApplies = input.blindPick || !laneEnemiesKnown`, matching SPECS §5. Consequence: a UI toggle can never change the output — when a lane-group enemy role is unknown blind safety already applies, and when all are known `blindOpponents` gets an empty role list so the term is 0. The desktop pick screen therefore ships without the control (B-074, PR #142); `apps/web` still renders the same dead toggle (frozen, D-121).
+
+Question for the owner: what should `blindPick: true` mean?
+
+- (a) Keep OR semantics: the field is meaningless; remove it from `DraftInput` in a later cleanup.
+- (b) Redefine as an override: when true, score ALL lane-group enemy roles as unseen (not only the unknown ones), so a player who knows the enemy comp can still ask for safe-pick scoring. Requires an engine change, tests and a SPECS §5 amendment.
+- (c) Keep the field but document it as reserved for a future mode.
+
+Recommendation: (b) if a manual blind-pick mode is wanted for live drafts; otherwise (a).

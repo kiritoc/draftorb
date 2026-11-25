@@ -10,12 +10,11 @@ import type { Champion, Recommendation } from '@draftorb/shared';
 import type { ProfileLoad } from '../profile/profile-export';
 import type { Role } from '@draftorb/shared';
 import { strings } from '../strings';
+import { RECOMMENDATION_PAGE_SIZE } from '../config';
 import { paginate } from '../pick/pagination';
 import type { PoolUnavailableItem } from '../pick/pool-unavailable';
 import { RecommendationCard } from './RecommendationCard';
 import { UnavailableChampionCard } from './UnavailableChampionCard';
-
-export const RECOMMENDATION_PAGE_SIZE = 5;
 
 interface PaginationAction {
   type: 'reset' | 'showMore';

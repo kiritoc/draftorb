@@ -20,10 +20,10 @@ For bug fixes: `fix(<scope>): <summary> (B-xxx)`. Exactly one work item id, enfo
 
 ## Body
 
-Use `.github/pull_request_template.md` verbatim as the body — write it to a temp file and pass `--body-file`:
+Use `.github/pull_request_template.md` verbatim as the body — write it to a temp file and pass `--body-file`. Pick a temp path for the OS you are on (`$env:TEMP\pr-body.md` on Windows, `/tmp/pr-body.md` on macOS/Linux):
 
 ```bash
-gh pr create --title "..." --body-file /tmp/pr-body.md
+gh pr create --title "..." --body-file "$env:TEMP/pr-body.md"
 ```
 
 Required content:

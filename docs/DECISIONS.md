@@ -1375,6 +1375,7 @@ Question for the owner: what should `blindPick: true` mean?
 - (c) Keep the field but document it as reserved for a future mode.
 
 Recommendation: (b) if a manual blind-pick mode is wanted for live drafts; otherwise (a).
+
 - Integrity: the tarball's manifest copy lists every archive entry with sha256 — including the root files `latest.json` and `champion-tags.json` as `/name` entries added by `publish-public` (`augmentManifestWithRootFiles`). The desktop loader is fail-closed: a missing hash, a hash mismatch or an uncovered tar entry rejects the archive. `manifest.json` itself is the trust root (it travels inside the same HTTPS asset); whole-asset replacement is bounded by GitHub release integrity, not by this scheme.
 - Cache: files land under `<config>/data-cache/` via `data_cache_*` commands; root files and `cache-meta.json` are written last and old patch dirs are pruned after commit, so a mid-download crash leaves either the previous consistent cache or a detectable `latest.json`/meta mismatch (treated as no cache).
 

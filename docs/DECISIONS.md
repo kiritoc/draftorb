@@ -1291,7 +1291,7 @@ Amends D-001, D-098 and D-099. TypeScript engine with a Tauri shell for the Wind
 
 ### D-116 — Desktop spike dependencies: Tauri v2 + Vite — ACCEPTED (owner, 2026-11-16)
 
-BL-002 (issue #68) introduces the first desktop-shell dependencies: npm `@tauri-apps/cli` ^2.9 (dev-only, MIT/Apache-2.0) and the Cargo crates `tauri` 2.12 + `tauri-build` 2.x (MIT/Apache-2.0, ~400 transitive crates locked in `apps/desktop/src-tauri/Cargo.lock`), plus `vite` ^6 reused from `apps/web` (already in the repo). Rust toolchain (rustup, MSVC) is required to compile the shell per the D-115 amendment of AGENTS.md rule 4; it does not affect `packages/shared`, `packages/engine`, `packages/etl` or tooling. `withGlobalTauri` is enabled only for the spike; the real app should import `@tauri-apps/api` instead. Measurements and the GO/NO-GO recommendation are in `docs/reports/bl-002-tauri-spike.md`; the owner confirmation line there is still blank.
+BL-002 (issue #68) introduces the first desktop-shell dependencies: npm `@tauri-apps/cli` ^2.9 (dev-only, MIT/Apache-2.0) and the Cargo crates `tauri` 2.12 + `tauri-build` 2.x (MIT/Apache-2.0, ~400 transitive crates locked in `apps/desktop/src-tauri/Cargo.lock`), plus `vite` ^6 reused from `apps/web` (already in the repo). Rust toolchain (rustup, MSVC) is required to compile the shell per the D-115 amendment of AGENTS.md rule 4; it does not affect `packages/shared`, `packages/engine`, `packages/etl` or tooling. `withGlobalTauri` is enabled only for the spike; the real app should import `@tauri-apps/api` instead. Measurements and the GO/NO-GO recommendation are in `docs/reports/bl-002-tauri-spike.md`; the owner confirmed the GO on 2026-11-21 with adjusted thresholds (cold start < 3 s, idle memory < 400 MB, `recommend()` < 5 ms per call on real data) — see the report's "Owner confirmation" section.
 
 Update (2026-11-17, BL-010a): the app skeleton adds npm `@tauri-apps/api` 2.12.4, pinned exactly (2.12.5 was published less than 7 days before; the `invoke` bridge that replaces `withGlobalTauri`; MIT/Apache-2.0, free, small JS-only package with no runtime dependencies), plus `react`, `react-dom`, `tailwindcss` and `zod` at the same version ranges as `apps/web` and `packages/shared`. No new Rust crates. `withGlobalTauri` is now off.
 
@@ -1332,14 +1332,29 @@ Owner delegated the choice ("choose, best practice"; translated from French). Am
 
 `apps/web` is frozen until it is deleted: no new features and no alignment with new contracts or decisions (e.g. the `banned` pool reason label, the D-117 dual patch label, the 300-line convention for `DraftScreen.tsx`). The only allowed changes are the minimum needed to keep `pnpm check` green when shared contracts change. All product work goes to `apps/desktop` (D-115). Review findings on `apps/web` are closed as "frozen" unless they are security issues.
 
-### D-123 — Public aggregates host: rolling `data-latest` release on the main repo — PROPOSED (BL-004)
+### D-122 — DB size alert thresholds and raw-timeline retention plan — ACCEPTED (owner, 2026-11-21)
 
-D-111 delegated the host choice to this ticket. Proposal (awaiting owner veto at PR review):
+Report: `docs/reports/bl-007-db-size.md` (state release `state-20261112T1035Z`, DB 1.208 GiB / ~209 MiB gzipped (local `gzip -6` estimate; the published asset size is authoritative), ~81% derived aggregate tables + ~19% raw `participants`, all raw timeline tables empty).
+
+Thresholds (issue #110 comment, 2026-11-16, confirmed 2026-11-21): two levels — **1 GiB = alert, 1.5 GiB = retention decision required** — measured on the **published gzip asset** (the constrained resource, ~10% of the 2 GiB limit today), plus a **growth-rate trigger**: months until the 2 GiB release-asset limit (D-091) at the current pace matters more than absolute size. The DB file size is a secondary signal only (already ~1.2 GiB). Growth pace is computed as the delta between two consecutive `state-*` release assets; until two post-backfill snapshots exist, the backlog-bounded projection in the report (~350–450 MiB expected) is the substitute pace.
+
+Retention/prune plan for the raw timeline tables (`item_events`, `kill_events`, `lane_snapshots`, `participant_challenges`, `participant_starters`, `item_build` inputs):
+
+- Keep raw events for a **rolling window aligned with the D-044 match-retention window** (`--keep-patches`, currently 20 patches) — owner choice 2026-11-21 over a shorter 8-patch window.
+- Prune only **after** the derived aggregates that consume them (`item_build`, `entity_change_scores`, lane/item contexts) have been rebuilt for the retained window; pruning raw rows never changes `data/public` exports, which come from aggregate tables.
+- **Personal-data minimization**: `item_events`/`kill_events`/`lane_snapshots`/`participant_challenges` carry `puuid` columns — the largest PII surface in the DB. A rolling window bounds it; `participants.puuid` (encrypted) stays as the aggregation input.
+- **Amends D-113** (owner-approved 2026-11-21): windowed pruning of raw _rows_ is allowed (tables kept, rolling window above). No row is deleted until the pruning command exists and the owner triggers it; D-113's "do not delete the raw tables" still holds for the tables themselves.
+- VACUUM needs up to 2× free space on the runner; schedule compaction inside the existing time budgets.
+- Follow-up (not in this PR): wire `pnpm etl check-state-private` into a scheduled workflow using the state-repo token already present in `etl.yml`, so the private-repo guarantee is enforced automatically.
+
+### D-123 — Public aggregates host: rolling `data-latest` release on the main repo — ACCEPTED (owner, 2026-11-25, BL-004)
+
+D-111 delegated the host choice to this ticket. Accepted contents (confirmed at PR #140 review):
 
 - **Host**: the public main repo (`kiritoc/draftorb`, i.e. the `origin` remote), not a dedicated repo — no new infrastructure, `gh release` works today, and release noise is minimal (one rolling tag).
 - **Tag/asset**: rolling tag `data-latest` (override `--tag`) with a single asset `aggregates.tar.gz`; each publish uses `gh release upload --clobber`, giving a stable URL `releases/download/data-latest/aggregates.tar.gz` for the app. Patch history is not kept as releases (the data is regenerable; the private state repo keeps the audit trail).
-- **Contents**: `latest.json` + `<patch>/` tree only; `profiles/` and SQLite excluded by path rule and verified by a content scan (PUUID-like + `RGAPI-`) before packing.
-- **Command**: `pnpm etl publish-public` (`--dry-run` builds and scans without uploading). `pnpm etl pull`/`publish` (private state repo) are unchanged.
+- **Contents**: `latest.json` + the `<patch>/` tree selected by `latest.json` (other patch dirs are not packed) + `champion-tags.json` at the archive root (public curated data the engine needs for `RecommendData.tags`); `profiles/` and SQLite excluded by path rule and verified by a content scan (PUUID-like + `RGAPI-`) before packing.
+- **Command**: `pnpm etl publish-public` (`--dry-run` builds and scans without uploading, `--out=path` writes the tarball locally). `pnpm etl pull`/`publish` (private state repo) are unchanged.
 
 ### D-124 — Desktop aggregate download uses `tauri-plugin-http` (BL-010b) — PROPOSED
 

@@ -48,7 +48,7 @@ Default posture: these skills were designed for GitHub. If a `git remote` points
 
 Record the choice in `docs/agents/issue-tracker.md`. The GitHub and GitLab templates carry a "PRs as a request surface" flag, defaulted **off**. Leave it off and don't raise it: a user who wants external PRs in the triage queue can flip the flag in the file later.
 
-A GitHub or GitLab tracker needs a reachable repo. When the user picks one and no `git remote` points at that host, get the repo URL from them and wire it up (`git init` if needed, `git remote add origin <url>`) before going further. Done when `gh repo view` / `glab repo view` prints the project from inside this directory; if it can't, stop and tell the user what's missing.
+A GitHub or GitLab tracker needs a reachable repo, but a git remote is not the only way `gh`/`glab` find it: `GH_REPO`/`GL_REPO` environment variables and explicit repo arguments work too (proxy clones may expose no GitHub remote at all). When the user picks one and the project can't be resolved that way, get the repo URL from them and wire it up (`git init` if needed, `git remote add origin <url>`) before going further. Done when `gh repo view` / `glab repo view` prints the project from inside this directory; if it can't, stop and tell the user what's missing.
 
 **Section B: Triage label vocabulary.** Skip this section entirely if the `triage` skill isn't installed (exploration told you), since an uninstalled skill needs no labels.
 
@@ -105,11 +105,13 @@ Include the `### Triage labels` sub-block, and write `docs/agents/triage-labels.
 
 When Section B ran on GitHub or GitLab, create each configured label the tracker lacks (`gh label create` / `glab label create`).
 
-Then write the docs files. The upstream seed templates are not vendored in this repo; use the existing files as the starting point instead:
+Then write the docs files using the seed templates in this skill folder as a starting point:
 
-- `docs/agents/issue-tracker.md`: current GitHub tracker config (adapt for GitLab / local markdown when switching)
-- `docs/agents/domain.md`: domain doc consumer rules + layout
-- `docs/agents/triage-labels.md`: write from scratch with the five canonical roles (only if `triage` is installed)
+- [issue-tracker-github.md](./issue-tracker-github.md): GitHub issue tracker
+- [issue-tracker-gitlab.md](./issue-tracker-gitlab.md): GitLab issue tracker
+- [issue-tracker-local.md](./issue-tracker-local.md): local-markdown issue tracker
+- [triage-labels.md](./triage-labels.md): label mapping (only if `triage` is installed)
+- [domain.md](./domain.md): domain doc consumer rules + layout
 
 For "other" issue trackers, write `docs/agents/issue-tracker.md` from scratch using the user's description.
 

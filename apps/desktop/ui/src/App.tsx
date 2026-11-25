@@ -3,6 +3,7 @@ import type { Role } from '@draftorb/shared';
 import { AppShell } from './components/AppShell';
 import type { ScreenId } from './components/Nav';
 import type { DataStatus } from './data-status';
+import { ensureData } from './data/aggregates';
 import { describeProfileLoad, loadProfileExport, type ProfileLoad } from './profile/profile-export';
 import { loadPool } from './pool/pool-store';
 import { poolSyncStatus, type PoolSyncStatus } from './pool/pool-sync';
@@ -39,6 +40,7 @@ export function App() {
   const [poolNotice, setPoolNotice] = useState<string | undefined>();
   const [poolSync, setPoolSync] = useState<PoolSyncStatus>({ kind: 'noFolder' });
   const [profileLoad, setProfileLoad] = useState<ProfileLoad>({ kind: 'none', reason: 'noFolder' });
+  const [dataStatus, setDataStatus] = useState<DataStatus>(NO_DATA);
   const prefersDark = usePrefersDark();
   const resolvedTheme = settings === null ? null : resolveTheme(settings.theme, prefersDark);
 
@@ -47,6 +49,7 @@ export function App() {
       setSettings(loaded.settings);
       setNotice(loaded.notice);
     });
+    void ensureData().then(setDataStatus);
   }, []);
 
   const repoFolder = settings?.repoFolder;
@@ -107,7 +110,7 @@ export function App() {
     <AppShell
       screen={screen}
       onScreenChange={setScreen}
-      dataStatus={NO_DATA}
+      dataStatus={dataStatus}
       theme={settings.theme}
       resolvedTheme={resolvedTheme}
       onThemeChange={changeTheme}

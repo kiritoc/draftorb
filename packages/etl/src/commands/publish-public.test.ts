@@ -11,12 +11,17 @@ import { join } from 'node:path';
 import { MANIFEST_SCHEMA_VERSION } from '@draftorb/shared';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { createHash } from 'node:crypto';
+
 import {
+  augmentManifestWithRootFiles,
   collectPublishFiles,
   findSecretViolations,
   isForbiddenPublishPath,
   parsePublishPublicArgs,
   scanPublishSet,
+  toTarEntries,
+  type PublishFile,
 } from './publish-public';
 import { parseOriginRepo } from './shared';
 
@@ -188,6 +193,44 @@ describe('collectPublishFiles', () => {
     const rels = collectPublishFiles(dir).map((f) => f.rel);
     expect(rels.some((r) => r.startsWith('16.21/'))).toBe(false);
     expect(rels).not.toContain('backtest-report.json');
+  });
+});
+
+describe('augmentManifestWithRootFiles', () => {
+  function archiveEntries(): ReturnType<typeof toTarEntries> {
+    const dir = makePublicDir();
+    const tagsPath = join(dir, 'champion-tags.json');
+    writeFileSync(tagsPath, '{"tags":{}}');
+    const files: PublishFile[] = [
+      ...collectPublishFiles(dir),
+      { rel: 'champion-tags.json', abs: tagsPath, size: 11 },
+    ];
+    return toTarEntries(files);
+  }
+
+  it('adds sha256 entries for the archive-root files to the manifest copy', () => {
+    const entries = augmentManifestWithRootFiles(archiveEntries());
+    const manifest = entries.find((e) => e.name === '16.22/manifest.json');
+    expect(manifest).toBeDefined();
+    const parsed = JSON.parse(manifest!.data.toString('utf8')) as {
+      files: Array<{ path: string; sha256?: string }>;
+    };
+    const byPath = new Map(parsed.files.map((f) => [f.path, f.sha256]));
+    const latest = entries.find((e) => e.name === 'latest.json')!;
+    const tags = entries.find((e) => e.name === 'champion-tags.json')!;
+    const sha = (buf: Buffer) => createHash('sha256').update(buf).digest('hex');
+    expect(byPath.get('/latest.json')).toBe(sha(latest.data));
+    expect(byPath.get('/champion-tags.json')).toBe(sha(tags.data));
+    // The fixture manifest starts empty, so the archive copy lists exactly
+    // the two root files.
+    expect(parsed.files).toHaveLength(2);
+    // The manifest does not list itself.
+    expect(parsed.files.some((f) => f.path.includes('manifest.json'))).toBe(false);
+  });
+
+  it('fails when a root file is missing from the publish set', () => {
+    const entries = toTarEntries(collectPublishFiles(makePublicDir()));
+    expect(() => augmentManifestWithRootFiles(entries)).toThrow('missing champion-tags.json');
   });
 });
 

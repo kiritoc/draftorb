@@ -17,6 +17,7 @@
     "@draftorb/engine": "workspace:*",
     "@draftorb/shared": "workspace:*",
     "@tauri-apps/api": "2.12.4",
+    "@tauri-apps/plugin-http": "^2.9.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "zod": "^4.6.7"

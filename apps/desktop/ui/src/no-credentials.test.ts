@@ -22,7 +22,9 @@ describe('desktop app credentials (BL-010a)', () => {
   const targets = [
     ...files(join(desktopRoot, 'ui', 'src')),
     ...files(join(desktopRoot, 'src-tauri', 'src')),
+    ...files(join(desktopRoot, 'src-tauri', 'capabilities')),
     join(desktopRoot, 'src-tauri', 'tauri.conf.json'),
+    join(desktopRoot, 'src-tauri', 'Cargo.toml'),
   ].filter((file) => file !== fileURLToPath(import.meta.url));
 
   it('scans the app sources and config', () => {

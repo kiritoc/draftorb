@@ -7,6 +7,7 @@ export const strings = {
   patchInternalOnly: (internal: string) => `Patch ${internal} (data label; public name unknown)`,
   dataNone: 'No data loaded yet',
   dataLoaded: (generatedAt: string) => `Data generated ${generatedAt}`,
+  dataStale: (generatedAt: string) => `Cached data generated ${generatedAt} (offline)`,
   unvalidatedLabel: 'Unvalidated model',
   unvalidatedHint: 'Rankings have not passed the offline backtest yet.',
   themeToggleToDark: 'Switch to dark theme',

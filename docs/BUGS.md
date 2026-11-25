@@ -4,14 +4,15 @@ Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATI
 
 ## Open
 
-| ID    | Sev | Area | Title                                                                                                                                                                              | Status | Found by/date              | Ticket |
-| ----- | --- | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | -------------------------- | ------ |
-| B-072 | S3  | etl  | Riot API error redaction kept an 8-character PUUID prefix in public workflow logs (D-078 point 9)                                                                                  | FIXED  | review/2026-11-17          | –      |
-| B-071 | S1  | etl  | Scheduled ETL refresh never saves progress: the unbudgeted `matches --refresh` step hits the 360-minute timeout and the B-070 guard refuses the snapshot                           | FIXED  | Devin/2026-11-17           | –      |
-| B-067 | S4  | etl  | `check-key` prints `undefined` for the league name                                                                                                                                 | FIXED  | Devin/2026-11-12           | –      |
-| B-068 | S4  | docs | "512 MiB release-asset cap" was a self-imposed 25% headroom rule, not a GitHub limit (real cap: 2 GiB/file)                                                                        | FIXED  | external review/2026-11-12 | –      |
-| B-069 | S2  | etl  | `profile-sync` marked every match `invalid`: Riot renamed `spell1Id`/`spell2Id` to `summoner1Id`/`summoner2Id` in newer game versions; `extractProfileGame` required the old names | FIXED  | Devin/2026-11-13           | –      |
-| B-070 | S1  | etl  | Corrupt `DraftOrb.sqlite.gz` published by a timeout-cancelled run broke every ETL refresh (`integrity_check` errors)                                                               | FIXED  | Devin/2026-11-15           | –      |
+| ID    | Sev | Area    | Title                                                                                                                                                                              | Status | Found by/date              | Ticket  |
+| ----- | --- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | -------------------------- | ------- |
+| B-073 | S2  | desktop | Aggregate download-at-launch failed with `TypeError: Failed to fetch`: GitHub release assets send no CORS headers, so the webview `fetch` is blocked                               | FIXED  | Devin/2026-11-21           | BL-010b |
+| B-072 | S3  | etl     | Riot API error redaction kept an 8-character PUUID prefix in public workflow logs (D-078 point 9)                                                                                  | FIXED  | review/2026-11-17          | –       |
+| B-071 | S1  | etl     | Scheduled ETL refresh never saves progress: the unbudgeted `matches --refresh` step hits the 360-minute timeout and the B-070 guard refuses the snapshot                           | FIXED  | Devin/2026-11-17           | –       |
+| B-067 | S4  | etl     | `check-key` prints `undefined` for the league name                                                                                                                                 | FIXED  | Devin/2026-11-12           | –       |
+| B-068 | S4  | docs    | "512 MiB release-asset cap" was a self-imposed 25% headroom rule, not a GitHub limit (real cap: 2 GiB/file)                                                                        | FIXED  | external review/2026-11-12 | –       |
+| B-069 | S2  | etl     | `profile-sync` marked every match `invalid`: Riot renamed `spell1Id`/`spell2Id` to `summoner1Id`/`summoner2Id` in newer game versions; `extractProfileGame` required the old names | FIXED  | Devin/2026-11-13           | –       |
+| B-070 | S1  | etl     | Corrupt `DraftOrb.sqlite.gz` published by a timeout-cancelled run broke every ETL refresh (`integrity_check` errors)                                                               | FIXED  | Devin/2026-11-15           | –       |
 
 ## Duplicate bug IDs (not renumbered)
 
@@ -37,6 +38,15 @@ Review notes that predate the bug log live in [Review history](#review-history) 
 ```
 
 ## Fixed
+
+### B-073 — Aggregate download failed in the webview: release assets have no CORS headers — FIXED
+
+- Severity / Area: S2 / desktop (BL-010b)
+- Steps to reproduce: launch the desktop app with network access; `ensureData()` in `apps/desktop/ui/src/data/aggregates.ts` fetches `https://github.com/kiritoc/draftorb/releases/download/data-latest/aggregates.tar.gz`.
+- Expected / Actual: expected the tarball to download; actual `TypeError: Failed to fetch`. Probes showed `api.github.com` reachable (it sends `Access-Control-Allow-Origin: *`) while the release-asset host `release-assets.githubusercontent.com` sends none, so Chromium blocks the response. Node-based tests could not catch it because Node `fetch` ignores CORS.
+- Environment (OS, Node version, patch): Windows 11, Tauri/WebView2, patch 16.22.
+- Suspected cause: GitHub release asset downloads redirect to a host without CORS headers; CSP was already correct.
+- Fix (commit/ticket): requests inside the webview now go through `tauri-plugin-http` (Rust-side fetch, no CORS), scoped by `src-tauri/capabilities/default.json` to the release hosts; decision D-124. The plain-browser path keeps native `fetch`.
 
 ### B-072 — Riot API error redaction kept an 8-character PUUID prefix — FIXED
 

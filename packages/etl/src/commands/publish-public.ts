@@ -16,6 +16,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   copyFileSync,
   existsSync,
@@ -204,6 +205,46 @@ export function toTarEntries(files: readonly PublishFile[]): TarFileEntry[] {
   return files.map((file) => ({ name: file.rel, data: readFileSync(file.abs) }));
 }
 
+/** Archive-root files the desktop surfaces as patch/freshness: they sit next
+ * to `latest.json` in the tarball, outside the `<patch>/` tree the on-disk
+ * manifest lists. */
+const ARCHIVE_ROOT_FILES = ['latest.json', 'champion-tags.json'] as const;
+
+/**
+ * Returns tar entries whose manifest copy also lists the archive-root files.
+ *
+ * The on-disk `<patch>/manifest.json` only covers files under `<patch>/`, but
+ * the tarball also carries `latest.json` and `champion-tags.json` at the root
+ * — the very files the app displays as patch and freshness. The manifest copy
+ * inside the archive therefore gains one entry per root file, pathed
+ * `/name` (archive-relative) to stay unambiguous beside the patch-relative
+ * paths. `manifest.json` itself stays the trust root and is not self-listed;
+ * the desktop loader rejects any tar entry the manifest does not cover.
+ */
+export function augmentManifestWithRootFiles(entries: readonly TarFileEntry[]): TarFileEntry[] {
+  const manifestIndex = entries.findIndex((e) => /(^|\/)manifest\.json$/.test(e.name));
+  if (manifestIndex === -1) {
+    throw new CliError('publish set has no manifest.json to augment');
+  }
+  const manifestEntry = entries[manifestIndex];
+  if (manifestEntry === undefined) throw new CliError('publish set has no manifest.json');
+  const manifest = manifestSchema.parse(JSON.parse(manifestEntry.data.toString('utf8')));
+  const rootEntries = ARCHIVE_ROOT_FILES.map((name) => {
+    const entry = entries.find((e) => e.name === name);
+    if (entry === undefined) throw new CliError(`publish set is missing ${name}`);
+    return {
+      path: `/${name}`,
+      sha256: createHash('sha256').update(entry.data).digest('hex'),
+    };
+  });
+  const merged = manifestSchema.parse({
+    ...manifest,
+    files: [...manifest.files, ...rootEntries].sort((a, b) => a.path.localeCompare(b.path)),
+  });
+  const data = Buffer.from(JSON.stringify(merged, null, 2), 'utf8');
+  return entries.map((e, i) => (i === manifestIndex ? { ...e, data } : e));
+}
+
 function releaseExists(repo: string, tag: string): boolean {
   try {
     execFileSync('gh', ['release', 'view', tag, '--repo', repo], {
@@ -241,7 +282,7 @@ async function runPublishPublic(args: string[]): Promise<void> {
     );
   }
 
-  const entries = toTarEntries(files);
+  const entries = augmentManifestWithRootFiles(toTarEntries(files));
   const tarball = createTarGz(entries);
   const treeBytes = files.reduce((sum, f) => sum + f.size, 0);
   log.info(

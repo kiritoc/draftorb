@@ -40,6 +40,7 @@ import { profileSyncCommand } from './commands/profile-sync';
 import { pullCommand } from './commands/pull';
 import { checkStatePrivateCommand } from './commands/check-state-private';
 import { publishCommand } from './commands/publish';
+import { publishPublicCommand } from './commands/publish-public';
 import { breakpointCommand } from './commands/breakpoint';
 import { log, type Command, findCommand, formatHelp, isHelpFlag } from './commands/shared';
 
@@ -68,6 +69,7 @@ const COMMANDS: readonly Command[] = [
   pullCommand,
   checkStatePrivateCommand,
   publishCommand,
+  publishPublicCommand,
   breakpointCommand,
 ];
 

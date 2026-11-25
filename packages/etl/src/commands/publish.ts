@@ -10,13 +10,11 @@
  * Old `state-*` releases are pruned to `--keep` (default 8, 0 disables).
  */
 
-import { execFileSync } from 'node:child_process';
 import {
   createReadStream,
   createWriteStream,
   existsSync,
   mkdirSync,
-  readdirSync,
   readFileSync,
   rmSync,
   statSync,
@@ -30,17 +28,18 @@ import { createGzip } from 'node:zlib';
 import Database from 'better-sqlite3';
 
 import { CliError, UsageError } from '../cli-args';
-import { defaultPublicDataDir, resolveDbPath, resolveRepoRoot } from '../config/paths';
+import { defaultPublicDataDir, resolveDbPath } from '../config/paths';
 import {
   DB_ASSET_NAME,
   EXPORTS_ASSET_NAME,
   ghReady,
   listStateReleases,
+  parseOriginOwner,
   resolveStateRepo,
   STATE_RELEASE_TAG_PATTERN,
 } from '../state-release';
 import { createTarGz } from '../tar-create';
-import { log, type Command } from './shared';
+import { execGh, log, originRemoteUrl, walkFiles, type Command } from './shared';
 
 const USAGE = 'publish [--db] [--vacuum] [--repo=owner/name] [--note=text] [--keep=N]';
 
@@ -86,29 +85,6 @@ function parsePublishArgs(args: string[]): PublishOptions {
   };
 }
 
-function gh(args: readonly string[]): void {
-  try {
-    execFileSync('gh', [...args], { stdio: ['ignore', 'pipe', 'pipe'] });
-  } catch (error: unknown) {
-    const stderr =
-      error instanceof Error && 'stderr' in error
-        ? String((error as { stderr?: unknown }).stderr ?? '')
-        : '';
-    const detail = stderr.trim().split('\n').pop() ?? '';
-    throw new CliError(
-      `gh CLI call failed: gh ${args.slice(0, 2).join(' ')}` + (detail ? ` — ${detail}` : ''),
-    );
-  }
-}
-
-function* walkFiles(dir: string): Generator<string> {
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const full = join(dir, entry.name);
-    if (entry.isDirectory()) yield* walkFiles(full);
-    else if (entry.isFile()) yield full;
-  }
-}
-
 function stateTag(now = new Date()): string {
   const p = (n: number) => String(n).padStart(2, '0');
   return (
@@ -139,19 +115,7 @@ async function runPublish(args: string[]): Promise<void> {
   const ready = ghReady();
   if (!ready.ok) throw new CliError(ready.problem ?? 'gh CLI is not ready.');
 
-  const originUrl = (() => {
-    try {
-      return execFileSync('git', ['remote', 'get-url', 'origin'], {
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'ignore'],
-        cwd: resolveRepoRoot(),
-      }).trim();
-    } catch {
-      return '';
-    }
-  })();
-  const ownerMatch = /[:/]([^/\s:]+)\/[^/\s:]+(?:\.git)?\/?$/.exec(originUrl);
-  const repo = resolveStateRepo(options.repo, process.env, ownerMatch?.[1]);
+  const repo = resolveStateRepo(options.repo, process.env, parseOriginOwner(originRemoteUrl()));
 
   const tag = stateTag();
   const existing = listStateReleases(repo).map((r) => r.tag);
@@ -190,7 +154,7 @@ async function runPublish(args: string[]): Promise<void> {
 
     // 3. create release
     const note = options.note ?? (options.withDb ? 'exports + DB backup' : 'exports only');
-    gh(['release', 'create', tag, '--repo', repo, '--title', tag, '--notes', note, ...assets]);
+    execGh(['release', 'create', tag, '--repo', repo, '--title', tag, '--notes', note, ...assets]);
     log.info(`Published ${tag} to ${repo} (${assets.length} asset(s))`);
 
     // 4. prune old state releases
@@ -201,7 +165,7 @@ async function runPublish(args: string[]): Promise<void> {
         .sort();
       const excess = releases.slice(0, Math.max(0, releases.length - options.keep));
       for (const old of excess) {
-        gh(['release', 'delete', old, '--repo', repo, '--yes']);
+        execGh(['release', 'delete', old, '--repo', repo, '--yes']);
         log.info(`Pruned old release ${old}`);
       }
     }

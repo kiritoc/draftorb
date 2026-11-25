@@ -126,6 +126,18 @@ describe('checkPrCreateCommand', () => {
     );
     expect(error).toContain('--body');
   });
+
+  it('ignores a work item link hidden in an HTML comment', () => {
+    const body = VALID_BODY.replace('Closes #145', '<!-- Closes #145 -->');
+    const error = checkPrCreateCommand(`gh pr create --title "x (BL-049)" --body "${body}"`);
+    expect(error).toContain('must link the work item');
+  });
+
+  it('requires section headings at line start, not mid-line mentions', () => {
+    const body = VALID_BODY.replace(/^## /gm, 'text ## ');
+    const error = checkPrCreateCommand(`gh pr create --title "x (BL-049)" --body "${body}"`);
+    expect(error).toContain('missing required template sections');
+  });
 });
 
 describe('check-pr-create CLI', () => {

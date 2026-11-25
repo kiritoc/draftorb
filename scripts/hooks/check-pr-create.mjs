@@ -37,6 +37,11 @@ const REQUIRED_SECTIONS = [
 
 const BODY_LINK = /Closes\s+#\d+|Fixes\s+B-\d{3,}/;
 const FILL_FLAGS = new Set(['--fill', '--fill-first', '--fill-verbose']);
+const HTML_COMMENT = /<!--[\s\S]*?-->/g;
+
+const REQUIRED_SECTION_PATTERNS = REQUIRED_SECTIONS.map(
+  (section) => new RegExp(`^${section.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'm'),
+);
 
 /**
  * Split a shell command line into top-level segments on `;`, `&`, `|` and
@@ -222,15 +227,15 @@ export function checkPrCreateCommand(command, readFile = (path) => readFileSync(
     return `${titleError}\nTitle was: ${flags.title}`;
   }
 
-  let bodyText;
+  let rawBodyText;
   if (flags.bodyFile !== null) {
     try {
-      bodyText = readFile(resolve(flags.bodyFile));
+      rawBodyText = readFile(resolve(flags.bodyFile));
     } catch {
       return `--body-file ${flags.bodyFile} could not be read.`;
     }
   } else if (flags.body !== null) {
-    bodyText = flags.body;
+    rawBodyText = flags.body;
   } else {
     return (
       '`gh pr create` has no readable body (--body or --body-file). --fill* bodies cannot be ' +
@@ -238,7 +243,13 @@ export function checkPrCreateCommand(command, readFile = (path) => readFileSync(
     );
   }
 
-  const missing = REQUIRED_SECTIONS.filter((section) => !bodyText.includes(section));
+  // HTML comments are template scaffolding, not content: a closing reference
+  // or heading hidden inside one must not satisfy the checks below, and a
+  // heading only counts at the start of a line.
+  const bodyText = rawBodyText.replace(HTML_COMMENT, '');
+  const missing = REQUIRED_SECTIONS.filter(
+    (_, index) => !REQUIRED_SECTION_PATTERNS[index].test(bodyText),
+  );
   if (missing.length > 0) {
     return (
       `PR body is missing required template sections: ${missing.join(', ')}.\n` +

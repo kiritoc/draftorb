@@ -35,9 +35,31 @@ const REQUIRED_SECTIONS = [
   '## Checklist',
 ];
 
-const BODY_LINK = /Closes\s+#\d+|Fixes\s+B-\d{3,}/;
+const ISSUE_LINK = /Closes\s+#\d+/;
+const TITLE_WORK_ITEM_ID = /(?<![A-Za-z0-9-])(?:BL-\d+[a-z]?|B-\d{3,})(?![A-Za-z0-9])/;
 const FILL_FLAGS = new Set(['--fill', '--fill-first', '--fill-verbose']);
 const HTML_COMMENT = /<!--[\s\S]*?-->/g;
+const BOM = /^\uFEFF/;
+// Code is literal text in Markdown: a `<!--` inside it is not a comment opener.
+const FENCED_CODE = /^ {0,3}(`{3,}|~{3,})[^\n]*\n[\s\S]*?^ {0,3}\1[^\n]*$/gm;
+const INLINE_CODE = /(`+)(?:(?!\1)[\s\S])*?\1/g;
+// Characters a backslash escapes inside bash double quotes; any other
+// backslash is literal (keeps Windows paths like "C:\Temp\x.md" intact).
+const DQ_ESCAPABLE = new Set(['"', '\\', '$', '`', '\n']);
+const ENV_REF =
+  /\$env:([A-Za-z_][A-Za-z0-9_]*)|\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)/g;
+
+/**
+ * Expand `$env:NAME` (PowerShell), `${NAME}` and `$NAME` (POSIX) the way the
+ * shell would before gh sees the path. Unknown variables are left as-is.
+ *
+ * @param {string} path
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {string}
+ */
+function expandEnv(path, env = process.env) {
+  return path.replace(ENV_REF, (match, ps, braced, plain) => env[ps ?? braced ?? plain] ?? match);
+}
 
 const REQUIRED_SECTION_PATTERNS = REQUIRED_SECTIONS.map(
   (section) => new RegExp(`^${section.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'm'),
@@ -77,6 +99,21 @@ function splitSegments(command) {
       current += ch;
       continue;
     }
+    if (ch === '\\' || ch === '`') {
+      // Line continuation: bash `\<newline>`, PowerShell `` `<newline> ``.
+      const next = command[i + 1];
+      const crlf = next === '\r' && command[i + 2] === '\n';
+      if (next === '\n' || crlf) {
+        i += crlf ? 2 : 1;
+        current += ' ';
+        continue;
+      }
+      if (ch === '\\' && next !== undefined) {
+        current += ch + next;
+        i += 1;
+        continue;
+      }
+    }
     if (ch === ';' || ch === '\n' || ch === '|' || ch === '&') {
       segments.push(current);
       current = '';
@@ -108,7 +145,7 @@ function tokenize(segment) {
       continue;
     }
     if (quote === '"') {
-      if (ch === '\\' && i + 1 < segment.length) {
+      if (ch === '\\' && DQ_ESCAPABLE.has(segment[i + 1])) {
         i += 1;
         current += segment[i];
       } else if (ch === '"') {
@@ -230,7 +267,7 @@ export function checkPrCreateCommand(command, readFile = (path) => readFileSync(
   let rawBodyText;
   if (flags.bodyFile !== null) {
     try {
-      rawBodyText = readFile(resolve(flags.bodyFile));
+      rawBodyText = readFile(resolve(expandEnv(flags.bodyFile)));
     } catch {
       return `--body-file ${flags.bodyFile} could not be read.`;
     }
@@ -243,10 +280,16 @@ export function checkPrCreateCommand(command, readFile = (path) => readFileSync(
     );
   }
 
-  // HTML comments are template scaffolding, not content: a closing reference
-  // or heading hidden inside one must not satisfy the checks below, and a
-  // heading only counts at the start of a line.
-  const bodyText = rawBodyText.replace(HTML_COMMENT, '');
+  // Validation-only view of the body (the submitted body is unchanged): HTML
+  // comments are invisible once rendered, so a closing reference or heading
+  // hidden inside one must not satisfy the checks below. Code spans/blocks are
+  // removed first so a literal `<!--` in code does not open a fake comment.
+  // A heading only counts at the start of a line.
+  const bodyText = rawBodyText
+    .replace(BOM, '')
+    .replace(FENCED_CODE, '')
+    .replace(INLINE_CODE, '')
+    .replace(HTML_COMMENT, '');
   const missing = REQUIRED_SECTIONS.filter(
     (_, index) => !REQUIRED_SECTION_PATTERNS[index].test(bodyText),
   );
@@ -256,8 +299,15 @@ export function checkPrCreateCommand(command, readFile = (path) => readFileSync(
       'Use .github/pull_request_template.md as the body (--body-file is easiest).'
     );
   }
-  if (!BODY_LINK.test(bodyText)) {
-    return 'PR body must link the work item: "Closes #<issue>" for a BL ticket or "Fixes B-xxx" for a bug.';
+  // The link must match the title's work item: BL ticket -> `Closes #n`,
+  // bug B-xxx -> `Fixes B-xxx` with the same id.
+  const titleId = TITLE_WORK_ITEM_ID.exec(flags.title)?.[0] ?? '';
+  if (titleId.startsWith('BL-')) {
+    if (!ISSUE_LINK.test(bodyText)) {
+      return `PR body must link the work item: title has ${titleId}, so the body needs "Closes #<issue>".`;
+    }
+  } else if (!new RegExp(`Fixes\\s+${titleId}(?![0-9])`).test(bodyText)) {
+    return `PR body must link the work item: title has ${titleId}, so the body needs "Fixes ${titleId}".`;
   }
   return null;
 }

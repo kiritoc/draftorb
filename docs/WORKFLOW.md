@@ -73,6 +73,10 @@ Devin reads `.claude/settings.json` for Claude-format hooks; both scripts are pl
 | `SessionStart`                | `scripts/hooks/session-start.mjs`   | Emits a `hookSpecificOutput.additionalContext` JSON envelope with the mandatory reading order and PR rules (plain stdout is not injected)                                                                                                      |
 | `PreToolUse` (matcher `exec`) | `scripts/hooks/check-pr-create.mjs` | Blocks `gh pr create` (exit 2) when the title fails `check-pr-title.mjs`, the body is missing/unreadable, or it misses the PR template sections / work item link; mentions of `gh pr create` inside other commands (e.g. commit messages) pass |
 
+Body checks run on a validation-only view (UTF-8 BOM, code spans/blocks and HTML comments removed); the submitted body is unchanged. The link must match the title: `BL-xxx` needs `Closes #n`, `B-xxx` needs `Fixes B-xxx` with the same id. `--body-file` paths expand `$env:NAME` / `$NAME`, keep Windows backslashes, and bash `\` / PowerShell `` ` `` line continuations are followed.
+
+Scope: `.claude/settings.json` covers Devin CLI/Desktop sessions only. Devin Cloud sessions load hooks through plugins and are not covered yet (tracked as a follow-up; needs an owner decision on plugin packaging).
+
 The repo PR process also lives in `.devin/skills/create-pr/SKILL.md`, which takes precedence over the generic `pr` skill.
 
 ## Weekly (owner)

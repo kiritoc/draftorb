@@ -65,7 +65,10 @@ describe('checkPrCreateCommand', () => {
 
   it('accepts short flags and --flag=value forms', () => {
     expect(
-      checkPrCreateCommand(`gh pr create -t "feat: x (B-070)" -b '${VALID_BODY}'`, failRead),
+      checkPrCreateCommand(
+        `gh pr create -t "fix: x (B-070)" -b '${VALID_BODY.replace('Closes #145', 'Fixes B-070')}'`,
+        failRead,
+      ),
     ).toBeNull();
     expect(
       checkPrCreateCommand(`gh pr create --title="fix: y (BL-049)" --body-file=body.md`, ok),
@@ -131,6 +134,72 @@ describe('checkPrCreateCommand', () => {
     const body = VALID_BODY.replace('Closes #145', '<!-- Closes #145 -->');
     const error = checkPrCreateCommand(`gh pr create --title "x (BL-049)" --body "${body}"`);
     expect(error).toContain('must link the work item');
+  });
+
+  it('does not treat a <!-- inside inline or fenced code as a comment opener', () => {
+    const inline = VALID_BODY.replace(
+      'Closes #145',
+      'Detects the `<!--` opener.\n\nCloses #145\n\n<!-- template note -->',
+    );
+    const command = 'gh pr create --title "x (BL-049)" --body-file b.md';
+    expect(checkPrCreateCommand(command, () => inline)).toBeNull();
+    const fenced = VALID_BODY.replace(
+      'Closes #145',
+      '```\n<!--\n```\n\nCloses #145\n\n<!-- template note -->',
+    );
+    expect(checkPrCreateCommand(command, () => fenced)).toBeNull();
+  });
+
+  it('accepts a body file that starts with a UTF-8 BOM', () => {
+    const command = 'gh pr create --title "x (BL-049)" --body-file b.md';
+    expect(checkPrCreateCommand(command, () => `\uFEFF${VALID_BODY}`)).toBeNull();
+  });
+
+  it('expands $env:TEMP (PowerShell) and $TMPDIR (POSIX) in --body-file', () => {
+    const seen: string[] = [];
+    const read = (path: string) => {
+      seen.push(path);
+      return VALID_BODY;
+    };
+    process.env.DRAFTORB_HOOK_TEST_DIR = '/tmp/hooktest';
+    checkPrCreateCommand(
+      'gh pr create --title "x (BL-049)" --body-file "$env:DRAFTORB_HOOK_TEST_DIR/pr-body.md"',
+      read,
+    );
+    checkPrCreateCommand(
+      'gh pr create --title "x (BL-049)" --body-file "$DRAFTORB_HOOK_TEST_DIR/pr-body.md"',
+      read,
+    );
+    delete process.env.DRAFTORB_HOOK_TEST_DIR;
+    expect(seen).toHaveLength(2);
+    for (const path of seen) expect(path).toContain(join('hooktest', 'pr-body.md'));
+  });
+
+  it('keeps backslashes of a quoted Windows path', () => {
+    let seen = '';
+    const command = 'gh pr create --title "x (BL-049)" --body-file "C:\\Temp\\pr-body.md"';
+    checkPrCreateCommand(command, (path) => {
+      seen = path;
+      return VALID_BODY;
+    });
+    expect(seen).toContain('C:\\Temp\\pr-body.md');
+  });
+
+  it('follows bash and PowerShell line continuations', () => {
+    const bash = 'gh pr create \\\n  --title "fix: hooks (BL-049)" \\\n  --body-file body.md';
+    expect(checkPrCreateCommand(bash, ok)).toBeNull();
+    const pwsh = 'gh pr create `\r\n  --title "fix: hooks (BL-049)" `\r\n  --body-file body.md';
+    expect(checkPrCreateCommand(pwsh, ok)).toBeNull();
+    expect(checkPrCreateCommand('git push\ngh pr create --title "x"')).toContain('work item id');
+  });
+
+  it('requires the body link to match the title work item', () => {
+    const bugBody = VALID_BODY.replace('Closes #145', 'Fixes B-071');
+    const command = 'gh pr create --title "fix: x (B-070)" --body-file b.md';
+    expect(checkPrCreateCommand(command, () => bugBody)).toContain('Fixes B-070');
+    expect(checkPrCreateCommand(command, ok)).toContain('Fixes B-070');
+    const blCommand = 'gh pr create --title "feat: x (BL-049)" --body-file b.md';
+    expect(checkPrCreateCommand(blCommand, () => bugBody)).toContain('Closes #');
   });
 
   it('requires section headings at line start, not mid-line mentions', () => {

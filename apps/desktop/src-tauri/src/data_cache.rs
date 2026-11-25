@@ -44,6 +44,29 @@ pub fn write(dir: &Path, name: &str, content: &str) -> Result<(), String> {
     fs::rename(&tmp, &path).map_err(|e| e.to_string())
 }
 
+/// Removes every top-level entry whose name is not in `keep` (file or dir).
+/// Used after a successful download to drop stale patch directories; the
+/// cache stays consistent because `cache-meta.json` is written last.
+pub fn prune(dir: &Path, keep: &[String]) -> Result<(), String> {
+    if !dir.exists() {
+        return Ok(());
+    }
+    for entry in fs::read_dir(dir).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if keep.iter().any(|k| k == &name) {
+            continue;
+        }
+        let path = entry.path();
+        if path.is_dir() {
+            fs::remove_dir_all(&path).map_err(|e| e.to_string())?;
+        } else {
+            fs::remove_file(&path).map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
+}
+
 /// Removes the whole cache dir contents (keeps the dir).
 pub fn clear(dir: &Path) -> Result<(), String> {
     if dir.exists() {
@@ -86,6 +109,27 @@ mod tests {
             assert!(read(&dir, name).is_err(), "{name}");
         }
         assert!(!dir.exists());
+    }
+
+    #[test]
+    fn prune_drops_everything_not_kept() {
+        let dir = temp_dir("prune");
+        write(&dir, "latest.json", "{}").unwrap();
+        write(&dir, "16.22/champions.json", "[]").unwrap();
+        write(&dir, "15.1/champions.json", "[]").unwrap();
+        write(&dir, "cache-meta.json", "{}").unwrap();
+        write(&dir, "stray.tmp", "x").unwrap();
+        prune(
+            &dir,
+            &["latest.json".to_string(), "16.22".to_string(), "cache-meta.json".to_string()],
+        )
+        .unwrap();
+        assert_eq!(read(&dir, "latest.json").unwrap().as_deref(), Some("{}"));
+        assert_eq!(read(&dir, "16.22/champions.json").unwrap().as_deref(), Some("[]"));
+        assert_eq!(read(&dir, "cache-meta.json").unwrap().as_deref(), Some("{}"));
+        assert_eq!(read(&dir, "15.1/champions.json").unwrap(), None);
+        assert_eq!(read(&dir, "stray.tmp").unwrap(), None);
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]

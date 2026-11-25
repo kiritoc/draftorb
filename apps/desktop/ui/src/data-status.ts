@@ -1,9 +1,10 @@
+import type { DataLoad } from './data/aggregates';
 import { patchLabels } from './patch-labels';
 import { strings } from './strings';
 
-/** BL-010b produces `loaded` (`patch` is the internal `major.minor` label); the skeleton only has `none`. */
-export type DataStatus =
-  { kind: 'none' } | { kind: 'loaded'; patch: string; generatedAt: string; stale?: boolean };
+/** Launch data state produced by `ensureData` (BL-010b): `loaded` carries the
+ * internal `major.minor` patch label, `stale` marks the offline cache fallback. */
+export type DataStatus = DataLoad;
 
 export function describeDataStatus(status: DataStatus): { patch: string; freshness: string } {
   if (status.kind === 'none') {

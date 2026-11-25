@@ -50,6 +50,13 @@ fn data_cache_write(app: tauri::AppHandle, name: String, content: String) -> Res
     data_cache::write(&dir, &name, &content)
 }
 
+/// Removes cached top-level entries whose name is not in `keep`.
+#[tauri::command]
+fn data_cache_prune(app: tauri::AppHandle, keep: Vec<String>) -> Result<(), String> {
+    let dir = app.path().app_config_dir().map_err(|e| e.to_string())?.join("data-cache");
+    data_cache::prune(&dir, &keep)
+}
+
 /// Removes every cached aggregate file.
 #[tauri::command]
 fn data_cache_clear(app: tauri::AppHandle) -> Result<(), String> {
@@ -105,6 +112,7 @@ fn main() {
             write_repo_pool,
             data_cache_read,
             data_cache_write,
+            data_cache_prune,
             data_cache_clear
         ])
         .run(tauri::generate_context!())

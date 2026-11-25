@@ -75,8 +75,8 @@ Let them edit before writing.
 
 **Pick the file to edit:**
 
-- If `CLAUDE.md` exists, edit it.
-- Else if `AGENTS.md` exists, edit it.
+- If `AGENTS.md` exists, edit it. In this repo, `CLAUDE.md` only redirects to `AGENTS.md`.
+- Else if `CLAUDE.md` exists, edit it.
 - If neither exists, ask the user which one to create; don't pick for them.
 
 Never create `AGENTS.md` when `CLAUDE.md` already exists (or vice versa); always edit the one that's already there.
@@ -105,13 +105,11 @@ Include the `### Triage labels` sub-block, and write `docs/agents/triage-labels.
 
 When Section B ran on GitHub or GitLab, create each configured label the tracker lacks (`gh label create` / `glab label create`).
 
-Then write the docs files using the seed templates in this skill folder as a starting point:
+Then write the docs files. The upstream seed templates are not vendored in this repo; use the existing files as the starting point instead:
 
-- [issue-tracker-github.md](./issue-tracker-github.md): GitHub issue tracker
-- [issue-tracker-gitlab.md](./issue-tracker-gitlab.md): GitLab issue tracker
-- [issue-tracker-local.md](./issue-tracker-local.md): local-markdown issue tracker
-- [triage-labels.md](./triage-labels.md): label mapping (only if `triage` is installed)
-- [domain.md](./domain.md): domain doc consumer rules + layout
+- `docs/agents/issue-tracker.md`: current GitHub tracker config (adapt for GitLab / local markdown when switching)
+- `docs/agents/domain.md`: domain doc consumer rules + layout
+- `docs/agents/triage-labels.md`: write from scratch with the five canonical roles (only if `triage` is installed)
 
 For "other" issue trackers, write `docs/agents/issue-tracker.md` from scratch using the user's description.
 

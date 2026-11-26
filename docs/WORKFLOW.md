@@ -64,6 +64,21 @@ Three Node scripts enforce the public-repo rules; run them locally before pushin
 | `node scripts/check-public-paths.mjs` (CI `safety` job)          | A tracked file lives under a `profiles/` directory or is a SQLite file (`*.sqlite`, `*.sqlite3`, `*.db`, `-wal`, `-shm`, or any of them `.gz`)                                           | Remove the file from git or exclude it from the artifact. `--dir DIR` checks a tree; BL-004 (public aggregates release, D-111) must run it on its tree. Never on the private state tarball |
 | `PR_TITLE=... node scripts/check-pr-title.mjs` (CI `safety` job) | The pull request title has no work item id, or more than one: a backlog ticket `BL-<n>` (optionally one lowercase letter, e.g. `BL-013a`) or a bug `B-<nnn>` from `docs/BUGS.md` (D-120) | Rename the PR, e.g. `feat(engine): bans (BL-012)` or `fix(etl): time budgets (B-071)`; split a PR that covers two work items                                                               |
 
+## Agent hooks (BL-049)
+
+Devin reads `.claude/settings.json` for Claude-format hooks; both scripts are plain Node and fail-open on malformed payloads.
+
+| Hook                          | Script                              | Effect                                                                                                                                                                                                                                         |
+| ----------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SessionStart`                | `scripts/hooks/session-start.mjs`   | Emits a `hookSpecificOutput.additionalContext` JSON envelope with the mandatory reading order and PR rules (plain stdout is not injected)                                                                                                      |
+| `PreToolUse` (matcher `exec`) | `scripts/hooks/check-pr-create.mjs` | Blocks `gh pr create` (exit 2) when the title fails `check-pr-title.mjs`, the body is missing/unreadable, or it misses the PR template sections / work item link; mentions of `gh pr create` inside other commands (e.g. commit messages) pass |
+
+Body checks run on a validation-only view (UTF-8 BOM, code spans/blocks and HTML comments removed); the submitted body is unchanged. The link must match the title: `BL-xxx` needs `Closes #n`, `B-xxx` needs `Fixes B-xxx` with the same id. `--body-file` paths expand `$env:NAME` / `$NAME`, keep Windows backslashes, and bash `\` / PowerShell `` ` `` line continuations are followed.
+
+Scope: `.claude/settings.json` covers Devin CLI/Desktop sessions only. Devin Cloud sessions load hooks through plugins and are not covered yet (tracked as a follow-up; needs an owner decision on plugin packaging).
+
+The repo PR process also lives in `.devin/skills/create-pr/SKILL.md`, which takes precedence over the generic `pr` skill.
+
 ## Weekly (owner)
 
 Review BUGS and GOALS, reprioritize GitHub issues/project, bump data to the new patch (`pnpm etl ...`), re-run golden tests.

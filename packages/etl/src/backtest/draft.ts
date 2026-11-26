@@ -700,7 +700,9 @@ export function runBacktestDraft(
     trainingPatches,
     holdoutGames: holdoutMatches.size,
     trainingGames: trainingMatches.size,
-    roles,
+    // Only roles with engine-scored holdout picks count as covered: a role
+    // that only received baseline fallbacks says nothing about its matchups.
+    roles: roles.filter((role) => points.some((p) => p.scored && p.role === role)),
     predictions: n,
     unscored: summary.unscored,
     logLoss: summary.logLoss,

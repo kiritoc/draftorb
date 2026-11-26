@@ -71,6 +71,17 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 ### Previous handoff (BL-011)
 
 - Date: 2026-11-26
+- Branch/PR: `feat/bl-017-thin-data-fallback` / BL-017 (#82), worktree `../draftorb-bl017`, no PR yet
+- State: REVIEW
+- Done: thin-data fallback (D-103) for champion picks in the desktop app. Every `DraftResult.insufficientData` entry now renders as an unavailable card appended after the ranked "Best overall" entries (same card/pagination pattern as §7.1 pool unavailable cards) via new `pick/insufficient-items.ts` (`buildInsufficientItems`); "Hide my pool" filters pool members there too. The baseline win rate is labeled "Broader win rate" (`strings.broaderWinRate`, replaces `poolBaselineWinRate`) and still appears only when weighted evidence exists; zero-evidence champions show "insufficient data" with `Sample 0.0` and no percentage. Engine output unchanged (already emitted `nEff`/`rawGames`/`winRate` per SPECS §7). SPECS §7 thin-data paragraph updated; DECISIONS.md D-129 (PROPOSED) records the Best-overall placement assumption.
+- Files touched: `apps/desktop/ui/src/pick/insufficient-items.ts` (new), `components/{PickRecommendations,UnavailableChampionCard}.tsx`, `components/{unavailable-champion-card.test.ts (new),pick-recommendations.test.ts,recommendations-list.test.ts}`, `strings.ts`, `docs/{SPECS,DECISIONS,PROGRESS}.md`.
+- Tests: `pnpm check` green (1576 tests); new card tests cover the broader label, sample size, omitted win rate and n=0; `PickRecommendations` test covers thin cards after ranked entries.
+- Blockers / next step: owner review of D-129; PR title must be `feat(desktop): thin-data fallback for picks (BL-017)` shape per check-pr-title.
+- Pitfalls: pool champions below the gate now appear as unavailable cards in BOTH lists (mirrors scored pool champions appearing in both); intentional per D-129.
+
+### Previous handoff (BL-011)
+
+- Date: 2026-11-26
 - Branch/PR: `feat/bl-011-top-jungle-export` / PR #152 / BL-011 (#74)
 - State: REVIEW
 - Done: `EXPORT_ROLES` extended to `['SUPPORT', 'TOP', 'JUNGLE']` (D-097); TOP/JUNGLE get the full `roles/<ROLE>/` layout (their `lane-full.json` stays empty — 1v1 lane groups). New `pnpm etl sample-report [patch]` (`export/sample-report.ts` + `commands/sample-report.ts`) prints per-file row counts and min/median/max `n_eff` for every `roles/<ROLE>/` file in the published manifest, pooled per role. DATA_MODEL.md documents the role enablement rule; DECISIONS.md D-126 (PROPOSED) records the ADC/MID assumption and the pending owner threshold question.

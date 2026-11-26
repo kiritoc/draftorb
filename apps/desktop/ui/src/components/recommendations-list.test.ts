@@ -119,10 +119,10 @@ describe('RecommendationsList', () => {
     expect(markup).toContain('Showing 2 of 2');
     expect(markup).toContain('Soraka');
     expect(markup).toContain('Not recommended');
-    // Insufficient-data card carries n_eff, raw games and baseline win rate.
+    // Insufficient-data card carries n_eff, raw games and the broader win rate.
     expect(markup).toContain('Sample 20.0');
     expect(markup).toContain('30 games');
-    expect(markup).toContain('Win rate 51.0%');
+    expect(markup).toContain('Broader win rate 51.0%');
     expect(markup.indexOf('Leona')).toBeLessThan(markup.indexOf('Soraka'));
   });
 

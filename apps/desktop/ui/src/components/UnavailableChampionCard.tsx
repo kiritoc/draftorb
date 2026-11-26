@@ -1,9 +1,17 @@
 /**
- * Pool champion without a score, rendered after the ranked pool entries
- * with a "Not recommended" badge (port of the web component, SPECS §7.1).
+ * Champion without a score, rendered after the ranked entries with a
+ * "Not recommended" badge (port of the web component, SPECS §7.1). For
+ * insufficient-data champions the baseline win rate is labeled as the
+ * broader statistic (BL-017, D-103).
  */
 
-import type { Champion, InsufficientDataEntry, RankBucket, Role } from '@draftorb/shared';
+import type {
+  Champion,
+  InsufficientDataEntry,
+  PoolUnavailableEntry,
+  RankBucket,
+  Role,
+} from '@draftorb/shared';
 import type { ProfileLoad } from '../profile/profile-export';
 import type { BaselineIndex } from '../pick/baseline-record';
 import { strings } from '../strings';
@@ -14,7 +22,7 @@ import { RecordBadge } from './RecordBadge';
 
 export interface UnavailableChampionCardProps {
   championId: number;
-  reason: 'insufficientData' | 'unknownChampion' | 'picked' | 'banned';
+  reason: PoolUnavailableEntry['reason'];
   sample?: InsufficientDataEntry;
   champions: Champion[];
   iconVersion?: string | null;
@@ -66,8 +74,7 @@ export function UnavailableChampionCard({
               {' '}
               · {strings.sampleSize} {sample.nEff.toFixed(1)}
               {sample.rawGames !== undefined && ` · ${strings.poolSampleGames(sample.rawGames)}`}
-              {sample.winRate !== undefined &&
-                ` · ${strings.poolBaselineWinRate(sample.winRate * 100)}`}
+              {sample.winRate !== undefined && ` · ${strings.broaderWinRate(sample.winRate * 100)}`}
             </>
           )}
         </span>

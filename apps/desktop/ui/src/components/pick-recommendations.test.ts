@@ -73,4 +73,29 @@ describe('PickRecommendations', () => {
     expect(render()).not.toContain('Champion pool editor');
     expect(render({ editorOpen: true })).toContain('Champion pool editor');
   });
+
+  it('renders thin-data champions as unavailable cards with the broader statistic (BL-017)', () => {
+    const markup = render({
+      champions: [
+        ...champions,
+        { id: 4, name: 'Twitch', icon: 'Twitch.png', roles: ['ADC'] },
+        { id: 7, name: 'Xin Zhao', icon: 'XinZhao.png', roles: ['JUNGLE'] },
+      ],
+      insufficientData: [
+        { championId: 4, nEff: 18.5, rawGames: 21, winRate: 0.545 },
+        { championId: 7, nEff: 0 },
+      ],
+    });
+    // The broader statistic is labeled as broader and carries its sample size.
+    expect(markup).toContain('Twitch');
+    expect(markup).toContain('Broader win rate 54.5%');
+    expect(markup).toContain('Sample 18.5');
+    expect(markup).toContain('21 games');
+    // Zero evidence renders "insufficient data" with n=0 and no fabricated %.
+    expect(markup).toContain('Xin Zhao');
+    expect(markup).toContain('Sample 0.0');
+    // Thin-data cards sit after the ranked recommendations, never scored.
+    expect(markup.indexOf('Soraka')).toBeLessThan(markup.indexOf('Twitch'));
+    expect(markup.match(/Not recommended/g)?.length).toBe(2);
+  });
 });

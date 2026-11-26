@@ -50,14 +50,17 @@ function latestJson(patch = '16.22'): string {
   });
 }
 
-function manifestJson(patch = '16.22'): string {
+function manifestJson(
+  patch = '16.22',
+  files: Array<{ path: string; sha256?: string }> = [],
+): string {
   return JSON.stringify({
     patch,
     generatedAt: 'x',
     region: 'EUW1',
     rankBuckets: [],
     roles: [],
-    files: [],
+    files,
     schemaVersion: MANIFEST_SCHEMA_VERSION,
   });
 }
@@ -65,7 +68,7 @@ function manifestJson(patch = '16.22'): string {
 function makePublicDir(): string {
   const dir = tempDir();
   touch(dir, 'latest.json', latestJson());
-  touch(dir, '16.22/manifest.json', manifestJson());
+  touch(dir, '16.22/manifest.json', manifestJson('16.22', [{ path: 'champions.json' }]));
   touch(dir, '16.22/champions.json', '[]');
   touch(dir, 'profiles/index.json', '{}');
   touch(dir, 'profiles/kirito.json', '{}');
@@ -194,6 +197,25 @@ describe('collectPublishFiles', () => {
     expect(rels.some((r) => r.startsWith('16.21/'))).toBe(false);
     expect(rels).not.toContain('backtest-report.json');
   });
+
+  it('packs only manifest-covered patch files (B-076)', () => {
+    const dir = makePublicDir();
+    touch(dir, '16.22/champions.bootstrap.json', '{}');
+    touch(dir, '16.22/champions.derived.json', '{}');
+    touch(dir, '16.22/reports/extra.json', '{}');
+    const rels = collectPublishFiles(dir)
+      .map((f) => f.rel)
+      .sort();
+    expect(rels).toEqual(['16.22/champions.json', '16.22/manifest.json', 'latest.json']);
+  });
+
+  it('fails when the manifest lists a file missing from the patch dir', () => {
+    const dir = tempDir();
+    touch(dir, 'latest.json', latestJson());
+    touch(dir, '16.22/manifest.json', manifestJson('16.22', [{ path: 'missing.json' }]));
+    touch(dir, '16.22/champions.json', '[]');
+    expect(() => collectPublishFiles(dir)).toThrow('missing.json');
+  });
 });
 
 describe('augmentManifestWithRootFiles', () => {
@@ -221,9 +243,9 @@ describe('augmentManifestWithRootFiles', () => {
     const sha = (buf: Buffer) => createHash('sha256').update(buf).digest('hex');
     expect(byPath.get('/latest.json')).toBe(sha(latest.data));
     expect(byPath.get('/champion-tags.json')).toBe(sha(tags.data));
-    // The fixture manifest starts empty, so the archive copy lists exactly
-    // the two root files.
-    expect(parsed.files).toHaveLength(2);
+    // The fixture manifest lists only champions.json, so the archive copy
+    // adds the two root files on top of it.
+    expect(parsed.files).toHaveLength(3);
     // The manifest does not list itself.
     expect(parsed.files.some((f) => f.path.includes('manifest.json'))).toBe(false);
   });
@@ -242,7 +264,7 @@ describe('scanPublishSet', () => {
   it('flags PUUID-like content inside a publishable file', () => {
     const dir = tempDir();
     touch(dir, 'latest.json', latestJson());
-    touch(dir, '16.22/manifest.json', manifestJson());
+    touch(dir, '16.22/manifest.json', manifestJson('16.22', [{ path: 'leak.json' }]));
     const puuid = 'Qw1_'.repeat(19) + 'Qw';
     touch(dir, '16.22/leak.json', `{"id":"${puuid}"}`);
     const violations = scanPublishSet(collectPublishFiles(dir));

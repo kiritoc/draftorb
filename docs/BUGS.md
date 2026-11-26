@@ -6,6 +6,7 @@ Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATI
 
 | ID    | Sev | Area    | Title                                                                                                                                                                              | Status | Found by/date              | Ticket  |
 | ----- | --- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | -------------------------- | ------- |
+| B-076 | S2  | etl     | `publish-public` packed patch files the manifest does not cover (`champions.bootstrap.json`/`champions.derived.json`), so `verifyArchive` rejected every release archive           | FIXED  | Devin/2026-11-26           | #149    |
 | B-075 | S4  | desktop | `loadPickData` zod-validates only the files `RecommendData` needs; every other manifest file is `JSON.parse`d without a schema check                                               | OPEN   | review/2026-11-25          | BL-009  |
 | B-074 | S3  | desktop | Pick screen "Blind pick" switch could never change recommendations: engine ORs `blindPick` with unknown lane roles, so the flag is unobservable                                    | FIXED  | review/2026-11-25          | BL-009  |
 | B-073 | S2  | desktop | Aggregate download-at-launch failed with `TypeError: Failed to fetch`: GitHub release assets send no CORS headers, so the webview `fetch` is blocked                               | FIXED  | Devin/2026-11-21           | BL-010b |
@@ -40,6 +41,15 @@ Review notes that predate the bug log live in [Review history](#review-history) 
 ```
 
 ## Fixed
+
+### B-076 — `publish-public` shipped files the manifest does not cover — FIXED
+
+- Severity / Area: S2 / etl + desktop (public aggregates download, D-111)
+- Steps to reproduce: `pnpm etl publish-public`, then launch the desktop app with an empty data cache (`ensureData` -> `downloadAggregates` -> `verifyArchive` in `apps/desktop/ui/src/data/aggregates.ts`).
+- Expected / Actual: expected the archive to contain exactly the manifest-covered files; actual `collectPublishFiles` walked the whole patch dir, so internal role-derivation snapshots (`champions.bootstrap.json`, `champions.derived.json` — internal state, not listed per DATA_MODEL.md) were packed, and `verifyArchive` failed closed with `archive file not covered by the manifest: 16.22/champions.bootstrap.json`. Fresh installs showed "Failed to load data: No aggregate data cached yet".
+- Environment (OS, Node version, patch): macOS, Tauri/WebView, patch 16.22, `data-latest` asset generatedAt 2026-11-19.
+- Suspected cause: `collectPublishFiles` packed the patch tree instead of the manifest-covered set.
+- Fix (commit/ticket): `collectPublishFiles` now packs `latest.json`, the patch `manifest.json` and only the `manifest.files` entries, and fails when a listed file is missing; regression tests in `publish-public.test.ts`; issue #149.
 
 ### B-074 — Pick screen "Blind pick" switch could never change recommendations — FIXED
 

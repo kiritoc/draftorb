@@ -133,11 +133,18 @@ function readJsonLenient(path: string): unknown {
 }
 
 /**
- * Lists the publishable set under `publicDir`: `latest.json` plus the tree
- * of the patch it selects (other patches and root-level reports are not
- * packed), minus forbidden paths. Throws when `latest.json` is invalid, the
- * patch dir is missing, or the manifest it points to is missing, invalid or
- * for another patch (e.g. invalidated by a same-patch `pnpm etl static`).
+ * Lists the publishable set under `publicDir`: `latest.json` plus the
+ * manifest-covered tree of the patch `latest.json` selects (other patches
+ * and root-level reports are not packed), minus forbidden paths. Throws when
+ * `latest.json` is invalid, the patch dir is missing, the manifest it points
+ * to is missing, invalid or for another patch (e.g. invalidated by a
+ * same-patch `pnpm etl static`), or a manifest-listed file is absent.
+ *
+ * The patch tree is filtered by `manifest.files`: the manifest is the trust
+ * root the desktop loader verifies against, and internal files the exporter
+ * preserves but does not list (e.g. `champions.bootstrap.json` /
+ * `champions.derived.json` role-derivation snapshots, DATA_MODEL.md) must
+ * never reach the public archive (B-076).
  */
 export function collectPublishFiles(publicDir: string): PublishFile[] {
   const latestPath = join(publicDir, 'latest.json');
@@ -155,24 +162,41 @@ export function collectPublishFiles(publicDir: string): PublishFile[] {
       `Patch dir ${latest.patch}/ missing from ${publicDir}; run \`pnpm etl export ${latest.patch}\`.`,
     );
   }
-  const files: PublishFile[] = [
-    { rel: 'latest.json', abs: latestPath, size: statSync(latestPath).size },
-  ];
-  for (const abs of walkFiles(patchDir)) {
-    const rel = relative(publicDir, abs).split(sep).join('/');
-    if (isForbiddenPublishPath(rel)) continue;
-    files.push({ rel, abs, size: statSync(abs).size });
-  }
-  const manifestFile = files.find((f) => f.rel === latest.manifest);
   const rerun = `run \`pnpm etl export ${latest.patch}\``;
-  if (manifestFile === undefined) {
+  const manifestAbs = join(publicDir, latest.manifest);
+  if (!existsSync(manifestAbs)) {
     throw new CliError(`Manifest ${latest.manifest} missing from ${publicDir}; ${rerun}.`);
   }
-  const manifest = manifestSchema.safeParse(readJsonLenient(manifestFile.abs));
+  const manifest = manifestSchema.safeParse(readJsonLenient(manifestAbs));
   if (!manifest.success || manifest.data.patch !== latest.patch) {
     throw new CliError(
       `Manifest ${latest.manifest} is invalid or not for ${latest.patch}; ${rerun}.`,
     );
+  }
+  // Archive-root entries (`/...`) are added to the manifest copy by
+  // augmentManifestWithRootFiles, not read from the patch dir.
+  const covered = new Set(
+    manifest.data.files.filter((f) => !f.path.startsWith('/')).map((f) => f.path),
+  );
+  const patchPrefix = `${latest.patch}/`;
+  const files: PublishFile[] = [
+    { rel: 'latest.json', abs: latestPath, size: statSync(latestPath).size },
+  ];
+  const present = new Set<string>();
+  for (const abs of walkFiles(patchDir)) {
+    const rel = relative(publicDir, abs).split(sep).join('/');
+    if (isForbiddenPublishPath(rel)) continue;
+    const patchRel = rel.startsWith(patchPrefix) ? rel.slice(patchPrefix.length) : rel;
+    present.add(patchRel);
+    if (rel !== latest.manifest && !covered.has(patchRel)) continue;
+    files.push({ rel, abs, size: statSync(abs).size });
+  }
+  for (const path of covered) {
+    if (!present.has(path)) {
+      throw new CliError(
+        `Manifest lists ${latest.patch}/${path} but the file is missing from ${publicDir}; ${rerun}.`,
+      );
+    }
   }
   return files;
 }

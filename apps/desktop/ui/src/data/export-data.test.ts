@@ -12,7 +12,7 @@ vi.mock('./aggregates', () => ({
 import type { ChampionTagsMap } from '@draftorb/shared';
 
 import { cacheRead as readDataFile } from './aggregates';
-import { createRecommendData, loadPickData } from './export-data';
+import { createRecommendData, loadChampionCatalog, loadPickData } from './export-data';
 
 const mockRead = vi.mocked(readDataFile);
 
@@ -107,6 +107,34 @@ describe('createRecommendData', () => {
     expect(() =>
       createRecommendData({ ...rest, 'role-prob.json': { '412': { SUPPORT: 1 } } }, Object.values(champions), tags, 'SUPPORT'),
     ).toThrow('lane-full.json');
+  });
+});
+
+describe('loadChampionCatalog', () => {
+  it('returns null when nothing is cached', async () => {
+    mockRead.mockResolvedValue(null);
+    expect(await loadChampionCatalog()).toBeNull();
+  });
+
+  it('returns the champion catalog without loading role files', async () => {
+    seedCache();
+    const catalog = await loadChampionCatalog();
+    expect(catalog?.patch).toBe('16.22');
+    expect(catalog?.champions.map((c) => c.id)).toEqual([412]);
+    // Only latest.json, the manifest and champions.json are read.
+    const readNames = mockRead.mock.calls.map(([name]) => name);
+    expect(readNames).not.toContain('16.22/roles/SUPPORT/baseline.json');
+  });
+
+  it('still loads when a role file is corrupt (pool editor use case)', async () => {
+    seedCache();
+    const base = mockRead.getMockImplementation();
+    if (base === undefined) throw new Error('expected seeded mock');
+    mockRead.mockImplementation(async (name: string) =>
+      name === '16.22/roles/SUPPORT/baseline.json' ? '{not json' : base(name),
+    );
+    const catalog = await loadChampionCatalog();
+    expect(catalog?.champions.map((c) => c.id)).toEqual([412]);
   });
 });
 

@@ -102,6 +102,27 @@ export async function loadCachedRelease(): Promise<CachedRelease | null> {
   return { latest, manifest };
 }
 
+export interface ChampionCatalog {
+  patch: string;
+  champions: Champion[];
+}
+
+/**
+ * Loads only the champion catalog (`champions.json`) for the cached release.
+ * The pool editor needs it even when pick data cannot load (no eligible
+ * role, corrupt role files): the pool is champion x roles and does not
+ * depend on recommendation tables. Returns null when nothing is cached.
+ */
+export async function loadChampionCatalog(): Promise<ChampionCatalog | null> {
+  const release = await loadCachedRelease();
+  if (release === null) return null;
+  const raw = await readJson(`${release.latest.patch}/champions.json`);
+  return {
+    patch: release.latest.patch,
+    champions: Object.values(championsMapSchema.parse(raw)),
+  };
+}
+
 /**
  * Loads the full pick-screen dataset from the data cache.
  * Returns null when nothing is cached (first launch, download failed).

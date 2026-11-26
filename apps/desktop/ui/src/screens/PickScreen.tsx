@@ -22,7 +22,12 @@ import {
 import type { ProfileLoad } from '../profile/profile-export';
 import { emptyPool, loadPool, savePool } from '../pool/pool-store';
 import { dropUnknownChampions, serializePoolConfig } from '../pool/pool-model';
-import { loadPickData, type PickData } from '../data/export-data';
+import {
+  loadChampionCatalog,
+  loadPickData,
+  type ChampionCatalog,
+  type PickData,
+} from '../data/export-data';
 import { loadChampionIconVersion } from '../data/champion-icons';
 import { championsForSlot } from '../pick/champion-availability';
 import { enemyRoleViews } from '../pick/enemy-roles';
@@ -67,6 +72,7 @@ export function PickScreen({
   noEligibleRole = false,
 }: PickScreenProps) {
   const [pickData, setPickData] = useState<PickData | null>(null);
+  const [catalog, setCatalog] = useState<ChampionCatalog | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [iconVersion, setIconVersion] = useState<string | null>(null);
   const [poolConfig, setPoolConfig] = useState<PoolConfig>(emptyPool());
@@ -118,6 +124,26 @@ export function PickScreen({
     };
   }, [role, dataReadyNonce, noEligibleRole]);
 
+  // Champion catalog for the pool editor: role-independent, so it stays
+  // usable when no role is eligible or pick data fails to load (BL-050).
+  useEffect(() => {
+    let cancelled = false;
+    void loadChampionCatalog()
+      .then((loaded) => {
+        if (cancelled || loaded === null) return;
+        setCatalog(loaded);
+        void loadChampionIconVersion(loaded.patch)
+          .then((version) => {
+            if (!cancelled) setIconVersion(version);
+          })
+          .catch(() => {});
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [dataReadyNonce]);
+
   // The pool loads independently of aggregates so the editor (and its JSON
   // backup) stays usable when pick data is missing or fails to load.
   useEffect(() => {
@@ -137,7 +163,10 @@ export function PickScreen({
     };
   }, [dataReadyNonce]);
 
-  const champions: Champion[] = useMemo(() => pickData?.champions ?? [], [pickData]);
+  const champions: Champion[] = useMemo(
+    () => pickData?.champions ?? catalog?.champions ?? [],
+    [pickData, catalog],
+  );
   const poolIds = useMemo(
     () => (poolConfig.pools[role] ?? []).map((entry) => entry.championId),
     [poolConfig, role],

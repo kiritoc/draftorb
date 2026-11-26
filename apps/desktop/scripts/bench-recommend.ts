@@ -31,6 +31,10 @@ const opt = (name: string, fallback: string): string => {
   return i >= 0 ? (args[i + 1] ?? fallback) : fallback;
 };
 const RUNS = Number(opt('--runs', '200'));
+if (!Number.isInteger(RUNS) || RUNS < 1) {
+  console.error('--runs must be a positive integer');
+  process.exit(1);
+}
 const repoRoot = resolve(fileURLToPath(new URL('..', import.meta.url)), '..', '..');
 const DATA = resolve(opt('--data', join(repoRoot, 'data')));
 const roleArg = opt('--role', 'SUPPORT');
@@ -41,17 +45,18 @@ if (!roleParsed.success) {
 }
 const ROLE: Role = roleParsed.data;
 
-const read = (rel: string) => JSON.parse(readFileSync(join(DATA, rel), 'utf8'));
+const read = (...segments: string[]) =>
+  JSON.parse(readFileSync(join(DATA, ...segments), 'utf8'));
 
-const latest = latestSchema.parse(read('public/latest.json'));
-const manifest = manifestSchema.parse(read(`public/${latest.manifest}`));
+const latest = latestSchema.parse(read('public', 'latest.json'));
+const manifest = manifestSchema.parse(read('public', ...latest.manifest.split('/')));
 const files: Record<string, unknown> = {};
 for (const file of manifest.files) {
   if (file.path.startsWith('/')) continue;
-  files[file.path] = read(`public/${latest.patch}/${file.path}`);
+  files[file.path] = read('public', latest.patch, ...file.path.split('/'));
 }
 const champions = Object.values(championsMapSchema.parse(files['champions.json']));
-const tags = championTagsMapSchema.parse(read('manual/champion-tags.json'));
+const tags = championTagsMapSchema.parse(read('manual', 'champion-tags.json'));
 const data = createRecommendData(files, champions, tags, ROLE);
 const ids = champions.map((c) => c.id);
 

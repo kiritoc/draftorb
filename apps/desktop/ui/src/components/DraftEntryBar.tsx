@@ -23,7 +23,13 @@ import {
 import type { Champion, ChampionId, Role } from '@draftorb/shared';
 import { PICKER_RESULT_LIMIT } from '../config';
 import { strings } from '../strings';
-import { BAN_TARGET, isPickTargetIndex, lastBan, targetIndexForDigit } from '../pick/draft-entry';
+import {
+  BAN_LIMIT,
+  BAN_TARGET,
+  isPickTargetIndex,
+  lastBan,
+  targetIndexForDigit,
+} from '../pick/draft-entry';
 import { championIconUrl } from '../data/champion-icons';
 import { ChampionPortrait } from './ChampionPortrait';
 import { BanList } from './BanList';
@@ -111,9 +117,26 @@ export function DraftEntryBar({
   }, [open]);
   const active = filtered.length === 0 ? -1 : Math.min(activeOption, filtered.length - 1);
   const optionId = (index: number) => `${listboxId}-option-${index}`;
+  const statusId = `${listboxId}-status`;
+  const banFull = bans.length >= BAN_LIMIT;
+  const activeTargetLabel =
+    activeIndex === BAN_TARGET
+      ? strings.entryBanCount(bans.length)
+      : (targets[activeIndex]?.label ?? '');
+
+  // Keep the highlighted option visible: focus stays on the input, so the
+  // browser does not scroll the listbox by itself (covers wraparound too).
+  useEffect(() => {
+    if (!open || active < 0) return;
+    const option = listboxRef.current?.querySelector<HTMLElement>(`[id="${optionId(active)}"]`);
+    option?.scrollIntoView({ block: 'nearest' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, active]);
 
   const handleSelect = (championId: ChampionId) => {
     if (activeIndex === BAN_TARGET) {
+      // At the limit, keep the query so the rejection is visible (status below).
+      if (banFull) return;
       onAddBan(championId);
     } else {
       onPick(activeIndex, championId);
@@ -200,6 +223,7 @@ export function DraftEntryBar({
             onKeyDown={handleKeyDown}
             placeholder={strings.championSearch}
             aria-label={strings.entrySearch}
+            aria-describedby={statusId}
             className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 focus:border-indigo-400 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
           />
           {open && (
@@ -282,6 +306,16 @@ export function DraftEntryBar({
         iconVersion={iconVersion}
         onRemoveBan={onRemoveBan}
       />
+
+      <p
+        id={statusId}
+        role="status"
+        aria-live="polite"
+        className="mt-2 text-xs font-medium text-slate-600 dark:text-slate-300"
+      >
+        {strings.entryActiveTarget(activeTargetLabel)}
+        {activeIndex === BAN_TARGET && banFull && ` · ${strings.banLimitReached(BAN_LIMIT)}`}
+      </p>
 
       <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">{strings.entryHints}</p>
     </div>

@@ -40,6 +40,8 @@ export const strings = {
   entryBanCount: (n: number) => `Ban (${n})`,
   banList: 'Bans',
   banRemove: (name: string) => `Remove ban ${name}`,
+  banLimitReached: (limit: number) => `Ban limit reached (${limit}); remove a ban first`,
+  entryActiveTarget: (label: string) => `Entering: ${label}`,
   entryHints: 'Type to search · Enter picks · 1-0 jump to a slot · Backspace undoes the last ban',
   championSearchFor: (slot: string) => `Search champion — ${slot}`,
   championClear: 'Clear',

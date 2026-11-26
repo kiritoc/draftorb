@@ -52,6 +52,7 @@ export function targetIndexForDigit(key: string): number | null {
   return null;
 }
 
+/** True for an entry-bar index that names one of the ten pick slots (not the ban target). */
 export function isPickTargetIndex(index: number): boolean {
   return Number.isInteger(index) && index >= 0 && index < PICK_TARGET_COUNT;
 }
@@ -88,10 +89,12 @@ export function addBan(
   return [...bans, championId];
 }
 
+/** Returns the ban list without `championId` (unchanged when absent). */
 export function removeBan(bans: readonly ChampionId[], championId: ChampionId): ChampionId[] {
   return bans.filter((id) => id !== championId);
 }
 
+/** Most recently added ban, or undefined when the list is empty. */
 export function lastBan(bans: readonly ChampionId[]): ChampionId | undefined {
   return bans[bans.length - 1];
 }

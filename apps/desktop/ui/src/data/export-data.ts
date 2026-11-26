@@ -4,8 +4,8 @@
  * Reads the cached aggregate tree written by `aggregates.ts`
  * (`latest.json`, `<patch>/manifest.json`, every manifest file plus the
  * manual `champion-tags.json` at the archive root) and builds the
- * `RecommendData` the engine consumes. SUPPORT only for v1a; the role
- * parameter is already threaded so v1b can enable more roles from data.
+ * `RecommendData` the engine consumes. Roles become selectable through the
+ * D-126 coverage check in `role-coverage.ts`, not through this loader.
  */
 
 import {
@@ -76,11 +76,16 @@ export function createRecommendData(
   };
 }
 
+interface CachedRelease {
+  latest: Latest;
+  manifest: Manifest;
+}
+
 /**
- * Loads the full pick-screen dataset from the data cache.
- * Returns null when nothing is cached (first launch, download failed).
+ * Reads `latest.json` and the manifest it points to from the data cache.
+ * Returns null when nothing is cached; throws on a corrupt or mismatched cache.
  */
-export async function loadPickData(role: Role): Promise<PickData | null> {
+export async function loadCachedRelease(): Promise<CachedRelease | null> {
   const latestRaw = await readDataFile('latest.json');
   if (latestRaw === null) return null;
   const latest: Latest = latestSchema.parse(JSON.parse(latestRaw));
@@ -94,19 +99,60 @@ export async function loadPickData(role: Role): Promise<PickData | null> {
       `Latest pointer patch ${latest.patch} does not match manifest patch ${manifest.patch}`,
     );
   }
+  return { latest, manifest };
+}
+
+export interface ChampionCatalog {
+  patch: string;
+  champions: Champion[];
+}
+
+/**
+ * Loads only the champion catalog (`champions.json`) for the cached release.
+ * The pool editor needs it even when pick data cannot load (no eligible
+ * role, corrupt role files): the pool is champion x roles and does not
+ * depend on recommendation tables. Returns null when nothing is cached.
+ */
+export async function loadChampionCatalog(): Promise<ChampionCatalog | null> {
+  const release = await loadCachedRelease();
+  if (release === null) return null;
+  const raw = await readJson(`${release.latest.patch}/champions.json`);
+  return {
+    patch: release.latest.patch,
+    champions: Object.values(championsMapSchema.parse(raw)),
+  };
+}
+
+/**
+ * Loads the full pick-screen dataset from the data cache.
+ * Returns null when nothing is cached (first launch, download failed).
+ */
+export async function loadPickData(role: Role): Promise<PickData | null> {
+  const release = await loadCachedRelease();
+  if (release === null) return null;
+  const { latest, manifest } = release;
 
   const files: Record<string, unknown> = {};
   // Archive-root entries ('/latest.json', '/champion-tags.json') are already
   // loaded through their dedicated paths above/below; only patch-relative
   // entries belong to the RecommendData file map.
   const patchEntries = manifest.files.filter((file) => !file.path.startsWith('/'));
+  // A corrupt file under another role's folder must not break this role
+  // (D-126 already treats it as zero coverage for that role); anything
+  // shared or belonging to `role` still fails loudly.
+  const ownRolePrefix = `roles/${role}/`;
   const loaded = await Promise.all(
-    patchEntries.map(
-      async (file) => [file.path, await readJson(`${latest.patch}/${file.path}`)] as const,
-    ),
+    patchEntries.map(async (file) => {
+      try {
+        return [file.path, await readJson(`${latest.patch}/${file.path}`)] as const;
+      } catch (err) {
+        if (file.path.startsWith('roles/') && !file.path.startsWith(ownRolePrefix)) return null;
+        throw err;
+      }
+    }),
   );
-  for (const [path, json] of loaded) {
-    files[path] = json;
+  for (const entry of loaded) {
+    if (entry !== null) files[entry[0]] = entry[1];
   }
 
   const champions = Object.values(

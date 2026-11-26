@@ -13,8 +13,8 @@ describe('roleAvailability', () => {
 
   it('explains disabled roles', () => {
     const a = roleAvailability();
-    expect(a.TOP.reason).toBe('Needs TOP/JUNGLE data (BL-011)');
-    expect(a.JUNGLE.reason).toBe('Needs TOP/JUNGLE data (BL-011)');
+    expect(a.TOP.reason).toBe('Not enough champion data for this role');
+    expect(a.JUNGLE.reason).toBe('Not enough champion data for this role');
     expect(a.ADC.reason).toBe('Minimal roles come later (BL-024)');
     expect(a.MID.reason).toBe('Minimal roles come later (BL-024)');
     expect(a.SUPPORT.reason).toBeUndefined();

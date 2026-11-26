@@ -46,7 +46,7 @@ describe('exportJson', () => {
     const result = suite.exportOnce();
     const manifest = result.manifest;
     expect(manifest.schemaVersion).toBe(4);
-    expect(manifest.roles).toEqual(['SUPPORT']);
+    expect(manifest.roles).toEqual(['SUPPORT', 'TOP', 'JUNGLE']);
     expect(manifest.rankBuckets).toEqual([
       'IRON',
       'BRONZE',
@@ -65,11 +65,21 @@ describe('exportJson', () => {
       'item-classes.json',
       'pick-rate.json',
       'role-prob.json',
+      'roles/JUNGLE/ally-pairs.json',
+      'roles/JUNGLE/baseline.json',
+      'roles/JUNGLE/enemy-pairs.json',
+      'roles/JUNGLE/lane-full.json',
+      'roles/JUNGLE/lane-vs.json',
       'roles/SUPPORT/ally-pairs.json',
       'roles/SUPPORT/baseline.json',
       'roles/SUPPORT/enemy-pairs.json',
       'roles/SUPPORT/lane-full.json',
       'roles/SUPPORT/lane-vs.json',
+      'roles/TOP/ally-pairs.json',
+      'roles/TOP/baseline.json',
+      'roles/TOP/enemy-pairs.json',
+      'roles/TOP/lane-full.json',
+      'roles/TOP/lane-vs.json',
     ]);
     for (const file of manifest.files) {
       expect(typeof file.sha256).toBe('string');
@@ -78,6 +88,22 @@ describe('exportJson', () => {
       // B2: recompute hash from disk and compare.
       const disk = readFileSync(join(suite.publicDir, PATCH, file.path), 'utf8');
       expect(createHash('sha256').update(disk, 'utf8').digest('hex')).toBe(file.sha256);
+    }
+  });
+
+  it('routes populated TOP and JUNGLE rows to their own role files (BL-011)', () => {
+    seed(suite.db, 'match', [{}]);
+    seed(suite.db, 'roleProb', [
+      { championId: 412, role: 'SUPPORT', gamesW: 10, gamesW2: 10, prob: 1 },
+    ]);
+    for (const myRole of ['SUPPORT', 'TOP', 'JUNGLE'] as const) {
+      seed(suite.db, 'baseline', [supportBaselineRow({ myRole })]);
+    }
+    suite.exportOnce();
+
+    for (const role of ['SUPPORT', 'TOP', 'JUNGLE']) {
+      const rows = baselineTableSchema.parse(suite.readFile(`roles/${role}/baseline.json`));
+      expect(rows).toHaveLength(1);
     }
   });
 

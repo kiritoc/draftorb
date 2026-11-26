@@ -31,11 +31,20 @@ import {
   type Role,
 } from '@draftorb/shared';
 
+/** Roles the desktop app currently enables (mirrors `DEFAULT_ENABLED_ROLES`,
+ *  apps/desktop/ui/src/config.ts). Only these block a release on an empty
+ *  recommendation list; other exported roles are reported as warnings so a
+ *  thin TOP/JUNGLE sample never holds back SUPPORT data (BL-011, D-126). */
+export const RELEASE_BLOCKING_ROLES: readonly Role[] = ['SUPPORT'];
+
 export interface PublishedExportCheckOptions {
   /** Root of the exported data tree (contains `latest.json` and `<patch>/`). */
   publicDir: string;
   /** Path to the manual champion tags file (`data/manual/champion-tags.json`). */
   tagsFilePath: string;
+  /** Roles whose empty recommendation list fails the check
+   *  (default `RELEASE_BLOCKING_ROLES`). */
+  blockingRoles?: readonly Role[];
 }
 
 export interface PublishedExportCheckResult {
@@ -45,6 +54,8 @@ export interface PublishedExportCheckResult {
   recommendationCounts: Readonly<Record<string, number>>;
   /** Human-readable problems; empty means the export is healthy. */
   errors: string[];
+  /** Non-blocking problems (exported roles the app does not enable yet). */
+  warnings: string[];
 }
 
 function readJson(path: string): unknown {
@@ -98,14 +109,15 @@ function recommendDataForRole(
 }
 
 /**
- * Validates the published export: every exported role must yield at least one
- * "Best overall" recommendation at Diamond. Throws on unreadable or
- * schema-invalid files; returns per-role counts and `errors` otherwise.
+ * Validates the published export: every exported role is schema-validated;
+ * each blocking role must yield at least one "Best overall" recommendation at
+ * Diamond, other roles only produce `warnings`. Throws on unreadable or
+ * schema-invalid files; returns per-role counts, `errors` and `warnings`.
  */
 export function checkPublishedExport(
   options: PublishedExportCheckOptions,
 ): PublishedExportCheckResult {
-  const { publicDir, tagsFilePath } = options;
+  const { publicDir, tagsFilePath, blockingRoles = RELEASE_BLOCKING_ROLES } = options;
   const { patch, roles, files } = loadPublishedExport(publicDir);
   const champions = championsMapSchema.parse(readJson(join(publicDir, patch, 'champions.json')));
   const championIds = Object.values(champions).map((champion) => champion.id);
@@ -113,6 +125,7 @@ export function checkPublishedExport(
 
   const recommendationCounts: Record<string, number> = {};
   const errors: string[] = [];
+  const warnings: string[] = [];
 
   if (roles.length === 0) {
     errors.push('Manifest exports no roles.');
@@ -125,9 +138,14 @@ export function checkPublishedExport(
     );
     recommendationCounts[role] = result.recommendations.length;
     if (result.recommendations.length === 0) {
-      errors.push(`No "Best overall" recommendations for role ${role}.`);
+      const message = `No "Best overall" recommendations for role ${role}.`;
+      if (blockingRoles.includes(role)) {
+        errors.push(message);
+      } else {
+        warnings.push(`${message} (not enabled in the app; not release-blocking)`);
+      }
     }
   }
 
-  return { patch, roles, recommendationCounts, errors };
+  return { patch, roles, recommendationCounts, errors, warnings };
 }

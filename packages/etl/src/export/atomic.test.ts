@@ -71,11 +71,21 @@ describe('exportJson', () => {
       'manifest.json',
       'pick-rate.json',
       'role-prob.json',
+      'roles/JUNGLE/ally-pairs.json',
+      'roles/JUNGLE/baseline.json',
+      'roles/JUNGLE/enemy-pairs.json',
+      'roles/JUNGLE/lane-full.json',
+      'roles/JUNGLE/lane-vs.json',
       'roles/SUPPORT/ally-pairs.json',
       'roles/SUPPORT/baseline.json',
       'roles/SUPPORT/enemy-pairs.json',
       'roles/SUPPORT/lane-full.json',
       'roles/SUPPORT/lane-vs.json',
+      'roles/TOP/ally-pairs.json',
+      'roles/TOP/baseline.json',
+      'roles/TOP/enemy-pairs.json',
+      'roles/TOP/lane-full.json',
+      'roles/TOP/lane-vs.json',
     ]);
     const roleProb = suite.readFile('role-prob.json') as Record<string, Record<string, number>>;
     expect(Object.keys(roleProb)).toEqual(['412']);

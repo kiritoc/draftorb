@@ -176,7 +176,7 @@ Adding a role means data only: no schema or code change. Migration 004 (T-011.b)
 Validated by one zod schema family parameterized by role (`packages/shared`, T-002.b). The role is carried by the file path, not by a column in the rows (the SQLite tables keep `my_role`). The web app loads only the roles listed in `manifest.json`. Keep each file < 5 MB gzip.
 
 ```
-manifest.json          // { patch, generatedAt, region, rankBuckets: [the 8 §3 buckets, not 10 tiers], roles: ["SUPPORT"], files[], schemaVersion }
+manifest.json          // { patch, generatedAt, region, rankBuckets: [the 8 §3 buckets, not 10 tiers], roles: ["SUPPORT", "TOP", "JUNGLE"], files[], schemaVersion }
 champions.json         // id, name, icon, roles
 items.json             // item catalog (from Data Dragon)
 runes.json             // rune tree catalog (from Data Dragon)
@@ -206,6 +206,8 @@ The exporter builds in a unique dot-prefixed temp directory, renames any previou
 Manual files (committed, hand-written, zod-validated): `data/manual/champion-tags.json`, `data/manual/item-tags.json`, `data/manual/gameplans/*.md`.
 
 `schemaVersion` is bumped once for this role-keyed layout, and again whenever a JSON format changes; the web app checks it and shows a clear error on mismatch. The exporter warns if an explicit patch differs from the latest stored patch or if data spans multiple platforms; `region` labels the manifest and does not filter aggregate data.
+
+Exported roles (D-097, BL-011): `SUPPORT`, `TOP` and `JUNGLE` get the full role directory layout above. `TOP`/`JUNGLE` are 1v1 lane groups, so their `lane-full.json` stays empty; `ADC`/`MID` keep champion-level statistics only (pick-rate/role-prob level) and get no role directory until BL-024. `pnpm etl sample-report [patch]` prints, for every file under `roles/<ROLE>/`, the row count and the min/median/max `n_eff` (`games_w^2 / games_w2`); it reads the published export, so it works on `pnpm etl pull` data too. **UI role enablement rule (D-126):** a role appears selectable only when at least 50 distinct champions have a `baseline.json` row with `n_eff >= minGames` in the DIAMOND bucket; the UI computes this at load time from the downloaded files (BL-050).
 
 Core scoring and engine contracts are unchanged (SPECS §14, D-045). The exported JSON format changes described above do not alter `n_eff` thresholds or D-021..D-027 semantics.
 

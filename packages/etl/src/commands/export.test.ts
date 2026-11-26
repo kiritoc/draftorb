@@ -95,7 +95,7 @@ describe('exportCommand', () => {
     );
     expect(manifest.schemaVersion).toBe(4);
     expect(manifest.patch).toBe('16.21');
-    expect(manifest.roles).toEqual(['SUPPORT']);
+    expect(manifest.roles).toEqual(['SUPPORT', 'TOP', 'JUNGLE']);
     expect(manifest.rankBuckets).toEqual([
       'IRON',
       'BRONZE',

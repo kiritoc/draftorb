@@ -80,7 +80,7 @@ export function PoolTransferSection({
             value={jsonImport}
             onChange={(event) => setJsonImport(event.target.value)}
             rows={4}
-            placeholder='{"schemaVersion":1,"pools":{}}'
+            placeholder={strings.poolJsonPlaceholder}
             aria-label={strings.poolJsonImport}
             className="w-full rounded-lg border border-slate-300 bg-white p-2 font-mono text-xs text-slate-800 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
           />

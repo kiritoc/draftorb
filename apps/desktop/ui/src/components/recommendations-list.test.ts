@@ -81,7 +81,7 @@ describe('RecommendationsList', () => {
         cardContext,
       }),
     );
-    expect(markup).toContain('Pool #2');
+    expect(markup).toContain('In your pool · #2');
     expect(markup).toContain('#14');
   });
 
@@ -119,6 +119,10 @@ describe('RecommendationsList', () => {
     expect(markup).toContain('Showing 2 of 2');
     expect(markup).toContain('Soraka');
     expect(markup).toContain('Not recommended');
+    // Insufficient-data card carries n_eff, raw games and baseline win rate.
+    expect(markup).toContain('Sample 20.0');
+    expect(markup).toContain('30 games');
+    expect(markup).toContain('Win rate 51.0%');
     expect(markup.indexOf('Leona')).toBeLessThan(markup.indexOf('Soraka'));
   });
 

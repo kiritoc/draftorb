@@ -20,10 +20,15 @@ import {
   type Role,
 } from '@draftorb/shared';
 import { strings } from '../strings';
-import { ChampionPicker } from './ChampionPicker';
+import { PoolAddForm } from './PoolAddForm';
 import { PoolRoleSection } from './PoolRoleSection';
 import { PoolTransferSection } from './PoolTransferSection';
-import { championPoolRoles, emptyPool, setChampionRoles } from '../pool/pool-model';
+import {
+  championPoolRoles,
+  emptyPool,
+  serializePoolConfig,
+  setChampionRoles,
+} from '../pool/pool-model';
 import { exportPoolToRepo, readRepoPool } from '../pool/repo-pool';
 
 const ROLES: readonly Role[] = roleSchema.options;
@@ -41,6 +46,8 @@ export interface PoolEditorProps {
   repoFolder?: string;
   /** Persists the working copy; may be async so failures keep the editor open. */
   onSave: (pool: PoolConfig) => void | Promise<void>;
+  /** Called after a successful repo-file export so the difference banner refreshes (D-118). */
+  onPoolChanged?: () => void;
 }
 
 export function PoolEditor({
@@ -51,9 +58,9 @@ export function PoolEditor({
   iconVersion = null,
   repoFolder,
   onSave,
+  onPoolChanged,
 }: PoolEditorProps) {
   const [working, setWorking] = useState<PoolConfig>(pool);
-  const [dirty, setDirty] = useState(false);
   const [message, setMessage] = useState<Message>({ text: '', kind: 'info' });
   const [draftChampionId, setDraftChampionId] = useState<ChampionId | null>(null);
   const [draftRoles, setDraftRoles] = useState<readonly Role[]>([]);
@@ -61,7 +68,6 @@ export function PoolEditor({
   useEffect(() => {
     if (!open) return;
     setWorking(pool);
-    setDirty(false);
     setMessage({ text: '', kind: 'info' });
     setDraftChampionId(null);
     setDraftRoles([]);
@@ -73,9 +79,11 @@ export function PoolEditor({
   );
   const totalCount = ROLES.reduce((sum, role) => sum + (working.pools[role]?.length ?? 0), 0);
 
+  // Canonical serialization makes "dirty" exact: reverting edits clears it.
+  const dirty = serializePoolConfig(working) !== serializePoolConfig(pool);
+
   const mutate = (next: PoolConfig) => {
     setWorking(next);
-    setDirty(true);
     setMessage({ text: '', kind: 'info' });
   };
 
@@ -157,6 +165,7 @@ export function PoolEditor({
     try {
       await exportPoolToRepo(repoFolder, working);
       setMessage({ text: strings.poolRepoExported, kind: 'info' });
+      onPoolChanged?.();
     } catch (error) {
       setMessage({
         text: error instanceof Error ? error.message : String(error),
@@ -207,41 +216,15 @@ export function PoolEditor({
           </p>
         )}
 
-        <div className="mb-4 space-y-2 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
-          <ChampionPicker
-            value={draftChampionId}
-            onChange={handlePickChampion}
-            champions={champions}
-            iconVersion={iconVersion}
-            placeholder={strings.championSearch}
-            searchLabel={strings.championSearch}
-          />
-          <div className="flex flex-wrap items-center gap-3">
-            {ROLES.map((role) => (
-              <label
-                key={role}
-                className="flex items-center gap-1.5 text-sm text-slate-700 dark:text-slate-200"
-              >
-                <input
-                  type="checkbox"
-                  checked={draftRoles.includes(role)}
-                  onChange={() => toggleDraftRole(role)}
-                  className="h-4 w-4"
-                />
-                {strings.roleNames[role]}
-              </label>
-            ))}
-            <button
-              type="button"
-              onClick={handleApply}
-              disabled={draftChampionId === null || draftRoles.length === 0}
-              className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white disabled:pointer-events-none disabled:opacity-50"
-            >
-              {strings.poolApply}
-            </button>
-          </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400">{strings.poolPickHint}</p>
-        </div>
+        <PoolAddForm
+          champions={champions}
+          iconVersion={iconVersion}
+          championId={draftChampionId}
+          roles={draftRoles}
+          onChampionChange={handlePickChampion}
+          onRoleToggle={toggleDraftRole}
+          onApply={handleApply}
+        />
 
         <div className="mb-4 space-y-3">
           {roleEntries.map(({ role, entries }) => (

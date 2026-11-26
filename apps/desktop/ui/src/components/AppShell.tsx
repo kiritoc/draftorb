@@ -28,6 +28,8 @@ export interface AppShellProps {
   poolSync?: PoolSyncStatus;
   repoFolder?: string;
   onSaveRepoFolder?: (value: string) => Promise<string | undefined>;
+  /** Called after the pool changes outside settings (save, repo export). */
+  onPoolChanged?: () => void;
   repoFolderAvailable?: boolean;
   profileStatus?: string;
   profileLoad?: ProfileLoad;
@@ -64,6 +66,7 @@ export function AppShell(props: AppShellProps) {
             profileLoad={props.profileLoad ?? { kind: 'none', reason: 'noFolder' }}
             dataReadyNonce={props.dataReadyNonce}
             repoFolder={props.repoFolder}
+            onPoolChanged={props.onPoolChanged}
           />
         </section>
         {props.screen === 'settings' && (

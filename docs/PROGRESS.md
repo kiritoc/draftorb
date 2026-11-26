@@ -16,6 +16,17 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 ## Current handoff
 
 - Date: 2026-11-26
+- Branch/PR: `feat/bl-022-fast-draft-entry` / BL-022 (#87)
+- State: REVIEW
+- Done: keyboard-first draft entry on the pick screen. New pure module `ui/src/pick/draft-entry.ts` (10 pick targets in entry order, digit-key map, next-empty advance, ban list rules) + `ui/src/components/DraftEntryBar.tsx` (persistent champion combobox that stays open after each pick, slot chips, role chips for the active slot, ban pseudo-target) + `ui/src/components/BanList.tsx`. `PickScreen` gained `bans` state wired into `DraftInput.bans`, a shared `blockedChampionIds` set (picked ∪ banned) for slot pickers and the entry search, and auto-advance to the next empty slot after each entry-bar pick. SPECS §10 documents the keyboard contract; `scripts/bench-recommend.ts` (`pnpm --filter @draftorb/desktop bench:recommend`) measures engine latency.
+- Files touched: `apps/desktop/ui/src/{pick/draft-entry.ts,pick/draft-entry.test.ts,components/DraftEntryBar.tsx,components/draft-entry-bar.test.ts,components/BanList.tsx,screens/PickScreen.tsx,strings.ts}`, `apps/desktop/scripts/bench-recommend.ts`, `apps/desktop/package.json`, `docs/SPECS.md`, `docs/PROGRESS.md`.
+- Tests: `pnpm check` green (1587 tests). Engine latency on the real 16.22 export: SUPPORT p50 1.75 ms / p95 2.44 ms, TOP p50 1.90 ms, JUNGLE p50 2.22 ms (n=300 each, well under the 50 ms budget). Timed mouse-free draft entry still needs the owner's manual run (protocol in the PR).
+- Blockers / next step: PR pending. BL-016b ban-list UI note in PROGRESS is now covered by `BanList`.
+- Pitfalls: the entry-bar dropdown stays open after Enter picks (rapid entry); it closes on Escape, outside pointerdown, or Tab away from the search (options keep it open so clicks land). Digit jumps only work with an empty query — champion names contain no digits.
+
+### Previous handoff (BL-011)
+
+- Date: 2026-11-26
 - Branch/PR: `feat/bl-011-top-jungle-export` / PR #152 / BL-011 (#74)
 - State: REVIEW
 - Done: `EXPORT_ROLES` extended to `['SUPPORT', 'TOP', 'JUNGLE']` (D-097); TOP/JUNGLE get the full `roles/<ROLE>/` layout (their `lane-full.json` stays empty — 1v1 lane groups). New `pnpm etl sample-report [patch]` (`export/sample-report.ts` + `commands/sample-report.ts`) prints per-file row counts and min/median/max `n_eff` for every `roles/<ROLE>/` file in the published manifest, pooled per role. DATA_MODEL.md documents the role enablement rule; DECISIONS.md D-126 (PROPOSED) records the ADC/MID assumption and the pending owner threshold question.

@@ -4,7 +4,8 @@ import { roleAvailability } from '../roles';
 import { strings } from '../strings';
 
 export interface RoleSelectorProps {
-  selected: Role;
+  /** null when no role is eligible (nothing highlighted). */
+  selected: Role | null;
   enabledRoles?: readonly Role[];
   onSelect: (role: Role) => void;
 }

@@ -71,16 +71,10 @@ describe('enabledRolesFromFiles', () => {
   });
 
   it('counts a champion once when several rows pass', () => {
-    const rows = [
-      baselineRow(1, 'DIAMOND'),
-      baselineRow(1, 'DIAMOND'),
-      ...coveredTable(49).map((row) => {
-        const r = [...(row as unknown[])];
-        r[0] = (r[0] as number) + 1;
-        return r;
-      }),
-    ];
-    expect(enabledRolesFromFiles(filesWith('TOP', rows), ['TOP'])).toEqual(['TOP']);
+    // 51 passing rows but only 49 distinct champions -> stays disabled.
+    const rows = [baselineRow(1), baselineRow(1), baselineRow(1), ...coveredTable(49).slice(1)];
+    expect(rows).toHaveLength(51);
+    expect(enabledRolesFromFiles(filesWith('TOP', rows), ['TOP'])).toEqual([]);
   });
 
   it('ignores non-baseline files', () => {

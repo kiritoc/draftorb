@@ -21,7 +21,8 @@ export interface AppShellProps {
   resolvedTheme: ResolvedTheme;
   onThemeChange: (theme: ThemeSetting) => void;
   onToggleTheme: () => void;
-  role: Role;
+  /** Active role; null when the coverage verdict enables no role. */
+  role: Role | null;
   onRoleChange: (role: Role) => void;
   enabledRoles?: readonly Role[];
   notice?: string;
@@ -61,13 +62,19 @@ export function AppShell(props: AppShellProps) {
             enabledRoles={props.enabledRoles}
             onSelect={props.onRoleChange}
           />
-          <PickScreen
-            role={props.role}
-            profileLoad={props.profileLoad ?? { kind: 'none', reason: 'noFolder' }}
-            dataReadyNonce={props.dataReadyNonce}
-            repoFolder={props.repoFolder}
-            onPoolChanged={props.onPoolChanged}
-          />
+          {props.role === null ? (
+            <p role="status" className="text-slate-600 dark:text-slate-300">
+              {strings.noEligibleRole}
+            </p>
+          ) : (
+            <PickScreen
+              role={props.role}
+              profileLoad={props.profileLoad ?? { kind: 'none', reason: 'noFolder' }}
+              dataReadyNonce={props.dataReadyNonce}
+              repoFolder={props.repoFolder}
+              onPoolChanged={props.onPoolChanged}
+            />
+          )}
         </section>
         {props.screen === 'settings' && (
           <SettingsScreen

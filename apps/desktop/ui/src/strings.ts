@@ -27,6 +27,7 @@ export const strings = {
     MID: 'Mid',
   },
   roleNeedsData: 'Not enough champion data for this role',
+  noEligibleRole: 'No role has enough champion data in the current export',
   roleMinimal: 'Minimal roles come later (BL-024)',
   pickPlaceholder: 'Pick screen coming in BL-022/BL-016',
   pickNoData: 'No aggregate data cached yet — check the connection and restart.',

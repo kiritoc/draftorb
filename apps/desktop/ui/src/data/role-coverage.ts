@@ -65,7 +65,12 @@ export async function loadEnabledRoles(): Promise<Role[] | null> {
   await Promise.all(
     manifest.roles.map(async (role) => {
       const raw = await cacheRead(`${latest.patch}/${baselinePath(role)}`);
-      if (raw !== null) files[baselinePath(role)] = JSON.parse(raw);
+      if (raw === null) return;
+      try {
+        files[baselinePath(role)] = JSON.parse(raw);
+      } catch {
+        // Malformed JSON counts as zero coverage for this role only.
+      }
     }),
   );
   return enabledRolesFromFiles(files, manifest.roles);

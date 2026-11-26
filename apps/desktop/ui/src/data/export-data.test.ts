@@ -57,7 +57,7 @@ function seedCache(overrides: { patchFiles?: Record<string, unknown> } = {}): vo
     region: 'euw',
     rankBuckets: ['IRON'],
     roles: ['SUPPORT'],
-    files: Object.keys(patchFiles).map((path) => ({
+    files: [...Object.keys(patchFiles), '/latest.json', '/champion-tags.json'].map((path) => ({
       path,
       sha256: '0'.repeat(64),
     })),

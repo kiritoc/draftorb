@@ -97,7 +97,12 @@ export async function loadPickData(role: Role): Promise<PickData | null> {
 
   const files: Record<string, unknown> = {};
   for (const file of manifest.files) {
-    files[file.path] = await readJson(`${latest.patch}/${file.path}`);
+    // Root entries ("/champion-tags.json") are cached at the archive root,
+    // matching verifyArchive/downloadAggregates; others are patch-relative.
+    const cachePath = file.path.startsWith('/')
+      ? file.path.slice(1)
+      : `${latest.patch}/${file.path}`;
+    files[file.path] = await readJson(cachePath);
   }
 
   const champions = Object.values(

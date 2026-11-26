@@ -1,5 +1,9 @@
 # SETUP (Windows, minimal)
 
+> Setting up the program with **your own** pool and profile (not the example
+> data)? Follow `docs/SHARING.md` — it covers the privacy boundary, the
+> first-run replacements and the profile export steps.
+
 ## Prerequisites
 
 1. **Node.js 22** (https://nodejs.org) — the version CI tests and the minimum supported version. Node 20 is no longer supported: `better-sqlite3` 13.x requires Node >=22 and segfaults on Node 20 (B-015).

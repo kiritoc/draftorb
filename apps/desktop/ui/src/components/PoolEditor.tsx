@@ -101,8 +101,7 @@ export function PoolEditor({
 
   const showError = (text: string) =>
     dispatch({ type: 'message', message: { text, kind: 'error' } });
-  const showInfo = (text: string) =>
-    dispatch({ type: 'message', message: { text, kind: 'info' } });
+  const showInfo = (text: string) => dispatch({ type: 'message', message: { text, kind: 'info' } });
 
   const handleSave = async () => {
     try {

@@ -16,8 +16,8 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 ## Current handoff
 
 - Date: 2026-11-26
-- Branch/PR: `feat/bl-011-top-jungle-export` / BL-011 (#74)
-- State: DOING
+- Branch/PR: `feat/bl-011-top-jungle-export` / PR #152 / BL-011 (#74)
+- State: REVIEW
 - Done: `EXPORT_ROLES` extended to `['SUPPORT', 'TOP', 'JUNGLE']` (D-097); TOP/JUNGLE get the full `roles/<ROLE>/` layout (their `lane-full.json` stays empty — 1v1 lane groups). New `pnpm etl sample-report [patch]` (`export/sample-report.ts` + `commands/sample-report.ts`) prints per-file row counts and min/median/max `n_eff` for every `roles/<ROLE>/` file in the published manifest, pooled per role. DATA_MODEL.md documents the role enablement rule; DECISIONS.md D-126 (PROPOSED) records the ADC/MID assumption and the pending owner threshold question.
 - Files touched: `packages/etl/src/export/{index.ts,sample-report.ts,sample-report.test.ts,manifest.test.ts,atomic.test.ts}`, `packages/etl/src/commands/{sample-report.ts,sample-report.test.ts,export.test.ts,cli.ts}`, `docs/{DATA_MODEL,SETUP,DECISIONS,PROGRESS}.md`.
 - Tests: `pnpm vitest run packages/etl` green (582 tests); real `pnpm etl export` on the local DB wrote 294 files incl. `roles/TOP/` + `roles/JUNGLE/`; `pnpm etl validate-export` PASSED (SUPPORT 54, TOP 91, JUNGLE 70 recommendations at Diamond); `pnpm etl sample-report` shows TOP 95 903 rows / median n_eff 19.3, JUNGLE 94 934 / 20.6.

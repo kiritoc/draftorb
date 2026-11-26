@@ -26,7 +26,10 @@ import { championsForSlot } from '../pick/champion-availability';
 import { excludePick, excludedRanks } from '../pick/exclude-pick';
 import { buildPoolUnavailableItems } from '../pick/pool-unavailable';
 import { DraftSlot, type DraftSlotState } from '../components/DraftSlot';
-import { RecommendationsList } from '../components/RecommendationsList';
+import {
+  RecommendationsList,
+  type RecommendationCardContext,
+} from '../components/RecommendationsList';
 import { strings } from '../strings';
 
 const DEFAULT_RANK: Rank = 'DIAMOND';
@@ -167,6 +170,11 @@ export function PickScreen({ role, profileLoad, dataReadyNonce }: PickScreenProp
     [poolUnavailable, insufficientData, user.championId],
   );
 
+  const cardContext = useMemo<RecommendationCardContext>(
+    () => ({ champions, iconVersion, profileLoad, role }),
+    [champions, iconVersion, profileLoad, role],
+  );
+
   if (loadError !== null) {
     return <p className="text-red-600 dark:text-red-400">{strings.loadFailed(loadError)}</p>;
   }
@@ -249,25 +257,19 @@ export function PickScreen({ role, profileLoad, dataReadyNonce }: PickScreenProp
         <RecommendationsList
           title={strings.fromYourPool}
           recommendations={visiblePoolRecommendations}
-          champions={champions}
           resetKey={draftInput}
           poolIds={poolSet}
           unavailable={poolUnavailableItems}
-          iconVersion={iconVersion}
-          profileLoad={profileLoad}
-          role={role}
+          cardContext={cardContext}
         />
       )}
 
       <RecommendationsList
         title={strings.bestOverall}
         recommendations={overallRecommendations}
-        champions={champions}
         resetKey={draftInput}
         poolIds={poolSet}
-        iconVersion={iconVersion}
-        profileLoad={profileLoad}
-        role={role}
+        cardContext={cardContext}
       />
     </div>
   );

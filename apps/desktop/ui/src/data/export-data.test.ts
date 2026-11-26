@@ -124,6 +124,13 @@ describe('loadPickData', () => {
     expect(pick?.champions.map((c) => c.id)).toEqual([412]);
     expect(pick?.data.baselines).toHaveLength(1);
     expect(mockRead).toHaveBeenCalledWith('champion-tags.json');
+    // Archive-root manifest entries are not re-read through the manifest loop.
+    const readCounts = new Map<string, number>();
+    for (const [name] of mockRead.mock.calls) {
+      readCounts.set(name, (readCounts.get(name) ?? 0) + 1);
+    }
+    expect(readCounts.get('latest.json')).toBe(1);
+    expect(readCounts.get('champion-tags.json')).toBe(1);
   });
 
   it('accepts a manifest path without the patch prefix', async () => {

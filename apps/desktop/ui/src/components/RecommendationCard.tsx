@@ -8,11 +8,13 @@ import {
   COUNTERED_BY_WARNING,
   OFF_ROLE_WARNING,
   type Champion,
+  type Reason,
   type Recommendation,
   type Role,
 } from '@draftorb/shared';
 import type { ProfileLoad } from '../profile/profile-export';
 import { strings } from '../strings';
+import { championName } from '../champion-name';
 import { championIconUrl } from '../data/champion-icons';
 import { ChampionPortrait } from './ChampionPortrait';
 import { RecordBadge } from './RecordBadge';
@@ -47,10 +49,6 @@ const LEVEL_CLASS: Record<number, string> = {
   '3': 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-900/40 dark:text-emerald-300',
 };
 
-function championName(champions: Champion[], id: number): string {
-  return champions.find((c) => c.id === id)?.name ?? strings.championFallback(id);
-}
-
 function formatDeltaPp(deltaPp: number | undefined): string {
   if (deltaPp === undefined) return strings.deltaUnavailable;
   const sign = deltaPp >= 0 ? '+' : '−';
@@ -69,6 +67,14 @@ export function warningText(warning: string, champions: Champion[]): string {
   return warning;
 }
 
+/** Short badge label for a reason: comp/blind use their own names, the rest
+ * take the first word of the level label ("weak synergy" -> "weak"). */
+function reasonBadgeLabel(reason: Reason): string {
+  if (reason.type === 'comp') return strings.reasonComp;
+  if (reason.type === 'blind') return strings.reasonBlind;
+  return (LEVEL_LABEL[reason.level ?? 0] ?? strings.reasonNeutral).split(' ')[0] ?? '';
+}
+
 export function RecommendationCard({
   recommendation,
   champions,
@@ -79,8 +85,9 @@ export function RecommendationCard({
 }: RecommendationCardProps) {
   const { score, poolRank, reasons, reliability, warnings } = recommendation;
   const champion = champions.find((c) => c.id === recommendation.championId);
-  const name = champion?.name ?? strings.championFallback(recommendation.championId);
+  const name = championName(champions, recommendation.championId);
   const winProb = (score * 100).toFixed(1);
+  const warningList = warnings.map((warning) => warningText(warning, champions)).join(', ');
 
   return (
     <div className="rounded-lg border border-slate-300 bg-white p-4 dark:border-slate-700 dark:bg-slate-800/60">
@@ -122,11 +129,7 @@ export function RecommendationCard({
               className={`rounded border px-2 py-1 ${LEVEL_CLASS[level] ?? LEVEL_CLASS[0]}`}
               title={`${label} · ${formatDeltaPp(reason.deltaPp)}`}
             >
-              {reason.type === 'comp' || reason.type === 'blind'
-                ? reason.type === 'comp'
-                  ? strings.reasonComp
-                  : strings.reasonBlind
-                : label.split(' ')[0]}
+              {reasonBadgeLabel(reason)}
               {withFirst != null && strings.reasonVs(championName(champions, withFirst))}
               {reason.deltaPp != null && ` ${formatDeltaPp(reason.deltaPp)}`}
             </span>
@@ -147,11 +150,9 @@ export function RecommendationCard({
         {warnings.length > 0 && (
           <span
             className="text-red-600 dark:text-red-400"
-            title={strings.warningLabel(
-              warnings.map((warning) => warningText(warning, champions)).join(', '),
-            )}
+            title={strings.warningLabel(warningList)}
           >
-            ⚠ {warnings.map((warning) => warningText(warning, champions)).join(', ')}
+            ⚠ {warningList}
           </span>
         )}
       </div>

@@ -30,30 +30,32 @@ type ListEntry =
   | { readonly type: 'recommendation'; readonly recommendation: Recommendation }
   | { readonly type: 'unavailable'; readonly item: PoolUnavailableItem };
 
-export interface RecommendationsListProps {
-  title: string;
-  recommendations: Recommendation[];
+/** Everything a recommendation or unavailable card needs to render. */
+export interface RecommendationCardContext {
   champions: Champion[];
-  pageSize?: number;
-  resetKey: unknown;
-  poolIds?: ReadonlySet<number>;
-  unavailable?: readonly PoolUnavailableItem[];
   iconVersion?: string | null;
   profileLoad?: ProfileLoad;
   role?: Role;
 }
 
+export interface RecommendationsListProps {
+  title: string;
+  recommendations: Recommendation[];
+  pageSize?: number;
+  resetKey: unknown;
+  poolIds?: ReadonlySet<number>;
+  unavailable?: readonly PoolUnavailableItem[];
+  cardContext: RecommendationCardContext;
+}
+
 export function RecommendationsList({
   title,
   recommendations,
-  champions,
   pageSize = RECOMMENDATION_PAGE_SIZE,
   resetKey,
   poolIds,
   unavailable,
-  iconVersion = null,
-  profileLoad,
-  role,
+  cardContext,
 }: RecommendationsListProps) {
   const entries = useMemo<ListEntry[]>(
     () => [
@@ -95,11 +97,11 @@ export function RecommendationsList({
                 <RecommendationCard
                   key={entry.recommendation.championId}
                   recommendation={entry.recommendation}
-                  champions={champions}
-                  iconVersion={iconVersion}
+                  champions={cardContext.champions}
+                  iconVersion={cardContext.iconVersion}
                   inPool={poolIds?.has(entry.recommendation.championId) ?? false}
-                  profileLoad={profileLoad}
-                  role={role}
+                  profileLoad={cardContext.profileLoad}
+                  role={cardContext.role}
                 />
               ) : (
                 <UnavailableChampionCard
@@ -107,8 +109,8 @@ export function RecommendationsList({
                   championId={entry.item.championId}
                   reason={entry.item.reason}
                   sample={entry.item.sample}
-                  champions={champions}
-                  iconVersion={iconVersion}
+                  champions={cardContext.champions}
+                  iconVersion={cardContext.iconVersion}
                 />
               ),
             )}

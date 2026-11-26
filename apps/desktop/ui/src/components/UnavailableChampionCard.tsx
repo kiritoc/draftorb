@@ -5,6 +5,7 @@
 
 import type { Champion, InsufficientDataEntry } from '@draftorb/shared';
 import { strings } from '../strings';
+import { championName } from '../champion-name';
 import { championIconUrl } from '../data/champion-icons';
 import { ChampionPortrait } from './ChampionPortrait';
 
@@ -31,7 +32,7 @@ export function UnavailableChampionCard({
   iconVersion = null,
 }: UnavailableChampionCardProps) {
   const champion = champions.find((c) => c.id === championId);
-  const name = champion?.name ?? strings.championFallback(championId);
+  const name = championName(champions, championId);
   return (
     <div className="flex items-center gap-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 dark:border-slate-600 dark:bg-slate-800/40">
       <ChampionPortrait

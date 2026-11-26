@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -122,6 +122,37 @@ describe('matchesCommand --dry-run', () => {
     } finally {
       if (originalDbPath === undefined) delete process.env.DRAFTORB_DB_PATH;
       else process.env.DRAFTORB_DB_PATH = originalDbPath;
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('leaves no SQLite -wal/-shm sidecars behind', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'draftorb-dry-run-sidecar-'));
+    const dbPath = join(dir, 'test.sqlite');
+    const originalDbPath = process.env.DRAFTORB_DB_PATH;
+    const originalPoolPath = process.env.DRAFTORB_POOL_CONFIG_PATH;
+    process.env.DRAFTORB_DB_PATH = dbPath;
+    process.env.DRAFTORB_POOL_CONFIG_PATH = join(dir, 'absent.pool.json');
+
+    const db = openDb(dbPath);
+    migrate(db);
+    db.close();
+    // Last read-write close checkpoints and removes sidecars, so the dry run
+    // is the only thing that could recreate them.
+    expect(existsSync(`${dbPath}-wal`)).toBe(false);
+    expect(existsSync(`${dbPath}-shm`)).toBe(false);
+
+    const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      await matchesCommand.run(['--dry-run']);
+      expect(existsSync(`${dbPath}-wal`)).toBe(false);
+      expect(existsSync(`${dbPath}-shm`)).toBe(false);
+    } finally {
+      consoleLog.mockRestore();
+      if (originalDbPath === undefined) delete process.env.DRAFTORB_DB_PATH;
+      else process.env.DRAFTORB_DB_PATH = originalDbPath;
+      if (originalPoolPath === undefined) delete process.env.DRAFTORB_POOL_CONFIG_PATH;
+      else process.env.DRAFTORB_POOL_CONFIG_PATH = originalPoolPath;
       rmSync(dir, { recursive: true, force: true });
     }
   });

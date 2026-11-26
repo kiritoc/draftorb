@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MIGRATIONS_DIR = join(__dirname, '../../migrations');
+const MIGRATIONS_LEDGER_EXISTS_SQL =
+  "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = '_migrations'";
 
 /**
  * Migration interface
@@ -166,10 +168,7 @@ export function getMigrationStatusReadOnly(db: Database.Database): {
   missingVersions: string[];
 } {
   const diskVersions = getMigrations().map((m) => m.version);
-  const hasLedger =
-    db
-      .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = '_migrations'")
-      .get() !== undefined;
+  const hasLedger = db.prepare(MIGRATIONS_LEDGER_EXISTS_SQL).get() !== undefined;
   if (!hasLedger) {
     return { applied: 0, pending: diskVersions.length, missingVersions: [] };
   }

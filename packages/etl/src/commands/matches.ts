@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { existsSync } from 'node:fs';
+import { existsSync, rmSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 
 import type { PoolConfig } from '@draftorb/shared';
@@ -114,6 +114,11 @@ async function runMatches(args: string[]): Promise<void> {
     if (!existsSync(dryRunDbPath)) {
       throw new CliError(`No database at ${dryRunDbPath}. Run \`pnpm etl migrate\` first.`);
     }
+    // A read-only connection to a WAL database still creates -shm/-wal
+    // sidecars and cannot checkpoint them away on close; track which ones
+    // already existed so the preview can remove only its own.
+    const sidecarPaths = [`${dryRunDbPath}-wal`, `${dryRunDbPath}-shm`];
+    const preExistingSidecars = new Set(sidecarPaths.filter((p) => existsSync(p)));
     const roDb = new Database(dryRunDbPath, { readonly: true, fileMustExist: true });
     try {
       // Read-only status: safe on pre-checksum `_migrations` ledgers, unlike
@@ -147,6 +152,11 @@ async function runMatches(args: string[]): Promise<void> {
       }
     } finally {
       roDb.close();
+      for (const sidecar of sidecarPaths) {
+        if (!preExistingSidecars.has(sidecar)) {
+          rmSync(sidecar, { force: true });
+        }
+      }
     }
     return;
   }

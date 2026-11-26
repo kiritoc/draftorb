@@ -16,6 +16,17 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 ## Current handoff
 
 - Date: 2026-11-26
+- Branch/PR: `main` / BL-050 (#153)
+- State: DOING
+- Done: role enablement is now data-driven (D-126). New `apps/desktop/ui/src/data/role-coverage.ts`: pure `enabledRolesFromFiles` (distinct champions with a `baseline.json` row at `n_eff >= minGames` in the DIAMOND bucket, >= 50 to enable) plus `loadEnabledRoles` reading only the baseline files through the shared `loadCachedRelease` helper extracted from `export-data.ts`. `App` recomputes on `dataReadyNonce` and feeds `enabledRoles` to `AppShell`/`RoleSelector`; `DEFAULT_ENABLED_ROLES` remains the no-data fallback. `roleNeedsData` string updated ("Not enough champion data for this role"); ADC/MID keep the minimal-roles reason.
+- Files touched: `apps/desktop/ui/src/{App.tsx,config.ts,roles.ts,roles.test.ts,strings.ts}`, `data/{role-coverage.ts,role-coverage.test.ts,export-data.ts}`.
+- Tests: `pnpm check` green (1585 tests); new `role-coverage.test.ts` covers the 49/50 boundary, empty/missing baseline, DIAMOND bucket filtering, non-baseline files ignored and the cache loader.
+- Blockers / next step: commit on `main` per session instruction; open a PR (`feat/... (BL-050)`) if the owner wants review before merge. Verify TOP/JUNGLE selectable in the Tauri app on Windows.
+- Pitfalls: enablement reads `manifest.roles`, not `manifest.files`; a role exported without a baseline file counts as zero coverage. `nEff`/`DEFAULT_CONFIG` come from `@draftorb/engine` (pure, already a UI dependency).
+
+### Previous handoff (BL-011)
+
+- Date: 2026-11-26
 - Branch/PR: `feat/bl-011-top-jungle-export` / PR #152 / BL-011 (#74)
 - State: REVIEW
 - Done: `EXPORT_ROLES` extended to `['SUPPORT', 'TOP', 'JUNGLE']` (D-097); TOP/JUNGLE get the full `roles/<ROLE>/` layout (their `lane-full.json` stays empty — 1v1 lane groups). New `pnpm etl sample-report [patch]` (`export/sample-report.ts` + `commands/sample-report.ts`) prints per-file row counts and min/median/max `n_eff` for every `roles/<ROLE>/` file in the published manifest, pooled per role. DATA_MODEL.md documents the role enablement rule; DECISIONS.md D-126 (PROPOSED) records the ADC/MID assumption and the pending owner threshold question.

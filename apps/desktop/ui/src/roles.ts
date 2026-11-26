@@ -7,7 +7,7 @@ export interface RoleAvailability {
   reason?: string;
 }
 
-const NEEDS_DATA: readonly Role[] = ['TOP', 'JUNGLE'];
+const MINIMAL_ROLES: readonly Role[] = ['ADC', 'MID'];
 
 export function roleAvailability(
   enabledRoles: readonly Role[] = DEFAULT_ENABLED_ROLES,
@@ -19,7 +19,7 @@ export function roleAvailability(
     } else {
       result[role] = {
         enabled: false,
-        reason: NEEDS_DATA.includes(role) ? strings.roleNeedsData : strings.roleMinimal,
+        reason: MINIMAL_ROLES.includes(role) ? strings.roleMinimal : strings.roleNeedsData,
       };
     }
   }

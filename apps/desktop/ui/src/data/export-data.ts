@@ -4,8 +4,8 @@
  * Reads the cached aggregate tree written by `aggregates.ts`
  * (`latest.json`, `<patch>/manifest.json`, every manifest file plus the
  * manual `champion-tags.json` at the archive root) and builds the
- * `RecommendData` the engine consumes. SUPPORT only for v1a; the role
- * parameter is already threaded so v1b can enable more roles from data.
+ * `RecommendData` the engine consumes. Roles become selectable through the
+ * D-126 coverage check in `role-coverage.ts`, not through this loader.
  */
 
 import {
@@ -76,11 +76,16 @@ export function createRecommendData(
   };
 }
 
+interface CachedRelease {
+  latest: Latest;
+  manifest: Manifest;
+}
+
 /**
- * Loads the full pick-screen dataset from the data cache.
- * Returns null when nothing is cached (first launch, download failed).
+ * Reads `latest.json` and the manifest it points to from the data cache.
+ * Returns null when nothing is cached; throws on a corrupt or mismatched cache.
  */
-export async function loadPickData(role: Role): Promise<PickData | null> {
+export async function loadCachedRelease(): Promise<CachedRelease | null> {
   const latestRaw = await readDataFile('latest.json');
   if (latestRaw === null) return null;
   const latest: Latest = latestSchema.parse(JSON.parse(latestRaw));
@@ -94,6 +99,17 @@ export async function loadPickData(role: Role): Promise<PickData | null> {
       `Latest pointer patch ${latest.patch} does not match manifest patch ${manifest.patch}`,
     );
   }
+  return { latest, manifest };
+}
+
+/**
+ * Loads the full pick-screen dataset from the data cache.
+ * Returns null when nothing is cached (first launch, download failed).
+ */
+export async function loadPickData(role: Role): Promise<PickData | null> {
+  const release = await loadCachedRelease();
+  if (release === null) return null;
+  const { latest, manifest } = release;
 
   const files: Record<string, unknown> = {};
   // Archive-root entries ('/latest.json', '/champion-tags.json') are already

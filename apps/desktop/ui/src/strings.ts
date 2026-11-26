@@ -26,7 +26,7 @@ export const strings = {
     ADC: 'ADC',
     MID: 'Mid',
   },
-  roleNeedsData: 'Needs TOP/JUNGLE data (BL-011)',
+  roleNeedsData: 'Not enough champion data for this role',
   roleMinimal: 'Minimal roles come later (BL-024)',
   pickPlaceholder: 'Pick screen coming in BL-022/BL-016',
   pickNoData: 'No aggregate data cached yet — check the connection and restart.',

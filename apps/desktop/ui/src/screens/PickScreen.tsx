@@ -25,6 +25,7 @@ import { loadChampionIconVersion } from '../data/champion-icons';
 import { championsForSlot } from '../pick/champion-availability';
 import { excludePick, excludedRanks } from '../pick/exclude-pick';
 import { buildPoolUnavailableItems } from '../pick/pool-unavailable';
+import { enemyRoleViews } from '../pick/enemy-roles';
 import { DraftSlot, type DraftSlotState } from '../components/DraftSlot';
 import {
   RecommendationsList,
@@ -105,6 +106,10 @@ export function PickScreen({ role, profileLoad, dataReadyNonce }: PickScreenProp
 
   const champions: Champion[] = useMemo(() => pickData?.champions ?? [], [pickData]);
   const poolSet = useMemo(() => new Set(poolIds), [poolIds]);
+  const enemyViews = useMemo(
+    () => (pickData === null ? [] : enemyRoleViews(enemies, pickData.data.roleProb)),
+    [enemies, pickData],
+  );
 
   const draftInput: DraftInput = useMemo(
     () => ({
@@ -246,6 +251,7 @@ export function PickScreen({ role, profileLoad, dataReadyNonce }: PickScreenProp
                 slot={slot}
                 onChange={(next) => setEnemy(index, next)}
                 champions={championsForSlot(champions, usedChampionIds, slot.championId)}
+                roleView={enemyViews[index] ?? null}
                 iconVersion={iconVersion}
               />
             ))}

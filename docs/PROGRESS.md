@@ -15,6 +15,17 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 
 ## Current handoff
 
+- Date: 2026-11-26
+- Branch/PR: `feat/bl-009-pick-screen` / PR #148 / BL-015 (#79)
+- State: REVIEW
+- Done: enemy pick slots now show the engine's inferred role and confidence, visually distinct from manual overrides; the role `<select>` stays the manual override path and feeds the same `recommend` input, so overrides persist for the draft session and recompute recommendations. `enemyRoleViews` wraps `resolveKnownSlots` (the resolver `recommend` uses) so badges match scoring; slots the engine drops — missing role probabilities or ambiguous duplicate fixed roles — show "No role inferred" instead of a false manual/inferred role.
+- Files touched: `apps/desktop/ui/src/pick/enemy-roles.ts` (+test), `apps/desktop/ui/src/components/DraftSlot.tsx` (+SSR test), `apps/desktop/ui/src/screens/PickScreen.tsx`, `apps/desktop/ui/src/strings.ts`, `packages/engine/src/index.ts` (export `resolveKnownSlots`), `docs/PROGRESS.md`.
+- Tests: `pnpm check` (140 files / 1500 tests); focused `enemy-roles` + `DraftSlot` SSR tests cover inferred/manual/unresolved views and the override→recommend recompute path.
+- Blockers / next step: no bans UI exists yet in `apps/desktop`; banned champions are already excluded by the engine input path. Keyboard accessibility is via the native `<select>`; Windows/device check still pending.
+- Pitfalls: `resolveKnownSlots` dedupes by champion and drops a fixed role used by two or more slots of the same team as ambiguous (D-030); the UI mirrors that as `unresolved` rather than claiming a manual role the engine ignored.
+
+### Previous handoff (BL-018)
+
 - Date: 2026-11-17
 - Branch/PR: `feat/bl-018-record-badge` (local only, not pushed, stacked on `feat/bl-016a-pool-ui`) / BL-018 (#83)
 - State: REVIEW

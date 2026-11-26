@@ -6,6 +6,8 @@ Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATI
 
 | ID    | Sev | Area    | Title                                                                                                                                                                              | Status | Found by/date              | Ticket  |
 | ----- | --- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | -------------------------- | ------- |
+| B-075 | S4  | desktop | `loadPickData` zod-validates only the files `RecommendData` needs; every other manifest file is `JSON.parse`d without a schema check                                               | OPEN   | review/2026-11-25          | BL-009  |
+| B-074 | S3  | desktop | Pick screen "Blind pick" switch could never change recommendations: engine ORs `blindPick` with unknown lane roles, so the flag is unobservable                                    | FIXED  | review/2026-11-25          | BL-009  |
 | B-073 | S2  | desktop | Aggregate download-at-launch failed with `TypeError: Failed to fetch`: GitHub release assets send no CORS headers, so the webview `fetch` is blocked                               | FIXED  | Devin/2026-11-21           | BL-010b |
 | B-072 | S3  | etl     | Riot API error redaction kept an 8-character PUUID prefix in public workflow logs (D-078 point 9)                                                                                  | FIXED  | review/2026-11-17          | –       |
 | B-071 | S1  | etl     | Scheduled ETL refresh never saves progress: the unbudgeted `matches --refresh` step hits the 360-minute timeout and the B-070 guard refuses the snapshot                           | FIXED  | Devin/2026-11-17           | –       |
@@ -38,6 +40,13 @@ Review notes that predate the bug log live in [Review history](#review-history) 
 ```
 
 ## Fixed
+
+### B-074 — Pick screen "Blind pick" switch could never change recommendations — FIXED
+
+- Severity / Area: S3 / desktop (BL-009, PR #142 review)
+- Steps to reproduce: open the Pick tab, toggle "Blind pick" with all enemy lane roles known, then with some unknown.
+- Expected / Actual: expected the switch to change scores/reasons; actual `recommend.ts` computes `blindApplies = input.blindPick || !laneEnemiesKnown`, so the flag is already implied when it could matter and contributes an empty opponent map (term 0) when all lane roles are known — the toggle was unobservable. SPECS §5 sanctions the same OR semantics, so the gap is spec-level; recorded as D-125 PROPOSED.
+- Fix (commit/ticket): the dead control was removed from `PickScreen` and `DraftInput.blindPick` is sent as `false`; `apps/web` keeps its identical dead toggle (frozen, D-121). Engine semantics await the D-125 owner decision.
 
 ### B-073 — Aggregate download failed in the webview: release assets have no CORS headers — FIXED
 

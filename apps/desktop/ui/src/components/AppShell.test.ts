@@ -7,6 +7,7 @@ const base: AppShellProps = {
   screen: 'pick',
   onScreenChange: () => {},
   dataStatus: { kind: 'none' },
+  dataReadyNonce: 0,
   theme: 'system',
   resolvedTheme: 'light',
   onThemeChange: () => {},

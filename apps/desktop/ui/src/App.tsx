@@ -41,6 +41,7 @@ export function App() {
   const [poolSync, setPoolSync] = useState<PoolSyncStatus>({ kind: 'noFolder' });
   const [profileLoad, setProfileLoad] = useState<ProfileLoad>({ kind: 'none', reason: 'noFolder' });
   const [dataStatus, setDataStatus] = useState<DataStatus>(NO_DATA);
+  const [dataReadyNonce, setDataReadyNonce] = useState(0);
   const prefersDark = usePrefersDark();
   const resolvedTheme = settings === null ? null : resolveTheme(settings.theme, prefersDark);
 
@@ -49,7 +50,10 @@ export function App() {
       setSettings(loaded.settings);
       setNotice(loaded.notice);
     });
-    void ensureData().then(setDataStatus);
+    void ensureData().then((status) => {
+      setDataStatus(status);
+      setDataReadyNonce((nonce) => nonce + 1);
+    });
   }, []);
 
   const repoFolder = settings?.repoFolder;
@@ -111,6 +115,7 @@ export function App() {
       screen={screen}
       onScreenChange={setScreen}
       dataStatus={dataStatus}
+      dataReadyNonce={dataReadyNonce}
       theme={settings.theme}
       resolvedTheme={resolvedTheme}
       onThemeChange={changeTheme}
@@ -123,6 +128,7 @@ export function App() {
       onSaveRepoFolder={saveFolder}
       repoFolderAvailable={isTauri()}
       profileStatus={describeProfileLoad(profileLoad)}
+      profileLoad={profileLoad}
     />
   );
 }

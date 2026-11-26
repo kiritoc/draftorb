@@ -16,9 +16,20 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 ## Current handoff
 
 - Date: 2026-11-26
-- Branch/PR: `feat/bl-003-windows-ci` / BL-003 (#69)
+- Branch/PR: `feat/bl-022-fast-draft-entry` / BL-022 (#87)
 - State: REVIEW
-- Done: new `windows` job in `.github/workflows/ci.yml` (`windows-latest`, Node 22, same format-bot gating as `lint`/`test`): `pnpm install --frozen-lockfile`, a named `better-sqlite3 prebuilt check` step, `pnpm check`, and the Tauri spike build `pnpm --filter @draftorb/desktop tauri build --no-bundle` (BL-002 landed, D-115 Rust exception scoped to `apps/desktop`). New test `packages/etl/src/db/native-prebuild.test.ts` asserts `binding.js`'s `getPrebuildPath()` resolves a shipped `prebuilds/<platform>-<arch>.node` (no node-gyp fallback) and that an in-memory database opens and round-trips a row. First CI run on PR #155: every step green — install, prebuilt check, `pnpm check`, Tauri build (windows job 5m49s). ETL-on-Windows end-to-end logged as B-077.
+- Done: keyboard-first draft entry on the pick screen. New pure module `ui/src/pick/draft-entry.ts` (10 pick targets in entry order, digit-key map, next-empty advance, ban list rules) + `ui/src/components/DraftEntryBar.tsx` (persistent champion combobox that stays open after each pick, slot chips, role chips for the active slot, ban pseudo-target) + `ui/src/components/BanList.tsx`. `PickScreen` gained `bans` state wired into `DraftInput.bans`, a shared `blockedChampionIds` set (picked ∪ banned) for slot pickers and the entry search, and auto-advance to the next empty slot after each entry-bar pick. SPECS §10 documents the keyboard contract; `scripts/bench-recommend.ts` (`pnpm --filter @draftorb/desktop bench:recommend`) measures engine latency.
+- Files touched: `apps/desktop/ui/src/{pick/draft-entry.ts,pick/draft-entry.test.ts,components/DraftEntryBar.tsx,components/draft-entry-bar.test.ts,components/BanList.tsx,screens/PickScreen.tsx,strings.ts}`, `apps/desktop/scripts/bench-recommend.ts`, `apps/desktop/package.json`, `docs/SPECS.md`, `docs/PROGRESS.md`.
+- Tests: `pnpm check` green (1587 tests). Engine latency on the real 16.22 export: SUPPORT p50 1.75 ms / p95 2.44 ms, TOP p50 1.90 ms, JUNGLE p50 2.22 ms (n=300 each, well under the 50 ms budget). Timed mouse-free draft entry still needs the owner's manual run (protocol in the PR).
+- Blockers / next step: PR pending. BL-016b ban-list UI note in PROGRESS is now covered by `BanList`.
+- Pitfalls: the entry-bar dropdown stays open after Enter picks (rapid entry); it closes on Escape, outside pointerdown, or Tab away from the search (options keep it open so clicks land). Digit jumps only work with an empty query — champion names contain no digits.
+
+### Previous handoff (BL-003)
+
+- Date: 2026-11-26
+- Branch/PR: `feat/bl-003-windows-ci` / PR #155 / BL-003 (#69)
+- State: REVIEW
+- Done: new `windows` job in `.github/workflows/ci.yml` (`windows-latest`, Node 22, same format-bot gating as `lint`/`test`): `pnpm install --frozen-lockfile`, a named `better-sqlite3 prebuilt check` step, `pnpm check`, and the Tauri spike build `pnpm --filter @draftorb/desktop tauri build --no-bundle` (BL-002 landed, D-115 Rust exception scoped to `apps/desktop`); `windows-latest` was dropped from the `test` matrix to avoid a duplicate Windows suite run. New test `packages/etl/src/db/native-prebuild.test.ts` asserts `binding.js`'s `getPrebuildPath()` resolves a shipped `prebuilds/<platform>-<arch>.node` (no node-gyp fallback) and that an in-memory database opens and round-trips a row. CI on PR #155: every step green (windows job ~6-9 min). ETL-on-Windows end-to-end logged as B-079 (renumbered after a B-077 collision on main).
 - Files touched: `.github/workflows/ci.yml`, `packages/etl/src/db/native-prebuild.test.ts`, `docs/{BUGS,PROGRESS}.md`.
 - Tests: `pnpm check` green locally (149 files / 1573 tests, macOS arm64) and on `windows-latest` in CI; actionlint clean on `ci.yml`.
 - Blockers / next step: PR #155 open, all checks green; owner review/merge, then close #69.

@@ -212,3 +212,36 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
+
+  # BL-003: Windows is a first-class target (D-099, D-115). Full `pnpm check`,
+  # a better-sqlite3 prebuilt proof, and the Tauri spike build. The Rust
+  # toolchain exception applies to apps/desktop build tooling only.
+  windows:
+    needs: [format, commit-format]
+    if: ${{ !cancelled() && needs.commit-format.result != 'success' }}
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # Named step so the native-dependency proof is visible in the log:
+      # asserts the shipped prebuild is what gets loaded, then opens a DB.
+      - name: better-sqlite3 prebuilt check
+        run: pnpm vitest run packages/etl/src/db/native-prebuild.test.ts
+
+      - run: pnpm check
+        if: ${{ !cancelled() }}
+
+      # Tauri spike build (BL-002 landed). windows-latest ships a stable Rust
+      # toolchain and MSVC; `tauri build` compiles src-tauri in release mode.
+      - name: Tauri spike build
+        run: pnpm --filter @draftorb/desktop tauri build --no-bundle
+        if: ${{ !cancelled() }}

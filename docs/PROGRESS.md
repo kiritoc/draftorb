@@ -16,6 +16,17 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 ## Current handoff
 
 - Date: 2026-11-26
+- Branch/PR: `feat/bl-003-windows-ci` / BL-003 (#69)
+- State: DOING
+- Done: new `windows` job in `.github/workflows/ci.yml` (`windows-latest`, Node 22, same format-bot gating as `lint`/`test`): `pnpm install --frozen-lockfile`, a named `better-sqlite3 prebuilt check` step, `pnpm check`, and the Tauri spike build `pnpm --filter @draftorb/desktop tauri build --no-bundle` (BL-002 landed, D-115 Rust exception scoped to `apps/desktop`). New test `packages/etl/src/db/native-prebuild.test.ts` asserts `binding.js`'s `getPrebuildPath()` resolves a shipped `prebuilds/<platform>-<arch>.node` (no node-gyp fallback) and that an in-memory database opens and round-trips a row.
+- Files touched: `.github/workflows/ci.yml`, `packages/etl/src/db/native-prebuild.test.ts`, `docs/PROGRESS.md`.
+- Tests: `pnpm check` green locally (149 files / 1573 tests, macOS arm64); actionlint clean on `ci.yml`. Windows job result pending first CI run on the PR.
+- Blockers / next step: push branch, open PR, record per-step pass/fail in the PR description once the `windows` job runs; log any Windows-only failure in `docs/BUGS.md`.
+- Pitfalls: `pnpm vitest run <file>` targets a single test from the repo root (vitest is a root devDependency, not an etl one); `getPrebuildPath()` is exported by `better-sqlite3/lib/binding.js` and is the same lookup the loader uses, so the test proves the prebuilt — not a `build/` node-gyp artifact — is what gets required.
+
+### Previous handoff (BL-011)
+
+- Date: 2026-11-26
 - Branch/PR: `feat/bl-011-top-jungle-export` / PR #152 / BL-011 (#74)
 - State: REVIEW
 - Done: `EXPORT_ROLES` extended to `['SUPPORT', 'TOP', 'JUNGLE']` (D-097); TOP/JUNGLE get the full `roles/<ROLE>/` layout (their `lane-full.json` stays empty — 1v1 lane groups). New `pnpm etl sample-report [patch]` (`export/sample-report.ts` + `commands/sample-report.ts`) prints per-file row counts and min/median/max `n_eff` for every `roles/<ROLE>/` file in the published manifest, pooled per role. DATA_MODEL.md documents the role enablement rule; DECISIONS.md D-126 (PROPOSED) records the ADC/MID assumption and the pending owner threshold question.

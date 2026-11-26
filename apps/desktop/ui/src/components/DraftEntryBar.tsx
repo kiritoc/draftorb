@@ -130,7 +130,6 @@ export function DraftEntryBar({
     if (!open || active < 0) return;
     const option = listboxRef.current?.querySelector<HTMLElement>(`[id="${optionId(active)}"]`);
     option?.scrollIntoView({ block: 'nearest' });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, active]);
 
   const handleSelect = (championId: ChampionId) => {

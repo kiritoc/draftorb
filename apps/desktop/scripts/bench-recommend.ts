@@ -45,8 +45,7 @@ if (!roleParsed.success) {
 }
 const ROLE: Role = roleParsed.data;
 
-const read = (...segments: string[]) =>
-  JSON.parse(readFileSync(join(DATA, ...segments), 'utf8'));
+const read = (...segments: string[]) => JSON.parse(readFileSync(join(DATA, ...segments), 'utf8'));
 
 const latest = latestSchema.parse(read('public', 'latest.json'));
 const manifest = manifestSchema.parse(read('public', ...latest.manifest.split('/')));

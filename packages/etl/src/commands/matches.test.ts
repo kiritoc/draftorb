@@ -1,3 +1,4 @@
+import Database from 'better-sqlite3';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -93,6 +94,31 @@ describe('matchesCommand --dry-run', () => {
         .n;
       check.close();
       expect(after).toBe(before);
+    } finally {
+      if (originalDbPath === undefined) delete process.env.DRAFTORB_DB_PATH;
+      else process.env.DRAFTORB_DB_PATH = originalDbPath;
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('reports pending migrations on a pre-checksum ledger without writing', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'draftorb-dry-run-legacy-'));
+    const dbPath = join(dir, 'legacy.sqlite');
+    // Ledger shape from before the checksum column existed: the read-only
+    // status check must not try to ALTER it.
+    const db = openDb(dbPath);
+    db.exec('CREATE TABLE _migrations (version TEXT PRIMARY KEY, applied_at INTEGER NOT NULL)');
+    db.prepare('INSERT INTO _migrations (version, applied_at) VALUES (?, ?)').run('001_initial', 0);
+    db.close();
+
+    const originalDbPath = process.env.DRAFTORB_DB_PATH;
+    process.env.DRAFTORB_DB_PATH = dbPath;
+    try {
+      await expect(matchesCommand.run(['--dry-run'])).rejects.toThrow(/pending migrations/);
+      const check = new Database(dbPath, { readonly: true, fileMustExist: true });
+      const columns = check.pragma('table_info(_migrations)') as { name: string }[];
+      check.close();
+      expect(columns.map((c) => c.name)).toEqual(['version', 'applied_at']);
     } finally {
       if (originalDbPath === undefined) delete process.env.DRAFTORB_DB_PATH;
       else process.env.DRAFTORB_DB_PATH = originalDbPath;

@@ -8,7 +8,7 @@ import { ingestMatches } from '../matches';
 import { poolChampionRolePairs, selectPlayers } from '../matches-select';
 import { loadPoolConfig, poolConfigPathFromEnv } from '../pool-config';
 import { dbPathFromEnv, resolveDbPath } from '../config/paths';
-import { getMigrationStatus, openDb } from '../db';
+import { getMigrationStatusReadOnly, openDb } from '../db';
 import { CliError, UsageError, parseStrictPositiveInt } from '../cli-args';
 import { log, parsePlatform, type Command } from './shared';
 
@@ -116,11 +116,9 @@ async function runMatches(args: string[]): Promise<void> {
     }
     const roDb = new Database(dryRunDbPath, { readonly: true, fileMustExist: true });
     try {
-      const hasMigrationsTable =
-        roDb
-          .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = '_migrations'")
-          .get() !== undefined;
-      if (!hasMigrationsTable || getMigrationStatus(roDb).pending > 0) {
+      // Read-only status: safe on pre-checksum `_migrations` ledgers, unlike
+      // getMigrationStatus which would try to ALTER the table.
+      if (getMigrationStatusReadOnly(roDb).pending > 0) {
         throw new CliError(
           `Database at ${dryRunDbPath} has pending migrations. ` +
             'Run `pnpm etl migrate` first; --dry-run never migrates.',

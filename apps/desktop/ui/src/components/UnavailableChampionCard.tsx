@@ -49,7 +49,15 @@ export function UnavailableChampionCard({
         </div>
         <span className="text-xs text-slate-500 dark:text-slate-400">
           {REASON_LABEL[reason]}
-          {sample !== undefined && ` · ${strings.sampleSize} ${sample.nEff.toFixed(0)}`}
+          {reason === 'insufficientData' && sample !== undefined && (
+            <>
+              {' '}
+              · {strings.sampleSize} {sample.nEff.toFixed(1)}
+              {sample.rawGames !== undefined && ` · ${strings.poolSampleGames(sample.rawGames)}`}
+              {sample.winRate !== undefined &&
+                ` · ${strings.poolBaselineWinRate(sample.winRate * 100)}`}
+            </>
+          )}
         </span>
       </div>
     </div>

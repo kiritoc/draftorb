@@ -12,6 +12,7 @@ import {
   type Champion,
   type DraftInput,
   type InsufficientDataEntry,
+  type PoolConfig,
   type PoolUnavailableEntry,
   type Rank,
   type Recommendation,
@@ -19,18 +20,15 @@ import {
   type Role,
 } from '@draftorb/shared';
 import type { ProfileLoad } from '../profile/profile-export';
-import { loadPool } from '../pool/pool-store';
+import { emptyPool, loadPool, savePool } from '../pool/pool-store';
+import { dropUnknownChampions, serializePoolConfig } from '../pool/pool-model';
 import { loadPickData, type PickData } from '../data/export-data';
 import { loadChampionIconVersion } from '../data/champion-icons';
 import { championsForSlot } from '../pick/champion-availability';
-import { excludePick, excludedRanks } from '../pick/exclude-pick';
-import { buildPoolUnavailableItems } from '../pick/pool-unavailable';
 import { enemyRoleViews } from '../pick/enemy-roles';
 import { DraftSlot, type DraftSlotState } from '../components/DraftSlot';
-import {
-  RecommendationsList,
-  type RecommendationCardContext,
-} from '../components/RecommendationsList';
+import { PickRecommendations } from '../components/PickRecommendations';
+import { PoolEditor } from '../components/PoolEditor';
 import { strings } from '../strings';
 
 const DEFAULT_RANK: Rank = 'DIAMOND';
@@ -52,13 +50,24 @@ export interface PickScreenProps {
   profileLoad: ProfileLoad;
   /** Bumped each time the launch data download settles; triggers a cache reload. */
   dataReadyNonce: number;
+  /** Repo folder for the pool editor's repo-file actions (SPECS §19.3). */
+  repoFolder?: string;
+  /** Called after the pool is saved or exported to the repo file (D-118 banner). */
+  onPoolChanged?: () => void;
 }
 
-export function PickScreen({ role, profileLoad, dataReadyNonce }: PickScreenProps) {
+export function PickScreen({
+  role,
+  profileLoad,
+  dataReadyNonce,
+  repoFolder,
+  onPoolChanged,
+}: PickScreenProps) {
   const [pickData, setPickData] = useState<PickData | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [iconVersion, setIconVersion] = useState<string | null>(null);
-  const [poolIds, setPoolIds] = useState<number[]>([]);
+  const [poolConfig, setPoolConfig] = useState<PoolConfig>(emptyPool());
+  const [poolEditorOpen, setPoolEditorOpen] = useState(false);
   const [user, setUser] = useState<DraftSlotState>({ championId: null });
   const [allies, setAllies] = useState<DraftSlotState[]>(
     Array.from({ length: ALLY_COUNT }, emptySlot),
@@ -90,9 +99,6 @@ export function PickScreen({ role, profileLoad, dataReadyNonce }: PickScreenProp
             if (!cancelled) setIconVersion(version);
           })
           .catch(() => {});
-        const { pool } = await loadPool();
-        if (cancelled) return;
-        setPoolIds((pool.pools[role] ?? []).map((entry) => entry.championId));
       } catch (err) {
         if (!cancelled) {
           setLoadError(err instanceof Error ? err.message : String(err));
@@ -104,8 +110,30 @@ export function PickScreen({ role, profileLoad, dataReadyNonce }: PickScreenProp
     };
   }, [role, dataReadyNonce]);
 
+  // The pool loads independently of aggregates so the editor (and its JSON
+  // backup) stays usable when pick data is missing or fails to load.
+  useEffect(() => {
+    let cancelled = false;
+    void loadPool()
+      .then(({ pool }) => {
+        if (cancelled) return;
+        // Keep the same object when the content is unchanged so reloads
+        // do not churn the pool editor or the lists.
+        setPoolConfig((current) =>
+          serializePoolConfig(current) === serializePoolConfig(pool) ? current : pool,
+        );
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [dataReadyNonce]);
+
   const champions: Champion[] = useMemo(() => pickData?.champions ?? [], [pickData]);
-  const poolSet = useMemo(() => new Set(poolIds), [poolIds]);
+  const poolIds = useMemo(
+    () => (poolConfig.pools[role] ?? []).map((entry) => entry.championId),
+    [poolConfig, role],
+  );
   const enemyViews = useMemo(
     () => (pickData === null ? [] : enemyRoleViews(enemies, pickData.data.roleProb)),
     [enemies, pickData],
@@ -159,32 +187,52 @@ export function PickScreen({ role, profileLoad, dataReadyNonce }: PickScreenProp
     [user, allies, enemies],
   );
 
-  const removedRanks = useMemo(
-    () => excludedRanks(user.championId, recommendations, poolRecommendations),
-    [user.championId, recommendations, poolRecommendations],
-  );
-  const overallRecommendations = excludePick(recommendations, user.championId, removedRanks);
-  const visiblePoolRecommendations = excludePick(
-    poolRecommendations,
-    user.championId,
-    removedRanks,
-  );
-  const poolUnavailableItems = useMemo(
-    () =>
-      buildPoolUnavailableItems(poolUnavailable, insufficientData, user.championId ?? undefined),
-    [poolUnavailable, insufficientData, user.championId],
-  );
+  /** Persists the editor's working copy; resolves to the dropped champion ids. */
+  const persistPool = async (next: PoolConfig): Promise<number[]> => {
+    // Without a champion catalog every id would look unknown: never drop then.
+    if (champions.length === 0) {
+      await savePool(next);
+      setPoolConfig(next);
+      onPoolChanged?.();
+      return [];
+    }
+    const knownIds = new Set(champions.map((champion) => champion.id));
+    const { pool: filtered, dropped } = dropUnknownChampions(next, knownIds);
+    await savePool(filtered);
+    setPoolConfig(filtered);
+    onPoolChanged?.();
+    return dropped;
+  };
 
-  const cardContext = useMemo<RecommendationCardContext>(
-    () => ({ champions, iconVersion, profileLoad, role }),
-    [champions, iconVersion, profileLoad, role],
-  );
-
-  if (loadError !== null) {
-    return <p className="text-red-600 dark:text-red-400">{strings.loadFailed(loadError)}</p>;
-  }
-  if (pickData === null) {
-    return <p className="text-slate-500 dark:text-slate-400">{strings.loading}</p>;
+  if (loadError !== null || pickData === null) {
+    return (
+      <div className="space-y-4">
+        {loadError !== null ? (
+          <p className="text-red-600 dark:text-red-400">{strings.loadFailed(loadError)}</p>
+        ) : (
+          <p className="text-slate-500 dark:text-slate-400">{strings.loading}</p>
+        )}
+        <button
+          type="button"
+          onClick={() => setPoolEditorOpen(true)}
+          className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
+        >
+          {strings.editPool}
+        </button>
+        <PoolEditor
+          open={poolEditorOpen}
+          onClose={() => setPoolEditorOpen(false)}
+          pool={poolConfig}
+          champions={champions}
+          iconVersion={iconVersion}
+          repoFolder={repoFolder}
+          onSave={async (next) => {
+            await persistPool(next);
+          }}
+          onPoolChanged={onPoolChanged}
+        />
+      </div>
+    );
   }
 
   return (
@@ -204,6 +252,13 @@ export function PickScreen({ role, profileLoad, dataReadyNonce }: PickScreenProp
             ))}
           </select>
         </label>
+        <button
+          type="button"
+          onClick={() => setPoolEditorOpen(true)}
+          className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
+        >
+          {strings.editPool}
+        </button>
       </div>
 
       {recommendError !== null && (
@@ -259,23 +314,24 @@ export function PickScreen({ role, profileLoad, dataReadyNonce }: PickScreenProp
         </section>
       </div>
 
-      {poolIds.length > 0 && (
-        <RecommendationsList
-          title={strings.fromYourPool}
-          recommendations={visiblePoolRecommendations}
-          resetKey={draftInput}
-          poolIds={poolSet}
-          unavailable={poolUnavailableItems}
-          cardContext={cardContext}
-        />
-      )}
-
-      <RecommendationsList
-        title={strings.bestOverall}
-        recommendations={overallRecommendations}
+      <PickRecommendations
+        role={role}
+        poolIds={poolIds}
+        poolConfig={poolConfig}
+        champions={champions}
+        iconVersion={iconVersion}
+        profileLoad={profileLoad}
+        userChampionId={user.championId}
+        recommendations={recommendations}
+        poolRecommendations={poolRecommendations}
+        poolUnavailable={poolUnavailable}
+        insufficientData={insufficientData}
         resetKey={draftInput}
-        poolIds={poolSet}
-        cardContext={cardContext}
+        repoFolder={repoFolder}
+        onSavePool={persistPool}
+        editorOpen={poolEditorOpen}
+        onEditorOpenChange={setPoolEditorOpen}
+        onPoolChanged={onPoolChanged}
       />
     </div>
   );

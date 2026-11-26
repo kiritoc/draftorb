@@ -12,6 +12,7 @@ import { paginate } from './pagination';
 import { excludePick, excludedRanks } from './exclude-pick';
 import { championsForSlot } from './champion-availability';
 import { buildPoolUnavailableItems } from './pool-unavailable';
+import { hidePoolChampions } from './hide-my-pool';
 
 const champ = (id: number, name = `C${id}`): Champion => ({
   id,
@@ -80,6 +81,28 @@ describe('championsForSlot', () => {
 
   it('excludes used champions when the slot is empty', () => {
     expect(championsForSlot(all, new Set([1]), null).map((c) => c.id)).toEqual([2, 3]);
+  });
+});
+
+describe('hidePoolChampions', () => {
+  const overall = [rec(1, 1), rec(2, 2), rec(3, 3), rec(10, 5, 1)];
+  const poolIds = new Set([2, 10]);
+
+  it('returns the list unchanged when the toggle is off', () => {
+    expect(hidePoolChampions(overall, poolIds, false).map((r) => r.championId)).toEqual([
+      1, 2, 3, 10,
+    ]);
+  });
+
+  it('removes pool champions but keeps global ranks (gaps expected)', () => {
+    const filtered = hidePoolChampions(overall, poolIds, true);
+    expect(filtered.map((r) => r.championId)).toEqual([1, 3]);
+    expect(filtered.map((r) => r.rank)).toEqual([1, 3]);
+  });
+
+  it('does not mutate the input list', () => {
+    hidePoolChampions(overall, poolIds, true);
+    expect(overall).toHaveLength(4);
   });
 });
 

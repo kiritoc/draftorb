@@ -58,20 +58,16 @@ export function App() {
 
   const repoFolder = settings?.repoFolder;
   const settingsLoaded = settings !== null;
+  const refreshPoolSync = useCallback(async () => {
+    const program = await loadPool();
+    const repo = repoFolder === undefined ? null : await readRepoPool(repoFolder);
+    setPoolNotice(program.notice);
+    setPoolSync(poolSyncStatus(program.pool, repo));
+  }, [repoFolder]);
   useEffect(() => {
     if (!settingsLoaded) return;
-    let cancelled = false;
-    void (async () => {
-      const program = await loadPool();
-      const repo = repoFolder === undefined ? null : await readRepoPool(repoFolder);
-      if (cancelled) return;
-      setPoolNotice(program.notice);
-      setPoolSync(poolSyncStatus(program.pool, repo));
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [settingsLoaded, repoFolder]);
+    void refreshPoolSync();
+  }, [settingsLoaded, refreshPoolSync]);
 
   useEffect(() => {
     if (!settingsLoaded) return;
@@ -126,6 +122,7 @@ export function App() {
       poolSync={poolSync}
       repoFolder={settings.repoFolder}
       onSaveRepoFolder={saveFolder}
+      onPoolChanged={() => void refreshPoolSync()}
       repoFolderAvailable={isTauri()}
       profileStatus={describeProfileLoad(profileLoad)}
       profileLoad={profileLoad}

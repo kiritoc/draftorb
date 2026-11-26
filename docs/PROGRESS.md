@@ -16,13 +16,19 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 ## Current handoff
 
 - Date: 2026-11-26
+- Branch/PR: `feat/bl-016b-pool-lists` / PR #151 / BL-016b (#81)
+- State: REVIEW
+- Done: recommendation-lists UI completed per SPECS §7.1 — empty-pool one-line CTA per role ("No <Role> champions in your pool." + "Edit your pool"), UI-only "Hide my pool" toggle (default off, `hidePoolChampions` keeps global ranks/gaps, score(c) untouched), pool cards show both ranks (`In your pool · #n` badge + global `#rank`), unavailable pool cards now show n_eff, raw games and baseline win rate. New `PoolEditor` modal: champion x roles (pick once, tick roles, same champion under several roles) on the program-stored `PoolConfig`, per-role sections with `n/40` counts, remove/clear, JSON backup (schema-validated import, export to read-only textarea), manual repo-file import/export per §19.3 (export refused while the working copy is dirty — dirtiness derived from canonical serialization). `PickRecommendations` component owns all list shaping (pick exclusion, rank-gap closing, pool filtering, editor open state is lifted to the screen for the top "Edit pool" button). `onPoolChanged` refreshes the pool-sync banner after save/repo export (D-118). SPECS unchanged.
+- Files touched: `apps/desktop/ui/src/{App.tsx,strings.ts}`, `components/{AppShell,PickRecommendations,PoolEditor,PoolAddForm,PoolRoleSection,PoolTransferSection,RecommendationsList,UnavailableChampionCard}.tsx`, `components/{pick-recommendations,recommendations-list,pool-editor}.test.ts`, `pick/{hide-my-pool.ts,pick.test.ts}`, `pool/{pool-model.ts,pool-model.test.ts}`, `screens/PickScreen.tsx`.
+- Tests: `pnpm check` green (1544 tests); new tests cover `hidePoolChampions`, `championPoolRoles`, list rendering (tags/ranks/pagination/unavailable), `PickRecommendations` CTA/both-lists, `PoolEditor` static render.
+- Blockers / next step: PR #151 open; Windows check pending. Engine `poolRecommendations` contract verified, not rewritten. Review fixes: editor logic moved to the pure `pool/pool-editor-state.ts` reducer (stale checkboxes, apply-with-no-role removes, export guard, all unit-tested); working copy resets only on open; native `<dialog>` + `showModal()` for focus and inert background (manual keyboard check pending in Tauri). Follow-up (out of scope): the pool editor is unreachable when aggregate loading fails — move it out of the pick screen in a separate issue.
+- Pitfalls: `dirty` in the editor is `serializePoolConfig(working) !== serializePoolConfig(pool)` — canonical order makes it exact; the repo-export guard therefore also clears when edits are reverted.
+
+### Previous handoff (BL-015)
+
+- Date: 2026-11-26
 - Branch/PR: `feat/bl-009-pick-screen` / PR #148 / BL-015 (#79)
 - State: REVIEW
-- Done: enemy pick slots now show the engine's inferred role and confidence, visually distinct from manual overrides; the role `<select>` stays the manual override path and feeds the same `recommend` input, so overrides persist for the draft session and recompute recommendations. `enemyRoleViews` wraps `resolveKnownSlots` (the resolver `recommend` uses) so badges match scoring; slots the engine drops — missing role probabilities or ambiguous duplicate fixed roles — show "No role inferred" instead of a false manual/inferred role.
-- Files touched: `apps/desktop/ui/src/pick/enemy-roles.ts` (+test), `apps/desktop/ui/src/components/DraftSlot.tsx` (+SSR test), `apps/desktop/ui/src/screens/PickScreen.tsx`, `apps/desktop/ui/src/strings.ts`, `packages/engine/src/index.ts` (export `resolveKnownSlots`), `docs/PROGRESS.md`.
-- Tests: `pnpm check` (140 files / 1500 tests); focused `enemy-roles` + `DraftSlot` SSR tests cover inferred/manual/unresolved views and the override→recommend recompute path.
-- Blockers / next step: no bans UI exists yet in `apps/desktop`; banned champions are already excluded by the engine input path. Keyboard accessibility is via the native `<select>`; Windows/device check still pending.
-- Pitfalls: `resolveKnownSlots` dedupes by champion and drops a fixed role used by two or more slots of the same team as ambiguous (D-030); the UI mirrors that as `unresolved` rather than claiming a manual role the engine ignored.
 
 ### Previous handoff (BL-018)
 

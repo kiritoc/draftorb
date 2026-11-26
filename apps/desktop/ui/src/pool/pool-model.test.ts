@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { poolConfigSchema, type PoolConfig, type Role } from '@draftorb/shared';
 import {
+  championPoolRoles,
   dropUnknownChampions,
   emptyPool,
   parsePoolConfig,
@@ -55,6 +56,17 @@ describe('setChampionRoles', () => {
     const twice = setChampionRoles(once, 2, ['TOP', 'JUNGLE']).pool;
     expect(twice).toEqual(once);
     expect(JSON.stringify(start)).toBe(snapshot);
+  });
+});
+
+describe('championPoolRoles', () => {
+  it('returns the roles a champion currently occupies, in role order', () => {
+    const pool = setChampionRoles(setChampionRoles(emptyPool(), 7, ['MID', 'TOP']).pool, 8, [
+      'SUPPORT',
+    ]).pool;
+    expect(championPoolRoles(pool, 7)).toEqual(['TOP', 'MID']);
+    expect(championPoolRoles(pool, 8)).toEqual(['SUPPORT']);
+    expect(championPoolRoles(pool, 9)).toEqual([]);
   });
 });
 

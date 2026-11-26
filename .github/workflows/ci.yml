@@ -195,12 +195,9 @@ jobs:
   test:
     needs: [format, commit-format]
     if: ${{ !cancelled() && needs.commit-format.result != 'success' }}
-    runs-on: ${{ matrix.os }}
+    # Windows tests run in the `windows` job below via `pnpm check` (BL-003).
+    runs-on: ubuntu-latest
     timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v7
         with:

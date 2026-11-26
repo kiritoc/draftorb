@@ -16,13 +16,19 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 ## Current handoff
 
 - Date: 2026-11-26
-- Branch/PR: `feat/bl-016b-pool-lists` (stacked on `fix/b-076-publish-manifest-coverage`, PR #150) / BL-016b (#81)
+- Branch/PR: `feat/bl-016b-pool-lists` / PR #151 / BL-016b (#81)
 - State: REVIEW
 - Done: recommendation-lists UI completed per SPECS §7.1 — empty-pool one-line CTA per role ("No <Role> champions in your pool." + "Edit your pool"), UI-only "Hide my pool" toggle (default off, `hidePoolChampions` keeps global ranks/gaps, score(c) untouched), pool cards show both ranks (`In your pool · #n` badge + global `#rank`), unavailable pool cards now show n_eff, raw games and baseline win rate. New `PoolEditor` modal: champion x roles (pick once, tick roles, same champion under several roles) on the program-stored `PoolConfig`, per-role sections with `n/40` counts, remove/clear, JSON backup (schema-validated import, export to read-only textarea), manual repo-file import/export per §19.3 (export refused while the working copy is dirty — dirtiness derived from canonical serialization). `PickRecommendations` component owns all list shaping (pick exclusion, rank-gap closing, pool filtering, editor open state is lifted to the screen for the top "Edit pool" button). `onPoolChanged` refreshes the pool-sync banner after save/repo export (D-118). SPECS unchanged.
 - Files touched: `apps/desktop/ui/src/{App.tsx,strings.ts}`, `components/{AppShell,PickRecommendations,PoolEditor,PoolAddForm,PoolRoleSection,PoolTransferSection,RecommendationsList,UnavailableChampionCard}.tsx`, `components/{pick-recommendations,recommendations-list,pool-editor}.test.ts`, `pick/{hide-my-pool.ts,pick.test.ts}`, `pool/{pool-model.ts,pool-model.test.ts}`, `screens/PickScreen.tsx`.
-- Tests: `pnpm check` green (1541 tests); new tests cover `hidePoolChampions`, `championPoolRoles`, list rendering (tags/ranks/pagination/unavailable), `PickRecommendations` CTA/both-lists, `PoolEditor` static render.
-- Blockers / next step: PR pending (stacked on #150 until it merges); Windows check pending. Engine `poolRecommendations` contract verified, not rewritten.
+- Tests: `pnpm check` green (1544 tests); new tests cover `hidePoolChampions`, `championPoolRoles`, list rendering (tags/ranks/pagination/unavailable), `PickRecommendations` CTA/both-lists, `PoolEditor` static render.
+- Blockers / next step: PR #151 open; Windows check pending. Engine `poolRecommendations` contract verified, not rewritten.
 - Pitfalls: `dirty` in the editor is `serializePoolConfig(working) !== serializePoolConfig(pool)` — canonical order makes it exact; the repo-export guard therefore also clears when edits are reverted.
+
+### Previous handoff (BL-015)
+
+- Date: 2026-11-26
+- Branch/PR: `feat/bl-009-pick-screen` / PR #148 / BL-015 (#79)
+- State: REVIEW
 
 ### Previous handoff (BL-018)
 

@@ -25,6 +25,7 @@ import { dropUnknownChampions } from '../pool/pool-model';
 import { loadPickData, type PickData } from '../data/export-data';
 import { loadChampionIconVersion } from '../data/champion-icons';
 import { championsForSlot } from '../pick/champion-availability';
+import { enemyRoleViews } from '../pick/enemy-roles';
 import { DraftSlot, type DraftSlotState } from '../components/DraftSlot';
 import { PickRecommendations } from '../components/PickRecommendations';
 import { strings } from '../strings';
@@ -115,6 +116,10 @@ export function PickScreen({
   const poolIds = useMemo(
     () => (poolConfig.pools[role] ?? []).map((entry) => entry.championId),
     [poolConfig, role],
+  );
+  const enemyViews = useMemo(
+    () => (pickData === null ? [] : enemyRoleViews(enemies, pickData.data.roleProb)),
+    [enemies, pickData],
   );
 
   const draftInput: DraftInput = useMemo(
@@ -253,6 +258,7 @@ export function PickScreen({
                 slot={slot}
                 onChange={(next) => setEnemy(index, next)}
                 champions={championsForSlot(champions, usedChampionIds, slot.championId)}
+                roleView={enemyViews[index] ?? null}
                 iconVersion={iconVersion}
               />
             ))}

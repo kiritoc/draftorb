@@ -31,9 +31,9 @@
   },
   "expected": {
     "recommendations": [
-      { "championId": 11, "rank": 1, "reasons": [{ "type": "blind", "lowData": false }] },
-      { "championId": 201, "rank": 2 },
-      { "championId": 12, "rank": 3, "reasons": [{ "type": "blind", "lowData": false }] }
+      { "championId": 11, "rank": 1, "reasons": [], "allReasons": true },
+      { "championId": 12, "rank": 2, "reasons": [], "allReasons": true },
+      { "championId": 201, "rank": 3, "reasons": [], "allReasons": true }
     ],
     "insufficientData": []
   }

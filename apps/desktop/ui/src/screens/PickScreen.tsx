@@ -1,5 +1,5 @@
 /**
- * Pick screen (BL-009, v1a SUPPORT-only): draft slots for the user's pick,
+ * Pick screen (BL-009/BL-024): draft slots for the user's pick,
  * four allies and five enemies, and a rank selector.
  * The engine's `recommend` output renders as "From your pool" above
  * "Best overall" (D-024 invariants, 5-per-page "Show more").
@@ -314,6 +314,10 @@ export function PickScreen({
           {strings.editPool}
         </button>
       </div>
+
+      {pickData.minimal && (
+        <p className="text-xs text-slate-500 dark:text-slate-400">{strings.pickMinimalNote}</p>
+      )}
 
       {recommendError !== null && (
         <p className="text-sm text-red-600 dark:text-red-400">

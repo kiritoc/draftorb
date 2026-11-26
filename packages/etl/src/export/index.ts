@@ -16,7 +16,7 @@ import type Database from 'better-sqlite3';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { DEFAULT_CONFIG, type RankWeightingConfig } from '@draftorb/engine';
+import { DEFAULT_CONFIG, MINIMAL_ROLES, type RankWeightingConfig } from '@draftorb/engine';
 import {
   LATEST_SCHEMA_VERSION,
   championTagsMapSchema,
@@ -64,9 +64,9 @@ import {
   writeFileAtomic,
 } from './io.js';
 
-/** Roles exported by default (D-097): SUPPORT, TOP and JUNGLE in full.
- *  ADC/MID stay at champion-level statistics and get no role directory
- *  (BL-024). */
+/** Roles exported with the full role directory (D-097): SUPPORT, TOP and
+ *  JUNGLE. ADC/MID (`MINIMAL_ROLES`, engine config) get `baseline.json` only —
+ *  champion-level statistics, no pair/lane/rune/build files (BL-024). */
 export const EXPORT_ROLES: readonly Role[] = ['SUPPORT', 'TOP', 'JUNGLE'];
 
 export interface ExportOptions {
@@ -123,8 +123,17 @@ function readPublishedPointer(publicDir: string): { patch: string; intact: boole
   let intact = false;
   try {
     if (existsSync(manifestPath)) {
-      const manifest = manifestSchema.safeParse(JSON.parse(readFileSync(manifestPath, 'utf8')));
-      intact = manifest.success && manifest.data.patch === latest.patch;
+      const json: unknown = JSON.parse(readFileSync(manifestPath, 'utf8'));
+      const manifest = manifestSchema.safeParse(json);
+      if (manifest.success) {
+        intact = manifest.data.patch === latest.patch;
+      } else {
+        // A manifest written by another schema version (e.g. v4 before the
+        // v5 bump, BL-024) still proves the patch dir is intact: the pointer
+        // guard only needs the patch name to match.
+        const patch = (json as { patch?: unknown }).patch;
+        intact = typeof patch === 'string' && patch === latest.patch;
+      }
     }
   } catch {
     intact = false;
@@ -143,7 +152,9 @@ export function exportJson(db: Database.Database, options: ExportOptions = {}): 
     );
   }
   const exportMinGames = config.exportMinGames;
-  const roles = options.roles ?? EXPORT_ROLES;
+  const roles = options.roles ?? [...EXPORT_ROLES, ...MINIMAL_ROLES];
+  const minimalRoles = roles.filter((role) => MINIMAL_ROLES.includes(role));
+  const fullLayoutRoles = roles.filter((role) => !MINIMAL_ROLES.includes(role));
   const maxFileBytes = options.maxFileBytes ?? MAX_FILE_BYTES;
   const now = options.now ?? (() => new Date());
 
@@ -250,8 +261,9 @@ export function exportJson(db: Database.Database, options: ExportOptions = {}): 
   filesToWrite.push(pickRateFile(roleProbRows, exportMinGames));
 
   for (const role of roles) {
+    filesToWrite.push(buildTableFile(TABLE_SPECS[0], baselineRows, role, exportMinGames));
+    if (MINIMAL_ROLES.includes(role)) continue;
     filesToWrite.push(
-      buildTableFile(TABLE_SPECS[0], baselineRows, role, exportMinGames),
       buildTableFile(TABLE_SPECS[1], allyPairRows, role, exportMinGames),
       buildTableFile(TABLE_SPECS[2], enemyPairRows, role, exportMinGames),
       buildTableFile(TABLE_SPECS[3], laneVsRows, role, exportMinGames),
@@ -259,7 +271,7 @@ export function exportJson(db: Database.Database, options: ExportOptions = {}): 
     );
   }
 
-  const runeResult = buildRuneFiles(runeRows, roles, exportMinGames);
+  const runeResult = buildRuneFiles(runeRows, fullLayoutRoles, exportMinGames);
   filesToWrite.push(...runeResult.files);
   const skippedRunePages = runeResult.skippedRunePages;
   if (skippedRunePages > 0) {
@@ -269,8 +281,8 @@ export function exportJson(db: Database.Database, options: ExportOptions = {}): 
   }
 
   filesToWrite.push(
-    ...buildBuildFiles(itemBuildRows, roles, exportMinGames, { championTags }).files,
-    ...buildBuildFiles(pathBuildRows, roles, exportMinGames, {
+    ...buildBuildFiles(itemBuildRows, fullLayoutRoles, exportMinGames, { championTags }).files,
+    ...buildBuildFiles(pathBuildRows, fullLayoutRoles, exportMinGames, {
       subdirectory: 'build-paths',
       championTags,
     }).files,
@@ -371,6 +383,7 @@ export function exportJson(db: Database.Database, options: ExportOptions = {}): 
       generatedAt,
       region,
       roles,
+      minimalRoles,
       files: written,
     });
     const manifestEntry = writeFile(tempDir, 'manifest.json', JSON.stringify(manifest, null, 2));

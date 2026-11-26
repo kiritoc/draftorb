@@ -1403,3 +1403,16 @@ Agreed enablement rule (owner-confirmed in session 2026-11-26, implemented by BL
 - **Failure UX**: the existing disabled `RoleSelector` button; the `roleNeedsData` string is updated since it goes stale once data exists but coverage fails.
 
 `pnpm etl sample-report [patch]` (`packages/etl/src/export/sample-report.ts`) remains the tuning tool: it prints per-file row counts and min/median/max `n_eff` for every `roles/<ROLE>/` file in the published manifest, and it reads the published export so it also works on `pnpm etl pull` data.
+
+### D-127 — Minimal roles (ADC/MID): baseline-only export, champion-level recommendations — PROPOSED (BL-024)
+
+Implements the BL-024 half of D-097/D-126: ADC and MID become selectable roles backed by champion-level statistics only — no pair, lane, rune or build claims.
+
+- **Export**: `pnpm etl export` writes `roles/ADC|MID/baseline.json` only (the five-table role directory stays SUPPORT/TOP/JUNGLE). `manifest.roles` now lists all five roles and `manifest.minimalRoles` marks the baseline-only subset; `MANIFEST_SCHEMA_VERSION` is bumped 4 -> 5. Rationale for an explicit field over inferring from missing files: a truncated or partially synced export must not be mistaken for a minimal role, and the UI loader stays fail-closed.
+- **Engine**: `RecommendConfig.minimalRoles` (default `['ADC','MID']`, `MINIMAL_ROLES` in `config.ts`) makes `recommend()` skip role inference and every matchup layer (pairs, lane_vs/lane_full, comp, blind) for those roles; the score is the shrunk baseline win rate (`p0`) alone, so `roleProb`/`pickRate` champion-level stats still drive candidate selection, pool join and `n_eff` gating. `minimalRoles: []` in config restores the full-layer path (used by tests that exercise layer mechanics).
+- **UI**: `createRecommendData` accepts a `minimal` flag (from `manifest.minimalRoles`) and defaults the four pair/lane tables to empty instead of requiring the files; `PickData.minimal` drives a one-line "champion-level stats only" note on the pick screen. Role enablement is unchanged — the D-126 baseline-coverage rule now applies to ADC/MID like every other role, so they appear once their baseline export is thick enough.
+- **Pick share stays engine-internal for now**: `pick-rate.json` exports shares without their sample denominator, and SPECS §7 forbids a percentage without a sample size, so cards show win rate + `n_eff` only. Surfacing pick share needs a denominator export (schema work, separate ticket).
+- **Backtest parity**: `buildRoleRecommendData` empties the pair/lane tables for minimal roles so the backtest sees the same inputs production ships (the DB still holds the raw aggregates; only the shaped `RecommendData` mirrors the export).
+- **validate-export**: `checkPublishedExport` validates minimal roles from `baseline.json` alone (empty pair/lane tables) and keeps SUPPORT as the only release-blocking role.
+
+Open question for the owner: none blocking — if ADC/MID later get full matchup exports, dropping them from `minimalRoles` (engine config + manifest field) restores the full pipeline without code changes.

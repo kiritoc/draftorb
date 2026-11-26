@@ -15,8 +15,8 @@ describe('roleAvailability', () => {
     const a = roleAvailability();
     expect(a.TOP.reason).toBe('Not enough champion data for this role');
     expect(a.JUNGLE.reason).toBe('Not enough champion data for this role');
-    expect(a.ADC.reason).toBe('Minimal roles come later (BL-024)');
-    expect(a.MID.reason).toBe('Minimal roles come later (BL-024)');
+    expect(a.ADC.reason).toBe('Not enough champion data for this role');
+    expect(a.MID.reason).toBe('Not enough champion data for this role');
     expect(a.SUPPORT.reason).toBeUndefined();
   });
 

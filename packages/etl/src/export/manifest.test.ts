@@ -45,8 +45,9 @@ describe('exportJson', () => {
     seed(suite.db, 'baseline', [supportBaselineRow()]);
     const result = suite.exportOnce();
     const manifest = result.manifest;
-    expect(manifest.schemaVersion).toBe(4);
-    expect(manifest.roles).toEqual(['SUPPORT', 'TOP', 'JUNGLE']);
+    expect(manifest.schemaVersion).toBe(5);
+    expect(manifest.roles).toEqual(['SUPPORT', 'TOP', 'JUNGLE', 'ADC', 'MID']);
+    expect(manifest.minimalRoles).toEqual(['ADC', 'MID']);
     expect(manifest.rankBuckets).toEqual([
       'IRON',
       'BRONZE',
@@ -65,11 +66,13 @@ describe('exportJson', () => {
       'item-classes.json',
       'pick-rate.json',
       'role-prob.json',
+      'roles/ADC/baseline.json',
       'roles/JUNGLE/ally-pairs.json',
       'roles/JUNGLE/baseline.json',
       'roles/JUNGLE/enemy-pairs.json',
       'roles/JUNGLE/lane-full.json',
       'roles/JUNGLE/lane-vs.json',
+      'roles/MID/baseline.json',
       'roles/SUPPORT/ally-pairs.json',
       'roles/SUPPORT/baseline.json',
       'roles/SUPPORT/enemy-pairs.json',
@@ -150,7 +153,7 @@ describe('exportJson', () => {
     seed(suite.db, 'roleProb', [
       { championId: 412, role: 'SUPPORT', gamesW: 10, gamesW2: 10, prob: 1 },
     ]);
-    for (const myRole of ['SUPPORT', 'MID'] as const) {
+    for (const myRole of ['SUPPORT', 'TOP'] as const) {
       seed(suite.db, 'baseline', [supportBaselineRow({ myRole })]);
       seed(suite.db, 'pairAlly', [
         {
@@ -232,12 +235,12 @@ describe('exportJson', () => {
       ]);
     }
 
-    suite.exportOnce({ roles: ['SUPPORT', 'MID'] });
+    suite.exportOnce({ roles: ['SUPPORT', 'TOP'] });
     const base = join(suite.publicDir, PATCH);
     // Manifest.
     manifestSchema.parse(JSON.parse(readFileSync(join(base, 'manifest.json'), 'utf8')));
     // Tuples.
-    for (const role of ['SUPPORT', 'MID']) {
+    for (const role of ['SUPPORT', 'TOP']) {
       baselineTableSchema.parse(suite.readFile(`roles/${role}/baseline.json`));
       allyPairTableSchema.parse(suite.readFile(`roles/${role}/ally-pairs.json`));
       enemyPairTableSchema.parse(suite.readFile(`roles/${role}/enemy-pairs.json`));

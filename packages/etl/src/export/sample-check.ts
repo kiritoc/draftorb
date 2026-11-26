@@ -74,6 +74,7 @@ function requiredFile(files: Readonly<Record<string, unknown>>, path: string): u
 function loadPublishedExport(publicDir: string): {
   patch: string;
   roles: readonly Role[];
+  minimalRoles: readonly Role[];
   files: Record<string, unknown>;
 } {
   const latest = latestSchema.parse(readJson(join(publicDir, 'latest.json')));
@@ -82,23 +83,33 @@ function loadPublishedExport(publicDir: string): {
   for (const file of manifest.files) {
     files[file.path] = readJson(join(publicDir, manifest.patch, file.path));
   }
-  return { patch: manifest.patch, roles: manifest.roles, files };
+  return {
+    patch: manifest.patch,
+    roles: manifest.roles,
+    minimalRoles: manifest.minimalRoles,
+    files,
+  };
 }
 
-/** Build the engine input for one exported role, mirroring the web loader. */
+/** Build the engine input for one exported role, mirroring the web loader.
+ *  Minimal roles (BL-024) export `baseline.json` only: their pair/lane
+ *  tables are empty, which is exactly what the engine's minimal mode
+ *  consumes (it skips those layers anyway). */
 function recommendDataForRole(
   role: Role,
+  minimal: boolean,
   files: Readonly<Record<string, unknown>>,
   championIds: readonly ChampionId[],
   tags: ReturnType<typeof championTagsMapSchema.parse>,
 ): RecommendData {
   const req = (path: string): unknown => requiredFile(files, path);
+  const table = (path: string): unknown => (minimal ? [] : req(path));
   return {
     baselines: baselineTableSchema.parse(req(`roles/${role}/baseline.json`)),
-    allyPairs: allyPairTableSchema.parse(req(`roles/${role}/ally-pairs.json`)),
-    enemyPairs: enemyPairTableSchema.parse(req(`roles/${role}/enemy-pairs.json`)),
-    laneVs: laneVsTableSchema.parse(req(`roles/${role}/lane-vs.json`)),
-    laneFull: laneFullTableSchema.parse(req(`roles/${role}/lane-full.json`)),
+    allyPairs: allyPairTableSchema.parse(table(`roles/${role}/ally-pairs.json`)),
+    enemyPairs: enemyPairTableSchema.parse(table(`roles/${role}/enemy-pairs.json`)),
+    laneVs: laneVsTableSchema.parse(table(`roles/${role}/lane-vs.json`)),
+    laneFull: laneFullTableSchema.parse(table(`roles/${role}/lane-full.json`)),
     roleProb: championRoleProbabilitiesSchema.parse(req('role-prob.json')),
     ...(files['pick-rate.json'] !== undefined
       ? { pickRate: pickRateSchema.parse(files['pick-rate.json']) }
@@ -118,7 +129,7 @@ export function checkPublishedExport(
   options: PublishedExportCheckOptions,
 ): PublishedExportCheckResult {
   const { publicDir, tagsFilePath, blockingRoles = RELEASE_BLOCKING_ROLES } = options;
-  const { patch, roles, files } = loadPublishedExport(publicDir);
+  const { patch, roles, minimalRoles, files } = loadPublishedExport(publicDir);
   const champions = championsMapSchema.parse(readJson(join(publicDir, patch, 'champions.json')));
   const championIds = Object.values(champions).map((champion) => champion.id);
   const tags = championTagsMapSchema.parse(readJson(tagsFilePath));
@@ -131,7 +142,7 @@ export function checkPublishedExport(
     errors.push('Manifest exports no roles.');
   }
   for (const role of roles) {
-    const data = recommendDataForRole(role, files, championIds, tags);
+    const data = recommendDataForRole(role, minimalRoles.includes(role), files, championIds, tags);
     const result = recommend(
       { userRank: 'DIAMOND', userRole: role, allies: [], enemies: [], blindPick: true },
       data,

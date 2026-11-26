@@ -27,6 +27,12 @@ export const manifestSchema = z
     region: z.string().min(1),
     rankBuckets: z.array(rankBucketSchema),
     roles: z.array(roleSchema),
+    /**
+     * Subset of `roles` exported at champion-level statistics only
+     * (baseline.json, no pair/lane/rune/build files) — ADC and MID (D-097,
+     * BL-024). Empty when every exported role has the full layout.
+     */
+    minimalRoles: z.array(roleSchema),
     files: z.array(manifestFileSchema),
     schemaVersion: z.literal(MANIFEST_SCHEMA_VERSION),
   })

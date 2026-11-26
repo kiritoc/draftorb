@@ -70,7 +70,12 @@ describe('recommend: blind safety triggers', () => {
         roleProb,
         enemyPairs,
       });
-      const result = recommend(makeInput({ userRole: role }), data);
+      // ADC/MID are minimal roles by default (BL-024): disable the minimal
+      // layer skip to exercise the blind-safety mechanics for every role.
+      const result = recommend(makeInput({ userRole: role }), data, DEFAULT_CONFIG, {
+        ...DEFAULT_RECOMMEND_CONFIG,
+        minimalRoles: [],
+      });
       expect(blindOf(result.recommendations.find((r) => r.championId === 11))).toBeDefined();
       expect(result.recommendations.map((r) => r.championId)).toEqual([12, 11]);
     },

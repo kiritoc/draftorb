@@ -30,10 +30,11 @@ function seedCache(corruptPath: string): void {
   const manifest = {
     patch: '16.22',
     generatedAt: '2026-11-26T00:00:00Z',
-    schemaVersion: 4,
+    schemaVersion: 5,
     region: 'euw',
     rankBuckets: ['DIAMOND'],
     roles: ['SUPPORT', 'TOP'],
+    minimalRoles: [],
     files: Object.keys(patchFiles).map((path) => ({ path, sha256: '0'.repeat(64) })),
   };
   const byPath: Record<string, string> = {

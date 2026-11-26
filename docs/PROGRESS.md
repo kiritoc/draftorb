@@ -15,6 +15,17 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 
 ## Current handoff
 
+- Date: 2026-11-27
+- Branch/PR: `feat/bl-024-adc-mid-minimal` (worktree `draftorb-bl-024`) / BL-024 (#89)
+- State: DOING
+- Done: ADC/MID are now selectable minimal roles (D-097, D-127 PROPOSED). Engine: `RecommendConfig.minimalRoles` (default `['ADC','MID']`, `MINIMAL_ROLES`) makes `recommend()` skip role inference and all matchup layers (pairs, lane, comp, blind) — score is the shrunk baseline win rate; pool join, roleProb/pickRate candidate selection and `n_eff` gating unchanged. Shared: `manifest.minimalRoles` added, `MANIFEST_SCHEMA_VERSION` 4 -> 5. ETL: export writes `roles/ADC|MID/baseline.json` only; `manifest.roles` lists all five roles; `checkPublishedExport` validates minimal roles from baseline alone. UI: `createRecommendData` takes a `minimal` flag (empty pair/lane tables), `PickData.minimal` shows a "champion-level stats only" note, `roleAvailability` no longer hardcodes ADC/MID — D-126 coverage decides like every role. Backtest `RecommendData` mirrors the baseline-only export for minimal roles. Review fixes: `readPublishedPointer` accepts older-schema manifests (v4 pointer stays intact); pick-share card display dropped — `pick-rate.json` has no exported sample denominator and SPECS §7 forbids a bare % (D-127).
+- Files touched: `packages/engine/src/{config,recommend}.ts` + tests (`recommend-minimal.test.ts` new, golden ADC/MID fixtures re-pinned, layer-mechanics tests opt out via `minimalRoles: []`), `packages/shared/src/schemas/{core,manifest}.ts`, `packages/etl/src/export/{index,manifest,sample-check}.ts` + tests, `apps/desktop/ui/src/{roles,strings}.ts`, `data/{export-data,role-coverage}.ts` + tests, `screens/PickScreen.tsx`, `apps/web` + shared/desktop manifest fixtures (schema v5), `docs/{DATA_MODEL,DECISIONS,PROGRESS}.md`.
+- Tests: engine 561 green; targeted vitest runs green; `pnpm typecheck` green. Full `pnpm check` pending.
+- Blockers / next step: run `pnpm check`, `code-review` skill, commit `feat(...): ... (BL-024)`.
+- Pitfalls: golden fixtures for ADC/MID now pin minimal (baseline-only) output — do not "fix" them back to full layers; layer-mechanics unit tests must pass `minimalRoles: []` to keep exercising pairs/lanes for ADC/MID. `manifest.minimalRoles` is required (strict schema) — every hand-written manifest fixture needs it.
+
+### Previous handoff (BL-050)
+
 - Date: 2026-11-26
 - Branch/PR: `main` / BL-050 (#153)
 - State: DOING

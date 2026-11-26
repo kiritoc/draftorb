@@ -71,11 +71,13 @@ describe('exportJson', () => {
       'manifest.json',
       'pick-rate.json',
       'role-prob.json',
+      'roles/ADC/baseline.json',
       'roles/JUNGLE/ally-pairs.json',
       'roles/JUNGLE/baseline.json',
       'roles/JUNGLE/enemy-pairs.json',
       'roles/JUNGLE/lane-full.json',
       'roles/JUNGLE/lane-vs.json',
+      'roles/MID/baseline.json',
       'roles/SUPPORT/ally-pairs.json',
       'roles/SUPPORT/baseline.json',
       'roles/SUPPORT/enemy-pairs.json',
@@ -232,6 +234,7 @@ describe('exportJson', () => {
           region: 'euw1',
           rankBuckets: [],
           roles: [],
+          minimalRoles: [],
           files: [],
         }),
       );
@@ -256,6 +259,39 @@ describe('exportJson', () => {
     // match seed defaults to patch 16.21; the published pointer is ahead.
     seed(suite.db, 'match', [{}]);
     writeLatest('16.22');
+    const result = suite.exportOnce();
+
+    expect(result.latestPath).toBeNull();
+    expect(result.warnings.some((w) => w.includes('newer patch 16.22'))).toBe(true);
+    expect(readLatestPatch()).toBe('16.22');
+  });
+
+  it('keeps a newer published latest.json whose manifest uses an older schema version', () => {
+    // BL-024 review: a complete v4 manifest must still count as intact, or a
+    // database restore could move the pointer backwards.
+    seed(suite.db, 'match', [{}]);
+    mkdirSync(join(suite.publicDir, '16.22'), { recursive: true });
+    writeFileSync(
+      join(suite.publicDir, 'latest.json'),
+      JSON.stringify({
+        schemaVersion: 1,
+        patch: '16.22',
+        manifest: '16.22/manifest.json',
+        generatedAt: FIXED_NOW.toISOString(),
+      }),
+    );
+    writeFileSync(
+      join(suite.publicDir, '16.22', 'manifest.json'),
+      JSON.stringify({
+        schemaVersion: 4,
+        patch: '16.22',
+        generatedAt: FIXED_NOW.toISOString(),
+        region: 'euw1',
+        rankBuckets: [],
+        roles: [],
+        files: [],
+      }),
+    );
     const result = suite.exportOnce();
 
     expect(result.latestPath).toBeNull();

@@ -14,6 +14,7 @@ import { readFileSync } from 'node:fs';
 
 import type Database from 'better-sqlite3';
 
+import { MINIMAL_ROLES } from '@draftorb/engine';
 import {
   championTagsMapSchema,
   type ChampionTagsMap,
@@ -100,12 +101,23 @@ export function buildRoleRecommendData(
   const championIds = [...options.championIds];
   const out = {} as Record<Role, RecommendData>;
   for (const role of ALL_ROLES) {
+    // Minimal roles (BL-024) export baseline.json only: mirror that here so
+    // the backtest never sees matchup data production does not ship.
+    const minimal = MINIMAL_ROLES.includes(role);
     out[role] = {
       baselines: tuplesForRole(TABLE_SPECS[0], baselineRows, role, options.exportMinGames),
-      allyPairs: tuplesForRole(TABLE_SPECS[1], allyPairRows, role, options.exportMinGames),
-      enemyPairs: tuplesForRole(TABLE_SPECS[2], enemyPairRows, role, options.exportMinGames),
-      laneVs: tuplesForRole(TABLE_SPECS[3], laneVsRows, role, options.exportMinGames),
-      laneFull: tuplesForRole(TABLE_SPECS[4], laneFullRows, role, options.exportMinGames),
+      allyPairs: minimal
+        ? []
+        : tuplesForRole(TABLE_SPECS[1], allyPairRows, role, options.exportMinGames),
+      enemyPairs: minimal
+        ? []
+        : tuplesForRole(TABLE_SPECS[2], enemyPairRows, role, options.exportMinGames),
+      laneVs: minimal
+        ? []
+        : tuplesForRole(TABLE_SPECS[3], laneVsRows, role, options.exportMinGames),
+      laneFull: minimal
+        ? []
+        : tuplesForRole(TABLE_SPECS[4], laneFullRows, role, options.exportMinGames),
       roleProb,
       pickRate,
       tags: options.tags,

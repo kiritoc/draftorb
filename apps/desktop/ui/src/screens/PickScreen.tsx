@@ -23,7 +23,13 @@ import {
 import type { ProfileLoad } from '../profile/profile-export';
 import { emptyPool, loadPool, savePool } from '../pool/pool-store';
 import { dropUnknownChampions, serializePoolConfig } from '../pool/pool-model';
-import { loadPickData, type PickData } from '../data/export-data';
+import {
+  loadChampionCatalog,
+  loadPickData,
+  type ChampionCatalog,
+  type PickData,
+} from '../data/export-data';
+import { championName } from '../champion-name';
 import { loadChampionIconVersion } from '../data/champion-icons';
 import { championsForSlot } from '../pick/champion-availability';
 import { enemyRoleViews } from '../pick/enemy-roles';
@@ -63,6 +69,8 @@ export interface PickScreenProps {
   repoFolder?: string;
   /** Called after the pool is saved or exported to the repo file (D-118 banner). */
   onPoolChanged?: () => void;
+  /** D-126 empty verdict: skip recommendation data, keep the pool editor. */
+  noEligibleRole?: boolean;
 }
 
 export function PickScreen({
@@ -71,8 +79,10 @@ export function PickScreen({
   dataReadyNonce,
   repoFolder,
   onPoolChanged,
+  noEligibleRole = false,
 }: PickScreenProps) {
   const [pickData, setPickData] = useState<PickData | null>(null);
+  const [catalog, setCatalog] = useState<ChampionCatalog | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [iconVersion, setIconVersion] = useState<string | null>(null);
   const [poolConfig, setPoolConfig] = useState<PoolConfig>(emptyPool());
@@ -92,8 +102,14 @@ export function PickScreen({
   const [poolUnavailable, setPoolUnavailable] = useState<PoolUnavailableEntry[]>([]);
   const [insufficientData, setInsufficientData] = useState<InsufficientDataEntry[]>([]);
   const [recommendError, setRecommendError] = useState<string | null>(null);
+  const [poolDropped, setPoolDropped] = useState<number[]>([]);
 
   useEffect(() => {
+    if (noEligibleRole) {
+      setPickData(null);
+      setLoadError(null);
+      return;
+    }
     let cancelled = false;
     void (async () => {
       try {
@@ -119,7 +135,27 @@ export function PickScreen({
     return () => {
       cancelled = true;
     };
-  }, [role, dataReadyNonce]);
+  }, [role, dataReadyNonce, noEligibleRole]);
+
+  // Champion catalog for the pool editor: role-independent, so it stays
+  // usable when no role is eligible or pick data fails to load (BL-050).
+  useEffect(() => {
+    let cancelled = false;
+    void loadChampionCatalog()
+      .then((loaded) => {
+        if (cancelled || loaded === null) return;
+        setCatalog(loaded);
+        void loadChampionIconVersion(loaded.patch)
+          .then((version) => {
+            if (!cancelled) setIconVersion(version);
+          })
+          .catch(() => {});
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [dataReadyNonce]);
 
   // The pool loads independently of aggregates so the editor (and its JSON
   // backup) stays usable when pick data is missing or fails to load.
@@ -140,7 +176,12 @@ export function PickScreen({
     };
   }, [dataReadyNonce]);
 
-  const champions: Champion[] = useMemo(() => pickData?.champions ?? [], [pickData]);
+  // The catalog is the dedicated lightweight loader: prefer it so a stale
+  // pickData from a previous patch cannot mask a newer champions.json.
+  const champions: Champion[] = useMemo(
+    () => catalog?.champions ?? pickData?.champions ?? [],
+    [pickData, catalog],
+  );
   const poolIds = useMemo(
     () => (poolConfig.pools[role] ?? []).map((entry) => entry.championId),
     [poolConfig, role],
@@ -301,10 +342,14 @@ export function PickScreen({
     return dropped;
   };
 
-  if (loadError !== null || pickData === null) {
+  if (noEligibleRole || loadError !== null || pickData === null) {
     return (
       <div className="space-y-4">
-        {loadError !== null ? (
+        {noEligibleRole ? (
+          <p role="status" className="text-slate-600 dark:text-slate-300">
+            {strings.noEligibleRole}
+          </p>
+        ) : loadError !== null ? (
           <p className="text-red-600 dark:text-red-400">{strings.loadFailed(loadError)}</p>
         ) : (
           <p className="text-slate-500 dark:text-slate-400">{strings.loading}</p>
@@ -324,10 +369,19 @@ export function PickScreen({
           iconVersion={iconVersion}
           repoFolder={repoFolder}
           onSave={async (next) => {
-            await persistPool(next);
+            setPoolDropped(await persistPool(next));
           }}
           onPoolChanged={onPoolChanged}
         />
+        {poolDropped.length > 0 && (
+          <p
+            role="status"
+            className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/40 dark:bg-amber-900/30 dark:text-amber-200"
+          >
+            {strings.poolDroppedNotice}{' '}
+            {poolDropped.map((id) => championName(champions, id)).join(', ')}
+          </p>
+        )}
       </div>
     );
   }

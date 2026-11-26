@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Role } from '@draftorb/shared';
 import { AppShell } from './components/AppShell';
+import { ROLE_ORDER } from './config';
 import type { ScreenId } from './components/Nav';
 import type { DataStatus } from './data-status';
 import { ensureData } from './data/aggregates';
+import { loadEnabledRoles } from './data/role-coverage';
 import { describeProfileLoad, loadProfileExport, type ProfileLoad } from './profile/profile-export';
 import { loadPool } from './pool/pool-store';
 import { poolSyncStatus, type PoolSyncStatus } from './pool/pool-sync';
@@ -42,6 +44,7 @@ export function App() {
   const [profileLoad, setProfileLoad] = useState<ProfileLoad>({ kind: 'none', reason: 'noFolder' });
   const [dataStatus, setDataStatus] = useState<DataStatus>(NO_DATA);
   const [dataReadyNonce, setDataReadyNonce] = useState(0);
+  const [enabledRoles, setEnabledRoles] = useState<readonly Role[] | undefined>(undefined);
   const prefersDark = usePrefersDark();
   const resolvedTheme = settings === null ? null : resolveTheme(settings.theme, prefersDark);
 
@@ -55,6 +58,28 @@ export function App() {
       setDataReadyNonce((nonce) => nonce + 1);
     });
   }, []);
+
+  // Role enablement is a dataset property (D-126): recompute whenever the
+  // launch download settles. Until a verdict exists the selector falls back
+  // to DEFAULT_ENABLED_ROLES.
+  useEffect(() => {
+    let cancelled = false;
+    void loadEnabledRoles()
+      .then((roles) => {
+        if (!cancelled && roles !== null) setEnabledRoles(roles);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [dataReadyNonce]);
+
+  // Keep the user's pick while it is eligible; otherwise fall back to the
+  // first eligible role. null = confirmed empty verdict (no eligible role).
+  const activeRole: Role | null =
+    enabledRoles === undefined || enabledRoles.includes(role)
+      ? role
+      : (ROLE_ORDER.find((r) => enabledRoles.includes(r)) ?? null);
 
   const repoFolder = settings?.repoFolder;
   const settingsLoaded = settings !== null;
@@ -116,8 +141,9 @@ export function App() {
       resolvedTheme={resolvedTheme}
       onThemeChange={changeTheme}
       onToggleTheme={() => changeTheme(toggledTheme(resolvedTheme))}
-      role={role}
+      role={activeRole}
       onRoleChange={setRole}
+      enabledRoles={enabledRoles}
       notice={notice ?? poolNotice}
       poolSync={poolSync}
       repoFolder={settings.repoFolder}

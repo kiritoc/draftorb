@@ -1,7 +1,14 @@
-import type { Role } from '@draftorb/shared';
+import type { RankBucket, Role } from '@draftorb/shared';
 
-/** Roles with exported data. v1b enables more from the loaded data (BL-011). */
+/** Fallback while the coverage verdict is unknown (no cached data yet).
+ *  The real list is computed from the export at load time (BL-050, D-126). */
 export const DEFAULT_ENABLED_ROLES: Role[] = ['SUPPORT'];
+
+/** D-126: minimum covered champions for a role to be selectable. */
+export const ROLE_COVERAGE_MIN_CHAMPIONS = 50;
+
+/** D-126: enablement is measured on the owner's rank bucket only. */
+export const ROLE_COVERAGE_BUCKET: RankBucket = 'DIAMOND';
 
 export const ROLE_ORDER: readonly Role[] = ['SUPPORT', 'TOP', 'JUNGLE', 'ADC', 'MID'];
 

@@ -1,13 +1,15 @@
 /**
- * @draftorb/web — Unvalidated model banner (D-023, T-034).
+ * @draftorb/web — Baseline-ranking banner (D-128, BL-014).
  *
- * Shown when there is no backtest report with log-loss significantly better
- * than baseline-only. Fetches the backtest report published by `pnpm etl
- * backtest draft`.
+ * Shown while the matchup layers are disabled: the ranking is the champion
+ * baseline win rate and the backtest has not validated matchup advice. The
+ * banner disappears only when `backtest-draft.json` reports
+ * `matchup.enabled` (fail-safe: a missing report keeps it visible).
  */
 
 import { useEffect, useState } from 'react';
-import { backtestPassedValidation } from '../data/backtest-validation.js';
+import { loadBacktestReport } from '../data/backtest-report.js';
+import { matchupConfigFromReport } from '../data/backtest-validation.js';
 import { strings } from '../strings.js';
 
 export function UnvalidatedModelBanner() {
@@ -15,16 +17,8 @@ export function UnvalidatedModelBanner() {
 
   useEffect(() => {
     void (async () => {
-      try {
-        const response = await fetch('backtest-draft.json');
-        if (!response.ok) {
-          setShow(true);
-          return;
-        }
-        setShow(!backtestPassedValidation(await response.json()));
-      } catch {
-        setShow(true);
-      }
+      const report = await loadBacktestReport();
+      setShow(matchupConfigFromReport(report) === null);
     })();
   }, []);
 

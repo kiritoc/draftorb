@@ -114,9 +114,9 @@ export const strings = {
   save: 'Save',
   clearAll: 'Clear all',
   exportFileName: 'draftorb-pool.json',
-  unvalidatedTitle: 'Unvalidated model:',
+  unvalidatedTitle: 'Champion baseline ranking:',
   unvalidatedBody:
-    'recommendations are not backed by a backtest report that passed the validation gate. Use at your own risk.',
+    'scores are champion win rates only — matchup advice is disabled because the backtest has not validated it.',
   runesTitle: (champion: string): string => `Runes — ${champion}`,
   runesLoading: 'Loading runes…',
   runesUnavailable: 'No rune data for this champion at your rank bucket.',

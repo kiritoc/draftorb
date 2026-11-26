@@ -108,6 +108,103 @@ describe('backtestCommand', () => {
     expect(report.logLoss).toBeTypeOf('number');
   });
 
+  it('runs the D-128 matchup experiment when a train-only validation patch exists', async () => {
+    const db = openDb(dbPath);
+    migrate(db);
+    seedPatches(db, ['16.19', '16.20', '16.21']);
+    const insertMatch = db.prepare(
+      `INSERT INTO matches (match_id, platform, patch, queue_id, duration, created_at, avg_rank_score, rank_known_count)
+       VALUES (?, 'euw1', ?, 420, 1800, ?, 6.5, 10)`,
+    );
+    const insertParticipant = db.prepare(
+      `INSERT INTO participants (match_id, puuid, team_id, champion_id, role, win, rank_score, champion_games, keystone, primary_style, sub_style, perks_json, items_json, kills, deaths, assists)
+       VALUES (?, ?, ?, ?, ?, ?, 6.5, 0, 8000, 8000, 8400, '[]', '[]', 0, 0, 0)`,
+    );
+    const roles = ['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT'] as const;
+    const matches = [
+      ...Array.from({ length: 15 }, (_, i) => ({
+        matchId: `p19-${i}`,
+        patch: '16.19',
+        createdAt: i + 1,
+        blueWins: i % 2 === 0,
+      })),
+      ...Array.from({ length: 15 }, (_, i) => ({
+        matchId: `p20-${i}`,
+        patch: '16.20',
+        createdAt: 100 + i,
+        blueWins: i % 2 === 0,
+      })),
+      ...Array.from({ length: 5 }, (_, i) => ({
+        matchId: `p21-${i}`,
+        patch: '16.21',
+        createdAt: 200 + i,
+        blueWins: i % 2 === 0,
+      })),
+    ];
+    for (const match of matches) {
+      insertMatch.run(match.matchId, match.patch, match.createdAt);
+      for (const [teamId, teamWins] of [
+        [100, match.blueWins],
+        [200, !match.blueWins],
+      ] as const) {
+        for (const [i, role] of roles.entries()) {
+          insertParticipant.run(
+            match.matchId,
+            `puuid-${match.matchId}-${teamId}-${i}`,
+            teamId,
+            i === 0 ? 100 : teamId * 10 + i,
+            role,
+            teamWins ? 1 : 0,
+          );
+        }
+      }
+    }
+    db.close();
+
+    await backtestCommand.run(['draft']);
+
+    const report = JSON.parse(
+      readFileSync(join(process.env.DRAFTORB_PUBLIC_DIR as string, 'backtest-draft.json'), 'utf8'),
+    );
+    expect(report.holdoutPatch).toBe('16.21');
+    expect(report.matchup).not.toBeNull();
+    expect(report.matchup.validationPatch).toBe('16.20');
+    expect(report.matchup.candidates.map((c: { shrinkageK: unknown }) => c.shrinkageK)).toEqual([
+      'off',
+      0,
+      25,
+      50,
+      100,
+      200,
+      400,
+    ]);
+    // Tiny synthetic data cannot pass the gate: matchups stay disabled.
+    expect(report.matchup.enabled).toBe(false);
+    expect(report.validationStatus).toBe('unvalidated');
+  });
+
+  it('restricts evaluated roles through --roles', async () => {
+    const db = openDb(dbPath);
+    migrate(db);
+    seed(db);
+    db.close();
+
+    await backtestCommand.run(['draft', '--roles=SUPPORT']);
+
+    const report = JSON.parse(
+      readFileSync(join(process.env.DRAFTORB_PUBLIC_DIR as string, 'backtest-draft.json'), 'utf8'),
+    );
+    expect(report.roles).toEqual(['SUPPORT']);
+    expect(report.perRole.SUPPORT.predictions).toBe(10);
+    expect(report.perRole.TOP.predictions).toBe(0);
+  });
+
+  it('rejects an unknown --roles value', async () => {
+    await expect(backtestCommand.run(['draft', '--roles=SUPPORT,NOPE'])).rejects.toThrow(
+      /Unknown role/,
+    );
+  });
+
   it('copies patches into the in-memory database without touching the live table', async () => {
     const db = openDb(dbPath);
     migrate(db);

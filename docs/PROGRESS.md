@@ -16,6 +16,17 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 ## Current handoff
 
 - Date: 2026-11-26
+- Branch/PR: `feat/bl-014-backtest-gate` / BL-014 (#78)
+- State: REVIEW
+- Done: first real `pnpm etl backtest draft --roles=SUPPORT,TOP,JUNGLE` on the private DB (holdout 16.22, 13 946 games) failed the new D-023 paired-bootstrap gate (engine log-loss 0.6972 vs baseline 0.6950, Δ −0.0023, 95% CI excludes 0 on match and player units). Per the owner's Option 3 directive, D-128 puts matchup layers behind a report-driven flag: engine `matchupEnabled`/`matchupShrinkK`, ETL train-only k CV + single holdout eval (`matchup` block in `backtest-draft.json`), web `matchupConfigFromReport` fail-safe + reworded banner, desktop pinned off (B-079). Shrinkage CV picked variant `off` — the app now ranks by champion win rates only.
+- Files touched: `packages/engine/src/{config,levels,recommend,recommend-terms}.ts` + `test/recommend-matchup-flag.test.ts`, `packages/etl/src/{backtest/draft.ts,backtest/draft.test.ts,commands/backtest.ts,commands/backtest.test.ts,config/etl-config.ts}`, `apps/web/src/{data/backtest-report.ts,data/backtest-validation.ts,data/backtest-validation.test.ts,components/{DraftScreen,UnvalidatedModelBanner}.tsx,strings.ts}`, `apps/desktop/ui/src/{screens/PickScreen.tsx,strings.ts,components/{Header,AppShell.test}.tsx/ts}`, `docs/{DECISIONS,SPECS,SETUP,BUGS,PROGRESS}.md`.
+- Tests: `pnpm check` green. Engine: flag off ⇒ score = baseline prior exactly, empty reasons, no matchup warnings; shrinkage monotonic. ETL: gate/bootstrap, `--roles`, matchup experiment on seeded DBs. Web: `matchupConfigFromReport` fail-safe cases.
+- Blockers / next step: PR pending. Gate thresholds in `ETL_CONFIG.backtest` are provisional (`thresholdsPendingOwnerConfirmation` in the report). Desktop needs the report shipped in the aggregate archive before `matchupEnabled` can be report-driven there (B-079). Re-run `pnpm etl backtest draft` after each data refresh (SETUP.md); revisit at ×3/×10 match volume.
+- Pitfalls: `data/public/` is gitignored — the report is generated, not committed; the PR body carries the numbers. `matchupEnabled` engine default stays `true` for backward compat; apps must pass the report-derived value. If `runMatchupExperiment` returns null (too few training patches) `validationStatus` falls back to the shadow gate — apps still stay off via `matchup.enabled`.
+
+### Previous handoff (BL-022)
+
+- Date: 2026-11-26
 - Branch/PR: `feat/bl-022-fast-draft-entry` / BL-022 (#87)
 - State: REVIEW
 - Done: keyboard-first draft entry on the pick screen. New pure module `ui/src/pick/draft-entry.ts` (10 pick targets in entry order, digit-key map, next-empty advance, ban list rules) + `ui/src/components/DraftEntryBar.tsx` (persistent champion combobox that stays open after each pick, slot chips, role chips for the active slot, ban pseudo-target) + `ui/src/components/BanList.tsx`. `PickScreen` gained `bans` state wired into `DraftInput.bans`, a shared `blockedChampionIds` set (picked ∪ banned) for slot pickers and the entry search, and auto-advance to the next empty slot after each entry-bar pick. SPECS §10 documents the keyboard contract; `scripts/bench-recommend.ts` (`pnpm --filter @draftorb/desktop bench:recommend`) measures engine latency.

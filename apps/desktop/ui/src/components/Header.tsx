@@ -20,9 +20,9 @@ export function Header({ dataStatus, resolvedTheme, onToggleTheme }: HeaderProps
       </div>
       <span
         className="rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-900 dark:bg-amber-900/40 dark:text-amber-200"
-        title={strings.unvalidatedHint}
+        title={strings.baselineHint}
       >
-        {strings.unvalidatedLabel}
+        {strings.baselineLabel}
       </span>
       <button
         type="button"

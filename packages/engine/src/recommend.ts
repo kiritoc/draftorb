@@ -30,7 +30,14 @@ import {
   rankToBucket,
 } from './config.js';
 import { sigmoid } from './weighting.js';
-import { baselineGate, baselineLogOdds, baselinePrior, deltaPp, scoreLane } from './levels.js';
+import {
+  baselineGate,
+  baselineLogOdds,
+  baselinePrior,
+  deltaPp,
+  matchupShrink,
+  scoreLane,
+} from './levels.js';
 import { computeCompNeed, teamMissingNeeds } from './comp.js';
 import {
   indexBaselines,
@@ -67,7 +74,7 @@ function applyLane(
 ): LaneDelta | null {
   if (!row) return null;
   const result = scoreLane(row.winsE, row.gamesE, sigmoid(logOdds), config);
-  const term = confLane * result.term;
+  const term = confLane * matchupShrink(result.term, row.gamesE, config);
   return { term, lowData: result.lowData, n: row.nE, deltaPp: deltaPp(logOdds, term) };
 }
 
@@ -89,6 +96,8 @@ export function recommend(
 ): DraftResult {
   const userBucket = rankToBucket(input.userRank);
   const myRole = input.userRole;
+  // D-128: with matchup layers off the score is exactly the baseline prior.
+  const matchupOn = config.matchupEnabled;
 
   // --- Build indexes over the data tables ---
   const baselineIdx = indexBaselines(data.baselines, userBucket);
@@ -98,9 +107,12 @@ export function recommend(
   const laneFullIdx = indexLaneFull(data.laneFull, userBucket);
 
   // --- Infer roles for ally and enemy teams ---
-  // The user's own role is reserved on the ally team (D-050).
-  const allySlots = resolveKnownSlots(input.allies, 'ally', data.roleProb, [myRole]);
-  const enemySlots = resolveKnownSlots(input.enemies, 'enemy', data.roleProb);
+  // The user's own role is reserved on the ally team (D-050). Slot
+  // resolution only feeds the matchup layers, so it is skipped when off.
+  const allySlots = matchupOn
+    ? resolveKnownSlots(input.allies, 'ally', data.roleProb, [myRole])
+    : [];
+  const enemySlots = matchupOn ? resolveKnownSlots(input.enemies, 'enemy', data.roleProb) : [];
 
   // --- Infer lane-group champions from known enemies/allies ---
   const laneGroup = rc.laneGroups[myRole];
@@ -129,31 +141,35 @@ export function recommend(
   );
   const blindApplies = input.blindPick || !laneEnemiesKnown;
   const unavailableChampionSet = new Set<ChampionId>([...knownChampionSet, ...candidateSet.banned]);
-  const opponents = blindOpponents(
-    blindApplies ? unknownLaneRoles : [],
-    unavailableChampionSet,
-    data.championIds,
-    data.roleProb,
-    rc.blindOpponentMinShare,
-    data.pickRate,
-  );
+  const opponents =
+    matchupOn && blindApplies
+      ? blindOpponents(
+          unknownLaneRoles,
+          unavailableChampionSet,
+          data.championIds,
+          data.roleProb,
+          rc.blindOpponentMinShare,
+          data.pickRate,
+        )
+      : new Map();
 
   // D-088: per-slot pair main effects are candidate-independent, so they are
   // computed once per draft when the flag is enabled.
   const knownSlots = [...allySlots, ...enemySlots];
-  const pairEffects = config.pairMainEffectAdjust
-    ? pairMainEffects(
-        candidateSet.candidates,
-        knownSlots,
-        allyPairIdx,
-        enemyPairIdx,
-        (c) => {
-          const row = baselineIdx.get(c);
-          return row ? baselinePrior(row.winsE, row.gamesE, config.k0) : 0.5;
-        },
-        config,
-      )
-    : undefined;
+  const pairEffects =
+    matchupOn && config.pairMainEffectAdjust
+      ? pairMainEffects(
+          candidateSet.candidates,
+          knownSlots,
+          allyPairIdx,
+          enemyPairIdx,
+          (c) => {
+            const row = baselineIdx.get(c);
+            return row ? baselinePrior(row.winsE, row.gamesE, config.k0) : 0.5;
+          },
+          config,
+        )
+      : undefined;
 
   // --- Score each candidate ---
   const scored: ScoredCandidate[] = [];
@@ -192,23 +208,15 @@ export function recommend(
       isBelowRoleThreshold(c, myRole, data.roleProb, rc.roleProbThreshold);
 
     // --- Layer 1: pairs ---
-    const pairInfo = scorePairs(
-      c,
-      myRole,
-      knownSlots,
-      allyPairIdx,
-      enemyPairIdx,
-      p0,
-      config,
-      x,
-      pairEffects,
-    );
+    const pairInfo = matchupOn
+      ? scorePairs(c, myRole, knownSlots, allyPairIdx, enemyPairIdx, p0, config, x, pairEffects)
+      : { sum: 0, deltas: [] };
     let logOdds = x + config.s * pairInfo.sum;
 
     // --- Layer 2: lane_vs (all lane-group enemies known) ---
     const [enemy1, enemy2] = laneGroupInfo.enemies;
     const laneVsDelta =
-      laneEnemiesKnown && enemy1
+      matchupOn && laneEnemiesKnown && enemy1
         ? applyLane(
             laneVsIdx.get(
               makeLaneVsKey(c, enemy1.championId, enemy2?.championId ?? MISSING_LANE_ID),
@@ -223,7 +231,7 @@ export function recommend(
     // --- Layer 3: lane_full (skipped for 1v1 lane groups) ---
     const partner = laneGroupInfo.allies[0];
     const laneFullDelta =
-      !laneGroup.oneToOne && laneEnemiesKnown && partner && enemy1 && enemy2
+      matchupOn && !laneGroup.oneToOne && laneEnemiesKnown && partner && enemy1 && enemy2
         ? applyLane(
             laneFullIdx.get(
               makeLaneFullKey(c, partner.championId, enemy1.championId, enemy2.championId),
@@ -236,10 +244,12 @@ export function recommend(
     if (laneFullDelta) logOdds += laneFullDelta.term;
 
     // --- Layer 4: comp need ---
-    const compResult = computeCompNeed(c, allyChampIds, data.tags, rc.comp, missingNeeds);
+    const compResult = matchupOn
+      ? computeCompNeed(c, allyChampIds, data.tags, rc.comp, missingNeeds)
+      : { bonus: 0, filled: [] };
     let compDeltaPp: number | null = null;
     // A filled need with a 0 weight (or wComp = 0) adds nothing and gets no reason.
-    const compTerm = rc.wComp * compResult.bonus;
+    const compTerm = matchupOn ? rc.wComp * compResult.bonus : 0;
     if (compResult.filled.length > 0 && compTerm !== 0) {
       compDeltaPp = deltaPp(logOdds, compTerm);
       logOdds += compTerm;
@@ -247,7 +257,7 @@ export function recommend(
 
     // --- Layer 5: blind safety (blind pick or lane enemies still unknown) ---
     let blindDeltaPp: number | null = null;
-    if (blindApplies) {
+    if (matchupOn && blindApplies) {
       const rawTerm = blindSafetyFromOpponents(
         c,
         opponents,

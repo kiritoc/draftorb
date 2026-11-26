@@ -125,6 +125,18 @@ export function scorePair(
 }
 
 /**
+ * D-128 partial pooling: shrink a matchup term toward 0 in proportion to its
+ * effective sample, `term * gamesE / (gamesE + matchupShrinkK)`. `gamesE` is
+ * the context's equivalent game count (SPECS §5 shrinkage units). A `k` of 0
+ * (or a zero term) returns the term unchanged.
+ */
+export function matchupShrink(term: number, gamesE: number, config: RankWeightingConfig): number {
+  const k = config.matchupShrinkK;
+  if (k <= 0 || term === 0) return term;
+  return term * (gamesE / (gamesE + k));
+}
+
+/**
  * `laneTerm` with the lowData flag and all parameters taken from `config`.
  */
 export function scoreLane(

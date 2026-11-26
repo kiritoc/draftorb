@@ -191,6 +191,114 @@ describe('runBacktestDraft (engine evaluation, B-053)', () => {
     expect(report.brier).toBeTypeOf('number');
   });
 
+  it('filters evaluated roles through options.roles', () => {
+    const rows: DraftRow[] = [];
+    for (let i = 0; i < 6; i += 1) {
+      rows.push(...makeMatch({ matchId: `t${i}`, patch: '16.20', blueWins: i % 2 === 0 }));
+      rows.push(
+        ...makeMatch({
+          matchId: `h${i}`,
+          patch: '16.21',
+          blueWins: true,
+          blue: { TOP: 100, SUPPORT: 200 },
+          red: { TOP: 101, SUPPORT: 201 },
+        }),
+      );
+    }
+
+    const report = runBacktestDraft(rows, ENGINE, { roles: ['TOP'] });
+    expect(report.insufficientData).toBe(false);
+    expect(report.roles).toEqual(['TOP']);
+    expect(report.predictions).toBe(12);
+    expect(report.perRole.TOP.predictions).toBe(12);
+    expect(report.perRole.SUPPORT.predictions).toBe(0);
+  });
+
+  it('reports a paired-bootstrap gate on log-loss vs the champion baseline', () => {
+    const rows: DraftRow[] = [];
+    for (let i = 0; i < 6; i += 1) {
+      rows.push(...makeMatch({ matchId: `t${i}`, patch: '16.20', blueWins: i % 2 === 0 }));
+      rows.push(
+        ...makeMatch({
+          matchId: `h${i}`,
+          patch: '16.21',
+          blueWins: i % 2 === 0,
+          blue: { TOP: 100, SUPPORT: 200 },
+          red: { TOP: 101, SUPPORT: 201 },
+        }),
+      );
+    }
+
+    const report = runBacktestDraft(rows, ENGINE, {
+      gate: { resamples: 200, confidenceLevel: 0.95, logLossTolerance: 0 },
+    });
+    expect(report.insufficientData).toBe(false);
+    expect(report.gate).not.toBeNull();
+    expect(report.gate?.metric).toBe('logLoss');
+    expect(report.gate?.resamples).toBe(200);
+    expect(report.gate?.confidenceLevel).toBe(0.95);
+    expect(report.gate?.logLossTolerance).toBe(0);
+    expect(report.gate?.units.match.ciLower).toBeLessThanOrEqual(
+      report.gate?.units.match.ciUpper ?? 0,
+    );
+    expect(report.gate?.units.player.ciLower).toBeLessThanOrEqual(
+      report.gate?.units.player.ciUpper ?? 0,
+    );
+    expect(report.gate?.thresholdsPendingOwnerConfirmation).toBe(true);
+    // Engine equals the baseline on this fixture: no significant improvement.
+    expect(report.validationStatus).toBe('unvalidated');
+    expect(report.gate?.passed).toBe(false);
+  });
+
+  it('marks the report validated when the engine beats the baseline significantly', () => {
+    // Same planted matchup as above: every holdout match is identical, so the
+    // match-unit bootstrap collapses to the point estimate, which is positive.
+    const enemyPairs: RecommendData['enemyPairs'] = [[100, 101, 'TOP', 'DIAMOND', 45, 50, 0.1]];
+    const rows: DraftRow[] = [];
+    for (let i = 0; i < 6; i += 1) {
+      rows.push(...makeMatch({ matchId: `t${i}`, patch: '16.20', blueWins: i % 2 === 0 }));
+      rows.push(
+        ...makeMatch({
+          matchId: `h${i}`,
+          patch: '16.21',
+          blueWins: true,
+          blue: { TOP: 100 },
+          red: { TOP: 101 },
+        }),
+      );
+    }
+
+    const report = runBacktestDraft(
+      rows,
+      { dataByRole: topSupportData({ topEnemyPairs: enemyPairs }) },
+      { gate: { resamples: 200, confidenceLevel: 0.95, logLossTolerance: 0 } },
+    );
+    expect(report.insufficientData).toBe(false);
+    expect(report.gate?.units.match.meanDelta).toBeGreaterThan(0);
+    expect(report.gate?.passed).toBe(true);
+    expect(report.validationStatus).toBe('validated');
+  });
+
+  it('is deterministic: identical inputs give identical gate intervals', () => {
+    const rows: DraftRow[] = [];
+    for (let i = 0; i < 6; i += 1) {
+      rows.push(...makeMatch({ matchId: `t${i}`, patch: '16.20', blueWins: i % 2 === 0 }));
+      rows.push(
+        ...makeMatch({
+          matchId: `h${i}`,
+          patch: '16.21',
+          blueWins: i % 2 === 0,
+          blue: { TOP: 100, SUPPORT: 200 },
+          red: { TOP: 101, SUPPORT: 201 },
+        }),
+      );
+    }
+    const options = { gate: { resamples: 200, confidenceLevel: 0.95, logLossTolerance: 0 } };
+    const a = runBacktestDraft(rows, ENGINE, options);
+    const b = runBacktestDraft(rows, ENGINE, options);
+    expect(a.gate).toEqual(b.gate);
+  });
+
   it('lets matchup layers move the engine prediction away from the champion baseline', () => {
     // Champion 100 (TOP) gets a strong positive enemy-pair term against the
     // actual red TOP (101): the engine score must exceed the 0.6 baseline, so

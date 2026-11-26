@@ -21,15 +21,24 @@ import { aggregateBaseline } from '../aggregate-baseline';
 import { aggregatePairTables } from '../aggregate-pairs';
 import {
   draftPatchSplit,
+  evaluatePatch,
   runBacktestDraft,
   type BacktestEngineData,
   type DraftRow,
+  type MatchupCandidateResult,
+  type MatchupExperiment,
+  type MatchupShrinkageK,
 } from '../backtest/draft';
 import { buildRoleRecommendData, loadChampionTagsMap } from '../backtest/recommend-data';
+import { ETL_CONFIG } from '../config/etl-config';
+import type { Role } from '@draftorb/shared';
+
 import { UsageError } from '../cli-args';
 import { defaultManualDataDir, resolveRepoRoot, defaultPublicDataDir } from '../config/paths';
 import { migrate } from '../db';
 import { log, parsePositionals, type Command } from './shared';
+
+const ALL_ROLES: readonly Role[] = ['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT'];
 
 function resolveDbPathReadOnly(): string {
   const chosen = process.env.DRAFTORB_DB_PATH ?? join(resolveRepoRoot(), 'data', 'DraftOrb.sqlite');
@@ -39,14 +48,23 @@ function resolveDbPathReadOnly(): string {
 /**
  * Rebuild the engine's per-role inputs from the training window only. The
  * source database is attached read-only into a throwaway in-memory database
- * that holds every match except the holdout patch, then aggregated with the
- * snapshot set to the last training patch — the same code path as
- * `pnpm etl aggregate`, so recency is relative to the patch before the
- * holdout (D-023).
+ * that holds every match except the excluded patches (the holdout patch by
+ * default; D-128 train-only validation also excludes the validation patch),
+ * then aggregated with the snapshot set to the last included patch — the
+ * same code path as `pnpm etl aggregate`, so recency is relative to the
+ * patch before the holdout (D-023).
  */
-export function buildEngineData(dbPath: string, rows: readonly DraftRow[]): BacktestEngineData {
+export function buildEngineData(
+  dbPath: string,
+  rows: readonly DraftRow[],
+  extraExcludePatches: readonly string[] = [],
+): BacktestEngineData {
   const { holdoutPatch, trainingPatches } = draftPatchSplit(rows);
-  const snapshotPatch = trainingPatches[trainingPatches.length - 1];
+  const excluded = new Set(
+    [holdoutPatch, ...extraExcludePatches].filter((p): p is string => p !== null),
+  );
+  const includedPatches = trainingPatches.filter((p) => !excluded.has(p));
+  const snapshotPatch = includedPatches[includedPatches.length - 1];
   if (holdoutPatch === null || snapshotPatch === undefined) {
     return { dataByRole: {} };
   }
@@ -56,9 +74,13 @@ export function buildEngineData(dbPath: string, rows: readonly DraftRow[]): Back
     migrate(memory);
     memory.exec(`ATTACH DATABASE '${dbPath.replaceAll("'", "''")}' AS src`);
     try {
+      const excludeList = [...excluded];
+      const placeholders = excludeList.map(() => '?').join(', ');
       memory
-        .prepare('INSERT INTO matches SELECT * FROM src.matches WHERE patch <> ?')
-        .run(holdoutPatch);
+        .prepare(
+          `INSERT INTO matches SELECT * FROM src.matches WHERE patch NOT IN (${placeholders})`,
+        )
+        .run(...excludeList);
       memory
         .prepare(
           `INSERT INTO participants SELECT * FROM src.participants
@@ -110,12 +132,84 @@ export function buildEngineData(dbPath: string, rows: readonly DraftRow[]): Back
   }
 }
 
+/**
+ * D-128 matchup experiment. `matchupShrinkK` candidates (plus 'off' =
+ * matchup layers disabled) are scored on the LAST TRAINING PATCH ONLY —
+ * engine data built from earlier patches — then the selected variant is
+ * evaluated exactly once on the frozen holdout through the paired-bootstrap
+ * gate. Returns null when there is no validation patch to select on.
+ */
+export function runMatchupExperiment(
+  dbPath: string,
+  rows: readonly DraftRow[],
+  engine: BacktestEngineData,
+  roles: readonly Role[],
+): MatchupExperiment | null {
+  const { holdoutPatch, trainingPatches } = draftPatchSplit(rows);
+  const validationPatch = trainingPatches[trainingPatches.length - 1] ?? null;
+  if (holdoutPatch === null || validationPatch === null) return null;
+
+  const baseConfig = engine.config ?? DEFAULT_CONFIG;
+  const engineSub = buildEngineData(dbPath, rows, [validationPatch]);
+  if (Object.keys(engineSub.dataByRole).length === 0) return null;
+
+  const candidates: MatchupShrinkageK[] = ['off', ...ETL_CONFIG.backtest.matchupShrinkKGrid];
+  // Tie-break toward more shrinkage ('off' = infinite), never toward less.
+  const shrinkRank = (k: MatchupShrinkageK): number => (k === 'off' ? Number.POSITIVE_INFINITY : k);
+  const results: MatchupCandidateResult[] = [];
+  let best: { k: MatchupShrinkageK; logLoss: number } | null = null;
+  for (const k of candidates) {
+    const config = {
+      ...baseConfig,
+      matchupEnabled: k !== 'off',
+      matchupShrinkK: typeof k === 'number' ? k : 0,
+    };
+    const ev = evaluatePatch(rows, { ...engineSub, config }, roles, validationPatch, {
+      resamples: 0,
+    });
+    results.push({ shrinkageK: k, logLoss: ev.logLoss });
+    if (
+      ev.logLoss !== null &&
+      (best === null ||
+        ev.logLoss < best.logLoss - 1e-12 ||
+        (Math.abs(ev.logLoss - best.logLoss) <= 1e-12 && shrinkRank(k) > shrinkRank(best.k)))
+    ) {
+      best = { k, logLoss: ev.logLoss };
+    }
+  }
+
+  if (best === null || best.k === 'off') {
+    return {
+      enabled: false,
+      variant: 'off',
+      shrinkageK: null,
+      validationPatch,
+      candidates: results,
+      gate: null,
+    };
+  }
+
+  const k = best.k;
+  const config = { ...baseConfig, matchupEnabled: true, matchupShrinkK: k };
+  const holdout = evaluatePatch(rows, { ...engine, config }, roles, holdoutPatch);
+  const passed = holdout.gate?.passed ?? false;
+  return {
+    enabled: passed,
+    variant: k === 0 ? 'full' : 'shrunk',
+    shrinkageK: k,
+    validationPatch,
+    candidates: results,
+    gate: holdout.gate,
+  };
+}
+
 async function runBacktest(args: string[]): Promise<void> {
   // `--out=<path>` and `--pair-adjust` are handled here, not by
   // parsePositionals: the shared helper uses strict parseArgs with no
   // options, which would reject the flags.
   const outArgs = args.filter((arg) => arg.startsWith('--out='));
   const pairAdjustArgs = args.filter((arg) => arg === '--pair-adjust');
+  const roleArgs = args.filter((arg) => arg.startsWith('--roles='));
   const pairAdjust = pairAdjustArgs.length > 0;
   if (outArgs.length > 1) {
     throw new UsageError('Duplicate --out option.\nUsage: backtest draft [--out=<path>]');
@@ -125,15 +219,37 @@ async function runBacktest(args: string[]): Promise<void> {
       'Duplicate --pair-adjust option.\nUsage: backtest draft [--out=<path>] [--pair-adjust]',
     );
   }
-  const positionalArgs = args.filter((arg) => !arg.startsWith('--out=') && arg !== '--pair-adjust');
+  if (roleArgs.length > 1) {
+    throw new UsageError(
+      'Duplicate --roles option.\nUsage: backtest draft [--out=<path>] [--roles=<TOP,JUNGLE,MID,ADC,SUPPORT>]',
+    );
+  }
+  const rolesValue = roleArgs[0]?.slice('--roles='.length);
+  let roles: Role[] | undefined;
+  if (rolesValue !== undefined) {
+    if (rolesValue === '') {
+      throw new UsageError('Missing value for --roles.');
+    }
+    const parsed = rolesValue.split(',').map((r) => r.trim().toUpperCase());
+    const invalid = parsed.filter((r) => !ALL_ROLES.includes(r as Role));
+    if (invalid.length > 0) {
+      throw new UsageError(
+        `Unknown role(s) in --roles: ${invalid.join(', ')}. Valid roles: ${ALL_ROLES.join(', ')}`,
+      );
+    }
+    roles = [...new Set(parsed as Role[])];
+  }
+  const positionalArgs = args.filter(
+    (arg) => !arg.startsWith('--out=') && !arg.startsWith('--roles=') && arg !== '--pair-adjust',
+  );
   const [subcommand] = parsePositionals(
     positionalArgs,
     1,
-    'backtest draft [--out=<path>] [--pair-adjust]',
+    'backtest draft [--out=<path>] [--pair-adjust] [--roles=<...>]',
   );
   if (subcommand !== 'draft') {
     throw new UsageError(
-      `Unknown backtest subcommand "${subcommand ?? ''}". Usage: backtest draft [--out=<path>] [--pair-adjust]`,
+      `Unknown backtest subcommand "${subcommand ?? ''}". Usage: backtest draft [--out=<path>] [--pair-adjust] [--roles=<...>]`,
     );
   }
 
@@ -171,10 +287,31 @@ async function runBacktest(args: string[]): Promise<void> {
     const evaluated = pairAdjust
       ? { ...engine, config: { ...DEFAULT_CONFIG, pairMainEffectAdjust: true } }
       : engine;
-    const report = runBacktestDraft(rows, evaluated);
+    const report = runBacktestDraft(rows, evaluated, { roles });
+
+    // D-128: the report's headline metrics stay the shadow full-matchup
+    // evaluation; `matchup` carries the shrinkage experiment and decides
+    // `validationStatus` (validated only when the gate passes).
+    let finalReport = report;
+    if (!report.insufficientData) {
+      const matchup = runMatchupExperiment(dbPath, rows, evaluated, roles ?? ALL_ROLES);
+      if (matchup !== null) {
+        finalReport = {
+          ...report,
+          matchup,
+          validationStatus: matchup.enabled ? 'validated' : 'unvalidated',
+          message: matchup.enabled
+            ? `${report.message} Matchup layers validated on the holdout: variant ${matchup.variant}${matchup.shrinkageK !== null ? ` (matchupShrinkK=${matchup.shrinkageK})` : ''} passed the D-023 gate.`
+            : `${report.message} Matchup layers stay disabled: the train-selected variant ${matchup.variant} did not pass the D-023 gate on the holdout.`,
+        };
+        log.detail(
+          `matchup experiment: variant=${matchup.variant} shrinkK=${matchup.shrinkageK ?? 'off'} enabled=${matchup.enabled} (train validation on ${matchup.validationPatch})`,
+        );
+      }
+    }
 
     mkdirSync(dirname(out), { recursive: true });
-    writeFileSync(out, JSON.stringify(report, null, 2), 'utf8');
+    writeFileSync(out, JSON.stringify(finalReport, null, 2), 'utf8');
 
     log.info(`Backtest draft report written to ${out}`);
     log.detail(`holdout patch: ${report.holdoutPatch ?? 'none'}`);
@@ -197,7 +334,7 @@ async function runBacktest(args: string[]): Promise<void> {
 
 export const backtestCommand: Command = {
   name: 'backtest',
-  usage: 'backtest draft [--out=<path>] [--pair-adjust]',
+  usage: 'backtest draft [--out=<path>] [--pair-adjust] [--roles=<TOP,JUNGLE,MID,ADC,SUPPORT>]',
   description: 'Backtest the draft recommendation model on a frozen temporal holdout',
   run: runBacktest,
 };

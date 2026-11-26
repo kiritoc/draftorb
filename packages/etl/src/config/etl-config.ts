@@ -40,4 +40,24 @@ export const ETL_CONFIG = Object.freeze({
   profileFavMasteryCount: 5,
   /** Max new profile games fetched per profile per sync run (resumable). */
   profileSyncMaxGames: 200,
+
+  /**
+   * Draft-backtest gate knobs (D-023, BL-014). Priors pending owner
+   * confirmation; `pnpm etl backtest draft` reports both resampling units
+   * (`match` is the gate unit, `player` is informational).
+   */
+  backtest: Object.freeze({
+    /** Paired-bootstrap resamples per unit (D-023 `bootstrapResamples`). */
+    bootstrapResamples: 1000,
+    /** Two-sided confidence level for the gate interval. */
+    confidenceLevel: 0.95,
+    /** Minimum mean log-loss improvement (baseline − engine) to pass. */
+    logLossTolerance: 0,
+    /**
+     * D-128 `matchupShrinkK` candidates tried on the last training patch
+     * (train-only selection); 'off' (matchup layers disabled) is always
+     * evaluated first as the baseline candidate.
+     */
+    matchupShrinkKGrid: Object.freeze([0, 25, 50, 100, 200, 400]),
+  }),
 });

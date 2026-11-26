@@ -11,8 +11,9 @@
  * picked. Picks the engine cannot score fall back to the champion's
  * baseline-only prior so the comparison stays paired. Metrics are
  * per-player log-loss / Brier / calibration against that champion-baseline
- * model. Masked drafts, rolling validation and the paired-bootstrap gate
- * remain outstanding (report stays `unvalidated`).
+ * model, plus the D-023 paired-bootstrap gate on holdout log-loss vs the
+ * baseline-only model (resampling units `match` and `player`, fixed seed).
+ * Masked drafts, rolling validation and layer ablation remain outstanding.
  *
  * No DOM, no Node APIs, no network, no file I/O, no randomness.
  */
@@ -30,6 +31,7 @@ import {
 import type { DraftInput, Rank, RankBucket, RecommendData, Role, Slot } from '@draftorb/shared';
 import { comparePatches } from '../matches-store';
 import { gameBucketIndex } from '../aggregate-shared';
+import { ETL_CONFIG } from '../config/etl-config';
 
 export interface DraftRow {
   matchId: string;
@@ -49,6 +51,24 @@ export interface BacktestEngineData {
   readonly recommendConfig?: RecommendConfig;
 }
 
+/** D-023 gate knobs; defaults come from `ETL_CONFIG.backtest` (priors pending
+ *  owner confirmation, see docs/DECISIONS.md). */
+export interface BacktestGateOptions {
+  /** Bootstrap resamples per resampling unit (D-023 `bootstrapResamples`). */
+  readonly resamples?: number;
+  /** Two-sided confidence level for the interval, e.g. 0.95. */
+  readonly confidenceLevel?: number;
+  /** Minimum required mean log-loss improvement (baseline minus engine). */
+  readonly logLossTolerance?: number;
+}
+
+export interface BacktestOptions {
+  /** Roles to evaluate; defaults to every role (D-097 scope is
+   *  SUPPORT/TOP/JUNGLE). */
+  readonly roles?: readonly Role[];
+  readonly gate?: BacktestGateOptions;
+}
+
 interface CalibrationBin {
   bin: number;
   meanPred: number;
@@ -65,11 +85,39 @@ export interface RoleMetrics {
   brier: number | null;
 }
 
+export interface BacktestGateInterval {
+  /** Observed mean of (baseline log-loss − engine log-loss); positive = engine better. */
+  meanDelta: number;
+  ciLower: number;
+  ciUpper: number;
+}
+
+/** D-023 paired-bootstrap gate on holdout log-loss vs the champion-baseline
+ *  model. Both resampling units are always reported; `passed` uses the
+ *  configured gate unit (`match`, the D-023 default). */
+export interface BacktestGate {
+  metric: 'logLoss';
+  comparison: 'engine-vs-championBaseline';
+  resamples: number;
+  confidenceLevel: number;
+  logLossTolerance: number;
+  gateUnit: 'match';
+  units: {
+    match: BacktestGateInterval;
+    player: BacktestGateInterval;
+  };
+  passed: boolean;
+  /** The numeric thresholds are priors pending owner confirmation. */
+  thresholdsPendingOwnerConfirmation: true;
+}
+
 export interface BacktestReport {
   holdoutPatch: string | null;
   trainingPatches: string[];
   holdoutGames: number;
   trainingGames: number;
+  /** Roles this report evaluated (D-097 scope: SUPPORT, TOP, JUNGLE). */
+  roles: Role[];
   /** Player-level predictions evaluated (one per scored holdout participant). */
   predictions: number;
   /** Predictions where the engine had no score and the baseline prior was used. */
@@ -80,9 +128,39 @@ export interface BacktestReport {
   baselineBrier: number | null;
   calibration: CalibrationBin[];
   perRole: Record<Role, RoleMetrics>;
+  gate: BacktestGate | null;
+  /** D-128 matchup experiment result; null when the report is insufficient
+   *  or the command did not run the experiment. */
+  matchup: MatchupExperiment | null;
   insufficientData: boolean;
-  validationStatus: 'unvalidated';
+  validationStatus: 'unvalidated' | 'validated';
   message: string;
+}
+
+export type MatchupShrinkageK = number | 'off';
+
+export interface MatchupCandidateResult {
+  shrinkageK: MatchupShrinkageK;
+  /** Validation-patch log-loss; null when the patch had no scored points. */
+  logLoss: number | null;
+}
+
+/**
+ * D-128 matchup experiment: `matchupShrinkK` candidates are selected on the
+ * last training patch only (never the holdout), then evaluated once on the
+ * holdout through the paired-bootstrap gate. `enabled` is true only when
+ * the selected variant beats the champion baseline significantly.
+ */
+export interface MatchupExperiment {
+  enabled: boolean;
+  variant: 'off' | 'full' | 'shrunk';
+  /** Selected `matchupShrinkK`; null when variant is 'off'. */
+  shrinkageK: number | null;
+  /** Last training patch used for k selection (train-only validation). */
+  validationPatch: string | null;
+  candidates: MatchupCandidateResult[];
+  /** Holdout gate of the selected variant; null when variant is 'off'. */
+  gate: BacktestGate | null;
 }
 
 const MIN_TRAINING_GAMES = 5;
@@ -113,6 +191,65 @@ function clamp(p: number): number {
 function logLossBinary(pred: number, actual: number): number {
   const p = clamp(pred);
   return -(actual * Math.log(p) + (1 - actual) * Math.log(1 - p));
+}
+
+/** Deterministic PRNG (mulberry32): the backtest must be reproducible. */
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Fixed seed for every bootstrap run so reports are byte-reproducible. */
+const BOOTSTRAP_SEED = 0x9e3779b9;
+
+/**
+ * Percentile bootstrap CI of the mean of `units` (each unit is a group of
+ * paired per-observation differences, resampled with replacement). Returns
+ * the observed mean plus the two-sided `confidenceLevel` interval.
+ */
+function bootstrapInterval(
+  units: readonly (readonly number[])[],
+  resamples: number,
+  confidenceLevel: number,
+  seed: number,
+): BacktestGateInterval {
+  const observed: number[] = [];
+  for (const unit of units) observed.push(...unit);
+  const meanDelta =
+    observed.length === 0 ? 0 : observed.reduce((a, b) => a + b, 0) / observed.length;
+  if (units.length === 0 || resamples <= 0) {
+    return { meanDelta, ciLower: meanDelta, ciUpper: meanDelta };
+  }
+
+  const rand = mulberry32(seed);
+  const means: number[] = new Array<number>(resamples);
+  for (let r = 0; r < resamples; r += 1) {
+    let total = 0;
+    let count = 0;
+    for (let u = 0; u < units.length; u += 1) {
+      const unit = units[Math.floor(rand() * units.length)];
+      if (unit === undefined) continue;
+      for (const d of unit) {
+        total += d;
+        count += 1;
+      }
+    }
+    means[r] = count === 0 ? 0 : total / count;
+  }
+  means.sort((a, b) => a - b);
+  const alpha = 1 - confidenceLevel;
+  const lower = means[Math.floor((alpha / 2) * resamples)];
+  const upper = means[Math.min(resamples - 1, Math.floor((1 - alpha / 2) * resamples))];
+  return {
+    meanDelta,
+    ciLower: lower ?? meanDelta,
+    ciUpper: upper ?? meanDelta,
+  };
 }
 
 function brierBinary(pred: number, actual: number): number {
@@ -163,6 +300,7 @@ function championBaseline(
 }
 
 interface PlayerPoint {
+  matchId: string;
   pred: number;
   baseline: number;
   actual: number;
@@ -207,6 +345,7 @@ function evaluatePlayer(
 
   const baseline = championBaseline(data, row.championId, bucket, config.k0);
   return {
+    matchId: row.matchId,
     pred: picked?.score ?? baseline,
     baseline,
     actual: row.win,
@@ -253,7 +392,7 @@ function emptyRoleMetrics(): RoleMetrics {
 function insufficient(
   partial: Pick<
     BacktestReport,
-    'holdoutPatch' | 'trainingPatches' | 'holdoutGames' | 'trainingGames'
+    'holdoutPatch' | 'trainingPatches' | 'holdoutGames' | 'trainingGames' | 'roles'
   >,
   message: string,
 ): BacktestReport {
@@ -270,6 +409,8 @@ function insufficient(
       Role,
       RoleMetrics
     >,
+    gate: null,
+    matchup: null,
     insufficientData: true,
     validationStatus: 'unvalidated',
     message,
@@ -279,7 +420,7 @@ function insufficient(
 function insufficientWithFallbackCounts(
   partial: Pick<
     BacktestReport,
-    'holdoutPatch' | 'trainingPatches' | 'holdoutGames' | 'trainingGames'
+    'holdoutPatch' | 'trainingPatches' | 'holdoutGames' | 'trainingGames' | 'roles'
   >,
   message: string,
   points: readonly PlayerPoint[],
@@ -300,57 +441,36 @@ function insufficientWithFallbackCounts(
   };
 }
 
-export function runBacktestDraft(rows: DraftRow[], engine: BacktestEngineData): BacktestReport {
-  const { holdoutPatch, trainingPatches } = draftPatchSplit(rows);
-  const holdoutRows = rows.filter((r) => r.patch === holdoutPatch);
-  const trainingRows = rows.filter((r) => trainingPatches.includes(r.patch));
-  const holdoutMatches = groupByMatch(holdoutRows);
-  const trainingMatches = groupByMatch(trainingRows);
-  const counts = {
-    holdoutPatch,
-    trainingPatches,
-    holdoutGames: holdoutMatches.size,
-    trainingGames: trainingMatches.size,
-  };
-
-  if (rows.length === 0) {
-    return insufficient(counts, 'No matches in the database; nothing to backtest.');
-  }
-  if (trainingMatches.size < MIN_TRAINING_GAMES || holdoutMatches.size === 0) {
-    return insufficient(
-      counts,
-      'Insufficient data for a backtest (need at least 5 training matches and a non-empty holdout patch).',
-    );
-  }
-  if (Object.keys(engine.dataByRole).length === 0) {
-    return insufficient(
-      counts,
-      'No engine recommendation data for the training window; run `pnpm etl aggregate` first.',
-    );
-  }
-
+/** Evaluate every player of the given matches whose role is in `roleSet`. */
+function collectPoints(
+  matches: Iterable<readonly DraftRow[]>,
+  engine: BacktestEngineData,
+  roleSet: ReadonlySet<Role>,
+): PlayerPoint[] {
   const points: PlayerPoint[] = [];
-  for (const matchRows of holdoutMatches.values()) {
+  for (const matchRows of matches) {
     for (const row of matchRows) {
+      if (!roleSet.has(row.role)) continue;
       const point = evaluatePlayer(row, matchRows, engine);
       if (point !== null) points.push(point);
     }
   }
+  return points;
+}
 
-  if (points.length === 0) {
-    return insufficient(
-      counts,
-      'No holdout player has engine data for their role; nothing to evaluate.',
-    );
-  }
-  if (points.every((point) => !point.scored)) {
-    return insufficientWithFallbackCounts(
-      counts,
-      'No holdout pick was scored by the engine; only baseline fallbacks are available.',
-      points,
-    );
-  }
+interface PointSummary {
+  predictions: number;
+  unscored: number;
+  logLoss: number;
+  brier: number;
+  baselineLogLoss: number;
+  baselineBrier: number;
+  perRole: Record<Role, RoleMetrics>;
+  calibration: CalibrationBin[];
+}
 
+/** Mean metrics over scored points plus the per-role breakdown. */
+function summarizePoints(points: readonly PlayerPoint[]): PointSummary {
   let logLoss = 0;
   let brier = 0;
   let baselineLogLoss = 0;
@@ -400,24 +520,178 @@ export function runBacktestDraft(rows: DraftRow[], engine: BacktestEngineData): 
   }
 
   const n = points.length;
-  const unscored = points.filter((p) => !p.scored).length;
+  return {
+    predictions: n,
+    unscored: points.filter((p) => !p.scored).length,
+    logLoss: logLoss / n,
+    brier: brier / n,
+    baselineLogLoss: baselineLogLoss / n,
+    baselineBrier: baselineBrier / n,
+    perRole,
+    calibration: calibrationBins(points.map(({ pred, actual }) => ({ pred, actual }))),
+  };
+}
+
+/** D-023 paired bootstrap on per-point (baseline − engine) log-loss diffs. */
+function computeGate(
+  points: readonly PlayerPoint[],
+  gateOptions?: BacktestGateOptions,
+): BacktestGate {
+  const gateCfg = ETL_CONFIG.backtest;
+  const resamples = gateOptions?.resamples ?? gateCfg.bootstrapResamples;
+  const confidenceLevel = gateOptions?.confidenceLevel ?? gateCfg.confidenceLevel;
+  const logLossTolerance = gateOptions?.logLossTolerance ?? gateCfg.logLossTolerance;
+  const diffsByMatch = new Map<string, number[]>();
+  for (const point of points) {
+    const diff =
+      logLossBinary(point.baseline, point.actual) - logLossBinary(point.pred, point.actual);
+    const list = diffsByMatch.get(point.matchId) ?? [];
+    list.push(diff);
+    diffsByMatch.set(point.matchId, list);
+  }
+  const matchUnits = [...diffsByMatch.values()];
+  const playerUnits = [...diffsByMatch.values()].flatMap((unit) => unit.map((d) => [d]));
+  const matchInterval = bootstrapInterval(matchUnits, resamples, confidenceLevel, BOOTSTRAP_SEED);
+  const playerInterval = bootstrapInterval(playerUnits, resamples, confidenceLevel, BOOTSTRAP_SEED);
+  const passed = matchInterval.ciLower > logLossTolerance;
+  return {
+    metric: 'logLoss',
+    comparison: 'engine-vs-championBaseline',
+    resamples,
+    confidenceLevel,
+    logLossTolerance,
+    gateUnit: 'match',
+    units: { match: matchInterval, player: playerInterval },
+    passed,
+    thresholdsPendingOwnerConfirmation: true,
+  };
+}
+
+export interface PatchEvaluation {
+  predictions: number;
+  unscored: number;
+  logLoss: number | null;
+  baselineLogLoss: number | null;
+  brier: number | null;
+  baselineBrier: number | null;
+  gate: BacktestGate | null;
+}
+
+/**
+ * Evaluate one patch's matches through the engine with the given role set —
+ * the same scoring path as the holdout report, usable for train-only
+ * validation (D-128 k selection) and single-shot holdout variant checks.
+ */
+export function evaluatePatch(
+  rows: readonly DraftRow[],
+  engine: BacktestEngineData,
+  roles: readonly Role[],
+  patch: string,
+  gateOptions?: BacktestGateOptions,
+): PatchEvaluation {
+  const roleSet = new Set<Role>(ALL_ROLES.filter((role) => roles.includes(role)));
+  const matches = [...groupByMatch(rows.filter((r) => r.patch === patch)).values()];
+  const points = collectPoints(matches, engine, roleSet);
+  if (points.length === 0) {
+    return {
+      predictions: 0,
+      unscored: 0,
+      logLoss: null,
+      baselineLogLoss: null,
+      brier: null,
+      baselineBrier: null,
+      gate: null,
+    };
+  }
+  const summary = summarizePoints(points);
+  return {
+    predictions: summary.predictions,
+    unscored: summary.unscored,
+    logLoss: summary.logLoss,
+    baselineLogLoss: summary.baselineLogLoss,
+    brier: summary.brier,
+    baselineBrier: summary.baselineBrier,
+    gate: computeGate(points, gateOptions),
+  };
+}
+
+export function runBacktestDraft(
+  rows: DraftRow[],
+  engine: BacktestEngineData,
+  options: BacktestOptions = {},
+): BacktestReport {
+  const { holdoutPatch, trainingPatches } = draftPatchSplit(rows);
+  const holdoutRows = rows.filter((r) => r.patch === holdoutPatch);
+  const trainingRows = rows.filter((r) => trainingPatches.includes(r.patch));
+  const holdoutMatches = groupByMatch(holdoutRows);
+  const trainingMatches = groupByMatch(trainingRows);
+  const requestedRoles = options.roles ?? ALL_ROLES;
+  const roles = ALL_ROLES.filter((role) => requestedRoles.includes(role));
+  const roleSet = new Set<Role>(roles);
+  const counts = {
+    holdoutPatch,
+    trainingPatches,
+    holdoutGames: holdoutMatches.size,
+    trainingGames: trainingMatches.size,
+    roles,
+  };
+
+  if (rows.length === 0) {
+    return insufficient(counts, 'No matches in the database; nothing to backtest.');
+  }
+  if (trainingMatches.size < MIN_TRAINING_GAMES || holdoutMatches.size === 0) {
+    return insufficient(
+      counts,
+      'Insufficient data for a backtest (need at least 5 training matches and a non-empty holdout patch).',
+    );
+  }
+  if (Object.keys(engine.dataByRole).length === 0) {
+    return insufficient(
+      counts,
+      'No engine recommendation data for the training window; run `pnpm etl aggregate` first.',
+    );
+  }
+
+  const points = collectPoints(holdoutMatches.values(), engine, roleSet);
+
+  if (points.length === 0) {
+    return insufficient(
+      counts,
+      'No holdout player has engine data for their role; nothing to evaluate.',
+    );
+  }
+  if (points.every((point) => !point.scored)) {
+    return insufficientWithFallbackCounts(
+      counts,
+      'No holdout pick was scored by the engine; only baseline fallbacks are available.',
+      points,
+    );
+  }
+
+  const summary = summarizePoints(points);
+  const gate = computeGate(points, options.gate);
+  const n = points.length;
 
   return {
     holdoutPatch,
     trainingPatches,
     holdoutGames: holdoutMatches.size,
     trainingGames: trainingMatches.size,
+    roles,
     predictions: n,
-    unscored,
-    logLoss: logLoss / n,
-    brier: brier / n,
-    baselineLogLoss: baselineLogLoss / n,
-    baselineBrier: baselineBrier / n,
-    calibration: calibrationBins(points.map(({ pred, actual }) => ({ pred, actual }))),
-    perRole,
+    unscored: summary.unscored,
+    logLoss: summary.logLoss,
+    brier: summary.brier,
+    baselineLogLoss: summary.baselineLogLoss,
+    baselineBrier: summary.baselineBrier,
+    calibration: summary.calibration,
+    perRole: summary.perRole,
+    gate,
+    matchup: null,
     insufficientData: false,
-    validationStatus: 'unvalidated',
-    message:
-      'Backtest complete (deployed engine, full-draft holdout evaluation). This report is not validated: the D-023 paired-bootstrap gate, masked drafts, rolling validation and layer ablation are not implemented.',
+    validationStatus: gate.passed ? 'validated' : 'unvalidated',
+    message: gate.passed
+      ? `Backtest complete (deployed engine, full-draft holdout evaluation). The D-023 paired-bootstrap gate passed: match-unit ${gate.confidenceLevel} CI lower bound ${gate.units.match.ciLower.toFixed(4)} > log-loss tolerance ${gate.logLossTolerance}. Masked drafts, rolling validation and layer ablation are not implemented.`
+      : `Backtest complete (deployed engine, full-draft holdout evaluation). validationStatus stays "unvalidated": the D-023 paired-bootstrap gate failed (match-unit ${gate.confidenceLevel} CI lower bound ${gate.units.match.ciLower.toFixed(4)} <= log-loss tolerance ${gate.logLossTolerance}). Masked drafts, rolling validation and layer ablation are not implemented.`,
   };
 }

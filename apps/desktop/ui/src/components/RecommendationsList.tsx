@@ -16,12 +16,12 @@ import type { PoolUnavailableItem } from '../pick/pool-unavailable';
 import { RecommendationCard } from './RecommendationCard';
 import { UnavailableChampionCard } from './UnavailableChampionCard';
 
-interface PaginationAction {
+export interface PaginationAction {
   type: 'reset' | 'showMore';
   maxPages?: number;
 }
 
-function pageCountReducer(pageCount: number, action: PaginationAction): number {
+export function pageCountReducer(pageCount: number, action: PaginationAction): number {
   if (action.type === 'reset') return 1;
   return Math.min(pageCount + 1, action.maxPages ?? pageCount + 1);
 }

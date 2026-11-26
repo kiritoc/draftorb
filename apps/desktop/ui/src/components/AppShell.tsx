@@ -63,6 +63,7 @@ export function AppShell(props: AppShellProps) {
             role={props.role}
             profileLoad={props.profileLoad ?? { kind: 'none', reason: 'noFolder' }}
             dataReadyNonce={props.dataReadyNonce}
+            repoFolder={props.repoFolder}
           />
         </section>
         {props.screen === 'settings' && (

@@ -52,6 +52,13 @@ export function setChampionRoles(
   return { pool: next, rejectedRoles };
 }
 
+/** Roles a champion currently occupies, in `roleSchema` order (editor checkboxes). */
+export function championPoolRoles(pool: PoolConfig, championId: number): Role[] {
+  return ROLES.filter((role) =>
+    (pool.pools[role] ?? []).some((entry) => entry.championId === championId),
+  );
+}
+
 /** Per-role champion-id sets; order, names and empty roles are ignored (SPECS §19.3). */
 export function poolDiffers(a: PoolConfig, b: PoolConfig): boolean {
   return ROLES.some((role) => {

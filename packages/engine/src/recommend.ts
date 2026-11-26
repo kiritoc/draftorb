@@ -290,7 +290,15 @@ export function recommend(
       ...hardCounterWarnings(pairInfo.deltas, rc.hardCounterDeltaPp),
     ];
 
-    scored.push({ championId: c, score: sigmoid(logOdds), reasons, baselineNEff: nE, warnings });
+    // D-128: with matchup layers off the score IS the baseline prior — no
+    // logit/sigmoid round-trip, so it equals `championBaseline` exactly.
+    scored.push({
+      championId: c,
+      score: matchupOn ? sigmoid(logOdds) : p0,
+      reasons,
+      baselineNEff: nE,
+      warnings,
+    });
   }
 
   // --- Sort and rank ---

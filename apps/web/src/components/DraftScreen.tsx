@@ -43,8 +43,7 @@ import {
   type RuneIconInfo,
 } from '../data/runes.js';
 import { createRecommendData } from '../data/recommend-data.js';
-import { loadBacktestReport } from '../data/backtest-report.js';
-import { matchupConfigFromReport, type MatchupConfig } from '../data/backtest-validation.js';
+import { useMatchupConfig } from '../use-matchup-config.js';
 import { excludePick, excludedRanks } from '../data/exclude-pick.js';
 import { computePersonalizedEntries } from '../personalized.js';
 import { championsForSlot } from '../champion-availability.js';
@@ -106,22 +105,10 @@ export function DraftScreen() {
   const [runeIcons, setRuneIcons] = useState<ReadonlyMap<number, RuneIconInfo> | null>(null);
   const [runesResult, setRunesResult] = useState<RuneRecommendationResult | null>(null);
   const [runesLoading, setRunesLoading] = useState(false);
-  const [matchupConfig, setMatchupConfig] = useState<MatchupConfig | null>(null);
+  // D-128: matchup layers run only when the backtest report validates them
+  // for SUPPORT on the loaded patch; anything else keeps the baseline ranking.
+  const matchupConfig = useMatchupConfig(USER_ROLE);
   const runeExportCache = useRef(new Map<number, Promise<RuneExport | null>>());
-
-  // D-128: matchup layers run only when the backtest report validates them;
-  // a missing/unreadable report keeps the champion-baseline ranking.
-  useEffect(() => {
-    let cancelled = false;
-    void loadBacktestReport().then((report) => {
-      if (!cancelled) {
-        setMatchupConfig(matchupConfigFromReport(report));
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const engineConfig = useMemo(
     () => ({

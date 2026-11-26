@@ -73,6 +73,7 @@ function makeMatch({
         role,
         win: wins ? 1 : 0,
         matchRankScore: 6.5, // persisted D-016 scale: DIAMOND
+        playerId: `puuid-${matchId}-${teamId}-${ROLES.indexOf(role)}`,
       });
     }
   }
@@ -271,12 +272,113 @@ describe('runBacktestDraft (engine evaluation, B-053)', () => {
     const report = runBacktestDraft(
       rows,
       { dataByRole: topSupportData({ topEnemyPairs: enemyPairs }) },
-      { gate: { resamples: 200, confidenceLevel: 0.95, logLossTolerance: 0 } },
+      // minHoldoutMatches: 1 isolates the interval mechanics; the default
+      // floor is covered by the dedicated minimum-matches test below.
+      {
+        gate: { resamples: 200, confidenceLevel: 0.95, logLossTolerance: 0, minHoldoutMatches: 1 },
+      },
     );
     expect(report.insufficientData).toBe(false);
     expect(report.gate?.units.match.meanDelta).toBeGreaterThan(0);
     expect(report.gate?.passed).toBe(true);
     expect(report.validationStatus).toBe('validated');
+  });
+
+  it('keeps the gate closed below the minimum evaluated holdout matches', () => {
+    // Same planted matchup as the validated case: the point estimate is
+    // positive, but 6 matches is below ETL_CONFIG.backtest.minHoldoutMatches,
+    // so resampling cannot evidence an improvement across matches.
+    const enemyPairs: RecommendData['enemyPairs'] = [[100, 101, 'TOP', 'DIAMOND', 45, 50, 0.1]];
+    const rows: DraftRow[] = [];
+    for (let i = 0; i < 6; i += 1) {
+      rows.push(...makeMatch({ matchId: `t${i}`, patch: '16.20', blueWins: i % 2 === 0 }));
+      rows.push(
+        ...makeMatch({
+          matchId: `h${i}`,
+          patch: '16.21',
+          blueWins: true,
+          blue: { TOP: 100 },
+          red: { TOP: 101 },
+        }),
+      );
+    }
+
+    const report = runBacktestDraft(rows, {
+      dataByRole: topSupportData({ topEnemyPairs: enemyPairs }),
+    });
+    expect(report.insufficientData).toBe(false);
+    expect(report.gate?.units.match.meanDelta).toBeGreaterThan(0);
+    expect(report.gate?.passed).toBe(false);
+    expect(report.validationStatus).toBe('unvalidated');
+    expect(report.message).toMatch(/fewer than \d+ evaluated holdout matches/);
+  });
+
+  it('resamples the player unit by player, not by appearance', () => {
+    // Two recurring players (one per outcome) across 8 holdout matches:
+    // clustering their appearances into single player units must change the
+    // player interval versus treating every appearance as independent.
+    const enemyPairs: RecommendData['enemyPairs'] = [[100, 101, 'TOP', 'DIAMOND', 45, 50, 0.1]];
+    const buildRows = (groupPlayers: boolean): DraftRow[] => {
+      const rows: DraftRow[] = [];
+      for (let i = 0; i < 6; i += 1) {
+        rows.push(...makeMatch({ matchId: `t${i}`, patch: '16.20', blueWins: i % 2 === 0 }));
+      }
+      for (let i = 0; i < 8; i += 1) {
+        const blueWins = i % 2 === 0;
+        const match = makeMatch({
+          matchId: `h${i}`,
+          patch: '16.21',
+          blueWins,
+          blue: { TOP: 100 },
+          red: { TOP: 101 },
+        });
+        if (groupPlayers) {
+          for (const row of match) {
+            if (row.role === 'TOP' && row.teamId === 100) {
+              row.playerId = blueWins ? 'player-wins' : 'player-losses';
+            }
+          }
+        }
+        rows.push(...match);
+      }
+      return rows;
+    };
+    const engine = { dataByRole: topSupportData({ topEnemyPairs: enemyPairs }) };
+    const options = {
+      roles: ['TOP'] as Role[],
+      gate: { resamples: 500, confidenceLevel: 0.95, logLossTolerance: 0, minHoldoutMatches: 1 },
+    };
+    const grouped = runBacktestDraft(buildRows(true), engine, options);
+    const ungrouped = runBacktestDraft(buildRows(false), engine, options);
+    expect(grouped.insufficientData).toBe(false);
+    expect(ungrouped.insufficientData).toBe(false);
+    expect(grouped.gate?.units.player).not.toEqual(ungrouped.gate?.units.player);
+    // The player interval must stay a valid two-sided interval either way.
+    expect(grouped.gate?.units.player.ciLower).toBeLessThanOrEqual(
+      grouped.gate?.units.player.ciUpper ?? 0,
+    );
+  });
+
+  it('skips the paired-bootstrap gate when skipGate is set', () => {
+    const rows: DraftRow[] = [];
+    for (let i = 0; i < 6; i += 1) {
+      rows.push(...makeMatch({ matchId: `t${i}`, patch: '16.20', blueWins: i % 2 === 0 }));
+      rows.push(
+        ...makeMatch({
+          matchId: `h${i}`,
+          patch: '16.21',
+          blueWins: true,
+          blue: { TOP: 100, SUPPORT: 200 },
+          red: { TOP: 101, SUPPORT: 201 },
+        }),
+      );
+    }
+    const report = runBacktestDraft(rows, ENGINE, { skipGate: true });
+    expect(report.insufficientData).toBe(false);
+    expect(report.gate).toBeNull();
+    expect(report.validationStatus).toBe('unvalidated');
+    expect(report.logLoss).toBeTypeOf('number');
+    expect(report.message).toMatch(/gate was skipped/);
   });
 
   it('is deterministic: identical inputs give identical gate intervals', () => {

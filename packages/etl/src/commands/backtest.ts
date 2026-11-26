@@ -275,7 +275,7 @@ async function runBacktest(args: string[]): Promise<void> {
         `SELECT
            m.match_id AS matchId, m.patch AS patch, p.team_id AS teamId,
            p.champion_id AS championId, p.role AS role, p.win AS win,
-           m.avg_rank_score AS matchRankScore
+           m.avg_rank_score AS matchRankScore, p.puuid AS playerId
          FROM participants p
          JOIN matches m ON m.match_id = p.match_id`,
       )
@@ -294,15 +294,20 @@ async function runBacktest(args: string[]): Promise<void> {
     // `validationStatus` (validated only when the gate passes).
     let finalReport = report;
     if (!report.insufficientData) {
-      const matchup = runMatchupExperiment(dbPath, rows, evaluated, roles ?? ALL_ROLES);
+      // The matchup block must validate the configuration the apps actually
+      // run (DEFAULT_CONFIG + matchup flags): `--pair-adjust` is an A/B
+      // experiment on the headline metrics only, so the experiment always
+      // sees the unadjusted engine even when the shadow report used it.
+      const matchup = runMatchupExperiment(dbPath, rows, engine, roles ?? ALL_ROLES);
       if (matchup !== null) {
+        const shadow = report.gate?.passed ? 'passed' : 'failed';
         finalReport = {
           ...report,
           matchup,
           validationStatus: matchup.enabled ? 'validated' : 'unvalidated',
           message: matchup.enabled
-            ? `${report.message} Matchup layers validated on the holdout: variant ${matchup.variant}${matchup.shrinkageK !== null ? ` (matchupShrinkK=${matchup.shrinkageK})` : ''} passed the D-023 gate.`
-            : `${report.message} Matchup layers stay disabled: the train-selected variant ${matchup.variant} did not pass the D-023 gate on the holdout.`,
+            ? `Backtest complete (deployed engine, full-draft holdout evaluation). Matchup layers validated on the holdout: variant ${matchup.variant}${matchup.shrinkageK !== null ? ` (matchupShrinkK=${matchup.shrinkageK})` : ''} passed the D-023 gate (validationStatus "validated"). The shadow champion-baseline gate ${shadow}. Masked drafts, rolling validation and layer ablation are not implemented.`
+            : `Backtest complete (deployed engine, full-draft holdout evaluation). Matchup layers stay disabled: the train-selected variant ${matchup.variant} did not pass the D-023 gate on the holdout (validationStatus "unvalidated"). The shadow champion-baseline gate ${shadow}. Masked drafts, rolling validation and layer ablation are not implemented.`,
         };
         log.detail(
           `matchup experiment: variant=${matchup.variant} shrinkK=${matchup.shrinkageK ?? 'off'} enabled=${matchup.enabled} (train validation on ${matchup.validationPatch})`,

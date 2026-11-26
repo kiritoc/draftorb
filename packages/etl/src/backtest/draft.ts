@@ -42,6 +42,9 @@ export interface DraftRow {
   win: number; // 1 when this participant's team won the match
   /** Match average rank score (D-019), the same rank context used by aggregates. */
   matchRankScore: number;
+  /** Player identifier (participants.puuid); groups the player bootstrap unit.
+   *  Internal only — never written to the report. */
+  playerId: string;
 }
 
 /** Per-role engine inputs built from the training window (never the holdout). */
@@ -60,6 +63,9 @@ export interface BacktestGateOptions {
   readonly confidenceLevel?: number;
   /** Minimum required mean log-loss improvement (baseline minus engine). */
   readonly logLossTolerance?: number;
+  /** Minimum distinct evaluated holdout matches before the gate can pass;
+   *  below it the bootstrap has no independent-match evidence. */
+  readonly minHoldoutMatches?: number;
 }
 
 export interface BacktestOptions {
@@ -67,6 +73,9 @@ export interface BacktestOptions {
    *  SUPPORT/TOP/JUNGLE). */
   readonly roles?: readonly Role[];
   readonly gate?: BacktestGateOptions;
+  /** Skip the paired-bootstrap gate entirely (grid searches that only read
+   *  the point metrics, e.g. `tune-priors`). */
+  readonly skipGate?: boolean;
 }
 
 interface CalibrationBin {
@@ -101,6 +110,8 @@ export interface BacktestGate {
   resamples: number;
   confidenceLevel: number;
   logLossTolerance: number;
+  /** Distinct evaluated holdout matches the gate requires before it can pass. */
+  minHoldoutMatches: number;
   gateUnit: 'match';
   units: {
     match: BacktestGateInterval;
@@ -301,6 +312,8 @@ function championBaseline(
 
 interface PlayerPoint {
   matchId: string;
+  /** Player identifier for the player bootstrap unit; never serialized. */
+  playerId: string;
   pred: number;
   baseline: number;
   actual: number;
@@ -346,6 +359,7 @@ function evaluatePlayer(
   const baseline = championBaseline(data, row.championId, bucket, config.k0);
   return {
     matchId: row.matchId,
+    playerId: row.playerId,
     pred: picked?.score ?? baseline,
     baseline,
     actual: row.win,
@@ -541,25 +555,34 @@ function computeGate(
   const resamples = gateOptions?.resamples ?? gateCfg.bootstrapResamples;
   const confidenceLevel = gateOptions?.confidenceLevel ?? gateCfg.confidenceLevel;
   const logLossTolerance = gateOptions?.logLossTolerance ?? gateCfg.logLossTolerance;
+  const minHoldoutMatches = gateOptions?.minHoldoutMatches ?? gateCfg.minHoldoutMatches;
   const diffsByMatch = new Map<string, number[]>();
+  const diffsByPlayer = new Map<string, number[]>();
   for (const point of points) {
     const diff =
       logLossBinary(point.baseline, point.actual) - logLossBinary(point.pred, point.actual);
     const list = diffsByMatch.get(point.matchId) ?? [];
     list.push(diff);
     diffsByMatch.set(point.matchId, list);
+    const playerList = diffsByPlayer.get(point.playerId) ?? [];
+    playerList.push(diff);
+    diffsByPlayer.set(point.playerId, playerList);
   }
   const matchUnits = [...diffsByMatch.values()];
-  const playerUnits = [...diffsByMatch.values()].flatMap((unit) => unit.map((d) => [d]));
+  // D-023 player unit: every appearance of the same player resamples together.
+  const playerUnits = [...diffsByPlayer.values()];
   const matchInterval = bootstrapInterval(matchUnits, resamples, confidenceLevel, BOOTSTRAP_SEED);
   const playerInterval = bootstrapInterval(playerUnits, resamples, confidenceLevel, BOOTSTRAP_SEED);
-  const passed = matchInterval.ciLower > logLossTolerance;
+  // A handful of matches cannot evidence an improvement: resampling them only
+  // reuses the same matches, so the gate stays closed below the floor.
+  const passed = matchUnits.length >= minHoldoutMatches && matchInterval.ciLower > logLossTolerance;
   return {
     metric: 'logLoss',
     comparison: 'engine-vs-championBaseline',
     resamples,
     confidenceLevel,
     logLossTolerance,
+    minHoldoutMatches,
     gateUnit: 'match',
     units: { match: matchInterval, player: playerInterval },
     passed,
@@ -669,7 +692,7 @@ export function runBacktestDraft(
   }
 
   const summary = summarizePoints(points);
-  const gate = computeGate(points, options.gate);
+  const gate = options.skipGate ? null : computeGate(points, options.gate);
   const n = points.length;
 
   return {
@@ -689,9 +712,12 @@ export function runBacktestDraft(
     gate,
     matchup: null,
     insufficientData: false,
-    validationStatus: gate.passed ? 'validated' : 'unvalidated',
-    message: gate.passed
-      ? `Backtest complete (deployed engine, full-draft holdout evaluation). The D-023 paired-bootstrap gate passed: match-unit ${gate.confidenceLevel} CI lower bound ${gate.units.match.ciLower.toFixed(4)} > log-loss tolerance ${gate.logLossTolerance}. Masked drafts, rolling validation and layer ablation are not implemented.`
-      : `Backtest complete (deployed engine, full-draft holdout evaluation). validationStatus stays "unvalidated": the D-023 paired-bootstrap gate failed (match-unit ${gate.confidenceLevel} CI lower bound ${gate.units.match.ciLower.toFixed(4)} <= log-loss tolerance ${gate.logLossTolerance}). Masked drafts, rolling validation and layer ablation are not implemented.`,
+    validationStatus: gate !== null && gate.passed ? 'validated' : 'unvalidated',
+    message:
+      gate === null
+        ? 'Backtest complete (deployed engine, full-draft holdout evaluation). The paired-bootstrap gate was skipped; point metrics only. Masked drafts, rolling validation and layer ablation are not implemented.'
+        : gate.passed
+          ? `Backtest complete (deployed engine, full-draft holdout evaluation). The D-023 paired-bootstrap gate passed: match-unit ${gate.confidenceLevel} CI lower bound ${gate.units.match.ciLower.toFixed(4)} > log-loss tolerance ${gate.logLossTolerance}. Masked drafts, rolling validation and layer ablation are not implemented.`
+          : `Backtest complete (deployed engine, full-draft holdout evaluation). validationStatus stays "unvalidated": the D-023 paired-bootstrap gate failed (match-unit ${gate.confidenceLevel} CI lower bound ${gate.units.match.ciLower.toFixed(4)} <= log-loss tolerance ${gate.logLossTolerance}, or fewer than ${gate.minHoldoutMatches} evaluated holdout matches). Masked drafts, rolling validation and layer ablation are not implemented.`,
   };
 }

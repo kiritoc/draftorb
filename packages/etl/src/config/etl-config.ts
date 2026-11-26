@@ -54,6 +54,12 @@ export const ETL_CONFIG = Object.freeze({
     /** Minimum mean log-loss improvement (baseline − engine) to pass. */
     logLossTolerance: 0,
     /**
+     * Minimum distinct evaluated holdout matches before the gate can pass —
+     * below it the bootstrap only resamples the same matches. Prior pending
+     * owner confirmation like the other gate thresholds.
+     */
+    minHoldoutMatches: 30,
+    /**
      * D-128 `matchupShrinkK` candidates tried on the last training patch
      * (train-only selection); 'off' (matchup layers disabled) is always
      * evaluated first as the baseline candidate.

@@ -3,26 +3,21 @@
  *
  * Shown while the matchup layers are disabled: the ranking is the champion
  * baseline win rate and the backtest has not validated matchup advice. The
- * banner disappears only when `backtest-draft.json` reports
- * `matchup.enabled` (fail-safe: a missing report keeps it visible).
+ * banner disappears only when `backtest-draft.json` validates matchup
+ * advice for the drafted role on the loaded patch — the same decision the
+ * draft screen makes (fail-safe: a missing report keeps it visible).
  */
 
-import { useEffect, useState } from 'react';
-import { loadBacktestReport } from '../data/backtest-report.js';
-import { matchupConfigFromReport } from '../data/backtest-validation.js';
+import { useMatchupConfig } from '../use-matchup-config.js';
 import { strings } from '../strings.js';
 
+const USER_ROLE = 'SUPPORT' as const;
+
 export function UnvalidatedModelBanner() {
-  const [show, setShow] = useState<boolean | null>(null);
+  const matchupConfig = useMatchupConfig(USER_ROLE);
 
-  useEffect(() => {
-    void (async () => {
-      const report = await loadBacktestReport();
-      setShow(matchupConfigFromReport(report) === null);
-    })();
-  }, []);
-
-  if (show === null || !show) {
+  // undefined = still loading: wait rather than flash the banner.
+  if (matchupConfig === undefined || matchupConfig !== null) {
     return null;
   }
 

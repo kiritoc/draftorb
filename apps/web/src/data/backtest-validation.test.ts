@@ -2,58 +2,89 @@ import { describe, expect, it } from 'vitest';
 
 import { matchupConfigFromReport } from './backtest-validation.js';
 
+const VALIDATED = {
+  validationStatus: 'validated',
+  holdoutPatch: '16.22',
+  roles: ['SUPPORT', 'TOP', 'JUNGLE'],
+  matchup: { enabled: true, variant: 'shrunk', shrinkageK: 100 },
+};
+
 describe('matchupConfigFromReport (D-128)', () => {
   it('returns null for a missing or malformed report (fail-safe off)', () => {
-    expect(matchupConfigFromReport(null)).toBeNull();
-    expect(matchupConfigFromReport('nope')).toBeNull();
-    expect(matchupConfigFromReport({})).toBeNull();
-    expect(matchupConfigFromReport({ validationStatus: 'validated' })).toBeNull();
+    expect(matchupConfigFromReport(null, 'SUPPORT', '16.22')).toBeNull();
+    expect(matchupConfigFromReport('nope', 'SUPPORT', '16.22')).toBeNull();
+    expect(matchupConfigFromReport({}, 'SUPPORT', '16.22')).toBeNull();
+    expect(
+      matchupConfigFromReport({ validationStatus: 'validated' }, 'SUPPORT', '16.22'),
+    ).toBeNull();
   });
 
   it('returns null unless the report is validated AND matchup.enabled', () => {
     expect(
-      matchupConfigFromReport({
-        validationStatus: 'unvalidated',
-        matchup: { enabled: true, shrinkageK: 100 },
-      }),
+      matchupConfigFromReport(
+        { ...VALIDATED, validationStatus: 'unvalidated' },
+        'SUPPORT',
+        '16.22',
+      ),
     ).toBeNull();
     expect(
-      matchupConfigFromReport({
-        validationStatus: 'validated',
-        matchup: { enabled: false, shrinkageK: null },
-      }),
+      matchupConfigFromReport(
+        { ...VALIDATED, matchup: { enabled: false, shrinkageK: null } },
+        'SUPPORT',
+        '16.22',
+      ),
     ).toBeNull();
     expect(
-      matchupConfigFromReport({ validationStatus: 'validated', matchup: null }),
+      matchupConfigFromReport({ ...VALIDATED, matchup: null }, 'SUPPORT', '16.22'),
     ).toBeNull();
   });
 
   it('returns the shrinkage k for a validated shrunk variant', () => {
-    expect(
-      matchupConfigFromReport({
-        validationStatus: 'validated',
-        matchup: { enabled: true, variant: 'shrunk', shrinkageK: 100 },
-      }),
-    ).toEqual({ enabled: true, shrinkK: 100 });
+    expect(matchupConfigFromReport(VALIDATED, 'SUPPORT', '16.22')).toEqual({
+      enabled: true,
+      shrinkK: 100,
+    });
   });
 
   it('returns shrinkK 0 for a validated full-matchup variant', () => {
     expect(
-      matchupConfigFromReport({
-        validationStatus: 'validated',
-        matchup: { enabled: true, variant: 'full', shrinkageK: 0 },
-      }),
+      matchupConfigFromReport(
+        { ...VALIDATED, matchup: { enabled: true, variant: 'full', shrinkageK: 0 } },
+        'SUPPORT',
+        '16.22',
+      ),
     ).toEqual({ enabled: true, shrinkK: 0 });
   });
 
   it('rejects an enabled matchup block without a sane shrinkageK', () => {
     for (const shrinkageK of [null, 'x', -1, Number.NaN]) {
       expect(
-        matchupConfigFromReport({
-          validationStatus: 'validated',
-          matchup: { enabled: true, shrinkageK },
-        }),
+        matchupConfigFromReport(
+          { ...VALIDATED, matchup: { enabled: true, shrinkageK } },
+          'SUPPORT',
+          '16.22',
+        ),
       ).toBeNull();
     }
+  });
+
+  it('rejects a report that did not evaluate the drafted role', () => {
+    // A TOP-only backtest says nothing about SUPPORT matchups.
+    expect(
+      matchupConfigFromReport(
+        { ...VALIDATED, roles: ['TOP'] },
+        'SUPPORT',
+        '16.22',
+      ),
+    ).toBeNull();
+    expect(
+      matchupConfigFromReport({ ...VALIDATED, roles: ['TOP', 'JUNGLE'] }, 'TOP', '16.22'),
+    ).toEqual({ enabled: true, shrinkK: 100 });
+    expect(matchupConfigFromReport({ ...VALIDATED, roles: 'SUPPORT' }, 'SUPPORT', '16.22')).toBeNull();
+  });
+
+  it('rejects a report validated on a different patch than the export', () => {
+    expect(matchupConfigFromReport(VALIDATED, 'SUPPORT', '16.23')).toBeNull();
+    expect(matchupConfigFromReport({ ...VALIDATED, holdoutPatch: null }, 'SUPPORT', '16.22')).toBeNull();
   });
 });

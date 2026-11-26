@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "build:rust": "cargo build --release --manifest-path src-tauri/Cargo.toml",
     "bench": "tsx scripts/bench.ts",
-    "gen:icon": "tsx scripts/gen-icon.ts"
+    "gen:icon": "tsx scripts/gen-icon.ts",
+    "bench:recommend": "tsx scripts/bench-recommend.ts"
   },
   "dependencies": {
     "@draftorb/engine": "workspace:*",

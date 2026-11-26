@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from
 import { recommend } from '@draftorb/engine';
 import {
   type Champion,
+  type ChampionId,
   type DraftInput,
   type InsufficientDataEntry,
   type PoolConfig,
@@ -32,7 +33,15 @@ import { championName } from '../champion-name';
 import { loadChampionIconVersion } from '../data/champion-icons';
 import { championsForSlot } from '../pick/champion-availability';
 import { enemyRoleViews } from '../pick/enemy-roles';
+import {
+  addBan,
+  isPickTargetIndex,
+  nextEmptyTarget,
+  PICK_TARGETS,
+  removeBan,
+} from '../pick/draft-entry';
 import { DraftSlot, type DraftSlotState } from '../components/DraftSlot';
+import { DraftEntryBar, type EntryTargetInfo } from '../components/DraftEntryBar';
 import { PickRecommendations } from '../components/PickRecommendations';
 import { PoolEditor } from '../components/PoolEditor';
 import { strings } from '../strings';
@@ -86,6 +95,8 @@ export function PickScreen({
     Array.from({ length: ENEMY_COUNT }, emptySlot),
   );
   const [userRank, setUserRank] = useState<Rank>(DEFAULT_RANK);
+  const [bans, setBans] = useState<ChampionId[]>([]);
+  const [activeIndex, setActiveIndex] = useState(0);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [poolRecommendations, setPoolRecommendations] = useState<Recommendation[]>([]);
   const [poolUnavailable, setPoolUnavailable] = useState<PoolUnavailableEntry[]>([]);
@@ -196,8 +207,9 @@ export function PickScreen({
       // enemy role is unknown (SPECS §5); a forced flag cannot change output.
       blindPick: false,
       pool: poolIds,
+      bans,
     }),
-    [userRank, role, allies, enemies, poolIds],
+    [userRank, role, allies, enemies, poolIds, bans],
   );
 
   useEffect(() => {
@@ -227,6 +239,91 @@ export function PickScreen({
     () => new Set([user, ...allies, ...enemies].filter(isFilled).map((slot) => slot.championId)),
     [user, allies, enemies],
   );
+
+  // Banned champions are unavailable everywhere: slot pickers and the entry
+  // bar search share this set (SPECS §2: banned ids leave the candidate set).
+  const blockedChampionIds = useMemo(
+    () => new Set<ChampionId>([...usedChampionIds, ...bans]),
+    [usedChampionIds, bans],
+  );
+
+  // Entry-bar state (BL-022): filled pick targets in PICK_TARGETS order
+  // (0 = you, 1-4 = allies, 5-9 = enemies) drive the auto-advance.
+  const filledTargetIndexes = useMemo(() => {
+    const filled = new Set<number>();
+    if (user.championId !== null) filled.add(0);
+    allies.forEach((slot, index) => {
+      if (slot.championId !== null) filled.add(1 + index);
+    });
+    enemies.forEach((slot, index) => {
+      if (slot.championId !== null) filled.add(5 + index);
+    });
+    return filled;
+  }, [user, allies, enemies]);
+
+  const slotAtTarget = (targetIndex: number): DraftSlotState | undefined => {
+    const target = PICK_TARGETS[targetIndex];
+    if (target === undefined) return undefined;
+    if (target.kind === 'user') return user;
+    if (target.kind === 'ally') return allies[target.index];
+    return enemies[target.index];
+  };
+
+  const applyEntryPick = (targetIndex: number, championId: ChampionId) => {
+    const target = PICK_TARGETS[targetIndex];
+    if (target === undefined) return;
+    const assign = (slot: DraftSlotState): DraftSlotState => ({
+      ...slot,
+      championId,
+      role: slot.championId === championId ? slot.role : undefined,
+    });
+    if (target.kind === 'user') {
+      setUser(assign(user));
+    } else if (target.kind === 'ally') {
+      setAllies((current) => current.map((s, i) => (i === target.index ? assign(s) : s)));
+    } else {
+      setEnemies((current) => current.map((s, i) => (i === target.index ? assign(s) : s)));
+    }
+    const filledAfter = new Set(filledTargetIndexes);
+    filledAfter.add(targetIndex);
+    setActiveIndex(nextEmptyTarget(filledAfter, targetIndex));
+  };
+
+  const applyEntryRole = (targetIndex: number, role: Role | undefined) => {
+    const target = PICK_TARGETS[targetIndex];
+    if (target?.kind === 'ally') {
+      setAllies((current) => current.map((s, i) => (i === target.index ? { ...s, role } : s)));
+    } else if (target?.kind === 'enemy') {
+      setEnemies((current) => current.map((s, i) => (i === target.index ? { ...s, role } : s)));
+    }
+  };
+
+  const activeTarget = isPickTargetIndex(activeIndex) ? PICK_TARGETS[activeIndex] : undefined;
+  const activeSlot = activeTarget === undefined ? undefined : slotAtTarget(activeIndex);
+  const activeSlotFilled = activeSlot?.championId != null;
+  const roleEditable =
+    activeTarget !== undefined && activeTarget.kind !== 'user' && activeSlotFilled;
+
+  const nameById = useMemo(
+    () => new Map(champions.map((champion) => [champion.id, champion.name])),
+    [champions],
+  );
+  const championNameOf = (id: ChampionId | null): string | null =>
+    id === null ? null : (nameById.get(id) ?? strings.championFallback(id));
+  const entryTargets: EntryTargetInfo[] = PICK_TARGETS.map((target, index) => {
+    const slot = slotAtTarget(index);
+    const label =
+      target.kind === 'user'
+        ? strings.userSlot
+        : target.kind === 'ally'
+          ? strings.allySlot(target.index + 1)
+          : strings.enemySlot(target.index + 1);
+    return {
+      key: target.kind === 'user' ? 'user' : `${target.kind}-${target.index}`,
+      label,
+      championName: championNameOf(slot?.championId ?? null),
+    };
+  });
 
   /** Persists the editor's working copy; resolves to the dropped champion ids. */
   const persistPool = async (next: PoolConfig): Promise<number[]> => {
@@ -321,6 +418,24 @@ export function PickScreen({
         </p>
       )}
 
+      <DraftEntryBar
+        champions={champions}
+        iconVersion={iconVersion}
+        targets={entryTargets}
+        activeIndex={activeIndex}
+        onActiveIndex={setActiveIndex}
+        bans={bans}
+        excludedIds={blockedChampionIds}
+        activeRole={roleEditable ? activeSlot?.role : undefined}
+        roleEditable={roleEditable}
+        onPick={applyEntryPick}
+        onSetRole={applyEntryRole}
+        onAddBan={(championId) =>
+          setBans((current) => addBan(current, championId, usedChampionIds) ?? current)
+        }
+        onRemoveBan={(championId) => setBans((current) => removeBan(current, championId))}
+      />
+
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="space-y-4">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
@@ -331,7 +446,7 @@ export function PickScreen({
               label={strings.userSlot}
               slot={user}
               onChange={setUser}
-              champions={championsForSlot(champions, usedChampionIds, user.championId)}
+              champions={championsForSlot(champions, blockedChampionIds, user.championId)}
               showRole={false}
               iconVersion={iconVersion}
             />
@@ -341,7 +456,7 @@ export function PickScreen({
                 label={strings.allySlot(index + 1)}
                 slot={slot}
                 onChange={(next) => setAlly(index, next)}
-                champions={championsForSlot(champions, usedChampionIds, slot.championId)}
+                champions={championsForSlot(champions, blockedChampionIds, slot.championId)}
                 iconVersion={iconVersion}
               />
             ))}
@@ -359,7 +474,7 @@ export function PickScreen({
                 label={strings.enemySlot(index + 1)}
                 slot={slot}
                 onChange={(next) => setEnemy(index, next)}
-                champions={championsForSlot(champions, usedChampionIds, slot.championId)}
+                champions={championsForSlot(champions, blockedChampionIds, slot.championId)}
                 roleView={enemyViews[index] ?? null}
                 iconVersion={iconVersion}
               />

@@ -27,9 +27,11 @@ the app as SPECS §10 requires.
 
 ## Contents and safety
 
-- Archive layout: `latest.json` at root + `16.22/**` (65 manifest files +
-  `champions.bootstrap.json`/`champions.derived.json` static catalogs kept by
-  the exporter). `profiles/` excluded (3 files present locally, none packed).
+- Archive layout: `latest.json` at root + the manifest-covered `16.22/**`
+  files. `profiles/` excluded (3 files present locally, none packed). Internal
+  role-derivation snapshots (`champions.bootstrap.json`/`champions.derived.json`)
+  are not manifest-covered and are excluded since B-076 (they were packed by
+  mistake in the first published asset).
 - Pre-publish scan (`scanPublishSet`): forbidden paths (`profiles/` segment,
   SQLite names) + content scan for PUUID-like identifiers and `RGAPI-`
   patterns — **0 violations** on the real tree, consistent with AUDIT §5e.

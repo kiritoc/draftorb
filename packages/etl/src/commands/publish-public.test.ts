@@ -250,6 +250,32 @@ describe('augmentManifestWithRootFiles', () => {
     expect(parsed.files.some((f) => f.path.includes('manifest.json'))).toBe(false);
   });
 
+  it('covers every archive entry except manifest.json, even with unlisted snapshots (B-076)', () => {
+    const dir = makePublicDir();
+    touch(dir, '16.22/champions.bootstrap.json', '{}');
+    touch(dir, '16.22/champions.derived.json', '{}');
+    const tagsPath = join(dir, 'champion-tags.json');
+    writeFileSync(tagsPath, '{"tags":{}}');
+    const entries = augmentManifestWithRootFiles(
+      toTarEntries([
+        ...collectPublishFiles(dir),
+        { rel: 'champion-tags.json', abs: tagsPath, size: 11 },
+      ]),
+    );
+    const manifest = entries.find((e) => e.name === '16.22/manifest.json')!;
+    const parsed = JSON.parse(manifest.data.toString('utf8')) as {
+      files: Array<{ path: string }>;
+    };
+    // Mirrors verifyArchive: `/x` entries are archive-root, others patch-relative.
+    const covered = new Set(
+      parsed.files.map((f) => (f.path.startsWith('/') ? f.path.slice(1) : `16.22/${f.path}`)),
+    );
+    const uncovered = entries
+      .map((e) => e.name)
+      .filter((name) => name !== '16.22/manifest.json' && !covered.has(name));
+    expect(uncovered).toEqual([]);
+  });
+
   it('fails when a root file is missing from the publish set', () => {
     const entries = toTarEntries(collectPublishFiles(makePublicDir()));
     expect(() => augmentManifestWithRootFiles(entries)).toThrow('missing champion-tags.json');

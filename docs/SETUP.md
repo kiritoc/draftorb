@@ -33,7 +33,7 @@ Needs the Rust toolchain (rustup; MSVC build tools on Windows) on top of Node + 
 
 - In the program's Settings, choose your local clone of this repository as the repo folder. Nothing else is configured; the program stores no token.
 - Personal record (badge): run `pnpm etl pull` (or `pnpm etl profile-sync` when you have a Riot key) so `data/public/profiles/` exists in that clone. The folder is gitignored and stays private.
-- Champion pool: use "Export to repo file" in the pool editor, then review and commit `data/pool.config.json` yourself. The repository is public, so the pool list is public; the scheduled pipeline reads only the committed copy.
+- Champion pool: use "Export to repo file" in the pool editor, then review and commit `data/pool.config.json` yourself. The repository is public, so the pool list is public; the scheduled pipeline reads only the committed copy and uses it to ingest players seen playing pool champion×role pairs first (D-102).
 
 ## Riot key
 
@@ -128,7 +128,7 @@ pnpm etl static [version]      # Data Dragon import -> data/public/<patch>/
 pnpm etl validate-tags         # validate data/manual/champion-tags.json (also: pnpm validate:tags)
 pnpm etl check-key [platform]  # test the Riot API key (default: euw1)
 pnpm etl players [platform]    # discover players by tier (--tiers, --quota, --reset)
-pnpm etl matches [platform]    # ingest matches, resumable, Ctrl+C safe (--since-patch, --per-player, --limit, --queue, --min-duration, --reset, --reset-tombstones, --refresh)
+pnpm etl matches [platform]    # ingest matches, resumable, Ctrl+C safe (--since-patch, --per-player, --limit, --queue, --min-duration, --reset, --reset-tombstones, --refresh, --call-budget, --time-budget, --dry-run). When `data/pool.config.json` exists, players already seen playing pool champion×role pairs are ingested first (D-102, BL-023); `--dry-run` prints the selection and each player's priority reason without API calls
 pnpm etl timeline [platform]   # fetch match timelines -> item_events (resumable; --limit=N)
 pnpm etl prune [--keep-patches=N] [--dry-run]  # delete matches older than the retention window and tombstone them as pruned (D-044; default keep: 20 patches)
 pnpm etl breakpoint <list|add|validate|reject>  # manage data breakpoints: manual add is active+manual, validate/reject move suggested->active/rejected (SPECS §16)
@@ -141,7 +141,7 @@ pnpm etl rekey [platform]      # rewrite stored PUUIDs to the current API key (a
 pnpm etl profile-sync [id]     # sync configured profiles -> SQLite -> data/public/profiles/ (T-091, D-068)
 ```
 
-Database commands (`aggregate`, `derive-roles`, `export`, `status`, `matches`, `players`, `migrate`) resolve the SQLite path the same way (`DRAFTORB_DB_PATH` env or repo default). `aggregate` and `derive-roles` refuse to run on a database with pending migrations — run `pnpm etl migrate` first.
+Database commands (`aggregate`, `derive-roles`, `export`, `status`, `matches`, `players`, `migrate`) resolve the SQLite path the same way (`DRAFTORB_DB_PATH` env or repo default). `matches` resolves the pool file the same way (`DRAFTORB_POOL_CONFIG_PATH` env or `<repo>/data/pool.config.json`). `aggregate` and `derive-roles` refuse to run on a database with pending migrations — run `pnpm etl migrate` first.
 
 Planned (target state):
 

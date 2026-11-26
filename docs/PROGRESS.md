@@ -16,6 +16,17 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 ## Current handoff
 
 - Date: 2026-11-26
+- Branch/PR: `feat/bl-023-pool-collection` (local worktree `draftorb-bl-023`, not pushed) / BL-023 (#88)
+- State: DOING
+- Done: pool-driven collection for match ingestion (D-102, D-114). New `pool-config.ts` loads/validates `data/pool.config.json` via the shared `poolConfigSchema` (missing file → `null`, invalid → throws; `DRAFTORB_POOL_CONFIG_PATH` env override mirrors `DRAFTORB_DB_PATH`). New `matches-select.ts` extracts player selection from `ingestMatches`: pending-first ordering unchanged, and when pool pairs exist, players with `participants` rows matching a pool champion×role pair (joined to `matches` for platform) move to the front of their pending/done group; `rank_score` remains the fallback. `ingestMatches` takes `poolConfig` and logs a pool-priority summary. `etl matches` loads the repo pool file (warn + rank-order fallback on invalid), passes it through, and gains `--dry-run`: prints every selected player with `[pool]`/`[rank]` reason, pending/done status and rank_score, with zero Riot calls. SETUP.md updated.
+- Files touched: `packages/etl/src/{pool-config.ts,pool-config.test.ts,matches-select.ts,matches-select.test.ts,matches.ts,matches.test.ts,commands/matches.ts,commands/matches.test.ts}`, `docs/{SETUP,PROGRESS}.md`.
+- Tests: new `matches-select.test.ts` (5: pool priority, rank fallback/empty pool, pending-vs-done groups, platform scoping, refresh cursor scope), `pool-config.test.ts` (4), `commands/matches.test.ts` (2 dry-run), one `ingestMatches` end-to-end order test; all etl match tests green.
+- Blockers / next step: `data/pool.config.json` does not exist yet — the owner commits it via the program's "Export to repo file" (BL-016a/BL-006 hand-off); until then behavior is identical to before. PR not yet opened.
+- Pitfalls: pool priority keys on `(champion_id, role)` pairs — a pool champion seen in another role does not count; `participants` rows come from already-ingested matches, so a never-seen player cannot match (cold-start limitation, inherent to the design).
+
+### Previous handoff (BL-011)
+
+- Date: 2026-11-26
 - Branch/PR: `feat/bl-011-top-jungle-export` / PR #152 / BL-011 (#74)
 - State: REVIEW
 - Done: `EXPORT_ROLES` extended to `['SUPPORT', 'TOP', 'JUNGLE']` (D-097); TOP/JUNGLE get the full `roles/<ROLE>/` layout (their `lane-full.json` stays empty — 1v1 lane groups). New `pnpm etl sample-report [patch]` (`export/sample-report.ts` + `commands/sample-report.ts`) prints per-file row counts and min/median/max `n_eff` for every `roles/<ROLE>/` file in the published manifest, pooled per role. DATA_MODEL.md documents the role enablement rule; DECISIONS.md D-126 (PROPOSED) records the ADC/MID assumption and the pending owner threshold question.

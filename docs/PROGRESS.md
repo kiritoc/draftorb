@@ -35,6 +35,17 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 - Blockers / next step: merged. BL-016b ban-list UI note in PROGRESS is now covered by `BanList`.
 - Pitfalls: the entry-bar dropdown stays open after Enter picks (rapid entry); it closes on Escape, outside pointerdown, or Tab away from the search (options keep it open so clicks land). Digit jumps only work with an empty query — champion names contain no digits.
 
+### Previous handoff (BL-003)
+
+- Date: 2026-11-26
+- Branch/PR: `feat/bl-003-windows-ci` / PR #155 / BL-003 (#69)
+- State: REVIEW
+- Done: new `windows` job in `.github/workflows/ci.yml` (`windows-latest`, Node 22, same format-bot gating as `lint`/`test`): `pnpm install --frozen-lockfile`, a named `better-sqlite3 prebuilt check` step, `pnpm check`, and the Tauri spike build `pnpm --filter @draftorb/desktop tauri build --no-bundle` (BL-002 landed, D-115 Rust exception scoped to `apps/desktop`); `windows-latest` was dropped from the `test` matrix to avoid a duplicate Windows suite run. New test `packages/etl/src/db/native-prebuild.test.ts` asserts `binding.js`'s `getPrebuildPath()` resolves a shipped `prebuilds/<platform>-<arch>.node` (no node-gyp fallback) and that an in-memory database opens and round-trips a row. CI on PR #155: every step green (windows job ~6-9 min). ETL-on-Windows end-to-end logged as B-079 (renumbered after a B-077 collision on main).
+- Files touched: `.github/workflows/ci.yml`, `packages/etl/src/db/native-prebuild.test.ts`, `docs/{BUGS,PROGRESS}.md`.
+- Tests: `pnpm check` green locally (149 files / 1573 tests, macOS arm64) and on `windows-latest` in CI; actionlint clean on `ci.yml`.
+- Blockers / next step: PR #155 open, all checks green; owner review/merge, then close #69.
+- Pitfalls: `pnpm vitest run <file>` targets a single test from the repo root (vitest is a root devDependency, not an etl one); `getPrebuildPath()` is exported by `better-sqlite3/lib/binding.js` and is the same lookup the loader uses, so the test proves the prebuilt — not a `build/` node-gyp artifact — is what gets required.
+
 ### Previous handoff (BL-011)
 
 - Date: 2026-11-26

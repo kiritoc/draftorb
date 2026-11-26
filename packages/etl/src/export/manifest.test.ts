@@ -46,7 +46,7 @@ describe('exportJson', () => {
     const result = suite.exportOnce();
     const manifest = result.manifest;
     expect(manifest.schemaVersion).toBe(4);
-    expect(manifest.roles).toEqual(['SUPPORT']);
+    expect(manifest.roles).toEqual(['SUPPORT', 'TOP', 'JUNGLE']);
     expect(manifest.rankBuckets).toEqual([
       'IRON',
       'BRONZE',
@@ -65,11 +65,21 @@ describe('exportJson', () => {
       'item-classes.json',
       'pick-rate.json',
       'role-prob.json',
+      'roles/JUNGLE/ally-pairs.json',
+      'roles/JUNGLE/baseline.json',
+      'roles/JUNGLE/enemy-pairs.json',
+      'roles/JUNGLE/lane-full.json',
+      'roles/JUNGLE/lane-vs.json',
       'roles/SUPPORT/ally-pairs.json',
       'roles/SUPPORT/baseline.json',
       'roles/SUPPORT/enemy-pairs.json',
       'roles/SUPPORT/lane-full.json',
       'roles/SUPPORT/lane-vs.json',
+      'roles/TOP/ally-pairs.json',
+      'roles/TOP/baseline.json',
+      'roles/TOP/enemy-pairs.json',
+      'roles/TOP/lane-full.json',
+      'roles/TOP/lane-vs.json',
     ]);
     for (const file of manifest.files) {
       expect(typeof file.sha256).toBe('string');

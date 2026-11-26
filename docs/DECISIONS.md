@@ -1382,3 +1382,11 @@ Question for the owner: what should `blindPick: true` mean?
 - (c) Keep the field but document it as reserved for a future mode.
 
 Recommendation: (b) if a manual blind-pick mode is wanted for live drafts; otherwise (a).
+
+### D-126 — TOP/JUNGLE export enablement: report now, thresholds pending owner — PROPOSED (BL-011)
+
+`pnpm etl export` now writes the full role layout for `SUPPORT`, `TOP` and `JUNGLE` (D-097) and lists all three in `manifest.roles`; `ADC`/`MID` stay at champion-level statistics (global `role-prob.json`/`pick-rate.json`) with no role directory — champion-level baseline exports for them belong to BL-024. Assumption recorded per workflow rule 9: BL-011's "keep ADC/MID at champion-level statistics only" is read as "do not export pair/lane layers for them", not "export a baseline-only role directory".
+
+The ticket requires a per-file sample-size report and a documented UI enablement rule ("a role appears selectable only when its export passes the agreed sample-size check"), but the check's thresholds must come from the report and need owner confirmation before becoming a gate. `pnpm etl sample-report [patch]` (`packages/etl/src/export/sample-report.ts`) prints, per file under `roles/<ROLE>/`, the row count and min/median/max `n_eff` (`games_w^2 / games_w2`), pooled per role; it reads the published export so it also works on `pnpm etl pull` data. First run on the local euw1 database (patch 16.22): TOP 95 903 rows / median n_eff 19.3, JUNGLE 94 934 rows / median 20.6 — both far above `exportMinGames` (10) and `minGames` (25) on baselines.
+
+Open question for the owner: which statistic and threshold should gate role selectability in the UI (e.g. baseline median n_eff, minimum rows per table file, or the `validate-export` recommendation check)? Until answered, every exported role stays selectable once its files exist; `validate-export` already fails the pipeline when an exported role yields zero "Best overall" picks.

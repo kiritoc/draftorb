@@ -135,6 +135,7 @@ pnpm etl breakpoint <list|add|validate|reject>  # manage data breakpoints: manua
 pnpm etl status [platform]     # counts and progress (incl. breakpoints pending review)
 pnpm etl aggregate [patch]     # compute every aggregated table (role probabilities, baselines, pair and lane tables, rune contexts, item builds; T-015..T-018, T-051)
 pnpm etl export [patch] [--region=<platform>]  # write versioned JSON and manifest for a patch (T-019)
+pnpm etl sample-report [patch]   # per-file row counts + n_eff distribution for roles/<ROLE>/ (BL-011)
 pnpm etl derive-roles [patch]  # rewrite champions.json.roles from observed roles (T-015.b); run after `matches`, and re-run after every `static`
 pnpm etl rekey [platform]      # rewrite stored PUUIDs to the current API key (after an RIOT_API_KEY change; --dry-run, --limit=N)
 pnpm etl profile-sync [id]     # sync configured profiles -> SQLite -> data/public/profiles/ (T-091, D-068)

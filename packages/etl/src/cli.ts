@@ -34,6 +34,7 @@ import { aggregateCommand } from './commands/aggregate';
 import { deriveRolesCommand } from './commands/derive-roles';
 import { exportCommand } from './commands/export';
 import { validateExportCommand } from './commands/validate-export';
+import { sampleReportCommand } from './commands/sample-report';
 import { statusCommand } from './commands/status';
 import { rekeyCommand } from './commands/rekey';
 import { profileSyncCommand } from './commands/profile-sync';
@@ -62,6 +63,7 @@ const COMMANDS: readonly Command[] = [
   aggregateCommand,
   exportCommand,
   validateExportCommand,
+  sampleReportCommand,
   deriveRolesCommand,
   statusCommand,
   rekeyCommand,

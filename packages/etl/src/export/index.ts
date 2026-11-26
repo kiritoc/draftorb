@@ -64,7 +64,10 @@ import {
   writeFileAtomic,
 } from './io.js';
 
-export const EXPORT_ROLES: readonly Role[] = ['SUPPORT'];
+/** Roles exported by default (D-097): SUPPORT, TOP and JUNGLE in full.
+ *  ADC/MID stay at champion-level statistics and get no role directory
+ *  (BL-024). */
+export const EXPORT_ROLES: readonly Role[] = ['SUPPORT', 'TOP', 'JUNGLE'];
 
 export interface ExportOptions {
   config?: RankWeightingConfig;

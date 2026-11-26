@@ -16,6 +16,17 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 ## Current handoff
 
 - Date: 2026-11-26
+- Branch/PR: `feat/bl-011-top-jungle-export` / BL-011 (#74)
+- State: DOING
+- Done: `EXPORT_ROLES` extended to `['SUPPORT', 'TOP', 'JUNGLE']` (D-097); TOP/JUNGLE get the full `roles/<ROLE>/` layout (their `lane-full.json` stays empty — 1v1 lane groups). New `pnpm etl sample-report [patch]` (`export/sample-report.ts` + `commands/sample-report.ts`) prints per-file row counts and min/median/max `n_eff` for every `roles/<ROLE>/` file in the published manifest, pooled per role. DATA_MODEL.md documents the role enablement rule; DECISIONS.md D-126 (PROPOSED) records the ADC/MID assumption and the pending owner threshold question.
+- Files touched: `packages/etl/src/export/{index.ts,sample-report.ts,sample-report.test.ts,manifest.test.ts,atomic.test.ts}`, `packages/etl/src/commands/{sample-report.ts,sample-report.test.ts,export.test.ts,cli.ts}`, `docs/{DATA_MODEL,SETUP,DECISIONS,PROGRESS}.md`.
+- Tests: `pnpm vitest run packages/etl` green (582 tests); real `pnpm etl export` on the local DB wrote 294 files incl. `roles/TOP/` + `roles/JUNGLE/`; `pnpm etl validate-export` PASSED (SUPPORT 54, TOP 91, JUNGLE 70 recommendations at Diamond); `pnpm etl sample-report` shows TOP 95 903 rows / median n_eff 19.3, JUNGLE 94 934 / 20.6.
+- Blockers / next step: role-selectability thresholds need owner confirmation (D-126); UI enablement itself is out of scope (BL-011). `pnpm check` + PR pending.
+- Pitfalls: TOP/JUNGLE `lane-full.json` is `[]` by design; `validate-export` now requires non-empty recommendations for TOP and JUNGLE, so a thin database can fail the pipeline where SUPPORT alone used to pass.
+
+### Previous handoff (BL-016b)
+
+- Date: 2026-11-26
 - Branch/PR: `feat/bl-016b-pool-lists` / PR #151 / BL-016b (#81)
 - State: REVIEW
 - Done: recommendation-lists UI completed per SPECS §7.1 — empty-pool one-line CTA per role ("No <Role> champions in your pool." + "Edit your pool"), UI-only "Hide my pool" toggle (default off, `hidePoolChampions` keeps global ranks/gaps, score(c) untouched), pool cards show both ranks (`In your pool · #n` badge + global `#rank`), unavailable pool cards now show n_eff, raw games and baseline win rate. New `PoolEditor` modal: champion x roles (pick once, tick roles, same champion under several roles) on the program-stored `PoolConfig`, per-role sections with `n/40` counts, remove/clear, JSON backup (schema-validated import, export to read-only textarea), manual repo-file import/export per §19.3 (export refused while the working copy is dirty — dirtiness derived from canonical serialization). `PickRecommendations` component owns all list shaping (pick exclusion, rank-gap closing, pool filtering, editor open state is lifted to the screen for the top "Edit pool" button). `onPoolChanged` refreshes the pool-sync banner after save/repo export (D-118). SPECS unchanged.

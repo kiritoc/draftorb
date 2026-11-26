@@ -16,7 +16,7 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 ## Current handoff
 
 - Date: 2026-11-26
-- Branch/PR: `feat/bl-009-pick-screen` (local commit, no new PR yet) / BL-015 (#79)
+- Branch/PR: `feat/bl-009-pick-screen` / PR #148 / BL-015 (#79)
 - State: REVIEW
 - Done: enemy pick slots now show the engine's inferred role and confidence, visually distinct from manual overrides; the role `<select>` stays the manual override path and feeds the same `recommend` input, so overrides persist for the draft session and recompute recommendations. `enemyRoleViews` wraps `resolveKnownSlots` (the resolver `recommend` uses) so badges match scoring; slots the engine drops — missing role probabilities or ambiguous duplicate fixed roles — show "No role inferred" instead of a false manual/inferred role.
 - Files touched: `apps/desktop/ui/src/pick/enemy-roles.ts` (+test), `apps/desktop/ui/src/components/DraftSlot.tsx` (+SSR test), `apps/desktop/ui/src/screens/PickScreen.tsx`, `apps/desktop/ui/src/strings.ts`, `packages/engine/src/index.ts` (export `resolveKnownSlots`), `docs/PROGRESS.md`.

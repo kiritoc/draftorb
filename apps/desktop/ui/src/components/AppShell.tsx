@@ -21,7 +21,8 @@ export interface AppShellProps {
   resolvedTheme: ResolvedTheme;
   onThemeChange: (theme: ThemeSetting) => void;
   onToggleTheme: () => void;
-  role: Role;
+  /** Active role; null when the coverage verdict enables no role. */
+  role: Role | null;
   onRoleChange: (role: Role) => void;
   enabledRoles?: readonly Role[];
   notice?: string;
@@ -61,8 +62,10 @@ export function AppShell(props: AppShellProps) {
             enabledRoles={props.enabledRoles}
             onSelect={props.onRoleChange}
           />
+          {/* Empty verdict: PickScreen skips recommendations but keeps the pool editor. */}
           <PickScreen
-            role={props.role}
+            role={props.role ?? 'SUPPORT'}
+            noEligibleRole={props.role === null}
             profileLoad={props.profileLoad ?? { kind: 'none', reason: 'noFolder' }}
             dataReadyNonce={props.dataReadyNonce}
             repoFolder={props.repoFolder}

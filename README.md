@@ -23,5 +23,6 @@ Personal League of Legends draft & itemization companion for Windows 11 (one pla
 | `docs/DECISIONS.md`    | Decision log (ADR)                                |
 | `docs/GLOSSARY.md`     | Domain vocabulary                                 |
 | `docs/SETUP.md`        | Windows setup                                     |
+| `docs/SHARING.md`      | Run the app with your own pool and profile        |
 
 Not affiliated with Riot Games.

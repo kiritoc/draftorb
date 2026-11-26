@@ -16,13 +16,35 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 ## Current handoff
 
 - Date: 2026-11-26
-- Branch/PR: `main` / BL-050 (#153)
-- State: DOING
-- Done: role enablement is now data-driven (D-126). New `apps/desktop/ui/src/data/role-coverage.ts`: pure `enabledRolesFromFiles` (distinct champions with a `baseline.json` row at `n_eff >= minGames` in the DIAMOND bucket, >= 50 to enable) plus `loadEnabledRoles` reading only the baseline files through the shared `loadCachedRelease` helper extracted from `export-data.ts`. `App` recomputes on `dataReadyNonce` and feeds `enabledRoles` to `AppShell`/`RoleSelector`; `DEFAULT_ENABLED_ROLES` remains the no-data fallback. `roleNeedsData` string updated ("Not enough champion data for this role"); ADC/MID keep the minimal-roles reason.
-- Files touched: `apps/desktop/ui/src/{App.tsx,config.ts,roles.ts,roles.test.ts,strings.ts}`, `data/{role-coverage.ts,role-coverage.test.ts,export-data.ts}`.
-- Tests: `pnpm check` green (1585 tests); new `role-coverage.test.ts` covers the 49/50 boundary, empty/missing baseline, DIAMOND bucket filtering, non-baseline files ignored and the cache loader.
-- Blockers / next step: commit on `main` per session instruction; open a PR (`feat/... (BL-050)`) if the owner wants review before merge. Verify TOP/JUNGLE selectable in the Tauri app on Windows.
-- Pitfalls: enablement reads `manifest.roles`, not `manifest.files`; a role exported without a baseline file counts as zero coverage. `nEff`/`DEFAULT_CONFIG` come from `@draftorb/engine` (pure, already a UI dependency).
+- Branch/PR: `feat/bl-050-role-enablement` / PR #154 / BL-050 (#153)
+- State: REVIEW
+- Done: role enablement is now data-driven (D-126). New `apps/desktop/ui/src/data/role-coverage.ts`: pure `enabledRolesFromFiles` (distinct champions with a `baseline.json` row at `n_eff >= minGames` in the DIAMOND bucket, >= 50 to enable) plus `loadEnabledRoles` reading only the baseline files through the shared `loadCachedRelease` helper extracted from `export-data.ts`. `App` recomputes on `dataReadyNonce` and feeds `enabledRoles` to `AppShell`/`RoleSelector`; `DEFAULT_ENABLED_ROLES` remains the no-data fallback. `roleNeedsData` string updated ("Not enough champion data for this role"); ADC/MID keep the minimal-roles reason. Review follow-ups (Devin Review + bot commits): active-role fallback to first eligible role, per-role JSON parse in `loadEnabledRoles`, `loadPickData` skips other roles' corrupt files, `loadChampionCatalog` keeps the pool editor's champion picker usable with no eligible role, dropped-champion notice in the fallback editor.
+- Files touched: `apps/desktop/ui/src/{App.tsx,config.ts,roles.ts,roles.test.ts,strings.ts,screens/PickScreen.tsx,components/{AppShell,RoleSelector}.tsx,data/{role-coverage.ts,role-coverage.test.ts,export-data.ts,export-data.test.ts,export-data-recovery.test.ts}}`, `docs/PROGRESS.md`.
+- Tests: `pnpm check` green (1592 tests); `role-coverage.test.ts` covers the 49/50 boundary, empty/missing baseline, DIAMOND bucket filtering, non-baseline files ignored and the cache loader; verified live in the Tauri app (TOP/JUNGLE selectable on patch 16.22 after `pnpm etl publish-public`).
+- Blockers / next step: PR #154 open, CI green, Devin Review findings addressed. Verify TOP/JUNGLE selectable in the Tauri app on Windows.
+- Pitfalls: enablement reads `manifest.roles`, not `manifest.files`; a role exported without a baseline file counts as zero coverage. `nEff`/`DEFAULT_CONFIG` come from `@draftorb/engine` (pure, already a UI dependency). The `data-latest` release asset must be republished (`pnpm etl publish-public`) for new roles to reach the app.
+
+### Previous handoff (BL-022)
+
+- Date: 2026-11-26
+- Branch/PR: `feat/bl-022-fast-draft-entry` / BL-022 (#87), merged via PR #159
+- State: DONE
+- Done: keyboard-first draft entry on the pick screen. New pure module `ui/src/pick/draft-entry.ts` (10 pick targets in entry order, digit-key map, next-empty advance, ban list rules) + `ui/src/components/DraftEntryBar.tsx` (persistent champion combobox that stays open after each pick, slot chips, role chips for the active slot, ban pseudo-target) + `ui/src/components/BanList.tsx`. `PickScreen` gained `bans` state wired into `DraftInput.bans`, a shared `blockedChampionIds` set (picked ∪ banned) for slot pickers and the entry search, and auto-advance to the next empty slot after each entry-bar pick. SPECS §10 documents the keyboard contract; `scripts/bench-recommend.ts` (`pnpm --filter @draftorb/desktop bench:recommend`) measures engine latency.
+- Files touched: `apps/desktop/ui/src/{pick/draft-entry.ts,pick/draft-entry.test.ts,components/DraftEntryBar.tsx,components/draft-entry-bar.test.ts,components/BanList.tsx,screens/PickScreen.tsx,strings.ts}`, `apps/desktop/scripts/bench-recommend.ts`, `apps/desktop/package.json`, `docs/SPECS.md`, `docs/PROGRESS.md`.
+- Tests: `pnpm check` green (1587 tests). Engine latency on the real 16.22 export: SUPPORT p50 1.75 ms / p95 2.44 ms, TOP p50 1.90 ms, JUNGLE p50 2.22 ms (n=300 each, well under the 50 ms budget). Timed mouse-free draft entry still needs the owner's manual run (protocol in the PR).
+- Blockers / next step: merged. BL-016b ban-list UI note in PROGRESS is now covered by `BanList`.
+- Pitfalls: the entry-bar dropdown stays open after Enter picks (rapid entry); it closes on Escape, outside pointerdown, or Tab away from the search (options keep it open so clicks land). Digit jumps only work with an empty query — champion names contain no digits.
+
+### Previous handoff (BL-003)
+
+- Date: 2026-11-26
+- Branch/PR: `feat/bl-003-windows-ci` / PR #155 / BL-003 (#69)
+- State: REVIEW
+- Done: new `windows` job in `.github/workflows/ci.yml` (`windows-latest`, Node 22, same format-bot gating as `lint`/`test`): `pnpm install --frozen-lockfile`, a named `better-sqlite3 prebuilt check` step, `pnpm check`, and the Tauri spike build `pnpm --filter @draftorb/desktop tauri build --no-bundle` (BL-002 landed, D-115 Rust exception scoped to `apps/desktop`); `windows-latest` was dropped from the `test` matrix to avoid a duplicate Windows suite run. New test `packages/etl/src/db/native-prebuild.test.ts` asserts `binding.js`'s `getPrebuildPath()` resolves a shipped `prebuilds/<platform>-<arch>.node` (no node-gyp fallback) and that an in-memory database opens and round-trips a row. CI on PR #155: every step green (windows job ~6-9 min). ETL-on-Windows end-to-end logged as B-079 (renumbered after a B-077 collision on main).
+- Files touched: `.github/workflows/ci.yml`, `packages/etl/src/db/native-prebuild.test.ts`, `docs/{BUGS,PROGRESS}.md`.
+- Tests: `pnpm check` green locally (149 files / 1573 tests, macOS arm64) and on `windows-latest` in CI; actionlint clean on `ci.yml`.
+- Blockers / next step: PR #155 open, all checks green; owner review/merge, then close #69.
+- Pitfalls: `pnpm vitest run <file>` targets a single test from the repo root (vitest is a root devDependency, not an etl one); `getPrebuildPath()` is exported by `better-sqlite3/lib/binding.js` and is the same lookup the loader uses, so the test proves the prebuilt — not a `build/` node-gyp artifact — is what gets required.
 
 ### Previous handoff (BL-011)
 

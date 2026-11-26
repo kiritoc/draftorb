@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Role } from '@draftorb/shared';
 import { AppShell } from './components/AppShell';
+import { ROLE_ORDER } from './config';
 import type { ScreenId } from './components/Nav';
 import type { DataStatus } from './data-status';
 import { ensureData } from './data/aggregates';
@@ -73,6 +74,13 @@ export function App() {
     };
   }, [dataReadyNonce]);
 
+  // Keep the user's pick while it is eligible; otherwise fall back to the
+  // first eligible role. null = confirmed empty verdict (no eligible role).
+  const activeRole: Role | null =
+    enabledRoles === undefined || enabledRoles.includes(role)
+      ? role
+      : (ROLE_ORDER.find((r) => enabledRoles.includes(r)) ?? null);
+
   const repoFolder = settings?.repoFolder;
   const settingsLoaded = settings !== null;
   const refreshPoolSync = useCallback(async () => {
@@ -133,7 +141,7 @@ export function App() {
       resolvedTheme={resolvedTheme}
       onThemeChange={changeTheme}
       onToggleTheme={() => changeTheme(toggledTheme(resolvedTheme))}
-      role={role}
+      role={activeRole}
       onRoleChange={setRole}
       enabledRoles={enabledRoles}
       notice={notice ?? poolNotice}

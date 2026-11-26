@@ -63,6 +63,8 @@ export interface MatchIngestionOptions {
    * pool never changes scores — it only reorders selection.
    */
   poolConfig?: PoolConfig | null;
+  /** Resolved path `poolConfig` was loaded from, for log messages only. */
+  poolConfigPath?: string;
 }
 
 export interface PlayerIngestionResult {
@@ -192,7 +194,7 @@ export async function ingestMatches(
       const poolCount = players.filter((p) => p.poolMatch).length;
       log(
         `Pool priority (${poolPairs.size} champion×role pairs from ` +
-          `data/pool.config.json): ${poolCount}/${players.length} selected players match.`,
+          `${options.poolConfigPath ?? 'pool config'}): ${poolCount}/${players.length} selected players match.`,
       );
     }
 

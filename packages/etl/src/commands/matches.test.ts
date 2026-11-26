@@ -71,6 +71,35 @@ describe('matchesCommand --dry-run', () => {
     }
   });
 
+  it('never migrates or writes: refuses a database with pending migrations', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'draftorb-dry-run-ro-'));
+    const dbPath = join(dir, 'legacy.sqlite');
+    const db = openDb(dbPath);
+    migrate(db);
+    // Simulate a database awaiting the latest migration (e.g. 017).
+    const latest = db
+      .prepare('SELECT version FROM _migrations ORDER BY version DESC LIMIT 1')
+      .get() as { version: string };
+    db.prepare('DELETE FROM _migrations WHERE version = ?').run(latest.version);
+    const before = (db.prepare('SELECT COUNT(*) AS n FROM _migrations').get() as { n: number }).n;
+    db.close();
+
+    const originalDbPath = process.env.DRAFTORB_DB_PATH;
+    process.env.DRAFTORB_DB_PATH = dbPath;
+    try {
+      await expect(matchesCommand.run(['--dry-run'])).rejects.toThrow(/pending migrations/);
+      const check = openDb(dbPath);
+      const after = (check.prepare('SELECT COUNT(*) AS n FROM _migrations').get() as { n: number })
+        .n;
+      check.close();
+      expect(after).toBe(before);
+    } finally {
+      if (originalDbPath === undefined) delete process.env.DRAFTORB_DB_PATH;
+      else process.env.DRAFTORB_DB_PATH = originalDbPath;
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('marks every player as rank-ordered when no pool file exists', async () => {
     const lines = await withDryRunEnv(null, () =>
       matchesCommand.run(['euw1', '--dry-run', '--limit=1']),

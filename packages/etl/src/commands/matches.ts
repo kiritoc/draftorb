@@ -1,12 +1,14 @@
+import Database from 'better-sqlite3';
+import { existsSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 
 import type { PoolConfig } from '@draftorb/shared';
 
 import { ingestMatches } from '../matches';
 import { poolChampionRolePairs, selectPlayers } from '../matches-select';
-import { loadPoolConfig } from '../pool-config';
-import { resolveDbPath } from '../config/paths';
-import { openDb, migrate } from '../db';
+import { loadPoolConfig, poolConfigPathFromEnv } from '../pool-config';
+import { dbPathFromEnv, resolveDbPath } from '../config/paths';
+import { getMigrationStatus, openDb } from '../db';
 import { CliError, UsageError, parseStrictPositiveInt } from '../cli-args';
 import { log, parsePlatform, type Command } from './shared';
 
@@ -14,9 +16,9 @@ const USAGE =
   'matches [platform] [--since-patch=16.19] [--per-player=20] [--limit=N] [--queue=420] [--min-duration=900] [--reset] [--reset-tombstones] [--refresh] [--call-budget=N] [--time-budget=MIN] [--dry-run]';
 
 /** Load the pool file for pool-driven prioritization; warn and continue without it. */
-function loadPoolConfigOrWarn(): PoolConfig | null {
+function loadPoolConfigOrWarn(configPath: string): PoolConfig | null {
   try {
-    return loadPoolConfig();
+    return loadPoolConfig(configPath);
   } catch (error) {
     log.info(
       `Warning: pool config ignored (${error instanceof Error ? error.message : String(error)}); ` +
@@ -102,16 +104,30 @@ async function runMatches(args: string[]): Promise<void> {
     );
   }
 
-  const dbPath = resolveDbPath();
-  const db = openDb(dbPath);
-  try {
-    const poolConfig = loadPoolConfigOrWarn();
+  const poolConfigPath = poolConfigPathFromEnv();
 
-    if (dryRun) {
-      // Selection preview only: no Riot calls, no patch resolution. The patch
-      // window never affects player ordering, so the list is exact.
-      migrate(db);
-      const selected = selectPlayers(db, platform, {
+  if (dryRun) {
+    // Selection preview only: no Riot calls, no patch resolution, and no
+    // writes — the database is opened read-only and never migrated, so a
+    // preview cannot apply destructive pending migrations (e.g. 017).
+    const dryRunDbPath = dbPathFromEnv();
+    if (!existsSync(dryRunDbPath)) {
+      throw new CliError(`No database at ${dryRunDbPath}. Run \`pnpm etl migrate\` first.`);
+    }
+    const roDb = new Database(dryRunDbPath, { readonly: true, fileMustExist: true });
+    try {
+      const hasMigrationsTable =
+        roDb
+          .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = '_migrations'")
+          .get() !== undefined;
+      if (!hasMigrationsTable || getMigrationStatus(roDb).pending > 0) {
+        throw new CliError(
+          `Database at ${dryRunDbPath} has pending migrations. ` +
+            'Run `pnpm etl migrate` first; --dry-run never migrates.',
+        );
+      }
+      const poolConfig = loadPoolConfigOrWarn(poolConfigPath);
+      const selected = selectPlayers(roDb, platform, {
         reset: resetValue,
         refresh: refreshValue,
         playerLimit,
@@ -121,7 +137,7 @@ async function runMatches(args: string[]): Promise<void> {
       log.info(
         `Dry run: ${selected.length} player(s) selected for platform "${platform}"` +
           (pairs.size > 0
-            ? ` (${pairs.size} pool champion×role pairs from data/pool.config.json)`
+            ? ` (${pairs.size} pool champion×role pairs from ${poolConfigPath})`
             : ' (no pool config)') +
           '.',
       );
@@ -131,8 +147,16 @@ async function runMatches(args: string[]): Promise<void> {
             `rank_score=${player.rank_score} ${player.done ? 'done' : 'pending'}`,
         );
       }
-      return;
+    } finally {
+      roDb.close();
     }
+    return;
+  }
+
+  const dbPath = resolveDbPath();
+  const db = openDb(dbPath);
+  try {
+    const poolConfig = loadPoolConfigOrWarn(poolConfigPath);
 
     log.info(
       `Ingesting ranked matches for platform "${platform}"` +
@@ -151,6 +175,7 @@ async function runMatches(args: string[]): Promise<void> {
       callBudget,
       timeBudgetMs: timeBudgetMinutes !== undefined ? timeBudgetMinutes * 60_000 : undefined,
       poolConfig,
+      poolConfigPath,
       db,
       onProgress: (message) => log.info(message),
     });

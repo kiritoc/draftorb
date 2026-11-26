@@ -133,12 +133,13 @@ champion and role. It is fed by an anonymized export the ETL produces locally.
    folders are gitignored, so your data never leaves your machine.
 
 3. In the app, open **Settings** and set **Repo folder** to the root of your
-   local clone (the folder that contains `data/`).
+   local clone (the folder that contains `data/`). If you already set it
+   earlier (for example for the pool file), skip this step.
 
-4. Done — champion cards now show your record badge. Re-run
-   `pnpm etl profile-sync --publish` anytime to refresh it, then restart the
-   app: the profile export is only reloaded at launch or when Repo folder
-   changes.
+4. (Re)start the app — the profile export is only read at launch or when
+   Repo folder changes, so a sync run while the app was already open is not
+   picked up. Champion cards now show your record badge. To refresh later,
+   re-run `pnpm etl profile-sync --publish` and restart the app again.
 
 If the profile file is missing or invalid, the badge simply shows **"no data"**
 and everything else keeps working — no crash, no warning noise. A notice in

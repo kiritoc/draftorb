@@ -36,3 +36,14 @@ export function championMetaRecord(
     nEff: row.nE,
   };
 }
+
+/**
+ * Effective sample `n_eff` of the champion's baseline row, or null when the
+ * row is missing or has no weighted evidence. Lets a gated-out figure still
+ * show its (thin) sample size.
+ */
+export function championMetaSample(index: BaselineIndex, championId: ChampionId): number | null {
+  const row = index.get(championId);
+  if (row === undefined || row.gamesE <= 0) return null;
+  return row.nE;
+}

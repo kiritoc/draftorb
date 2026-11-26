@@ -1,5 +1,9 @@
 import type { RankBucket, Role } from '@draftorb/shared';
-import { championMetaRecord, type BaselineIndex } from '../pick/baseline-record';
+import {
+  championMetaRecord,
+  championMetaSample,
+  type BaselineIndex,
+} from '../pick/baseline-record';
 import { personalStats, type PersonalRecord } from '../profile/personal-record';
 import { syncedDate, type ProfileLoad } from '../profile/profile-export';
 import { strings } from '../strings';
@@ -40,6 +44,14 @@ export function RecordBadge({
       ? championMetaRecord(baselineIndex, championId)
       : undefined;
   const bucketLabel = rankBucket === undefined ? '' : strings.bucketNames[rankBucket];
+  const thinSample =
+    meta === null && baselineIndex !== undefined
+      ? championMetaSample(baselineIndex, championId)
+      : null;
+  const insufficient = strings.recordMetaInsufficient(
+    bucketLabel,
+    thinSample === null ? undefined : Math.round(thinSample),
+  );
   const stats = load.kind === 'loaded' ? personalStats(load.profile, championId, role) : null;
   const tooltip =
     load.kind === 'loaded'
@@ -57,12 +69,12 @@ export function RecordBadge({
           className={chip}
           title={
             meta === null
-              ? strings.recordMetaInsufficient(bucketLabel)
+              ? insufficient
               : strings.recordMetaTooltip(bucketLabel, Math.round(meta.nEff))
           }
         >
           {meta === null
-            ? strings.recordMetaInsufficient(bucketLabel)
+            ? insufficient
             : strings.recordMetaRate(
                 bucketLabel,
                 Math.round(meta.winRate * 100),

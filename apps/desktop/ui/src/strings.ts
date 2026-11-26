@@ -154,7 +154,8 @@ export const strings = {
   recordWithRate: (games: number, percent: number) => `${games} games · ${percent}%`,
   recordMetaRate: (bucket: string, percent: number, nEff: number) =>
     `${bucket} avg ${percent}% · n≈${nEff}`,
-  recordMetaInsufficient: (bucket: string) => `${bucket} avg: not enough data`,
+  recordMetaInsufficient: (bucket: string, nEff?: number) =>
+    `${bucket} avg: not enough data${nEff === undefined ? '' : ` (n≈${nEff})`}`,
   recordMetaTooltip: (bucket: string, nEff: number) =>
     `Baseline win rate at ${bucket} rank · effective sample ${nEff}`,
   recordScopeAll: 'all roles',

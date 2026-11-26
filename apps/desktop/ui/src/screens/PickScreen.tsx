@@ -28,6 +28,7 @@ import {
   type ChampionCatalog,
   type PickData,
 } from '../data/export-data';
+import { championName } from '../champion-name';
 import { loadChampionIconVersion } from '../data/champion-icons';
 import { championsForSlot } from '../pick/champion-availability';
 import { enemyRoleViews } from '../pick/enemy-roles';
@@ -90,6 +91,7 @@ export function PickScreen({
   const [poolUnavailable, setPoolUnavailable] = useState<PoolUnavailableEntry[]>([]);
   const [insufficientData, setInsufficientData] = useState<InsufficientDataEntry[]>([]);
   const [recommendError, setRecommendError] = useState<string | null>(null);
+  const [poolDropped, setPoolDropped] = useState<number[]>([]);
 
   useEffect(() => {
     if (noEligibleRole) {
@@ -163,8 +165,10 @@ export function PickScreen({
     };
   }, [dataReadyNonce]);
 
+  // The catalog is the dedicated lightweight loader: prefer it so a stale
+  // pickData from a previous patch cannot mask a newer champions.json.
   const champions: Champion[] = useMemo(
-    () => pickData?.champions ?? catalog?.champions ?? [],
+    () => catalog?.champions ?? pickData?.champions ?? [],
     [pickData, catalog],
   );
   const poolIds = useMemo(
@@ -268,10 +272,19 @@ export function PickScreen({
           iconVersion={iconVersion}
           repoFolder={repoFolder}
           onSave={async (next) => {
-            await persistPool(next);
+            setPoolDropped(await persistPool(next));
           }}
           onPoolChanged={onPoolChanged}
         />
+        {poolDropped.length > 0 && (
+          <p
+            role="status"
+            className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/40 dark:bg-amber-900/30 dark:text-amber-200"
+          >
+            {strings.poolDroppedNotice}{' '}
+            {poolDropped.map((id) => championName(champions, id)).join(', ')}
+          </p>
+        )}
       </div>
     );
   }

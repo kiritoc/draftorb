@@ -54,6 +54,8 @@ export interface PickScreenProps {
   repoFolder?: string;
   /** Called after the pool is saved or exported to the repo file (D-118 banner). */
   onPoolChanged?: () => void;
+  /** D-126 empty verdict: skip recommendation data, keep the pool editor. */
+  noEligibleRole?: boolean;
 }
 
 export function PickScreen({
@@ -62,6 +64,7 @@ export function PickScreen({
   dataReadyNonce,
   repoFolder,
   onPoolChanged,
+  noEligibleRole = false,
 }: PickScreenProps) {
   const [pickData, setPickData] = useState<PickData | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -83,6 +86,11 @@ export function PickScreen({
   const [recommendError, setRecommendError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (noEligibleRole) {
+      setPickData(null);
+      setLoadError(null);
+      return;
+    }
     let cancelled = false;
     void (async () => {
       try {
@@ -108,7 +116,7 @@ export function PickScreen({
     return () => {
       cancelled = true;
     };
-  }, [role, dataReadyNonce]);
+  }, [role, dataReadyNonce, noEligibleRole]);
 
   // The pool loads independently of aggregates so the editor (and its JSON
   // backup) stays usable when pick data is missing or fails to load.
@@ -204,10 +212,14 @@ export function PickScreen({
     return dropped;
   };
 
-  if (loadError !== null || pickData === null) {
+  if (noEligibleRole || loadError !== null || pickData === null) {
     return (
       <div className="space-y-4">
-        {loadError !== null ? (
+        {noEligibleRole ? (
+          <p role="status" className="text-slate-600 dark:text-slate-300">
+            {strings.noEligibleRole}
+          </p>
+        ) : loadError !== null ? (
           <p className="text-red-600 dark:text-red-400">{strings.loadFailed(loadError)}</p>
         ) : (
           <p className="text-slate-500 dark:text-slate-400">{strings.loading}</p>

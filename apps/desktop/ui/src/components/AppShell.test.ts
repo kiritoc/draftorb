@@ -1,6 +1,7 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
+import { strings } from '../strings';
 import { AppShell, type AppShellProps } from './AppShell';
 
 const base: AppShellProps = {
@@ -48,6 +49,16 @@ describe('AppShell', () => {
     expect(buttonTag(html, 'Support')).not.toMatch(DISABLED);
     for (const label of ['Top', 'Jungle', 'ADC', 'Mid']) {
       expect(buttonTag(html, label)).toMatch(DISABLED);
+    }
+  });
+
+  it('hides recommendations but keeps Edit pool when no role is eligible', () => {
+    const empty = render({ role: null, enabledRoles: [] });
+    expect(empty).toContain(strings.noEligibleRole);
+    expect(empty).not.toContain(strings.loading);
+    expect(buttonTag(empty, strings.editPool)).not.toMatch(DISABLED);
+    for (const label of ['Support', 'Top', 'Jungle', 'ADC', 'Mid']) {
+      expect(buttonTag(empty, label)).toMatch(DISABLED);
     }
   });
 

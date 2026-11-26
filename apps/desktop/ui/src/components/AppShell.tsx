@@ -62,19 +62,15 @@ export function AppShell(props: AppShellProps) {
             enabledRoles={props.enabledRoles}
             onSelect={props.onRoleChange}
           />
-          {props.role === null ? (
-            <p role="status" className="text-slate-600 dark:text-slate-300">
-              {strings.noEligibleRole}
-            </p>
-          ) : (
-            <PickScreen
-              role={props.role}
-              profileLoad={props.profileLoad ?? { kind: 'none', reason: 'noFolder' }}
-              dataReadyNonce={props.dataReadyNonce}
-              repoFolder={props.repoFolder}
-              onPoolChanged={props.onPoolChanged}
-            />
-          )}
+          {/* Empty verdict: PickScreen skips recommendations but keeps the pool editor. */}
+          <PickScreen
+            role={props.role ?? 'SUPPORT'}
+            noEligibleRole={props.role === null}
+            profileLoad={props.profileLoad ?? { kind: 'none', reason: 'noFolder' }}
+            dataReadyNonce={props.dataReadyNonce}
+            repoFolder={props.repoFolder}
+            onPoolChanged={props.onPoolChanged}
+          />
         </section>
         {props.screen === 'settings' && (
           <SettingsScreen

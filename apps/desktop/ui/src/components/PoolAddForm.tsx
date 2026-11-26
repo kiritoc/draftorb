@@ -3,6 +3,8 @@
  * the roles it applies to, apply. The champion may land in several roles.
  */
 
+import type { ReactElement } from 'react';
+
 import type { Champion, ChampionId, Role } from '@draftorb/shared';
 import { roleSchema } from '@draftorb/shared';
 import { strings } from '../strings';
@@ -15,20 +17,24 @@ export interface PoolAddFormProps {
   iconVersion?: string | null;
   championId: ChampionId | null;
   roles: readonly Role[];
+  /** False when there is nothing to apply (no champion, or no roles for a new one). */
+  canApply: boolean;
   onChampionChange: (id: ChampionId | null) => void;
   onRoleToggle: (role: Role) => void;
   onApply: () => void;
 }
 
+/** Champion picker plus role checkboxes; applying with no role removes the champion. */
 export function PoolAddForm({
   champions,
   iconVersion = null,
   championId,
   roles,
+  canApply,
   onChampionChange,
   onRoleToggle,
   onApply,
-}: PoolAddFormProps) {
+}: PoolAddFormProps): ReactElement {
   return (
     <div className="mb-4 space-y-2 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
       <ChampionPicker
@@ -57,7 +63,7 @@ export function PoolAddForm({
         <button
           type="button"
           onClick={onApply}
-          disabled={championId === null || roles.length === 0}
+          disabled={!canApply}
           className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white disabled:pointer-events-none disabled:opacity-50"
         >
           {strings.poolApply}

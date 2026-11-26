@@ -8,14 +8,21 @@
  * overwrite either side automatically (D-118).
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+  type MouseEvent,
+  type ReactElement,
+  type SyntheticEvent,
+} from 'react';
 
 import {
-  POOL_CONFIG_MAX_PER_ROLE,
   poolConfigSchema,
   roleSchema,
   type Champion,
-  type ChampionId,
   type PoolConfig,
   type Role,
 } from '@draftorb/shared';
@@ -24,16 +31,15 @@ import { PoolAddForm } from './PoolAddForm';
 import { PoolRoleSection } from './PoolRoleSection';
 import { PoolTransferSection } from './PoolTransferSection';
 import {
-  championPoolRoles,
-  emptyPool,
-  serializePoolConfig,
-  setChampionRoles,
-} from '../pool/pool-model';
+  canApplyDraft,
+  canExportToRepo,
+  initPoolEditorState,
+  isPoolDirty,
+  poolEditorReducer,
+} from '../pool/pool-editor-state';
 import { exportPoolToRepo, readRepoPool } from '../pool/repo-pool';
 
 const ROLES: readonly Role[] = roleSchema.options;
-
-type Message = { text: string; kind: 'info' | 'error' };
 
 export interface PoolEditorProps {
   open: boolean;
@@ -50,6 +56,7 @@ export interface PoolEditorProps {
   onPoolChanged?: () => void;
 }
 
+/** Modal champion pool editor; edits stay in a working copy until Save. */
 export function PoolEditor({
   open,
   onClose,
@@ -59,19 +66,29 @@ export function PoolEditor({
   repoFolder,
   onSave,
   onPoolChanged,
-}: PoolEditorProps) {
-  const [working, setWorking] = useState<PoolConfig>(pool);
-  const [message, setMessage] = useState<Message>({ text: '', kind: 'info' });
-  const [draftChampionId, setDraftChampionId] = useState<ChampionId | null>(null);
-  const [draftRoles, setDraftRoles] = useState<readonly Role[]>([]);
+}: PoolEditorProps): ReactElement | null {
+  const [state, dispatch] = useReducer(poolEditorReducer, pool, initPoolEditorState);
+  const { working, draftChampionId, draftRoles, message } = state;
+  const dialogRef = useRef<HTMLDialogElement>(null);
 
+  // Reset only when a session starts (closed -> open). Reloads that hand in a
+  // new `pool` object while the editor is open must not erase unsaved edits.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) dispatch({ type: 'replace', pool, message: null });
+  }
+
+  // Native modal: initial focus, inert background, Esc; focus returns to the opener.
   useEffect(() => {
     if (!open) return;
-    setWorking(pool);
-    setMessage({ text: '', kind: 'info' });
-    setDraftChampionId(null);
-    setDraftRoles([]);
-  }, [open, pool]);
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const dialog = dialogRef.current;
+    if (dialog !== null && !dialog.open) dialog.showModal();
+    return () => {
+      if (opener?.isConnected === true) opener.focus();
+    };
+  }, [open]);
 
   const roleEntries = useMemo(
     () => ROLES.map((role) => ({ role, entries: working.pools[role] ?? [] })),
@@ -80,51 +97,19 @@ export function PoolEditor({
   const totalCount = ROLES.reduce((sum, role) => sum + (working.pools[role]?.length ?? 0), 0);
 
   // Canonical serialization makes "dirty" exact: reverting edits clears it.
-  const dirty = serializePoolConfig(working) !== serializePoolConfig(pool);
+  const dirty = isPoolDirty(working, pool);
 
-  const mutate = (next: PoolConfig) => {
-    setWorking(next);
-    setMessage({ text: '', kind: 'info' });
-  };
-
-  const handlePickChampion = (id: ChampionId | null) => {
-    setDraftChampionId(id);
-    setDraftRoles(id === null ? [] : championPoolRoles(working, id));
-  };
-
-  const toggleDraftRole = (role: Role) => {
-    setDraftRoles((current) =>
-      current.includes(role) ? current.filter((r) => r !== role) : [...current, role],
-    );
-  };
-
-  const handleApply = () => {
-    if (draftChampionId === null) return;
-    const result = setChampionRoles(working, draftChampionId, draftRoles);
-    mutate(result.pool);
-    if (result.rejectedRoles.length > 0) {
-      const names = result.rejectedRoles.map((role) => strings.roleNames[role]).join(', ');
-      setMessage({
-        text: strings.poolFull(names, POOL_CONFIG_MAX_PER_ROLE),
-        kind: 'error',
-      });
-    }
-  };
-
-  const handleRemove = (championId: number, role: Role) => {
-    const remaining = championPoolRoles(working, championId).filter((r) => r !== role);
-    mutate(setChampionRoles(working, championId, remaining).pool);
-  };
+  const showError = (text: string) =>
+    dispatch({ type: 'message', message: { text, kind: 'error' } });
+  const showInfo = (text: string) =>
+    dispatch({ type: 'message', message: { text, kind: 'info' } });
 
   const handleSave = async () => {
     try {
       await onSave(working);
       onClose();
     } catch (error) {
-      setMessage({
-        text: strings.poolSaveFailed(error instanceof Error ? error.message : String(error)),
-        kind: 'error',
-      });
+      showError(strings.poolSaveFailed(error instanceof Error ? error.message : String(error)));
     }
   };
 
@@ -132,11 +117,14 @@ export function PoolEditor({
     try {
       const parsed = poolConfigSchema.safeParse(JSON.parse(text));
       if (!parsed.success) throw new Error('schema');
-      mutate(parsed.data);
-      setMessage({ text: strings.poolJsonImported, kind: 'info' });
+      dispatch({
+        type: 'replace',
+        pool: parsed.data,
+        message: { text: strings.poolJsonImported, kind: 'info' },
+      });
       return true;
     } catch {
-      setMessage({ text: strings.poolJsonInvalid, kind: 'error' });
+      showError(strings.poolJsonInvalid);
       return false;
     }
   };
@@ -145,50 +133,57 @@ export function PoolEditor({
     if (repoFolder === undefined) return;
     const result = await readRepoPool(repoFolder);
     if (result.notice !== undefined) {
-      setMessage({ text: result.notice, kind: 'error' });
+      showError(result.notice);
       return;
     }
     if (result.missing) {
-      setMessage({ text: strings.poolRepoMissing, kind: 'info' });
+      showInfo(strings.poolRepoMissing);
       return;
     }
-    mutate(result.pool);
-    setMessage({ text: strings.poolRepoImported, kind: 'info' });
+    dispatch({
+      type: 'replace',
+      pool: result.pool,
+      message: { text: strings.poolRepoImported, kind: 'info' },
+    });
   };
 
   const handleRepoExport = async () => {
     if (repoFolder === undefined) return;
-    if (dirty) {
-      setMessage({ text: strings.poolDirtyExport, kind: 'error' });
+    if (!canExportToRepo(working, pool)) {
+      showError(strings.poolDirtyExport);
       return;
     }
     try {
       await exportPoolToRepo(repoFolder, working);
-      setMessage({ text: strings.poolRepoExported, kind: 'info' });
+      showInfo(strings.poolRepoExported);
       onPoolChanged?.();
     } catch (error) {
-      setMessage({
-        text: error instanceof Error ? error.message : String(error),
-        kind: 'error',
-      });
+      showError(error instanceof Error ? error.message : String(error));
     }
+  };
+
+  const handleCancel = (event: SyntheticEvent<HTMLDialogElement>) => {
+    // Esc: keep React as the source of truth for open state.
+    event.preventDefault();
+    onClose();
+  };
+
+  const handleBackdropClick = (event: MouseEvent<HTMLDialogElement>) => {
+    // Clicks on ::backdrop target the dialog element itself.
+    if (event.target === event.currentTarget) onClose();
   };
 
   if (!open) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      role="dialog"
-      aria-modal="true"
+    <dialog
+      ref={dialogRef}
       aria-label={strings.poolEditorLabel}
+      onCancel={handleCancel}
+      onClick={handleBackdropClick}
+      className="m-auto w-full max-w-3xl rounded-xl border border-slate-300 bg-transparent p-0 backdrop:bg-slate-900/50 backdrop:backdrop-blur-sm dark:border-slate-600"
     >
-      <div
-        className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm"
-        onClick={onClose}
-        aria-hidden="true"
-      />
-      <div className="relative max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl border border-slate-300 bg-white p-6 dark:border-slate-600 dark:bg-slate-800">
+      <div className="max-h-[90vh] overflow-y-auto bg-white p-6 dark:bg-slate-800">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-bold text-indigo-700 dark:text-indigo-300">
             {strings.poolEditorTitle}
@@ -203,7 +198,7 @@ export function PoolEditor({
           </button>
         </div>
 
-        {message.text !== '' && (
+        {message !== null && (
           <p
             role={message.kind === 'error' ? 'alert' : 'status'}
             className={`mb-4 rounded border px-3 py-2 text-sm ${
@@ -221,9 +216,10 @@ export function PoolEditor({
           iconVersion={iconVersion}
           championId={draftChampionId}
           roles={draftRoles}
-          onChampionChange={handlePickChampion}
-          onRoleToggle={toggleDraftRole}
-          onApply={handleApply}
+          canApply={canApplyDraft(state)}
+          onChampionChange={(id) => dispatch({ type: 'pickChampion', id })}
+          onRoleToggle={(role) => dispatch({ type: 'toggleRole', role })}
+          onApply={() => dispatch({ type: 'apply' })}
         />
 
         <div className="mb-4 space-y-3">
@@ -234,7 +230,7 @@ export function PoolEditor({
               entries={entries}
               champions={champions}
               iconVersion={iconVersion}
-              onRemove={handleRemove}
+              onRemove={(championId, role) => dispatch({ type: 'remove', championId, role })}
             />
           ))}
         </div>
@@ -251,7 +247,7 @@ export function PoolEditor({
         <div className="flex items-center justify-between border-t border-slate-200 pt-4 dark:border-slate-700">
           <button
             type="button"
-            onClick={() => mutate(emptyPool())}
+            onClick={() => dispatch({ type: 'clear' })}
             disabled={totalCount === 0}
             className="rounded-lg px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 disabled:pointer-events-none disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-900/30"
           >
@@ -275,6 +271,6 @@ export function PoolEditor({
           </div>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }

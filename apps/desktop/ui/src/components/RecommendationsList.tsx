@@ -16,11 +16,13 @@ import type { PoolUnavailableItem } from '../pick/pool-unavailable';
 import { RecommendationCard } from './RecommendationCard';
 import { UnavailableChampionCard } from './UnavailableChampionCard';
 
+/** Pagination event: reset on a new draft input, or reveal one more page. */
 export interface PaginationAction {
   type: 'reset' | 'showMore';
   maxPages?: number;
 }
 
+/** Number of revealed pages; never exceeds `maxPages`. */
 export function pageCountReducer(pageCount: number, action: PaginationAction): number {
   if (action.type === 'reset') return 1;
   return Math.min(pageCount + 1, action.maxPages ?? pageCount + 1);

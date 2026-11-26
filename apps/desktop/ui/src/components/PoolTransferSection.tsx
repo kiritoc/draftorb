@@ -4,7 +4,7 @@
  * import/export actions. All state lives in the parent; this is wiring.
  */
 
-import { useState } from 'react';
+import { useState, type ReactElement } from 'react';
 
 import type { PoolConfig } from '@draftorb/shared';
 import { strings } from '../strings';
@@ -21,6 +21,7 @@ export interface PoolTransferSectionProps {
   onRepoExport: () => void;
 }
 
+/** JSON backup and repo-file import/export controls for the pool editor. */
 export function PoolTransferSection({
   pool,
   dirty,
@@ -28,7 +29,7 @@ export function PoolTransferSection({
   onApplyJson,
   onRepoImport,
   onRepoExport,
-}: PoolTransferSectionProps) {
+}: PoolTransferSectionProps): ReactElement {
   const [showJsonExport, setShowJsonExport] = useState(false);
   const [jsonImport, setJsonImport] = useState('');
 

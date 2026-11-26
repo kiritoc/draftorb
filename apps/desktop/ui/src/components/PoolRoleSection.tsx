@@ -3,6 +3,8 @@
  * and the per-role count against `poolMaxSize` (SPECS §2.1, D-101).
  */
 
+import type { ReactElement } from 'react';
+
 import type { Champion, PoolConfigEntry, Role } from '@draftorb/shared';
 import { POOL_CONFIG_MAX_PER_ROLE } from '@draftorb/shared';
 import { strings } from '../strings';
@@ -18,13 +20,14 @@ export interface PoolRoleSectionProps {
   onRemove: (championId: number, role: Role) => void;
 }
 
+/** Chips for one role's pool entries with an `n/max` count. */
 export function PoolRoleSection({
   role,
   entries,
   champions,
   iconVersion = null,
   onRemove,
-}: PoolRoleSectionProps) {
+}: PoolRoleSectionProps): ReactElement {
   return (
     <div className="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
       <div className="mb-2 flex items-center justify-between">

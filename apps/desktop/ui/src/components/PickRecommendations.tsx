@@ -6,7 +6,7 @@
  * pool filtering) lives here; the screen only supplies engine output.
  */
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactElement } from 'react';
 
 import type {
   Champion,
@@ -52,6 +52,7 @@ export interface PickRecommendationsProps {
   onPoolChanged?: () => void;
 }
 
+/** Both recommendation lists, the empty-pool CTA, the hide toggle and the pool editor. */
 export function PickRecommendations({
   role,
   poolIds,
@@ -70,7 +71,7 @@ export function PickRecommendations({
   editorOpen,
   onEditorOpenChange,
   onPoolChanged,
-}: PickRecommendationsProps) {
+}: PickRecommendationsProps): ReactElement {
   const [hideMyPool, setHideMyPool] = useState(false);
   const [poolDropped, setPoolDropped] = useState<number[]>([]);
 

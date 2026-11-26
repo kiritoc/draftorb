@@ -21,7 +21,7 @@ import {
 } from '@draftorb/shared';
 import type { ProfileLoad } from '../profile/profile-export';
 import { emptyPool, loadPool, savePool } from '../pool/pool-store';
-import { dropUnknownChampions } from '../pool/pool-model';
+import { dropUnknownChampions, serializePoolConfig } from '../pool/pool-model';
 import { loadPickData, type PickData } from '../data/export-data';
 import { loadChampionIconVersion } from '../data/champion-icons';
 import { championsForSlot } from '../pick/champion-availability';
@@ -100,7 +100,11 @@ export function PickScreen({
           .catch(() => {});
         const { pool } = await loadPool();
         if (cancelled) return;
-        setPoolConfig(pool);
+        // Keep the same object when the content is unchanged so data refreshes
+        // do not churn the pool editor or the lists.
+        setPoolConfig((current) =>
+          serializePoolConfig(current) === serializePoolConfig(pool) ? current : pool,
+        );
       } catch (err) {
         if (!cancelled) {
           setLoadError(err instanceof Error ? err.message : String(err));

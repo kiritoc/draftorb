@@ -28,6 +28,7 @@ import { championsForSlot } from '../pick/champion-availability';
 import { enemyRoleViews } from '../pick/enemy-roles';
 import { DraftSlot, type DraftSlotState } from '../components/DraftSlot';
 import { PickRecommendations } from '../components/PickRecommendations';
+import { PoolEditor } from '../components/PoolEditor';
 import { strings } from '../strings';
 
 const DEFAULT_RANK: Rank = 'DIAMOND';
@@ -98,13 +99,6 @@ export function PickScreen({
             if (!cancelled) setIconVersion(version);
           })
           .catch(() => {});
-        const { pool } = await loadPool();
-        if (cancelled) return;
-        // Keep the same object when the content is unchanged so data refreshes
-        // do not churn the pool editor or the lists.
-        setPoolConfig((current) =>
-          serializePoolConfig(current) === serializePoolConfig(pool) ? current : pool,
-        );
       } catch (err) {
         if (!cancelled) {
           setLoadError(err instanceof Error ? err.message : String(err));
@@ -115,6 +109,25 @@ export function PickScreen({
       cancelled = true;
     };
   }, [role, dataReadyNonce]);
+
+  // The pool loads independently of aggregates so the editor (and its JSON
+  // backup) stays usable when pick data is missing or fails to load.
+  useEffect(() => {
+    let cancelled = false;
+    void loadPool()
+      .then(({ pool }) => {
+        if (cancelled) return;
+        // Keep the same object when the content is unchanged so reloads
+        // do not churn the pool editor or the lists.
+        setPoolConfig((current) =>
+          serializePoolConfig(current) === serializePoolConfig(pool) ? current : pool,
+        );
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [dataReadyNonce]);
 
   const champions: Champion[] = useMemo(() => pickData?.champions ?? [], [pickData]);
   const poolIds = useMemo(
@@ -176,6 +189,13 @@ export function PickScreen({
 
   /** Persists the editor's working copy; resolves to the dropped champion ids. */
   const persistPool = async (next: PoolConfig): Promise<number[]> => {
+    // Without a champion catalog every id would look unknown: never drop then.
+    if (champions.length === 0) {
+      await savePool(next);
+      setPoolConfig(next);
+      onPoolChanged?.();
+      return [];
+    }
     const knownIds = new Set(champions.map((champion) => champion.id));
     const { pool: filtered, dropped } = dropUnknownChampions(next, knownIds);
     await savePool(filtered);
@@ -184,11 +204,35 @@ export function PickScreen({
     return dropped;
   };
 
-  if (loadError !== null) {
-    return <p className="text-red-600 dark:text-red-400">{strings.loadFailed(loadError)}</p>;
-  }
-  if (pickData === null) {
-    return <p className="text-slate-500 dark:text-slate-400">{strings.loading}</p>;
+  if (loadError !== null || pickData === null) {
+    return (
+      <div className="space-y-4">
+        {loadError !== null ? (
+          <p className="text-red-600 dark:text-red-400">{strings.loadFailed(loadError)}</p>
+        ) : (
+          <p className="text-slate-500 dark:text-slate-400">{strings.loading}</p>
+        )}
+        <button
+          type="button"
+          onClick={() => setPoolEditorOpen(true)}
+          className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
+        >
+          {strings.editPool}
+        </button>
+        <PoolEditor
+          open={poolEditorOpen}
+          onClose={() => setPoolEditorOpen(false)}
+          pool={poolConfig}
+          champions={champions}
+          iconVersion={iconVersion}
+          repoFolder={repoFolder}
+          onSave={async (next) => {
+            await persistPool(next);
+          }}
+          onPoolChanged={onPoolChanged}
+        />
+      </div>
+    );
   }
 
   return (

@@ -85,7 +85,7 @@ describe('sampleReportCommand', () => {
     expect(output()).toContain('patch 16.22');
     expect(output()).toContain('TOP: 2 row(s)');
     expect(output()).toContain('roles/TOP/baseline.json: 2 row(s)');
-    expect(output()).toContain('n_eff min 4.0, median 7.0, max 10.0');
+    expect(output()).toContain('n_eff min 4.00, median 7.00, max 10.00');
     expect(output()).toContain('JUNGLE: 1 row(s)');
     expect(output()).toContain('roles/JUNGLE/baseline.json: 1 row(s)');
   });

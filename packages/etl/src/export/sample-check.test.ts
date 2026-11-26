@@ -124,6 +124,38 @@ describe('checkPublishedExport', () => {
     expect(result.errors).toEqual(['No "Best overall" recommendations for role SUPPORT.']);
   });
 
+  it('warns but does not fail when a non-enabled role yields zero recommendations', () => {
+    writeExport(active().publicDir, [
+      [412, 'DIAMOND', 30, 50, 0.1, 50],
+      [432, 'DIAMOND', 25, 50, 0.1, 50],
+    ]);
+    const patchDir = join(active().publicDir, PATCH);
+    const topFiles = ['baseline', 'ally-pairs', 'enemy-pairs', 'lane-vs', 'lane-full'].map(
+      (name) => `roles/TOP/${name}.json`,
+    );
+    for (const path of topFiles) writeJson(join(patchDir, path), []);
+    const manifestPath = join(patchDir, 'manifest.json');
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
+      roles: string[];
+      files: { path: string }[];
+    };
+    manifest.roles = ['SUPPORT', 'TOP'];
+    manifest.files.push(...topFiles.map((path) => ({ path })));
+    writeFileSync(manifestPath, JSON.stringify(manifest), 'utf8');
+
+    const result = checkPublishedExport({
+      publicDir: active().publicDir,
+      tagsFilePath: active().tagsFilePath,
+    });
+
+    expect(result.recommendationCounts['SUPPORT']).toBeGreaterThan(0);
+    expect(result.recommendationCounts['TOP']).toBe(0);
+    expect(result.errors).toEqual([]);
+    expect(result.warnings).toEqual([
+      'No "Best overall" recommendations for role TOP. (not enabled in the app; not release-blocking)',
+    ]);
+  });
+
   it('throws when a required export file is missing from the manifest', () => {
     writeExport(active().publicDir, [[412, 'DIAMOND', 30, 50, 0.1, 50]]);
     // Remove lane-vs.json from the manifest files list.

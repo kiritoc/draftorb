@@ -91,6 +91,22 @@ describe('exportJson', () => {
     }
   });
 
+  it('routes populated TOP and JUNGLE rows to their own role files (BL-011)', () => {
+    seed(suite.db, 'match', [{}]);
+    seed(suite.db, 'roleProb', [
+      { championId: 412, role: 'SUPPORT', gamesW: 10, gamesW2: 10, prob: 1 },
+    ]);
+    for (const myRole of ['SUPPORT', 'TOP', 'JUNGLE'] as const) {
+      seed(suite.db, 'baseline', [supportBaselineRow({ myRole })]);
+    }
+    suite.exportOnce();
+
+    for (const role of ['SUPPORT', 'TOP', 'JUNGLE']) {
+      const rows = baselineTableSchema.parse(suite.readFile(`roles/${role}/baseline.json`));
+      expect(rows).toHaveLength(1);
+    }
+  });
+
   it('retains static catalogs and role snapshots, hashing only the catalogs', () => {
     seed(suite.db, 'match', [{}]);
     seed(suite.db, 'roleProb', [

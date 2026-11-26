@@ -23,6 +23,9 @@ async function runValidateExport(args: string[]): Promise<void> {
   for (const role of result.roles) {
     log.detail(`${role}: ${result.recommendationCounts[role] ?? 0} recommendation(s)`);
   }
+  for (const warning of result.warnings) {
+    log.detail(`warning: ${warning}`);
+  }
 
   if (result.errors.length > 0) {
     const details = result.errors.map((error) => `  - ${error}`).join('\n');

@@ -81,7 +81,9 @@ async function runSampleReport(args: string[]): Promise<void> {
 }
 
 function formatNEff(value: number | null): string {
-  return value === null ? 'n/a' : value.toFixed(1);
+  // Two decimals so a near-threshold minimum (e.g. 9.97) is not shown as the
+  // `exportMinGames` cutoff (10.0).
+  return value === null ? 'n/a' : value.toFixed(2);
 }
 
 export const sampleReportCommand: Command = {

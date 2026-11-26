@@ -34,7 +34,8 @@ not (see "Privacy boundary" below).
 ## Install
 
 ```
-git clone <this repo> && cd DraftOrb
+git clone <this repo>
+cd DraftOrb
 pnpm install
 copy .env.example .env        # Windows; on macOS/Linux: cp .env.example .env
 # edit .env and set RIOT_API_KEY to YOUR key
@@ -75,11 +76,14 @@ it:
 - **In the app (source of truth for the pick screen):** open the pool editor,
   add champions and tick the roles for each. The program stores the pool in
   its own config directory.
-- **`data/pool.config.json` (repo copy):** used by the scheduled ETL pipeline
-  (pool-driven collection) and as a portable backup/sync between machines.
-  - To write it from the app: pool editor → **Export to repo file**. The
-    program writes `<your clone>/data/pool.config.json`; review it and commit
-    it yourself if you use the pipeline.
+- **`data/pool.config.json` (repo copy):** a portable backup/sync of your
+  pool between machines.
+  - Prerequisite: set **Settings → Repo folder** to your clone first; the
+    repo file actions stay hidden until it is set.
+  - To write it from the app: save your pool edits first (export is refused
+    while there are unsaved changes), then pool editor → **Export to repo file**. The
+    program writes `<your clone>/data/pool.config.json`; review it before
+    committing it (the repository is public).
   - To load it into the app: pool editor → **Import from repo file**.
   - If the two differ, the app shows a warning banner; nothing is overwritten
     automatically.
@@ -132,7 +136,9 @@ champion and role. It is fed by an anonymized export the ETL produces locally.
    local clone (the folder that contains `data/`).
 
 4. Done — champion cards now show your record badge. Re-run
-   `pnpm etl profile-sync --publish` anytime to refresh it.
+   `pnpm etl profile-sync --publish` anytime to refresh it, then restart the
+   app: the profile export is only reloaded at launch or when Repo folder
+   changes.
 
 If the profile file is missing or invalid, the badge simply shows **"no data"**
 and everything else keeps working — no crash, no warning noise. A notice in
@@ -141,12 +147,14 @@ validation.
 
 ## Running your own data pipeline (optional)
 
-If you want fresh aggregates or your own scheduled ETL instead of the app's
-built-in download, you run the pipeline yourself (`pnpm etl ...`, see
+You can run the ETL pipeline yourself (`pnpm etl ...`, see
 `docs/SETUP.md` > "ETL commands"). Notes:
 
-- The scheduled pipeline reads **only the committed `data/pool.config.json`**
-  — commit yours before scheduling.
+- The desktop app does **not** read locally generated aggregates: at launch
+  it always uses the public release download (or its cached copy). Local
+  aggregates are for development and inspection only.
+- The scheduled ingest does not read `data/pool.config.json` today; committing
+  a pool does not change what it collects.
 - You do not need access to anyone else's state repository; `pnpm etl migrate`
   creates a fresh local database and each command is resumable.
 - `pnpm etl pull` and the owner's state release are private infrastructure —

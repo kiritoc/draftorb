@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -126,7 +126,7 @@ describe('matchesCommand --dry-run', () => {
     }
   });
 
-  it('leaves no SQLite -wal/-shm sidecars behind', async () => {
+  it('does not discard commits from a concurrent writer', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'draftorb-dry-run-sidecar-'));
     const dbPath = join(dir, 'test.sqlite');
     const originalDbPath = process.env.DRAFTORB_DB_PATH;
@@ -137,16 +137,20 @@ describe('matchesCommand --dry-run', () => {
     const db = openDb(dbPath);
     migrate(db);
     db.close();
-    // Last read-write close checkpoints and removes sidecars, so the dry run
-    // is the only thing that could recreate them.
-    expect(existsSync(`${dbPath}-wal`)).toBe(false);
-    expect(existsSync(`${dbPath}-shm`)).toBe(false);
+
+    // A writer whose commit sits in the WAL while the preview runs.
+    const writer = openDb(dbPath);
+    writer.pragma('wal_autocheckpoint = 0');
+    seedPlayer(writer, 'p-concurrent', 4);
 
     const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => {});
     try {
       await matchesCommand.run(['--dry-run']);
-      expect(existsSync(`${dbPath}-wal`)).toBe(false);
-      expect(existsSync(`${dbPath}-shm`)).toBe(false);
+      writer.close();
+      const check = openDb(dbPath);
+      const row = check.prepare('SELECT puuid FROM players WHERE puuid = ?').get('p-concurrent');
+      check.close();
+      expect(row).toBeDefined();
     } finally {
       consoleLog.mockRestore();
       if (originalDbPath === undefined) delete process.env.DRAFTORB_DB_PATH;

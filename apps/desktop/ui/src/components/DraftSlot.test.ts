@@ -33,6 +33,16 @@ describe('DraftSlot enemy role view', () => {
     expect(html).not.toContain('disabled=""');
   });
 
+  it('keeps the select on Auto while the role is only inferred, so choosing it pins it', () => {
+    const html = render(
+      { championId: 200 },
+      { championId: 200, source: 'inferred', role: 'ADC', confidence: 0.7 },
+    );
+
+    expect(html).toContain('<option value="" selected="">');
+    expect(html).not.toContain('<option value="ADC" selected="">');
+  });
+
   it('shows a manual override without an inferred-confidence badge', () => {
     const html = render(
       { championId: 200, role: 'SUPPORT' },

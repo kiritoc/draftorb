@@ -53,8 +53,9 @@ export function DraftSlot({
   };
 
   const hasChampion = slot.championId != null;
-  const inferredRole = roleView?.source === 'inferred' ? roleView.role : null;
-  const selectRole = slot.role ?? inferredRole ?? '';
+  // Keep the select on Auto until a role is stored: preselecting the inferred
+  // role would make choosing it a no-op (native selects fire no change event).
+  const selectRole = slot.role ?? '';
   const autoRoleLabel = roleView === null ? strings.roleOptional : strings.roleAuto;
   const labelId = useId();
 
@@ -107,7 +108,7 @@ export function DraftSlot({
             </span>
           )}
           {roleView?.source === 'unresolved' && (
-            <span className="text-xs font-medium text-amber-600 dark:text-amber-300">
+            <span className="text-xs font-medium text-amber-700 dark:text-amber-300">
               {strings.roleUnresolved}
             </span>
           )}

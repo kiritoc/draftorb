@@ -26,6 +26,16 @@ export const strings = {
     ADC: 'ADC',
     MID: 'Mid',
   },
+  bucketNames: {
+    IRON: 'Iron',
+    BRONZE: 'Bronze',
+    SILVER: 'Silver',
+    GOLD: 'Gold',
+    PLATINUM: 'Platinum',
+    EMERALD: 'Emerald',
+    DIAMOND: 'Diamond',
+    MASTER_PLUS: 'Master+',
+  },
   roleNeedsData: 'Not enough champion data for this role',
   roleMinimal: 'Minimal roles come later (BL-024)',
   pickPlaceholder: 'Pick screen coming in BL-022/BL-016',
@@ -131,6 +141,16 @@ export const strings = {
   recordNotEnough: (games: number) =>
     `Not enough data (${games} ${games === 1 ? 'game' : 'games'})`,
   recordWithRate: (games: number, percent: number) => `${games} games · ${percent}%`,
+  recordMetaRate: (bucket: string, percent: number, nEff: number) =>
+    `${bucket} avg ${percent}% · n≈${nEff}`,
+  recordMetaInsufficient: (bucket: string) => `${bucket} avg: not enough data`,
+  recordMetaTooltip: (bucket: string, nEff: number) =>
+    `Baseline win rate at ${bucket} rank · effective sample ${nEff}`,
+  recordScopeAll: 'all roles',
+  recordYouRate: (scope: string, games: number, percent: number) =>
+    `You · ${scope}: ${games} ${games === 1 ? 'game' : 'games'} · ${percent}%`,
+  recordYouNotEnough: (scope: string, games: number) =>
+    `You · ${scope}: not enough data (${games} ${games === 1 ? 'game' : 'games'})`,
   recordTooltip: (label: string, date: string, gameCount: number) =>
     `${label} · synced ${date} · ${gameCount} games in the export`,
   profileLoaded: (label: string, gameCount: number, date: string) =>

@@ -14,10 +14,12 @@ import type {
   InsufficientDataEntry,
   PoolConfig,
   PoolUnavailableEntry,
+  RankBucket,
   Recommendation,
   Role,
 } from '@draftorb/shared';
 import type { ProfileLoad } from '../profile/profile-export';
+import type { BaselineIndex } from '../pick/baseline-record';
 import { excludePick, excludedRanks } from '../pick/exclude-pick';
 import { hidePoolChampions } from '../pick/hide-my-pool';
 import { buildPoolUnavailableItems } from '../pick/pool-unavailable';
@@ -35,6 +37,9 @@ export interface PickRecommendationsProps {
   champions: Champion[];
   iconVersion?: string | null;
   profileLoad: ProfileLoad;
+  /** Baseline lookup + rank bucket for the champion-average badge row (BL-051). */
+  baselineIndex?: BaselineIndex;
+  rankBucket?: RankBucket;
   /** The user's own pick: excluded from both lists with rank-gap closing. */
   userChampionId: ChampionId | null;
   recommendations: readonly Recommendation[];
@@ -60,6 +65,8 @@ export function PickRecommendations({
   champions,
   iconVersion = null,
   profileLoad,
+  baselineIndex,
+  rankBucket,
   userChampionId,
   recommendations,
   poolRecommendations,
@@ -91,8 +98,8 @@ export function PickRecommendations({
     [poolUnavailable, insufficientData, userChampionId],
   );
   const cardContext = useMemo<RecommendationCardContext>(
-    () => ({ champions, iconVersion, profileLoad, role }),
-    [champions, iconVersion, profileLoad, role],
+    () => ({ champions, iconVersion, profileLoad, role, baselineIndex, rankBucket }),
+    [champions, iconVersion, profileLoad, role, baselineIndex, rankBucket],
   );
 
   return (

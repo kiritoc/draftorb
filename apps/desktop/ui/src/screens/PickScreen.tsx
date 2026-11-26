@@ -7,7 +7,7 @@
 
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 
-import { recommend } from '@draftorb/engine';
+import { indexBaselines, rankToBucket, recommend } from '@draftorb/engine';
 import {
   type Champion,
   type DraftInput,
@@ -130,6 +130,13 @@ export function PickScreen({
   }, [dataReadyNonce]);
 
   const champions: Champion[] = useMemo(() => pickData?.champions ?? [], [pickData]);
+  // BL-051: per-bucket baseline index for the champion-average badge row;
+  // rebuilt when the rank selector changes the bucket.
+  const rankBucket = rankToBucket(userRank);
+  const baselineIndex = useMemo(
+    () => (pickData === null ? undefined : indexBaselines(pickData.data.baselines, rankBucket)),
+    [pickData, rankBucket],
+  );
   const poolIds = useMemo(
     () => (poolConfig.pools[role] ?? []).map((entry) => entry.championId),
     [poolConfig, role],
@@ -321,6 +328,8 @@ export function PickScreen({
         champions={champions}
         iconVersion={iconVersion}
         profileLoad={profileLoad}
+        baselineIndex={baselineIndex}
+        rankBucket={rankBucket}
         userChampionId={user.championId}
         recommendations={recommendations}
         poolRecommendations={poolRecommendations}

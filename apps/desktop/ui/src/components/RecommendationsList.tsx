@@ -6,9 +6,9 @@
 
 import { useMemo, useReducer, useState } from 'react';
 
-import type { Champion, Recommendation } from '@draftorb/shared';
+import type { Champion, RankBucket, Recommendation, Role } from '@draftorb/shared';
 import type { ProfileLoad } from '../profile/profile-export';
-import type { Role } from '@draftorb/shared';
+import type { BaselineIndex } from '../pick/baseline-record';
 import { strings } from '../strings';
 import { RECOMMENDATION_PAGE_SIZE } from '../config';
 import { paginate } from '../pick/pagination';
@@ -38,6 +38,9 @@ export interface RecommendationCardContext {
   iconVersion?: string | null;
   profileLoad?: ProfileLoad;
   role?: Role;
+  /** Baseline lookup + bucket for the champion-average badge row (BL-051). */
+  baselineIndex?: BaselineIndex;
+  rankBucket?: RankBucket;
 }
 
 export interface RecommendationsListProps {
@@ -104,6 +107,8 @@ export function RecommendationsList({
                   inPool={poolIds?.has(entry.recommendation.championId) ?? false}
                   profileLoad={cardContext.profileLoad}
                   role={cardContext.role}
+                  baselineIndex={cardContext.baselineIndex}
+                  rankBucket={cardContext.rankBucket}
                 />
               ) : (
                 <UnavailableChampionCard
@@ -113,6 +118,10 @@ export function RecommendationsList({
                   sample={entry.item.sample}
                   champions={cardContext.champions}
                   iconVersion={cardContext.iconVersion}
+                  profileLoad={cardContext.profileLoad}
+                  role={cardContext.role}
+                  baselineIndex={cardContext.baselineIndex}
+                  rankBucket={cardContext.rankBucket}
                 />
               ),
             )}

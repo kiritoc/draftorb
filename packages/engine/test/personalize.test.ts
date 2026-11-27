@@ -76,6 +76,7 @@ function rec(championId: number, rank: number, score: number): Recommendation {
 }
 
 const EMPTY_CONTEXT: PersonalizeContext = {
+  role: 'SUPPORT',
   allyAdcId: null,
   enemySupportId: null,
   enemySignature: new Set(),
@@ -83,6 +84,7 @@ const EMPTY_CONTEXT: PersonalizeContext = {
 };
 
 const L1_CONTEXT: PersonalizeContext = {
+  role: 'SUPPORT',
   allyAdcId: 10,
   enemySupportId: 200,
   enemySignature: new Set(),
@@ -133,6 +135,7 @@ describe('personalize: fallback levels and shrinkage', () => {
     const tagData = makeData({ champions: [1, 2, 3], tags });
     const games = [1, 2, 3].map(() => makeGame({ allyAdcId: 99, enemySupportId: 88 }));
     const context: PersonalizeContext = {
+      role: 'SUPPORT',
       allyAdcId: null,
       enemySupportId: null,
       enemySignature: new Set(['AD:marksman']),
@@ -371,9 +374,116 @@ describe('personalizeContext', () => {
       enemies: [{ championId: 200 }, { championId: 30 }, { championId: 31 }, { championId: 32 }],
     });
     const context = personalizeContext(input, tagData);
+    expect(context.role).toBe('SUPPORT');
     expect(context.allyAdcId).toBe(10);
     expect(context.enemySupportId).toBe(200);
     expect([...context.enemySignature].sort()).toEqual(['AP:mage', 'MIXED:tank']);
+  });
+});
+
+describe('personalize: role scope (D-097, BL-032)', () => {
+  const contextFor = (role: PersonalizeContext['role']): PersonalizeContext => ({
+    ...EMPTY_CONTEXT,
+    role,
+  });
+
+  it('personalizes TOP games for a TOP draft', () => {
+    const games = [1, 2, 3].map(() => makeGame({ role: 'TOP' }));
+    const result = personalize(
+      [rec(1, 1, 0.55)],
+      makeProfile(games),
+      contextFor('TOP'),
+      data,
+      NOW_MS,
+    );
+    const entry = must(result.entries[0]);
+    expect(entry.insufficientData).toBe(false);
+    expect(entry.fallbackLevel).toBe(4);
+    expect(entry.nEff).toBeCloseTo(3, 5);
+  });
+
+  it('personalizes JUNGLE games for a JUNGLE draft', () => {
+    const games = [1, 2, 3].map(() => makeGame({ role: 'JUNGLE' }));
+    const result = personalize(
+      [rec(1, 1, 0.55)],
+      makeProfile(games),
+      contextFor('JUNGLE'),
+      data,
+      NOW_MS,
+    );
+    const entry = must(result.entries[0]);
+    expect(entry.insufficientData).toBe(false);
+    expect(entry.fallbackLevel).toBe(4);
+  });
+
+  it('ignores games played in other roles', () => {
+    // Three TOP wins must not leak into a SUPPORT draft (and vice versa).
+    const topGames = [1, 2, 3].map(() => makeGame({ role: 'TOP' }));
+    const supportResult = personalize(
+      [rec(1, 1, 0.55)],
+      makeProfile(topGames),
+      EMPTY_CONTEXT,
+      data,
+      NOW_MS,
+    );
+    expect(must(supportResult.entries[0]).insufficientData).toBe(true);
+
+    const jungleGames = [1, 2, 3].map(() => makeGame({ role: 'JUNGLE' }));
+    const jungleAsTop = personalize(
+      [rec(1, 1, 0.55)],
+      makeProfile(jungleGames),
+      contextFor('TOP'),
+      data,
+      NOW_MS,
+    );
+    expect(must(jungleAsTop.entries[0]).insufficientData).toBe(true);
+  });
+
+  it('scopes p_profile to the drafted role', () => {
+    // Champ 1: 3 TOP losses + 3 SUPPORT wins. Champ 2: 3 TOP wins.
+    // For a TOP draft p_profile = 3/6 = 0.5 over TOP games only; the
+    // SUPPORT wins on champ 1 must not count.
+    const games = [
+      ...[1, 2, 3].map(() => makeGame({ championId: 1, role: 'TOP', win: false })),
+      ...[4, 5, 6].map(() => makeGame({ championId: 1, role: 'SUPPORT', win: true })),
+      ...[7, 8, 9].map(() => makeGame({ championId: 2, role: 'TOP', win: true })),
+    ];
+    const result = personalize(
+      [rec(1, 1, 0.5), rec(2, 2, 0.5)],
+      makeProfile(games),
+      contextFor('TOP'),
+      data,
+      NOW_MS,
+    );
+    const champ1 = must(result.entries.find((e) => e.championId === 1));
+    expect(champ1.insufficientData).toBe(false);
+    // p = (0 + 15*0.5)/(3+15) = 7.5/18 — the SUPPORT wins are excluded.
+    expect(champ1.profileWinRate).toBeCloseTo(7.5 / 18, 5);
+    const champ2 = must(result.entries.find((e) => e.championId === 2));
+    expect(champ2.insufficientData).toBe(false);
+  });
+
+  it('reports insufficient data for ADC/MID drafts (roles stored but ignored)', () => {
+    for (const role of ['ADC', 'MID'] as const) {
+      const games = [1, 2, 3, 4, 5].map(() => makeGame({ role }));
+      const result = personalize(
+        [rec(1, 1, 0.55)],
+        makeProfile(games),
+        contextFor(role),
+        data,
+        NOW_MS,
+      );
+      const entry = must(result.entries[0]);
+      expect(entry.insufficientData).toBe(true);
+      expect(entry.profileWinRate).toBeNull();
+      expect(entry.nEff).toBe(0);
+    }
+  });
+
+  it('personalizeContext carries the drafted role', () => {
+    const input = makeInput({ userRole: 'JUNGLE' });
+    const context = personalizeContext(input, data);
+    expect(context.role).toBe('JUNGLE');
   });
 });
 

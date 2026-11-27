@@ -30,6 +30,8 @@ import {
   laneFullEntrySchema,
   laneVsEntrySchema,
   manifestSchema,
+  manifestSchemaV5,
+  pickRateSamplesSchema,
   rankBucketSchema,
   rankSchema,
   recommendationSchema,
@@ -267,9 +269,24 @@ describe('shared schemas', () => {
       roles: ['SUPPORT'],
       minimalRoles: [],
       files: [{ path: 'champions.json' }],
-      schemaVersion: 5,
+      schemaVersion: 6,
     };
     expect(manifestSchema.parse(manifest)).toEqual(manifest);
+    // The frozen v5 layout still parses (latest-pointer guard, BL-052).
+    expect(manifestSchemaV5.parse({ ...manifest, schemaVersion: 5 })).toMatchObject({
+      schemaVersion: 5,
+    });
+    expect(() => manifestSchemaV5.parse(manifest)).toThrow();
+  });
+
+  it('validates pick-rate sample denominators (BL-052)', () => {
+    const samples = { SUPPORT: { '412': 30.5, '26': 10 }, ADC: { '1': 42 } };
+    expect(pickRateSamplesSchema.parse(samples)).toEqual(samples);
+    // n_eff must be a positive finite number; unknown roles are rejected.
+    expect(() => pickRateSamplesSchema.parse({ SUPPORT: { '412': 0 } })).toThrow();
+    expect(() => pickRateSamplesSchema.parse({ SUPPORT: { '412': -3 } })).toThrow();
+    expect(() => pickRateSamplesSchema.parse({ SUPPORT: { '412': Number.NaN } })).toThrow();
+    expect(() => pickRateSamplesSchema.parse({ UNRECOGNIZED: { '412': 10 } })).toThrow();
   });
 
   it('rejects champion role probabilities that do not sum to 1', () => {

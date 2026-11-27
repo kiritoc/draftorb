@@ -6,9 +6,17 @@
 
 import { useMemo, useReducer, useState } from 'react';
 
-import type { Champion, RankBucket, Recommendation, Role } from '@draftorb/shared';
+import type {
+  Champion,
+  PickRate,
+  PickRateSamples,
+  RankBucket,
+  Recommendation,
+  Role,
+} from '@draftorb/shared';
 import type { ProfileLoad } from '../profile/profile-export';
 import type { BaselineIndex } from '../pick/baseline-record';
+import { pickShareDisplay } from '../pick/pick-share';
 import { strings } from '../strings';
 import { RECOMMENDATION_PAGE_SIZE } from '../config';
 import { paginate } from '../pick/pagination';
@@ -41,6 +49,9 @@ export interface RecommendationCardContext {
   /** Baseline lookup + bucket for the champion-average badge row (BL-051). */
   baselineIndex?: BaselineIndex;
   rankBucket?: RankBucket;
+  /** Pick-share exports for the card figure (BL-052); absent on legacy data. */
+  pickRate?: PickRate;
+  pickRateSamples?: PickRateSamples;
 }
 
 export interface RecommendationsListProps {
@@ -109,6 +120,16 @@ export function RecommendationsList({
                   role={cardContext.role}
                   baselineIndex={cardContext.baselineIndex}
                   rankBucket={cardContext.rankBucket}
+                  pickShare={
+                    cardContext.role === undefined
+                      ? undefined
+                      : pickShareDisplay(
+                          cardContext.role,
+                          entry.recommendation.championId,
+                          cardContext.pickRate,
+                          cardContext.pickRateSamples,
+                        )
+                  }
                 />
               ) : (
                 <UnavailableChampionCard

@@ -84,7 +84,7 @@ describe('exportCommand', () => {
     db.close();
 
     await exportCommand.run([]);
-    expect(output()).toMatch(/schema v5/);
+    expect(output()).toMatch(/schema v6/);
     expect(output()).toMatch(/roles: SUPPORT, TOP, JUNGLE, ADC, MID/);
 
     const manifest = JSON.parse(
@@ -93,7 +93,7 @@ describe('exportCommand', () => {
         'utf8',
       ),
     );
-    expect(manifest.schemaVersion).toBe(5);
+    expect(manifest.schemaVersion).toBe(6);
     expect(manifest.patch).toBe('16.21');
     expect(manifest.roles).toEqual(['SUPPORT', 'TOP', 'JUNGLE', 'ADC', 'MID']);
     expect(manifest.minimalRoles).toEqual(['ADC', 'MID']);

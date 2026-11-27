@@ -59,7 +59,7 @@ function seedCache(
   const manifest = {
     patch: '16.22',
     generatedAt: '2026-11-21T00:00:00Z',
-    schemaVersion: 5,
+    schemaVersion: 6,
     region: 'euw',
     rankBuckets: ['IRON'],
     roles: overrides.roles ?? ['SUPPORT'],
@@ -208,6 +208,32 @@ describe('loadPickData', () => {
     expect(pick?.data.pickRate?.ADC?.['412']).toBe(1);
   });
 
+  it('loads pick-rate-samples.json as display-only PickData, outside RecommendData (BL-052)', async () => {
+    seedCache({
+      patchFiles: {
+        'pick-rate.json': { SUPPORT: { '412': 1 } },
+        'pick-rate-samples.json': { SUPPORT: { '412': 30 } },
+      },
+    });
+    const pick = await loadPickData('SUPPORT');
+    expect(pick?.pickRateSamples).toEqual({ SUPPORT: { '412': 30 } });
+    // Display-only: the engine input schema stays unchanged (D-024/D-101).
+    expect('pickRateSamples' in (pick?.data ?? {})).toBe(false);
+  });
+
+  it('leaves pickRateSamples undefined on exports without the file', async () => {
+    seedCache();
+    const pick = await loadPickData('SUPPORT');
+    expect(pick?.pickRateSamples).toBeUndefined();
+  });
+
+  it('rejects a malformed pick-rate-samples.json (fail-closed)', async () => {
+    seedCache({
+      patchFiles: { 'pick-rate-samples.json': { SUPPORT: { '412': -1 } } },
+    });
+    await expect(loadPickData('SUPPORT')).rejects.toThrow();
+  });
+
   it('accepts a manifest path without the patch prefix', async () => {
     seedCache();
     const base = mockRead.getMockImplementation();
@@ -236,7 +262,7 @@ describe('loadPickData', () => {
         return JSON.stringify({
           patch: '16.21',
           generatedAt: '2026-11-21T00:00:00Z',
-          schemaVersion: 5,
+          schemaVersion: 6,
           region: 'euw',
           rankBuckets: ['IRON'],
           roles: ['SUPPORT'],

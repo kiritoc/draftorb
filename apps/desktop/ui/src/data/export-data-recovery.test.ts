@@ -30,7 +30,7 @@ function seedCache(corruptPath: string): void {
   const manifest = {
     patch: '16.22',
     generatedAt: '2026-11-26T00:00:00Z',
-    schemaVersion: 5,
+    schemaVersion: 6,
     region: 'euw',
     rankBuckets: ['DIAMOND'],
     roles: ['SUPPORT', 'TOP'],

@@ -45,7 +45,7 @@ describe('exportJson', () => {
     seed(suite.db, 'baseline', [supportBaselineRow()]);
     const result = suite.exportOnce();
     const manifest = result.manifest;
-    expect(manifest.schemaVersion).toBe(5);
+    expect(manifest.schemaVersion).toBe(6);
     expect(manifest.roles).toEqual(['SUPPORT', 'TOP', 'JUNGLE', 'ADC', 'MID']);
     expect(manifest.minimalRoles).toEqual(['ADC', 'MID']);
     expect(manifest.rankBuckets).toEqual([
@@ -64,6 +64,7 @@ describe('exportJson', () => {
     // The manifest is not listed in its own `files`.
     expect(paths).toEqual([
       'item-classes.json',
+      'pick-rate-samples.json',
       'pick-rate.json',
       'role-prob.json',
       'roles/ADC/baseline.json',

@@ -59,6 +59,26 @@ export const manifestSchemaV4 = z
 export type ManifestV4 = z.infer<typeof manifestSchemaV4>;
 
 /**
+ * Manifest schema version 5 — the layout published before BL-052 added
+ * `pick-rate-samples.json` (schema v6). Frozen on purpose: it must keep
+ * accepting exactly the v5 shape so the ETL latest-pointer guard can tell an
+ * intact older export from a corrupt one.
+ */
+export const manifestSchemaV5 = z
+  .object({
+    patch: z.string().min(1),
+    generatedAt: z.string().min(1),
+    region: z.string().min(1),
+    rankBuckets: z.array(rankBucketSchema),
+    roles: z.array(roleSchema),
+    minimalRoles: z.array(roleSchema),
+    files: z.array(manifestFileSchema),
+    schemaVersion: z.literal(5),
+  })
+  .strict();
+export type ManifestV5 = z.infer<typeof manifestSchemaV5>;
+
+/**
  * Version of the `latest.json` patch pointer (D-051). Bumped when the pointer
  * format changes.
  */

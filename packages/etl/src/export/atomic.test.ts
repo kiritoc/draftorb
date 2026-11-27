@@ -69,6 +69,7 @@ describe('exportJson', () => {
     expect(remaining).toEqual([
       'item-classes.json',
       'manifest.json',
+      'pick-rate-samples.json',
       'pick-rate.json',
       'role-prob.json',
       'roles/ADC/baseline.json',

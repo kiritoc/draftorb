@@ -91,12 +91,14 @@ export {
   championsMapSchema,
   championRoleProbabilitiesSchema,
   pickRateSchema,
+  pickRateSamplesSchema,
 } from './schemas/champions.js';
 export type {
   Champion,
   ChampionsMap,
   ChampionRoleProbabilities,
   PickRate,
+  PickRateSamples,
 } from './schemas/champions.js';
 
 export {
@@ -106,8 +108,13 @@ export {
 } from './schemas/tags.js';
 export type { ChampionTagsScaling, ChampionTags, ChampionTagsMap } from './schemas/tags.js';
 
-export { manifestFileSchema, manifestSchema, manifestSchemaV4 } from './schemas/manifest.js';
-export type { Manifest, ManifestV4 } from './schemas/manifest.js';
+export {
+  manifestFileSchema,
+  manifestSchema,
+  manifestSchemaV4,
+  manifestSchemaV5,
+} from './schemas/manifest.js';
+export type { Manifest, ManifestV4, ManifestV5 } from './schemas/manifest.js';
 export { LATEST_SCHEMA_VERSION, latestSchema } from './schemas/manifest.js';
 export type { Latest } from './schemas/manifest.js';
 

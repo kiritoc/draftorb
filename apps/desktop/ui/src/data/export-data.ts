@@ -19,6 +19,7 @@ import {
   laneVsTableSchema,
   latestSchema,
   manifestSchema,
+  pickRateSamplesSchema,
   pickRateSchema,
   type AllyPairTable,
   type Champion,
@@ -28,6 +29,7 @@ import {
   type LaneFullTable,
   type LaneVsTable,
   type Manifest,
+  type PickRateSamples,
   type RecommendData,
   type Role,
 } from '@draftorb/shared';
@@ -40,6 +42,12 @@ export interface PickData {
   data: RecommendData;
   /** True when the role is exported at champion-level statistics only (BL-024). */
   minimal: boolean;
+  /**
+   * Per-(champion, role) pick-share denominators (`pick-rate-samples.json`,
+   * BL-052). Display-only: kept out of `RecommendData` so it can never feed
+   * `score(c)`; absent on exports predating the file.
+   */
+  pickRateSamples?: PickRateSamples;
 }
 
 async function readJson(name: string): Promise<unknown> {
@@ -180,11 +188,18 @@ export async function loadPickData(role: Role): Promise<PickData | null> {
   const tags = championTagsMapSchema.parse(await readJson('champion-tags.json'));
 
   const minimal = manifest.minimalRoles.includes(role);
+  // Optional display-only file (BL-052): parsed fail-closed like every other
+  // manifest file, but kept out of RecommendData (it must not reach the engine).
+  const pickRateSamples =
+    files['pick-rate-samples.json'] !== undefined
+      ? pickRateSamplesSchema.parse(files['pick-rate-samples.json'])
+      : undefined;
   return {
     patch: latest.patch,
     generatedAt: latest.generatedAt,
     champions,
     data: createRecommendData(files, champions, tags, role, minimal),
     minimal,
+    ...(pickRateSamples !== undefined ? { pickRateSamples } : {}),
   };
 }

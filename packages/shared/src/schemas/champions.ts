@@ -54,3 +54,14 @@ const pickRateRoleSchema = z.record(z.string(), z.number().finite().gt(0).max(1)
  */
 export const pickRateSchema = z.partialRecord(roleSchema, pickRateRoleSchema);
 export type PickRate = z.infer<typeof pickRateSchema>;
+
+const pickRateSamplesRoleSchema = z.record(z.string(), z.number().finite().positive());
+
+/**
+ * Per-(champion, role) effective sample behind each pick share
+ * (`pick-rate-samples.json`, BL-052): role -> championId -> `n_eff` of the
+ * same gated `role_prob` rows that produced `pick-rate.json`. Display-only:
+ * it never feeds `score(c)`, candidate selection or ranks (D-024/D-101).
+ */
+export const pickRateSamplesSchema = z.partialRecord(roleSchema, pickRateSamplesRoleSchema);
+export type PickRateSamples = z.infer<typeof pickRateSamplesSchema>;

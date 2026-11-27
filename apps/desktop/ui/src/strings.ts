@@ -17,7 +17,6 @@ export const strings = {
   navSetup: 'Setup',
   navGame: 'Game',
   navSettings: 'Settings',
-  navSetupDisabled: 'Coming in v2',
   navGameDisabled: 'Coming in v3',
   roleSelectorLabel: 'Your role',
   roleNames: {
@@ -182,4 +181,41 @@ export const strings = {
   profileReasonSchema: 'unexpected format',
   personalRecordLabel: 'Personal record',
   settingsReset: 'Settings were reset: the file was unreadable',
+  // --- Setup screen: runes (BL-030b, SPECS §18.5, D-134) ---
+  setupRunesTitle: (champion: string) => `Runes — ${champion}`,
+  setupChampionLabel: 'Champion',
+  setupPickChampion: 'Pick a champion to see rune recommendations.',
+  setupNoSetupRoles: 'No role has setup data in the current export.',
+  setupNoPages: 'Not enough data for rune recommendations on this champion and role.',
+  setupModeLabel: 'Data mode',
+  setupModeTopPlayers: 'Top players',
+  setupModeMyData: 'My data',
+  setupMasterPlus: 'Master+ only (optional)',
+  setupMasterPlusTag: 'Master+ only',
+  setupMasterPlusHint:
+    'Restricts expert evidence to Master+ and above games. Optional, off by default.',
+  setupDataSource: (source: string) => `Data source: ${source}`,
+  setupDataSourceExpert: 'expert aggregate (top players)',
+  setupDataSourceProfile: (label?: string) =>
+    label === undefined ? 'your profile export' : `your profile — ${label}`,
+  setupEvidenceExpert: (minPlayers: number, cap: number) =>
+    `Evidence rule: at least ${minPlayers} distinct players · per-player weight cap ${cap}`,
+  setupEvidenceProfile: (minGames: number) =>
+    `Evidence rule: at least ${minGames} effective games per rune page`,
+  setupWinRate: (percent: string) => `Win rate ${percent}%`,
+  setupPickShare: (percent: string) => `Pick share ${percent}%`,
+  setupNEff: (nEff: number) => `n≈${Math.round(nEff)}`,
+  setupPlayers: (n: number) => `${n} ${n === 1 ? 'player' : 'players'}`,
+  setupNotEnoughData: 'Not enough data',
+  setupSourcePrefix: 'Based on',
+  setupContextLane: (level: number) => `Lane context · level ${level}`,
+  setupContextDamageMix: 'Enemy damage mix',
+  setupContextGlobal: 'Champion global context',
+  setupContextMatchup: (level: number) => `Matchup context · level ${level}`,
+  setupContextChampionRecord: (level: number) => `Champion record · level ${level}`,
+  setupContextNone: 'No matching context',
+  setupBroaderTitle: 'Broader statistic (D-103 fallback)',
+  setupBroaderChampionRole: (champion: string, role: string) =>
+    `${champion} win rate in ${role} (all rune pages)`,
+  setupBroaderProfileChampion: (champion: string) => `Your win rate on ${champion}`,
 } as const;

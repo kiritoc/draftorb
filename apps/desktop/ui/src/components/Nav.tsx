@@ -10,7 +10,7 @@ interface NavEntry {
 
 const ENTRIES: readonly NavEntry[] = [
   { id: 'pick', label: strings.navPick },
-  { id: 'setup', label: strings.navSetup, disabledReason: strings.navSetupDisabled },
+  { id: 'setup', label: strings.navSetup },
   { id: 'game', label: strings.navGame, disabledReason: strings.navGameDisabled },
   { id: 'settings', label: strings.navSettings },
 ];

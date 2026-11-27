@@ -54,7 +54,8 @@ describe('recommend: matchupEnabled flag', () => {
     for (const rec of result.recommendations) {
       const row = baselineIdx.get(rec.championId);
       expect(row).toBeDefined();
-      expect(rec.score).toBeCloseTo(baselinePrior(row!.winsE, row!.gamesE, DEFAULT_CONFIG.k0), 12);
+      if (row === undefined) throw new Error('missing baseline row');
+      expect(rec.score).toBeCloseTo(baselinePrior(row.winsE, row.gamesE, DEFAULT_CONFIG.k0), 12);
       expect(rec.reasons).toEqual([]);
       expect(rec.warnings ?? []).not.toContain('counteredBy:SUPPORT:200');
       expect((rec.warnings ?? []).some((w) => w.startsWith('counteredBy'))).toBe(false);

@@ -72,14 +72,16 @@ function manifestFor(
   opts: { omitSha?: string[] } = {},
 ): string {
   const dir = `${patch}`;
-  const entries = Object.keys(files)
-    .filter((n) => n.startsWith(`${dir}/`) && n !== `${dir}/manifest.json`)
-    .map((n) => ({
+  const entries = Object.entries(files)
+    .filter(([n]) => n.startsWith(`${dir}/`) && n !== `${dir}/manifest.json`)
+    .map(([n, content]) => ({
       path: n.slice(dir.length + 1),
-      sha256: opts.omitSha?.includes(n) ? undefined : sha(files[n]!),
+      sha256: opts.omitSha?.includes(n) ? undefined : sha(content),
     }));
   for (const name of ['latest.json', 'champion-tags.json']) {
-    entries.push({ path: `/${name}`, sha256: sha(files[name]!) });
+    const content = files[name];
+    if (content === undefined) throw new Error(`fixture missing ${name}`);
+    entries.push({ path: `/${name}`, sha256: sha(content) });
   }
   return JSON.stringify({
     patch,

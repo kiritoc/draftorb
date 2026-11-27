@@ -14,7 +14,7 @@ import {
 
 import { recommendProfileRunes, recommendProfileSpells } from '../src/profile-setup.js';
 import type { PersonalizeContext } from '../src/personalize.js';
-import { makeData } from '../src/recommend-test-utils.js';
+import { makeData, must } from '../src/recommend-test-utils.js';
 
 const NOW_MS = 20_370 * 86_400_000;
 
@@ -91,27 +91,27 @@ describe('recommendProfileRunes', () => {
     ];
     const picks = recommendProfileRunes(makeProfile(games), 1, EMPTY_CONTEXT, data, NOW_MS);
     expect(picks).toHaveLength(2);
-    expect(picks[0]!.keystoneId).toBe(8112);
-    expect(picks[0]!.insufficientData).toBe(false);
-    expect(picks[0]!.winRate).toBeGreaterThan(0.5);
-    expect(picks[1]!.keystoneId).toBe(9923);
-    expect(picks[1]!.winRate).toBeLessThan(0.5);
-    expect(picks[0]!.nEff).toBeCloseTo(6, 3);
-    expect(picks[0]!.fallbackLevel).toBe(4);
+    expect(must(picks[0]).keystoneId).toBe(8112);
+    expect(must(picks[0]).insufficientData).toBe(false);
+    expect(must(picks[0]).winRate).toBeGreaterThan(0.5);
+    expect(must(picks[1]).keystoneId).toBe(9923);
+    expect(must(picks[1]).winRate).toBeLessThan(0.5);
+    expect(must(picks[0]).nEff).toBeCloseTo(6, 3);
+    expect(must(picks[0]).fallbackLevel).toBe(4);
   });
 
   it('uses the matched fallback level when context aligns', () => {
     const games = Array.from({ length: 5 }, () => makeGame());
     const picks = recommendProfileRunes(makeProfile(games), 1, L1_CONTEXT, data, NOW_MS);
-    expect(picks[0]!.fallbackLevel).toBe(1);
+    expect(must(picks[0]).fallbackLevel).toBe(1);
   });
 
   it('shows insufficient data below 5 effective games', () => {
     const games = Array.from({ length: 3 }, () => makeGame());
     const picks = recommendProfileRunes(makeProfile(games), 1, EMPTY_CONTEXT, data, NOW_MS);
-    expect(picks[0]!.insufficientData).toBe(true);
-    expect(picks[0]!.winRate).toBeNull();
-    expect(picks[0]!.nEff).toBeCloseTo(3, 3);
+    expect(must(picks[0]).insufficientData).toBe(true);
+    expect(must(picks[0]).winRate).toBeNull();
+    expect(must(picks[0]).nEff).toBeCloseTo(3, 3);
   });
 
   it('ignores games on other champions and games without rune data', () => {
@@ -122,7 +122,7 @@ describe('recommendProfileRunes', () => {
     ];
     const picks = recommendProfileRunes(makeProfile(games), 1, EMPTY_CONTEXT, data, NOW_MS);
     expect(picks).toHaveLength(1);
-    expect(picks[0]!.games).toBe(5);
+    expect(must(picks[0]).games).toBe(5);
   });
 });
 
@@ -136,19 +136,19 @@ describe('recommendProfileSpells', () => {
     const picks = recommendProfileSpells(makeProfile(games), 1, EMPTY_CONTEXT, data, NOW_MS);
     expect(picks).toHaveLength(2);
     // [4,7] normalized pair: 8 games, all wins -> ranks first.
-    expect(picks[0]!.spells).toEqual([4, 7]);
-    expect(picks[0]!.games).toBe(8);
-    expect(picks[0]!.insufficientData).toBe(false);
+    expect(must(picks[0]).spells).toEqual([4, 7]);
+    expect(must(picks[0]).games).toBe(8);
+    expect(must(picks[0]).insufficientData).toBe(false);
     // [4,13]: 6 losses.
-    expect(picks[1]!.spells).toEqual([4, 13]);
-    expect(picks[1]!.games).toBe(6);
+    expect(must(picks[1]).spells).toEqual([4, 13]);
+    expect(must(picks[1]).games).toBe(6);
   });
 
   it('reports insufficient data below 5 effective games', () => {
     const games = Array.from({ length: 2 }, () => makeGame());
     const picks = recommendProfileSpells(makeProfile(games), 1, EMPTY_CONTEXT, data, NOW_MS);
-    expect(picks[0]!.insufficientData).toBe(true);
-    expect(picks[0]!.winRate).toBeNull();
+    expect(must(picks[0]).insufficientData).toBe(true);
+    expect(must(picks[0]).winRate).toBeNull();
   });
 
   it('is deterministic', () => {

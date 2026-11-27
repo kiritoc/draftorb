@@ -28,8 +28,16 @@ function tempDir(): string {
   return dir;
 }
 afterEach(() => {
-  while (tempDirs.length > 0) rmSync(tempDirs.pop()!, { recursive: true, force: true });
+  for (const dir of tempDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
+
+/** Narrows a possibly-undefined lookup in tests (no-non-null-assertion). */
+function must<T>(value: T | null | undefined): T {
+  if (value === null || value === undefined) {
+    throw new Error('expected a defined value');
+  }
+  return value;
+}
 
 // --- argument parsing ---
 
@@ -189,8 +197,8 @@ describe('parseTar', () => {
   it('parses names, sizes and payloads', () => {
     const entries = parseTar(buildTar([{ name: 'public/a.json', body: '{"x":1}' }]));
     expect(entries).toHaveLength(1);
-    expect(entries[0]!.name).toBe('public/a.json');
-    expect(entries[0]!.data.toString('utf8')).toBe('{"x":1}');
+    expect(must(entries[0]).name).toBe('public/a.json');
+    expect(must(entries[0]).data.toString('utf8')).toBe('{"x":1}');
   });
 });
 

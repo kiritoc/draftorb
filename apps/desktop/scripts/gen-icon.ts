@@ -29,7 +29,11 @@ const crcTable = (() => {
 
 function crc32(buf: Buffer): number {
   let c = 0xffffffff;
-  for (const b of buf) c = crcTable[(c ^ b) & 0xff]! ^ (c >>> 8);
+  for (const b of buf) {
+    const tableEntry = crcTable[(c ^ b) & 0xff];
+    if (tableEntry === undefined) throw new Error('crc table index out of range');
+    c = tableEntry ^ (c >>> 8);
+  }
   return (c ^ 0xffffffff) >>> 0;
 }
 

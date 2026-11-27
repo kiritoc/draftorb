@@ -349,11 +349,11 @@ Version split (D-100): **v1** shows only a per-champion record badge on each cha
 
 ### 18.2 Profile win rate (champions)
 
-For candidate `c` in the current draft, over the profile's in-scope games:
+For candidate `c` in the current draft, over the profile's in-scope games played in the drafted role (§18.1; ADC/MID drafts have no in-scope games and every entry reports insufficient data):
 
 - Recency weight `w = 0.5^(age_days / 60)` per game (`HALF_LIFE_DAYS = 60`); `n_eff = (sum w)^2 / sum w^2`.
-- Profile win rate at a context level: `p = (wins_w + K_SHRINK * p_profile) / (games_w + K_SHRINK)`, `K_SHRINK = 15`, `p_profile` = the profile's recency-weighted win rate over all in-scope games.
-- Fallback hierarchy — first level with `n_eff >= MIN_GAMES` (`MIN_GAMES` = 3). Every level is scoped to games the profile played ON the candidate champion in the in-scope role (D-097); the levels widen the matchup context instead (D-076): L1 same ally ADC + same enemy support; L2 same enemy support; L3 enemy composition signature (`champion-tags.json` `damageType:archetype` pairs, draft signature ⊆ game signature); L4 any context ("role overall"); L5 champion overall (identical to L4 while only one role's games are in scope, kept distinct for later phases). `levelFactor` = 1.0/0.9/0.8/0.7/0.6 for L1..L5. The same hierarchy gives the profile's win rate "in the current matchup/setup".
+- Profile win rate at a context level: `p = (wins_w + K_SHRINK * p_profile) / (games_w + K_SHRINK)`, `K_SHRINK = 15`, `p_profile` = the profile's recency-weighted win rate over all in-scope games in the drafted role.
+- Fallback hierarchy — first level with `n_eff >= MIN_GAMES` (`MIN_GAMES` = 3). Every level is scoped to games the profile played ON the candidate champion in the in-scope role (D-097), i.e. the drafted role when it is SUPPORT, TOP or JUNGLE; the levels widen the matchup context instead (D-076): L1 same ally ADC + same enemy support; L2 same enemy support; L3 enemy composition signature (`champion-tags.json` `damageType:archetype` pairs, draft signature ⊆ game signature); L4 any context ("role overall"); L5 champion overall (identical to L4 while personalization is scoped to the drafted role's games, kept distinct for later phases). `levelFactor` = 1.0/0.9/0.8/0.7/0.6 for L1..L5. The same hierarchy gives the profile's win rate "in the current matchup/setup".
 - Trust: `trust = (n_eff * levelFactor) / (n_eff * levelFactor + K_TRUST)`, `K_TRUST` = 20.
 - Meta normalization: `metaNorm(c) = 1 - (rank - 1) / (N - 1)` over the complete overall list (N > 1; 1 when N = 1) — `score(c) = sigmoid(x)` is uncalibrated in absolute terms, rank position is stable.
 - `personalizedScore(c) = (1 - trust) * metaNorm(c) + trust * p`. The personalized list sorts desc, tie-break overall `rank`. Entries with `n_eff < MIN_GAMES` at every level show "insufficient data" with `n_eff` (D-075), never a number.
@@ -371,8 +371,8 @@ For candidate `c` in the current draft, over the profile's in-scope games:
 
 ### 18.5 Runes and summoner spells
 
-- Runes screen: two columns — "Profile's best" (shrunk profile WR of the profile's rune pages for that champion, matched per draft context when possible) and "Top players" (existing `recommendRunes` output); a marker highlights entries that differ. Page identity = `(keystoneId, primaryStyleId, subStyleId)` — minor rune picks and stat shards do not split pages; summoner spells are an unordered pair normalized to `[min(id), max(id)]`; the fallback/shrinkage levels are the champion-scoped L1..L5 of §18.2 applied per setup, with the shrinkage prior = the profile's recency-weighted win rate on that champion; fewer than 5 effective games (`DEFAULT_MIN_SETUP_GAMES`) on a setup -> "Profile's best" shows insufficient data with `nEff`, never a rate (D-077/D-075).
-- Summoner spells: same two-column layout from `profile_games` spell ids (profile WR per normalized spell pair vs the champion's global recommendation).
+- Runes screen: two columns — "Profile's best" (shrunk profile WR of the profile's rune pages for that champion in the drafted role — same in-scope role filter as §18.2 — matched per draft context when possible) and "Top players" (existing `recommendRunes` output); a marker highlights entries that differ. Page identity = `(keystoneId, primaryStyleId, subStyleId)` — minor rune picks and stat shards do not split pages; summoner spells are an unordered pair normalized to `[min(id), max(id)]`; the fallback/shrinkage levels are the champion-scoped L1..L5 of §18.2 applied per setup, with the shrinkage prior = the profile's recency-weighted win rate on that champion; fewer than 5 effective games (`DEFAULT_MIN_SETUP_GAMES`) on a setup -> "Profile's best" shows insufficient data with `nEff`, never a rate (D-077/D-075).
+- Summoner spells: same two-column layout and drafted-role scope, from `profile_games` spell ids (profile WR per normalized spell pair vs the champion's global recommendation).
 
 ### 18.6 Items (last)
 

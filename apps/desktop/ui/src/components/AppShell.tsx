@@ -3,6 +3,7 @@ import type { DataStatus } from '../data-status';
 import { strings } from '../strings';
 import type { ResolvedTheme, ThemeSetting } from '../theme';
 import { Header } from './Header';
+import { NewGameDialog } from './NewGameDialog';
 import { Nav, type ScreenId } from './Nav';
 import { PoolSyncBanner } from './PoolSyncBanner';
 import type { PoolSyncStatus } from '../pool/pool-sync';
@@ -35,6 +36,13 @@ export interface AppShellProps {
   repoFolderAvailable?: boolean;
   profileStatus?: string;
   profileLoad?: ProfileLoad;
+  /** BL-055: bumped on each confirmed "New game"; remounts the game screens. */
+  gameResetNonce: number;
+  /** Whether the "New game" confirmation dialog is open (state lives in App). */
+  newGameOpen: boolean;
+  onNewGameOpenChange: (open: boolean) => void;
+  /** Confirmed reset: clears every per-game field on Pick and Setup. */
+  onNewGameConfirm: () => void;
 }
 
 export function AppShell(props: AppShellProps) {
@@ -44,6 +52,7 @@ export function AppShell(props: AppShellProps) {
         dataStatus={props.dataStatus}
         resolvedTheme={props.resolvedTheme}
         onToggleTheme={props.onToggleTheme}
+        onNewGame={() => props.onNewGameOpenChange(true)}
       />
       {props.notice !== undefined && (
         <p
@@ -64,7 +73,10 @@ export function AppShell(props: AppShellProps) {
             onSelect={props.onRoleChange}
           />
           {/* Empty verdict: PickScreen skips recommendations but keeps the pool editor. */}
+          {/* BL-055: the reset nonce remounts the screen so every per-game
+              field returns to its default; the pool reloads untouched. */}
           <PickScreen
+            key={`pick-${props.gameResetNonce}`}
             role={props.role ?? 'SUPPORT'}
             noEligibleRole={props.role === null}
             profileLoad={props.profileLoad ?? { kind: 'none', reason: 'noFolder' }}
@@ -85,6 +97,7 @@ export function AppShell(props: AppShellProps) {
         )}
         {props.screen === 'setup' && (
           <SetupScreen
+            key={`setup-${props.gameResetNonce}`}
             preferredRole={props.role}
             dataReadyNonce={props.dataReadyNonce}
             profileLoad={props.profileLoad ?? { kind: 'none', reason: 'noFolder' }}
@@ -102,6 +115,11 @@ export function AppShell(props: AppShellProps) {
           </section>
         )}
       </main>
+      <NewGameDialog
+        open={props.newGameOpen}
+        onCancel={() => props.onNewGameOpenChange(false)}
+        onConfirm={props.onNewGameConfirm}
+      />
     </div>
   );
 }

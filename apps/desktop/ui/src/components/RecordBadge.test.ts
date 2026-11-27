@@ -70,7 +70,8 @@ describe('RecordBadge', () => {
       { kind: 'loaded', profile: makeProfile([]) },
       { baselineIndex: indexBaselines(thin, 'DIAMOND'), rankBucket: 'DIAMOND' },
     );
-    expect(html).toContain('Diamond avg: not enough data (n≈10)');
+    // The same string is also the chip's title tooltip, so match the text node.
+    expect(html).toMatch(/>Diamond avg: not enough data \(n≈10\)</);
   });
 });
 

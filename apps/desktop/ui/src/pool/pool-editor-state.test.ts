@@ -12,6 +12,7 @@ import {
   canExportToRepo,
   initPoolEditorState,
   poolEditorReducer as reduce,
+  poolMessageSlots,
 } from './pool-editor-state';
 
 const SHEN = 98;
@@ -76,6 +77,20 @@ describe('poolEditorReducer', () => {
     expect(s.message?.kind).toBe('error');
     expect(s.message?.scope).toBe('form');
     expect(championPoolRoles(s.working, 999)).toEqual([]);
+  });
+});
+
+describe('poolMessageSlots', () => {
+  it('routes each scope to its render location and null elsewhere', () => {
+    for (const scope of ['form', 'transfer', 'footer'] as const) {
+      const message = { text: 'feedback', kind: 'info' as const, scope };
+      const slots = poolMessageSlots(message);
+      expect(slots[scope]).toBe(message);
+      for (const other of ['form', 'transfer', 'footer'] as const) {
+        if (other !== scope) expect(slots[other]).toBeNull();
+      }
+    }
+    expect(poolMessageSlots(null)).toEqual({ form: null, transfer: null, footer: null });
   });
 });
 

@@ -37,6 +37,7 @@ import {
   initPoolEditorState,
   isPoolDirty,
   poolEditorReducer,
+  poolMessageSlots,
   type PoolEditorMessageScope,
 } from '../pool/pool-editor-state';
 import { exportPoolToRepo, readRepoPool } from '../pool/repo-pool';
@@ -102,9 +103,11 @@ export function PoolEditor({
   const dirty = isPoolDirty(working, pool);
 
   // Route each message to the section that produced it (B-081).
-  const formMessage = message?.scope === 'form' ? message : null;
-  const transferMessage = message?.scope === 'transfer' ? message : null;
-  const footerMessage = message?.scope === 'footer' ? message : null;
+  const {
+    form: formMessage,
+    transfer: transferMessage,
+    footer: footerMessage,
+  } = poolMessageSlots(message);
 
   // Each message renders next to the action that produced it (B-081).
   const showError = (text: string, scope: PoolEditorMessageScope) =>

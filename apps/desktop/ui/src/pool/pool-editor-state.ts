@@ -46,6 +46,19 @@ export function initPoolEditorState(pool: PoolConfig): PoolEditorState {
   return { working: pool, draftChampionId: null, draftRoles: [], message: null };
 }
 
+/** Routes the single message slot to the section that renders it (B-081). */
+export function poolMessageSlots(message: PoolEditorMessage | null): {
+  form: PoolEditorMessage | null;
+  transfer: PoolEditorMessage | null;
+  footer: PoolEditorMessage | null;
+} {
+  return {
+    form: message?.scope === 'form' ? message : null,
+    transfer: message?.scope === 'transfer' ? message : null,
+    footer: message?.scope === 'footer' ? message : null,
+  };
+}
+
 /**
  * Replacing the whole working copy invalidates the pending selection:
  * stale checkboxes would otherwise re-apply roles that no longer exist.

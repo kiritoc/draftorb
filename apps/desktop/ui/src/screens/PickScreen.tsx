@@ -509,6 +509,8 @@ export function PickScreen({
         profileLoad={profileLoad}
         baselineIndex={baselineIndex}
         rankBucket={rankBucket}
+        pickRate={pickData.data.pickRate}
+        pickRateSamples={pickData.pickRateSamples}
         userChampionId={user.championId}
         recommendations={recommendations}
         poolRecommendations={poolRecommendations}

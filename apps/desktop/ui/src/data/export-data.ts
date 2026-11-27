@@ -19,6 +19,9 @@ import {
   laneVsTableSchema,
   latestSchema,
   manifestSchema,
+  manifestSchemaV5,
+  manifestSchemaV6,
+  pickRateSamplesSchema,
   pickRateSchema,
   type AllyPairTable,
   type Champion,
@@ -28,6 +31,9 @@ import {
   type LaneFullTable,
   type LaneVsTable,
   type Manifest,
+  type ManifestV5,
+  type ManifestV6,
+  type PickRateSamples,
   type RecommendData,
   type Role,
 } from '@draftorb/shared';
@@ -40,6 +46,12 @@ export interface PickData {
   data: RecommendData;
   /** True when the role is exported at champion-level statistics only (BL-024). */
   minimal: boolean;
+  /**
+   * Per-(champion, role) pick-share denominators (`pick-rate-samples.json`,
+   * BL-052). Display-only: kept out of `RecommendData` so it can never feed
+   * `score(c)`; absent on exports predating the file.
+   */
+  pickRateSamples?: PickRateSamples;
 }
 
 async function readJson(name: string): Promise<unknown> {
@@ -95,9 +107,18 @@ export function createRecommendData(
   };
 }
 
+/** Manifest shapes the cache accepts: the current schema plus the frozen v6
+ *  and v5 layouts published before `pick-rate-samples.json` existed
+ *  (BL-052 merged onto BL-013a's v6). A v5/v6 cache stays fully usable —
+ *  the samples file is optional, so pick share is simply absent until the
+ *  next republish. Older layouts (v4 and below) are still rejected: they
+ *  predate `minimalRoles` and cannot drive the loader. */
+const cachedManifestSchema = manifestSchema.or(manifestSchemaV6).or(manifestSchemaV5);
+type CachedManifest = Manifest | ManifestV6 | ManifestV5;
+
 interface CachedRelease {
   latest: Latest;
-  manifest: Manifest;
+  manifest: CachedManifest;
 }
 
 /**
@@ -112,7 +133,7 @@ export async function loadCachedRelease(): Promise<CachedRelease | null> {
   const manifestPath = latest.manifest.startsWith(`${latest.patch}/`)
     ? latest.manifest
     : `${latest.patch}/${latest.manifest}`;
-  const manifest: Manifest = manifestSchema.parse(await readJson(manifestPath));
+  const manifest: CachedManifest = cachedManifestSchema.parse(await readJson(manifestPath));
   if (manifest.patch !== latest.patch) {
     throw new Error(
       `Latest pointer patch ${latest.patch} does not match manifest patch ${manifest.patch}`,
@@ -180,11 +201,18 @@ export async function loadPickData(role: Role): Promise<PickData | null> {
   const tags = championTagsMapSchema.parse(await readJson('champion-tags.json'));
 
   const minimal = manifest.minimalRoles.includes(role);
+  // Optional display-only file (BL-052): parsed fail-closed like every other
+  // manifest file, but kept out of RecommendData (it must not reach the engine).
+  const pickRateSamples =
+    files['pick-rate-samples.json'] !== undefined
+      ? pickRateSamplesSchema.parse(files['pick-rate-samples.json'])
+      : undefined;
   return {
     patch: latest.patch,
     generatedAt: latest.generatedAt,
     champions,
     data: createRecommendData(files, champions, tags, role, minimal),
     minimal,
+    ...(pickRateSamples !== undefined ? { pickRateSamples } : {}),
   };
 }

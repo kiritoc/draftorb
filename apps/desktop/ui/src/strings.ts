@@ -112,6 +112,12 @@ export const strings = {
   inPoolTag: 'In your pool',
   inPoolRank: (n: number) => `In your pool · #${n}`,
   sampleSize: 'Sample',
+  pickShareRate: (percent: string, nEff: number) =>
+    `Pick share ${percent}% · n≈${nEff} · all ranks`,
+  pickShareInsufficient: (nEff: number | null) =>
+    nEff === null
+      ? 'Pick share: not enough data'
+      : `Pick share: not enough data (n≈${Math.round(nEff)})`,
   poolSampleGames: (n: number) => `${n} ${n === 1 ? 'game' : 'games'}`,
   broaderWinRate: (percent: number) => `Broader win rate ${percent.toFixed(1)}%`,
   lowDataLabel: 'low data',

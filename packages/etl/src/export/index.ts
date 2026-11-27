@@ -25,6 +25,7 @@ import {
   manifestSchema,
   manifestSchemaV4,
   manifestSchemaV5,
+  manifestSchemaV6,
   type ChampionTagsMap,
   type Latest,
   type Manifest,
@@ -49,7 +50,7 @@ import {
   type LaneVsRow,
 } from './role-tables.js';
 import { roleProbFile, type RoleProbRow } from './role-prob.js';
-import { pickRateFile } from './pick-rate.js';
+import { pickRateFile, pickRateSamplesFile } from './pick-rate.js';
 import type { ItemBuildRow } from './builds.js';
 import type { RuneCtxRow } from './runes.js';
 import {
@@ -102,9 +103,15 @@ function all<T>(db: Database.Database, sql: string, params: readonly unknown[] =
 }
 
 /** Published manifest shapes the pointer guard accepts, newest first: the
- *  current schema, then the frozen v5 layout from before the BL-013a v6 bump,
- *  then the frozen v4 layout from before the BL-024 v5 bump. */
-const PUBLISHED_MANIFEST_SCHEMAS = [manifestSchema, manifestSchemaV5, manifestSchemaV4] as const;
+ *  current schema, then the frozen v6 layout from before the BL-052 v7
+ *  bump, then the frozen v5 layout from before the BL-013a v6 bump, then
+ *  the frozen v4 layout from before the BL-024 v5 bump. */
+const PUBLISHED_MANIFEST_SCHEMAS = [
+  manifestSchema,
+  manifestSchemaV6,
+  manifestSchemaV5,
+  manifestSchemaV4,
+] as const;
 
 /** Latest-patch pointer already published in `publicDir`, or undefined when
  *  `latest.json` is absent or does not validate against latestSchema.
@@ -265,6 +272,7 @@ export function exportJson(db: Database.Database, options: ExportOptions = {}): 
 
   filesToWrite.push(roleProbFile(roleProbRows, exportMinGames));
   filesToWrite.push(pickRateFile(roleProbRows, exportMinGames));
+  filesToWrite.push(pickRateSamplesFile(roleProbRows, exportMinGames));
 
   for (const role of roles) {
     filesToWrite.push(buildTableFile(TABLE_SPECS[0], baselineRows, role, exportMinGames));

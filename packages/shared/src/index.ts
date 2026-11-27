@@ -91,12 +91,14 @@ export {
   championsMapSchema,
   championRoleProbabilitiesSchema,
   pickRateSchema,
+  pickRateSamplesSchema,
 } from './schemas/champions.js';
 export type {
   Champion,
   ChampionsMap,
   ChampionRoleProbabilities,
   PickRate,
+  PickRateSamples,
 } from './schemas/champions.js';
 
 export {
@@ -111,8 +113,9 @@ export {
   manifestSchema,
   manifestSchemaV4,
   manifestSchemaV5,
+  manifestSchemaV6,
 } from './schemas/manifest.js';
-export type { Manifest, ManifestV4, ManifestV5 } from './schemas/manifest.js';
+export type { Manifest, ManifestV4, ManifestV5, ManifestV6 } from './schemas/manifest.js';
 export { LATEST_SCHEMA_VERSION, latestSchema } from './schemas/manifest.js';
 export type { Latest } from './schemas/manifest.js';
 

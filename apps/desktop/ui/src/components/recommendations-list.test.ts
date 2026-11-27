@@ -126,6 +126,43 @@ describe('RecommendationsList', () => {
     expect(markup.indexOf('Leona')).toBeLessThan(markup.indexOf('Soraka'));
   });
 
+  it('renders pick share with its role-wide sample, or not enough data (BL-052)', () => {
+    const markup = renderToStaticMarkup(
+      createElement(RecommendationsList, {
+        title: 'Best overall',
+        recommendations: [rec(89, 1), rec(16, 2)],
+        resetKey: 'draft',
+        cardContext: {
+          champions,
+          iconVersion: null,
+          role: 'SUPPORT',
+          pickRate: { SUPPORT: { '89': 0.25, '16': 0.75 } },
+          // 89 clears minGames (25); 16 is below it -> insufficient label.
+          pickRateSamples: { SUPPORT: { '89': 40, '16': 12 } },
+        },
+      }),
+    );
+    expect(markup).toContain('Pick share 25.0% · n≈40 · all ranks');
+    expect(markup).toContain('Pick share: not enough data (n≈12)');
+  });
+
+  it('hides the pick-share figure on legacy exports without the samples file', () => {
+    const markup = renderToStaticMarkup(
+      createElement(RecommendationsList, {
+        title: 'Best overall',
+        recommendations: [rec(89, 1)],
+        resetKey: 'draft',
+        cardContext: {
+          champions,
+          iconVersion: null,
+          role: 'SUPPORT',
+          pickRate: { SUPPORT: { '89': 0.25 } },
+        },
+      }),
+    );
+    expect(markup).not.toContain('Pick share');
+  });
+
   it('tags a pool champion on an unavailable card in the overall list', () => {
     const markup = renderToStaticMarkup(
       createElement(RecommendationsList, {

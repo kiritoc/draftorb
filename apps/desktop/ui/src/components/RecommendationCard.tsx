@@ -15,6 +15,7 @@ import {
 import type { RankBucket } from '@draftorb/shared';
 import type { ProfileLoad } from '../profile/profile-export';
 import type { BaselineIndex } from '../pick/baseline-record';
+import type { PickShareDisplay } from '../pick/pick-share';
 import { strings } from '../strings';
 import { championName } from '../champion-name';
 import { championIconUrl } from '../data/champion-icons';
@@ -32,6 +33,8 @@ export interface RecommendationCardProps {
   /** Baseline lookup + bucket for the champion-average row (BL-051). */
   baselineIndex?: BaselineIndex;
   rankBucket?: RankBucket;
+  /** Pick share + role-wide sample for this card (BL-052); undefined hides it. */
+  pickShare?: PickShareDisplay;
 }
 
 const LEVEL_LABEL: Record<number, string> = {
@@ -89,6 +92,7 @@ export function RecommendationCard({
   role,
   baselineIndex,
   rankBucket,
+  pickShare,
 }: RecommendationCardProps) {
   const { score, poolRank, reasons, reliability, warnings } = recommendation;
   const champion = champions.find((c) => c.id === recommendation.championId);
@@ -151,12 +155,24 @@ export function RecommendationCard({
       </div>
 
       <div className="flex items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
-        <div className="flex items-center gap-1.5">
-          <span>{strings.sampleSize}</span>
-          <span className="font-mono">{reliability.nEff.toFixed(0)}</span>
-          {reliability.lowData && (
-            <span className="text-amber-600 dark:text-amber-400" title={strings.lowDataHint}>
-              ⚠ {strings.lowDataLabel}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5">
+            <span>{strings.sampleSize}</span>
+            <span className="font-mono">{reliability.nEff.toFixed(0)}</span>
+            {reliability.lowData && (
+              <span className="text-amber-600 dark:text-amber-400" title={strings.lowDataHint}>
+                ⚠ {strings.lowDataLabel}
+              </span>
+            )}
+          </div>
+          {pickShare !== undefined && (
+            <span className="font-mono">
+              {pickShare.kind === 'rate'
+                ? strings.pickShareRate(
+                    (pickShare.share * 100).toFixed(1),
+                    Math.round(pickShare.nEff),
+                  )
+                : strings.pickShareInsufficient(pickShare.nEff)}
             </span>
           )}
         </div>

@@ -55,7 +55,7 @@ function writeExport(publicDir: string, baseline: unknown): void {
     roles: ['SUPPORT'],
     minimalRoles: [],
     files: files.map((path) => ({ path })),
-    schemaVersion: 6,
+    schemaVersion: 7,
   });
   writeJson(join(patchDir, 'champions.json'), {
     '412': { id: 412, name: 'Thresh', icon: 'Thresh.png', roles: ['SUPPORT', 'TOP'] },

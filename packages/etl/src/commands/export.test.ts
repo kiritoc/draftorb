@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import Database from 'better-sqlite3';
 
+import { MANIFEST_SCHEMA_VERSION } from '@draftorb/shared';
+
 import { openDb, migrate } from '../db';
 import { exportCommand } from './export';
 
@@ -84,7 +86,7 @@ describe('exportCommand', () => {
     db.close();
 
     await exportCommand.run([]);
-    expect(output()).toMatch(/schema v6/);
+    expect(output()).toMatch(/schema v7/);
     expect(output()).toMatch(/roles: SUPPORT, TOP, JUNGLE, ADC, MID/);
 
     const manifest = JSON.parse(
@@ -93,7 +95,7 @@ describe('exportCommand', () => {
         'utf8',
       ),
     );
-    expect(manifest.schemaVersion).toBe(6);
+    expect(manifest.schemaVersion).toBe(MANIFEST_SCHEMA_VERSION);
     expect(manifest.patch).toBe('16.21');
     expect(manifest.roles).toEqual(['SUPPORT', 'TOP', 'JUNGLE', 'ADC', 'MID']);
     expect(manifest.minimalRoles).toEqual(['ADC', 'MID']);

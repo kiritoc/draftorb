@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-import { pickRateSchema } from '@draftorb/shared';
+import { pickRateSamplesSchema, pickRateSchema } from '@draftorb/shared';
 import { seed } from './export.fixtures.js';
 import { createExportTestSuite, PATCH } from './export.test-utils.js';
 import { exportJson } from './index.js';
-import { exportPickRates, pickRateFile } from './pick-rate.js';
+import {
+  exportPickRateSamples,
+  exportPickRates,
+  pickRateFile,
+  pickRateSamplesFile,
+} from './pick-rate.js';
 import type { RoleProbRow } from './role-prob.js';
 
 const suite = createExportTestSuite();
@@ -58,6 +63,77 @@ describe('pickRateFile', () => {
   });
 });
 
+describe('exportPickRateSamples', () => {
+  it('exports n_eff of the same gated rows that produce the shares', () => {
+    const rows = [
+      row(1, 'SUPPORT', 30, 15), // nEff = 30^2/15 = 60
+      row(2, 'SUPPORT', 10, 10), // nEff = 10
+      row(3, 'ADC', 20, 20), // nEff = 20
+    ];
+    const samples = exportPickRateSamples(rows, 10);
+    expect(pickRateSamplesSchema.parse(samples)).toEqual({
+      SUPPORT: { '1': 60, '2': 10 },
+      ADC: { '3': 20 },
+    });
+    // Same (role, champion) keys as the shares, so share and n always pair up.
+    const shares = exportPickRates(rows, 10);
+    for (const role of Object.keys(shares)) {
+      expect(Object.keys(samples[role as keyof typeof samples] ?? {}).sort()).toEqual(
+        Object.keys(shares[role as keyof typeof shares] ?? {}).sort(),
+      );
+    }
+  });
+
+  it('excludes rows below the exportMinGames gate (boundary: n_eff >= gate)', () => {
+    const samples = exportPickRateSamples(
+      [
+        row(1, 'SUPPORT', 30, 30),
+        row(2, 'SUPPORT', 9, 9), // nEff = 9 < 10 -> excluded
+        row(3, 'SUPPORT', 10, 10), // nEff = 10 -> included
+        row(4, 'SUPPORT', 5, 25), // nEff = 1 -> excluded
+      ],
+      10,
+    );
+    expect(samples).toEqual({ SUPPORT: { '1': 30, '3': 10 } });
+  });
+
+  it('returns an empty map when no row survives the gate', () => {
+    expect(exportPickRateSamples([row(1, 'SUPPORT', 1, 100)], 10)).toEqual({});
+  });
+
+  it('fails loudly on an unknown role', () => {
+    expect(() => exportPickRateSamples([row(1, 'UNRECOGNIZED', 10)], 0)).toThrow(
+      /pick-rate-samples\.json/,
+    );
+  });
+
+  it('excludes a gated row whose share rounds to zero, keeping key parity (PR #168)', () => {
+    // Champ 1 passes the gate (nEff = 100) but its share 1/3_000_001 rounds to
+    // 0 in pick-rate.json, so it must not appear in the samples file either.
+    const rows = [
+      row(1, 'SUPPORT', 1, 0.01), // nEff = 100, share ~3.3e-7 -> dropped
+      row(2, 'SUPPORT', 3_000_000), // dominant pick
+    ];
+    const shares = exportPickRates(rows, 10);
+    expect(shares).toEqual({ SUPPORT: { '2': 1 } });
+    const samples = exportPickRateSamples(rows, 10);
+    expect(pickRateSamplesSchema.parse(samples)).toEqual({ SUPPORT: { '2': 3_000_000 } });
+    for (const role of Object.keys(shares)) {
+      expect(Object.keys(samples[role as keyof typeof samples] ?? {}).sort()).toEqual(
+        Object.keys(shares[role as keyof typeof shares] ?? {}).sort(),
+      );
+    }
+  });
+});
+
+describe('pickRateSamplesFile', () => {
+  it('writes pick-rate-samples.json as compact JSON', () => {
+    const file = pickRateSamplesFile([row(412, 'SUPPORT', 10)], 0);
+    expect(file.relativePath).toBe('pick-rate-samples.json');
+    expect(file.content).toBe(JSON.stringify({ SUPPORT: { '412': 10 } }));
+  });
+});
+
 describe('exportJson pick-rate.json', () => {
   it('is written next to role-prob.json and listed in the manifest', () => {
     seed(suite.db, 'match', [{}]);
@@ -72,6 +148,33 @@ describe('exportJson pick-rate.json', () => {
     expect(pickRateSchema.parse(pickRate)).toBeDefined();
     expect(result.manifest.files.map((f) => f.path)).toContain('pick-rate.json');
     expect(result.files.map((f) => f.relativePath)).toContain('pick-rate.json');
+  });
+
+  it('writes pick-rate-samples.json with the n_eff of the same gated rows (BL-052)', () => {
+    seed(suite.db, 'match', [{}]);
+    seed(suite.db, 'roleProb', [
+      { championId: 412, role: 'SUPPORT', gamesW: 30, gamesW2: 30, prob: 0.7 },
+      { championId: 26, role: 'SUPPORT', gamesW: 10, gamesW2: 10, prob: 0.3 },
+      { championId: 412, role: 'ADC', gamesW: 5, gamesW2: 25, prob: 0.3 }, // nEff=1 -> dropped
+    ]);
+    const result = suite.exportOnce();
+    const samples = suite.readFile('pick-rate-samples.json') as Record<
+      string,
+      Record<string, number>
+    >;
+    expect(pickRateSamplesSchema.parse(samples)).toEqual({
+      SUPPORT: { '412': 30, '26': 10 },
+    });
+    expect(result.manifest.files.map((f) => f.path)).toContain('pick-rate-samples.json');
+    expect(result.files.map((f) => f.relativePath)).toContain('pick-rate-samples.json');
+    // The share's eligible rows are exactly the sample's: ADC has no share, so
+    // it has no sample either.
+    const pickRate = suite.readFile('pick-rate.json') as Record<string, Record<string, number>>;
+    for (const role of Object.keys(pickRate)) {
+      expect(Object.keys(samples[role] ?? {}).sort()).toEqual(
+        Object.keys(pickRate[role] ?? {}).sort(),
+      );
+    }
   });
 
   it('fails loudly when role_prob contains an unknown role', () => {

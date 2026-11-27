@@ -12,6 +12,8 @@ import type {
   Champion,
   ChampionId,
   InsufficientDataEntry,
+  PickRate,
+  PickRateSamples,
   PoolConfig,
   PoolUnavailableEntry,
   RankBucket,
@@ -41,6 +43,9 @@ export interface PickRecommendationsProps {
   /** Baseline lookup + rank bucket for the champion-average badge row (BL-051). */
   baselineIndex?: BaselineIndex;
   rankBucket?: RankBucket;
+  /** Pick-share export + denominators for the card figure (BL-052). */
+  pickRate?: PickRate;
+  pickRateSamples?: PickRateSamples;
   /** The user's own pick: excluded from both lists with rank-gap closing. */
   userChampionId: ChampionId | null;
   recommendations: readonly Recommendation[];
@@ -68,6 +73,8 @@ export function PickRecommendations({
   profileLoad,
   baselineIndex,
   rankBucket,
+  pickRate,
+  pickRateSamples,
   userChampionId,
   recommendations,
   poolRecommendations,
@@ -106,8 +113,26 @@ export function PickRecommendations({
     return hideMyPool ? items.filter((item) => !poolSet.has(item.championId)) : items;
   }, [insufficientData, userChampionId, hideMyPool, poolSet]);
   const cardContext = useMemo<RecommendationCardContext>(
-    () => ({ champions, iconVersion, profileLoad, role, baselineIndex, rankBucket }),
-    [champions, iconVersion, profileLoad, role, baselineIndex, rankBucket],
+    () => ({
+      champions,
+      iconVersion,
+      profileLoad,
+      role,
+      baselineIndex,
+      rankBucket,
+      pickRate,
+      pickRateSamples,
+    }),
+    [
+      champions,
+      iconVersion,
+      profileLoad,
+      role,
+      baselineIndex,
+      rankBucket,
+      pickRate,
+      pickRateSamples,
+    ],
   );
 
   return (

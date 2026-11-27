@@ -48,6 +48,7 @@ function seedCache(
     patchFiles?: Record<string, unknown>;
     roles?: ('SUPPORT' | 'ADC')[];
     minimalRoles?: ('SUPPORT' | 'ADC')[];
+    schemaVersion?: number;
   } = {},
 ): void {
   const patchFiles: Record<string, unknown> = {
@@ -59,7 +60,7 @@ function seedCache(
   const manifest = {
     patch: '16.22',
     generatedAt: '2026-11-21T00:00:00Z',
-    schemaVersion: 6,
+    schemaVersion: overrides.schemaVersion ?? 7,
     region: 'euw',
     rankBuckets: ['IRON'],
     roles: overrides.roles ?? ['SUPPORT'],
@@ -208,6 +209,52 @@ describe('loadPickData', () => {
     expect(pick?.data.pickRate?.ADC?.['412']).toBe(1);
   });
 
+  it('loads pick-rate-samples.json as display-only PickData, outside RecommendData (BL-052)', async () => {
+    seedCache({
+      patchFiles: {
+        'pick-rate.json': { SUPPORT: { '412': 1 } },
+        'pick-rate-samples.json': { SUPPORT: { '412': 30 } },
+      },
+    });
+    const pick = await loadPickData('SUPPORT');
+    expect(pick?.pickRateSamples).toEqual({ SUPPORT: { '412': 30 } });
+    // Display-only: the engine input schema stays unchanged (D-024/D-101).
+    expect('pickRateSamples' in (pick?.data ?? {})).toBe(false);
+  });
+
+  it('leaves pickRateSamples undefined on exports without the file', async () => {
+    seedCache();
+    const pick = await loadPickData('SUPPORT');
+    expect(pick?.pickRateSamples).toBeUndefined();
+  });
+
+  it('still loads a cached v5 manifest (pre-samples export) without pick share (BL-052)', async () => {
+    // Offline launch on a cache written before pick-rate-samples.json
+    // existed: the manifest validates against the frozen v5 schema and the
+    // optional file is simply absent (PR #168 review).
+    seedCache({ schemaVersion: 5 });
+    const pick = await loadPickData('SUPPORT');
+    expect(pick?.data.baselines).toHaveLength(1);
+    expect(pick?.pickRateSamples).toBeUndefined();
+  });
+
+  it('still loads a cached v6 manifest (BL-013a export, pre-samples) without pick share', async () => {
+    // BL-013a published schema v6 (item `players` fields) before BL-052
+    // landed as v7: that cache shape is identical for the manifest and must
+    // keep loading, with pick share absent until the next republish.
+    seedCache({ schemaVersion: 6 });
+    const pick = await loadPickData('SUPPORT');
+    expect(pick?.data.baselines).toHaveLength(1);
+    expect(pick?.pickRateSamples).toBeUndefined();
+  });
+
+  it('rejects a malformed pick-rate-samples.json (fail-closed)', async () => {
+    seedCache({
+      patchFiles: { 'pick-rate-samples.json': { SUPPORT: { '412': -1 } } },
+    });
+    await expect(loadPickData('SUPPORT')).rejects.toThrow();
+  });
+
   it('accepts a manifest path without the patch prefix', async () => {
     seedCache();
     const base = mockRead.getMockImplementation();
@@ -236,7 +283,7 @@ describe('loadPickData', () => {
         return JSON.stringify({
           patch: '16.21',
           generatedAt: '2026-11-21T00:00:00Z',
-          schemaVersion: 6,
+          schemaVersion: 7,
           region: 'euw',
           rankBuckets: ['IRON'],
           roles: ['SUPPORT'],

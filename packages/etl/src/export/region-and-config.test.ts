@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_CONFIG } from '@draftorb/engine';
-import { championRoleProbabilitiesSchema } from '@draftorb/shared';
+import { MANIFEST_SCHEMA_VERSION, championRoleProbabilitiesSchema } from '@draftorb/shared';
 import { seed } from './export.fixtures.js';
 import { createExportTestSuite, PATCH } from './export.test-utils.js';
 import { exportJson } from './index.js';
@@ -35,7 +35,7 @@ describe('exportJson', () => {
     expect(roleProb['26']).toBeUndefined();
     expect(roleProb['412']?.MID).toBeUndefined();
     expect(result.patch).toBe(PATCH);
-    expect(result.manifest.schemaVersion).toBe(6);
+    expect(result.manifest.schemaVersion).toBe(MANIFEST_SCHEMA_VERSION);
   });
 
   it('keeps global roles even when the roles option selects only SUPPORT (X2)', () => {

@@ -13,7 +13,7 @@ const latestJson = {
 };
 
 const manifestJson = {
-  schemaVersion: 6,
+  schemaVersion: 7,
   patch: '16.21',
   generatedAt: '2026-11-04T16:47:00.000Z',
   region: 'euw1',

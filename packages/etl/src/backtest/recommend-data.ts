@@ -104,20 +104,16 @@ export function buildRoleRecommendData(
     // Minimal roles (BL-024) export baseline.json only: mirror that here so
     // the backtest never sees matchup data production does not ship.
     const minimal = MINIMAL_ROLES.includes(role);
+    const layer = <Row extends WeightedRow, Entry extends readonly unknown[]>(
+      spec: TableSpec<Row, Entry>,
+      rows: readonly Row[],
+    ): Entry[] => (minimal ? [] : tuplesForRole(spec, rows, role, options.exportMinGames));
     out[role] = {
       baselines: tuplesForRole(TABLE_SPECS[0], baselineRows, role, options.exportMinGames),
-      allyPairs: minimal
-        ? []
-        : tuplesForRole(TABLE_SPECS[1], allyPairRows, role, options.exportMinGames),
-      enemyPairs: minimal
-        ? []
-        : tuplesForRole(TABLE_SPECS[2], enemyPairRows, role, options.exportMinGames),
-      laneVs: minimal
-        ? []
-        : tuplesForRole(TABLE_SPECS[3], laneVsRows, role, options.exportMinGames),
-      laneFull: minimal
-        ? []
-        : tuplesForRole(TABLE_SPECS[4], laneFullRows, role, options.exportMinGames),
+      allyPairs: layer(TABLE_SPECS[1], allyPairRows),
+      enemyPairs: layer(TABLE_SPECS[2], enemyPairRows),
+      laneVs: layer(TABLE_SPECS[3], laneVsRows),
+      laneFull: layer(TABLE_SPECS[4], laneFullRows),
       roleProb,
       pickRate,
       tags: options.tags,

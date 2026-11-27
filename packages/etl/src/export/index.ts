@@ -262,7 +262,7 @@ export function exportJson(db: Database.Database, options: ExportOptions = {}): 
 
   for (const role of roles) {
     filesToWrite.push(buildTableFile(TABLE_SPECS[0], baselineRows, role, exportMinGames));
-    if (MINIMAL_ROLES.includes(role)) continue;
+    if (minimalRoles.includes(role)) continue;
     filesToWrite.push(
       buildTableFile(TABLE_SPECS[1], allyPairRows, role, exportMinGames),
       buildTableFile(TABLE_SPECS[2], enemyPairRows, role, exportMinGames),

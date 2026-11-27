@@ -8,6 +8,7 @@ Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATI
 | ----- | --- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | -------------------------- | ------- |
 | B-082 | S3  | engine+desktop | Setup rune path counted every expert page as sufficient: thin pages (`lowData` or below the D-102 distinct-player gate) suppressed the D-103 broader-statistic fallback, and pre-D-102 (manifest v5) rune exports were accepted as evidence-compliant | FIXED  | Devin Review/PR #173       | BL-030a |
 | B-081 | S3  | engine         | `recommendProfileRunes`/`recommendProfileSpells` filtered profile games to `role === 'SUPPORT'` only, so the "my data" setup path silently returned nothing for TOP/JUNGLE (D-097 scope)                                                              | FIXED  | Devin/2026-11-28           | BL-030a |
+| B-081 | S3  | desktop        | Pool editor repo-file actions gave no visible feedback: the status message rendered at the top of the modal while the transfer buttons sit at the bottom, so a successful "Export to repo file" looked like a no-op                                   | FIXED  | owner/2026-11-27           | –       |
 | B-079 | S3  | etl            | ETL end-to-end on Windows is unverified (AUDIT §5j): the Windows CI job proves install + `pnpm check` + better-sqlite3 prebuilt, but no ticket runs the real pipeline there                                                                           | OPEN   | Devin/2026-11-26           | BL-003  |
 | B-078 | S4  | etl            | `aggregate.test.ts` timed out twice at the 15s vitest limit on `windows-latest` CI (plus a vitest worker RPC timeout); passed on rerun with no code change — suspected slow-runner flake                                                              | OPEN   | Devin/2026-11-26           | BL-026  |
 | B-080 | S3  | desktop        | Matchup layers pinned off: the backtest report is not part of the aggregate archive, so `PickScreen` cannot drive `matchupEnabled` from `backtest-draft.json` yet                                                                                     | OPEN   | Devin/2026-11-26           | BL-014  |
@@ -25,8 +26,9 @@ Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATI
 
 ## Duplicate bug IDs (not renumbered)
 
-Three IDs each label two distinct bugs (per owner instruction, IDs are never renumbered; the duplicates are documented here):
+Four IDs each label two distinct bugs (per owner instruction, IDs are never renumbered; the duplicates are documented here):
 
+- **B-081**: FIXED in the Fixed section — "Pool editor repo-file actions gave no visible feedback" (desktop) — and also FIXED in the Fixed section — "Profile setup functions ignored non-SUPPORT games" (engine, BL-030a).
 - **B-026**: two FIXED entries in the Fixed section — "`blindSafety` approximates `pickShare(e)` with roleProb (no pick-rate export)" and "Engine `shrink()` returns NaN for empty contexts with zero prior strength".
 - **B-027**: FIXED in the Fixed section — "Recommendation constants injectable via `RecommendConfig`" — and also FIXED in the Fixed section — "Transient enrichment failures become permanent gaps (no retry on duplicates)".
 - **B-035**: FIXED in the Fixed section — "Export removes static catalogs and role-derivation snapshots" — and also FIXED in the Fixed section — "Export review findings (role-prob rounding, empty builds, publish cleanup, static catalogs)".
@@ -47,6 +49,13 @@ Review notes that predate the bug log live in [Review history](#review-history) 
 ```
 
 ## Fixed
+
+### B-081 — Pool editor repo-file actions gave no visible feedback — FIXED
+
+- Severity / Area: S3 / desktop (pool editor modal)
+- Steps to reproduce: open the champion pool editor with a repo folder set, click "Export to repo file" (or Import).
+- Expected / Actual: expected a visible confirmation next to the buttons; actual the single status line rendered at the top of the modal while the transfer buttons sit at the bottom, so a successful export looked like a no-op.
+- Fix (commit/ticket): `PoolEditorMessage` gained a `scope` (`form` | `transfer` | `footer`) so each message renders next to the action that produced it: capacity warnings under `PoolAddForm`, repo/JSON feedback inside `PoolTransferSection` (new `message` prop + shared `PoolMessage` component), save errors above the footer buttons. Regression tests: `pool-editor-state.test.ts` (full-role rejection is scoped `form`) and `pool-transfer-section.test.ts` (message renders next to the repo actions).
 
 ### B-082 — Thin expert rune pages suppressed the D-103 fallback; legacy rune exports trusted — FIXED
 

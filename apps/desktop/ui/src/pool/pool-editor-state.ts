@@ -14,10 +14,13 @@ import {
 import { strings } from '../strings';
 import { championPoolRoles, emptyPool, serializePoolConfig, setChampionRoles } from './pool-model';
 
-/** Feedback line shown at the top of the editor. */
+/** Where a feedback line renders, next to the action that produced it (B-081). */
+export type PoolEditorMessageScope = 'form' | 'transfer' | 'footer';
+
 export interface PoolEditorMessage {
   text: string;
   kind: 'info' | 'error';
+  scope: PoolEditorMessageScope;
 }
 
 /** Working copy plus the pending champion x roles selection. */
@@ -41,6 +44,19 @@ export type PoolEditorAction =
 /** Fresh editor session seeded from the stored pool. */
 export function initPoolEditorState(pool: PoolConfig): PoolEditorState {
   return { working: pool, draftChampionId: null, draftRoles: [], message: null };
+}
+
+/** Routes the single message slot to the section that renders it (B-081). */
+export function poolMessageSlots(message: PoolEditorMessage | null): {
+  form: PoolEditorMessage | null;
+  transfer: PoolEditorMessage | null;
+  footer: PoolEditorMessage | null;
+} {
+  return {
+    form: message?.scope === 'form' ? message : null,
+    transfer: message?.scope === 'transfer' ? message : null,
+    footer: message?.scope === 'footer' ? message : null,
+  };
 }
 
 /**
@@ -83,6 +99,7 @@ export function poolEditorReducer(
                 POOL_CONFIG_MAX_PER_ROLE,
               ),
               kind: 'error',
+              scope: 'form',
             }
           : null;
       // Re-sync the checkboxes with what actually landed (full roles drop out).

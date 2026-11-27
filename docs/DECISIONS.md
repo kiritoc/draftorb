@@ -1007,7 +1007,7 @@ Mode flag `stateBucketMode` on aggregation options; default
 Update: `stateBucket`/`item_state_scale` in engine `item-context.ts` and
 `aggregate-items.ts`.
 
-### D-086 — Starter bundles and lane archetype backoff — PROPOSED
+### D-086 — Starter bundles and lane archetype backoff — PROPOSED, starter-bundle clause accepted by D-134 (lane-archetype clause superseded by D-095)
 
 `participant_starters` stores the net purchased bundle per
 (match, participant) within `starterWindowSeconds` (default 45 s, from the
@@ -1495,6 +1495,20 @@ The D-023 gate failed on the first real report (BL-014): on holdout patch 16.22 
 - **First run (BL-014, patch 16.22 holdout)**: the train-only CV on patch 16.21 selected variant `off` — champion baseline log-loss 0.6958 beat every matchup variant (k=0: 0.6962; k=25..400: 0.6962–0.6963). Shrinkage did not recover the signal, so `matchup.enabled = false`, `validationStatus = 'unvalidated'` and the app stays on the champion-baseline ranking. The negative result is kept in `backtest-draft.json` (`matchup.candidates`) for the ×3/×10 revisit.
 
 (Renumbered D-129→D-130 after BL-017 took D-129 on main, then D-130→D-133 after BL-025 claimed D-130 on `feat/bl-025-windows-installer`; D-131 is BL-052 and D-132 is BL-013.)
+
+### D-134 — Setup screen: mode switch, starter/summoner scope, M2 role enablement — ACCEPTED (owner, 2026-11-27)
+
+Owner decisions recorded for the runes/summoners/starters data path (BL-030a/BL-031a, amends SPECS §18.5).
+
+- **D-086 partially accepted for v2 — starter bundles only.** `participant_starters` stores the net starter bundle per (match, participant) within `starterWindowSeconds` = 45 s and `starterBundleKey()` produces the stable `"itemId:count"` grouping key. The lane-archetype clause of D-086 is **superseded by D-095**, which stays PROPOSED until M3.
+- **Setup-screen backoff chain for starters and summoner spells:** (champion, role, exact lane) -> (champion, role) -> role-only -> global. Exact-lane coverage must be measured first; the exact-lane level is dropped if it almost never passes the D-102 evidence gate.
+- **Mode switch, not columns.** The setup screen switches between "top players" and "my data" modes; switching re-queries the chosen source without a restart and each mode shows its data source. This replaces the side-by-side two-column layout previously described in SPECS §18.5.
+- **M2 role scope.** SUPPORT/TOP/JUNGLE only. Role enablement on the setup screen = `manifest.roles` minus `minimalRoles`, plus D-103 insufficient-data states when a role's setup data is thin. The BL-050/D-126 baseline-coverage enablement mechanism stays pick-screen-only.
+- **"Insufficient data" is a normal state**, handled by the D-103 broader-statistic fallback (labeled), never an error.
+
+### D-135 — Profile setup fallback levels are support-shaped for every role — PROPOSED (BL-030a)
+
+`recommendProfileRunes`/`recommendProfileSpells` reuse the D-073 L1..L5 matchup predicates (ally ADC id, enemy support id, enemy `damageType:archetype` signature) for every role, and BL-030a parameterized only the game-role filter (SUPPORT -> the picked role, D-097). For TOP/JUNGLE the lane-shaped L1..L3 contexts (bot-lane ally/enemy ids) rarely match profile games, so profile pages mostly resolve at L4/L5 champion level — honest under D-103 but possibly thinner than intended. Question for the owner: define per-role matchup contexts for the profile fallback (e.g. TOP vs enemy TOP, JUNGLE vs enemy JUNGLE) in a later ticket, or keep champion-level-only profile setup for non-SUPPORT roles until then. Working assumption until answered: keep the shared predicates; insufficient matchup data falls back to champion level, clearly labeled.
 
 ### D-136 — Personalization role scope: drafted-role games, in-scope roles SUPPORT/TOP/JUNGLE — PROPOSED (BL-032)
 

@@ -70,6 +70,14 @@ export const PROFILE_EXPORT_SCHEMA_VERSION = 1;
  */
 export const PERSONAL_RESULT_SCHEMA_VERSION = 2;
 
+/**
+ * Version of the engine setup-screen rune output contract
+ * (`SetupRuneResult`, SPECS §18.5, BL-030a). Bumped on every breaking change
+ * so consumers fail loudly instead of misreading fields.
+ * v1: initial mode-switched rune setup result (top players / my data).
+ */
+export const SETUP_RESULT_SCHEMA_VERSION = 1;
+
 export const roleSchema = z.enum(['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT']);
 export type Role = z.infer<typeof roleSchema>;
 

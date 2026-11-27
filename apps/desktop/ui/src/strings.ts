@@ -112,7 +112,7 @@ export const strings = {
   inPoolRank: (n: number) => `In your pool · #${n}`,
   sampleSize: 'Sample',
   poolSampleGames: (n: number) => `${n} ${n === 1 ? 'game' : 'games'}`,
-  poolBaselineWinRate: (percent: number) => `Win rate ${percent.toFixed(1)}%`,
+  broaderWinRate: (percent: number) => `Broader win rate ${percent.toFixed(1)}%`,
   lowDataLabel: 'low data',
   lowDataHint: 'Effective sample size is below the reliability threshold.',
   warningLabel: (text: string) => `Warnings: ${text}`,

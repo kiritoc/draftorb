@@ -1427,6 +1427,14 @@ Implements the BL-024 half of D-097/D-126: ADC and MID become selectable roles b
 
 Open question for the owner: none blocking — if ADC/MID later get full matchup exports, dropping them from `minimalRoles` (engine config + manifest field) restores the full pipeline without code changes.
 
+### D-129 — Thin-data cards render in "Best overall" for every gated candidate — PROPOSED (BL-017)
+
+- Context: D-103 requires thin-data picks to show a broader statistic clearly labeled as broader, but SPECS §7.1 only placed insufficient-data cards in the pool list; non-pool champions below the baseline `n_eff` gate had no rendering surface and showed nothing.
+- Decision (implemented, pending owner OK): every `DraftResult.insufficientData` entry renders as an unavailable card appended after the ranked "Best overall" entries — the same card and pagination pattern as the §7.1 pool unavailable cards — showing `nEff`, `rawGames` when known, and the baseline win rate labeled "Broader win rate" only when weighted baseline evidence exists (`games_e > 0`, D-054). A champion with no baseline row shows "insufficient data" with `nEff` 0 and no percentage. Pool members appear in both lists, mirroring scored pool champions; "Hide my pool" filters them from Best overall too. SPECS §7 thin-data paragraph updated to match.
+- Alternatives: a separate "Insufficient data" section (rejected: adds a third list the spec does not define); rendering only pool thin champions (rejected: non-pool candidates would still show nothing, violating D-103); showing the raw unshrunk win rate (rejected by D-054: tiny samples can read 0%/100%).
+
+(Renumbered from the branch's original D-127 after BL-051/BL-024 took D-127/D-128 on main.)
+
 ### D-132 — Evidence rule edge semantics: cap scope and pick-share denominator — PROPOSED (BL-013a, PR #166 review)
 
 Two boundary questions raised by review of the D-102 mechanism (BL-013a); the implemented reading is recorded as the working assumption until the owner confirms.

@@ -42,8 +42,8 @@ The CI `Release` workflow (`.github/workflows/release.yml`) builds an unsigned N
 
 To install on a clean Windows 11 machine:
 
-1. Download the `*.exe` asset from the GitHub release (or the workflow artifact) — no GitHub account or token is needed for the public repo.
-2. Run the installer. Windows SmartScreen shows a warning because the binary is **unsigned** (owner decision D-130: no paid code signing — the free constraint stands). This is the expected shipping state, not a sign of tampering: proceed via **More info → Run anyway**. Do not disable SmartScreen globally.
+1. Download the `*.exe` asset from the GitHub release — release assets on the public repo download without a GitHub account or token. (Workflow artifacts from a manual `Release` run do require signing in to GitHub.)
+2. Run the installer. Windows SmartScreen shows a warning because the binary is **unsigned** (owner decision D-130: no paid code signing — the free constraint stands). This is the expected shipping state, not a sign of tampering: proceed via **More info → Run anyway**. Do not disable SmartScreen globally. Note: SmartScreen is not the only gate — if **Smart App Control** is enabled (some fresh Windows 11 installs), it blocks unsigned apps with no per-app exception; check Windows Security → App & browser control. The owner's machine has it disabled (issue #113, 2026-11-16); if it is ever enabled for you, building from source or getting the app signed are the options.
 3. Launch **DraftOrb** from the Start menu. On first launch the app downloads the latest public aggregates from the `data-latest` release (D-111, D-123) — an internet connection is required once; afterwards the data is cached locally and the app still works offline (a stale-data notice is shown when the cache is old). No Riot key, Git or pnpm needed.
 
 Updates: there is no auto-update — download and run the installer of the newer release; it upgrades in place. Only Windows x64 is shipped; macOS/Linux builds are out of scope.

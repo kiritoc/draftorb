@@ -45,6 +45,12 @@ export function matchupConfigFromReport(
   if (m['enabled'] !== true) {
     return null;
   }
+  // The experiment's pooled k-selection and gate cover `matchup.roles`; a
+  // role missing there has no matchup evidence even if listed top-level.
+  const matchupRoles = m['roles'];
+  if (!Array.isArray(matchupRoles) || !matchupRoles.includes(role)) {
+    return null;
+  }
   const shrinkK = m['shrinkageK'];
   if (typeof shrinkK !== 'number' || !Number.isFinite(shrinkK) || shrinkK < 0) {
     return null;

@@ -184,6 +184,7 @@ export function runMatchupExperiment(
       variant: 'off',
       shrinkageK: null,
       validationPatch,
+      roles: [...roles],
       candidates: results,
       gate: null,
     };
@@ -198,6 +199,7 @@ export function runMatchupExperiment(
     variant: k === 0 ? 'full' : 'shrunk',
     shrinkageK: k,
     validationPatch,
+    roles: [...roles],
     candidates: results,
     gate: holdout.gate,
   };
@@ -298,7 +300,11 @@ async function runBacktest(args: string[]): Promise<void> {
       // run (DEFAULT_CONFIG + matchup flags): `--pair-adjust` is an A/B
       // experiment on the headline metrics only, so the experiment always
       // sees the unadjusted engine even when the shadow report used it.
-      const matchup = runMatchupExperiment(dbPath, rows, engine, roles ?? ALL_ROLES);
+      // It gates only the report's scored-covered roles: a requested role
+      // whose holdout picks all fell back to the baseline prior carries no
+      // matchup evidence, so pooling it would dilute the gate while the
+      // report's `roles` (and the web gate) treat coverage as scored-only.
+      const matchup = runMatchupExperiment(dbPath, rows, engine, report.roles);
       if (matchup !== null) {
         const shadow = report.gate?.passed ? 'passed' : 'failed';
         finalReport = {

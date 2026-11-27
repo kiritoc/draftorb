@@ -169,6 +169,9 @@ export interface MatchupExperiment {
   shrinkageK: number | null;
   /** Last training patch used for k selection (train-only validation). */
   validationPatch: string | null;
+  /** Roles pooled into the k selection and the holdout gate — the report's
+   *  scored-covered roles, so pooled coverage matches top-level `roles`. */
+  roles: Role[];
   candidates: MatchupCandidateResult[];
   /** Holdout gate of the selected variant; null when variant is 'off'. */
   gate: BacktestGate | null;

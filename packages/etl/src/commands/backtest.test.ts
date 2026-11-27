@@ -181,6 +181,86 @@ describe('backtestCommand', () => {
     // Tiny synthetic data cannot pass the gate: matchups stay disabled.
     expect(report.matchup.enabled).toBe(false);
     expect(report.validationStatus).toBe('unvalidated');
+    expect(report.matchup.roles).toEqual(report.roles);
+  });
+
+  it('pools the matchup experiment only over roles with scored holdout picks', async () => {
+    const db = openDb(dbPath);
+    migrate(db);
+    seedPatches(db, ['16.19', '16.20', '16.21']);
+    const insertMatch = db.prepare(
+      `INSERT INTO matches (match_id, platform, patch, queue_id, duration, created_at, avg_rank_score, rank_known_count)
+       VALUES (?, 'euw1', ?, 420, 1800, ?, 6.5, 10)`,
+    );
+    const insertParticipant = db.prepare(
+      `INSERT INTO participants (match_id, puuid, team_id, champion_id, role, win, rank_score, champion_games, keystone, primary_style, sub_style, perks_json, items_json, kills, deaths, assists)
+       VALUES (?, ?, ?, ?, ?, ?, 6.5, 0, 8000, 8000, 8400, '[]', '[]', 0, 0, 0)`,
+    );
+    const roles = ['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT'] as const;
+    const matches = [
+      ...Array.from({ length: 15 }, (_, i) => ({
+        matchId: `q19-${i}`,
+        patch: '16.19',
+        createdAt: i + 1,
+        blueWins: i % 2 === 0,
+      })),
+      ...Array.from({ length: 15 }, (_, i) => ({
+        matchId: `q20-${i}`,
+        patch: '16.20',
+        createdAt: 100 + i,
+        blueWins: i % 2 === 0,
+      })),
+      ...Array.from({ length: 5 }, (_, i) => ({
+        matchId: `q21-${i}`,
+        patch: '16.21',
+        createdAt: 200 + i,
+        blueWins: i % 2 === 0,
+      })),
+    ];
+    let matchSeq = 0;
+    for (const match of matches) {
+      matchSeq += 1;
+      insertMatch.run(match.matchId, match.patch, match.createdAt);
+      for (const [teamId, teamWins] of [
+        [100, match.blueWins],
+        [200, !match.blueWins],
+      ] as const) {
+        for (const [i, role] of roles.entries()) {
+          // MID picks a unique champion per match: never enough baseline
+          // games to be scored, so it carries no matchup evidence.
+          const championId =
+            role === 'MID'
+              ? 9000 + matchSeq * 2 + (teamId === 100 ? 0 : 1)
+              : i === 0
+                ? 100
+                : teamId * 10 + i;
+          insertParticipant.run(
+            match.matchId,
+            `puuid-${match.matchId}-${teamId}-${i}`,
+            teamId,
+            championId,
+            role,
+            teamWins ? 1 : 0,
+          );
+        }
+      }
+    }
+    db.close();
+
+    await backtestCommand.run(['draft']);
+
+    const report = JSON.parse(
+      readFileSync(join(process.env.DRAFTORB_PUBLIC_DIR as string, 'backtest-draft.json'), 'utf8'),
+    );
+    expect(report.insufficientData).toBe(false);
+    // MID picks were all baseline fallbacks: evaluated but not covered.
+    expect(report.perRole.MID.predictions).toBeGreaterThan(0);
+    expect(report.perRole.MID.unscored).toBe(report.perRole.MID.predictions);
+    expect(report.roles).not.toContain('MID');
+    expect(report.roles.length).toBeGreaterThan(0);
+    expect(report.matchup).not.toBeNull();
+    expect(report.matchup.roles).toEqual(report.roles);
+    expect(report.matchup.roles).not.toContain('MID');
   });
 
   it('restricts evaluated roles through --roles', async () => {

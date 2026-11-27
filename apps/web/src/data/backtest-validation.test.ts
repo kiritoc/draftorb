@@ -6,7 +6,12 @@ const VALIDATED = {
   validationStatus: 'validated',
   holdoutPatch: '16.22',
   roles: ['SUPPORT', 'TOP', 'JUNGLE'],
-  matchup: { enabled: true, variant: 'shrunk', shrinkageK: 100 },
+  matchup: {
+    enabled: true,
+    variant: 'shrunk',
+    shrinkageK: 100,
+    roles: ['SUPPORT', 'TOP', 'JUNGLE'],
+  },
 };
 
 describe('matchupConfigFromReport (D-128)', () => {
@@ -49,7 +54,10 @@ describe('matchupConfigFromReport (D-128)', () => {
   it('returns shrinkK 0 for a validated full-matchup variant', () => {
     expect(
       matchupConfigFromReport(
-        { ...VALIDATED, matchup: { enabled: true, variant: 'full', shrinkageK: 0 } },
+        {
+          ...VALIDATED,
+          matchup: { ...VALIDATED.matchup, variant: 'full', shrinkageK: 0 },
+        },
         'SUPPORT',
         '16.22',
       ),
@@ -60,7 +68,10 @@ describe('matchupConfigFromReport (D-128)', () => {
     for (const shrinkageK of [null, 'x', -1, Number.NaN]) {
       expect(
         matchupConfigFromReport(
-          { ...VALIDATED, matchup: { enabled: true, shrinkageK } },
+          {
+            ...VALIDATED,
+            matchup: { ...VALIDATED.matchup, enabled: true, shrinkageK },
+          },
           'SUPPORT',
           '16.22',
         ),
@@ -81,6 +92,25 @@ describe('matchupConfigFromReport (D-128)', () => {
       matchupConfigFromReport({ ...VALIDATED, roles: ['TOP', 'JUNGLE'] }, 'TOP', '16.22'),
     ).toEqual({ enabled: true, shrinkK: 100 });
     expect(matchupConfigFromReport({ ...VALIDATED, roles: 'SUPPORT' }, 'SUPPORT', '16.22')).toBeNull();
+  });
+
+  it('rejects a role the matchup experiment did not pool', () => {
+    // Top-level `roles` claims coverage, but the experiment's pooled
+    // k-selection/gate only covered TOP — SUPPORT has no matchup evidence.
+    expect(
+      matchupConfigFromReport(
+        { ...VALIDATED, matchup: { ...VALIDATED.matchup, roles: ['TOP'] } },
+        'SUPPORT',
+        '16.22',
+      ),
+    ).toBeNull();
+    expect(
+      matchupConfigFromReport(
+        { ...VALIDATED, matchup: { enabled: true, variant: 'full', shrinkageK: 0 } },
+        'SUPPORT',
+        '16.22',
+      ),
+    ).toBeNull();
   });
 
   it('rejects a report validated on a different patch than the export', () => {

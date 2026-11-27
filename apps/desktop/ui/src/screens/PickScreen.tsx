@@ -7,7 +7,7 @@
 
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 
-import { indexBaselines, rankToBucket, recommend } from '@draftorb/engine';
+import { DEFAULT_CONFIG, indexBaselines, rankToBucket, recommend } from '@draftorb/engine';
 import {
   type Champion,
   type ChampionId,
@@ -222,7 +222,13 @@ export function PickScreen({
   useEffect(() => {
     if (pickData === null) return;
     try {
-      const result = recommend(draftInput, pickData.data);
+      // D-133: the backtest report is not part of the aggregate archive yet,
+      // so the matchup flag stays off (champion-baseline ranking) until it is
+      // shipped and wired like the web app.
+      const result = recommend(draftInput, pickData.data, {
+        ...DEFAULT_CONFIG,
+        matchupEnabled: false,
+      });
       setRecommendations(result.recommendations);
       setPoolRecommendations(result.poolRecommendations ?? []);
       setPoolUnavailable(result.poolUnavailable ?? []);

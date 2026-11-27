@@ -32,8 +32,8 @@ function buttonTag(html: string, label: string): string {
 describe('AppShell', () => {
   const html = render();
 
-  it('shows the unvalidated label and the empty data status', () => {
-    expect(html).toContain('Unvalidated model');
+  it('shows the baseline-ranking label and the empty data status', () => {
+    expect(html).toContain('Baseline ranking');
     expect(html).toContain('No data loaded yet');
     expect(html).toContain('Patch');
   });

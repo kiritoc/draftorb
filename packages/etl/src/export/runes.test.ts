@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { DEFAULT_CONFIG } from '@draftorb/engine';
 import { RUNE_CONTEXT_LEVELS } from '@draftorb/shared';
 import { seed, supportRuneRow, validPerksJson } from './export.fixtures.js';
 import { createExportTestSuite } from './export.test-utils.js';
@@ -21,7 +22,7 @@ describe('exportJson', () => {
         gamesW: 15,
         gamesW2: 15,
         winsW: 6,
-        players: 2,
+        players: 3,
       },
       {
         championId: 412,
@@ -33,7 +34,7 @@ describe('exportJson', () => {
         gamesW: 10,
         gamesW2: 10,
         winsW: 4,
-        players: 1,
+        players: 3,
       },
       {
         championId: 412,
@@ -45,7 +46,7 @@ describe('exportJson', () => {
         gamesW: 10,
         gamesW2: 10,
         winsW: 6,
-        players: 1,
+        players: 3,
       },
       {
         championId: 412,
@@ -57,7 +58,7 @@ describe('exportJson', () => {
         gamesW: 10,
         gamesW2: 10,
         winsW: 6,
-        players: 1,
+        players: 3,
       }, // unparseable
       {
         championId: 412,
@@ -75,7 +76,7 @@ describe('exportJson', () => {
         gamesW: 10,
         gamesW2: 10,
         winsW: 6,
-        players: 1,
+        players: 3,
       }, // primaryStyleId <= 0
     ]);
     const result = suite.exportOnce({ roles: ['SUPPORT', 'TOP'] as const });
@@ -113,6 +114,26 @@ describe('exportJson', () => {
     );
     // B6: TOP role file exists under roles/TOP (separate group).
     expect(result.files.map((f) => f.relativePath)).toContain('roles/TOP/runes/412.json');
+  });
+
+  it('suppresses rune pages below the configured distinct-player minimum (D-102)', () => {
+    seed(suite.db, 'match', [{}]);
+    seed(suite.db, 'runeCtx', [
+      supportRuneRow({ perksHash: 'one', players: 1 }),
+      supportRuneRow({ perksHash: 'two', players: 4, winsW: 8 }),
+    ]);
+    suite.exportOnce({
+      config: { ...DEFAULT_CONFIG, evidenceMinDistinctPlayers: 2 },
+    });
+    const runes = suite.readFile('roles/SUPPORT/runes/412.json') as {
+      contexts: Array<{
+        pages: Array<{ players?: number; gamesW: number }>;
+      }>;
+    };
+    const pages = runes.contexts[0]?.pages ?? [];
+    expect(pages).toHaveLength(1);
+    expect(pages[0]?.players).toBe(4);
+    expect(pages[0]?.gamesW).toBe(10);
   });
 
   it('gates a low-sample global context and uses the raw pre-gate context denominator (X1, X3)', () => {
@@ -211,7 +232,7 @@ describe('exportJson', () => {
         gamesW: 10,
         gamesW2: 10,
         winsW: 6,
-        players: 1,
+        players: 3,
       },
       {
         championId: 412,
@@ -229,7 +250,7 @@ describe('exportJson', () => {
         gamesW: 10,
         gamesW2: 10,
         winsW: 6,
-        players: 1,
+        players: 3,
       }, // primaryStyleId <= 0
     ]);
     const result = suite.exportOnce();

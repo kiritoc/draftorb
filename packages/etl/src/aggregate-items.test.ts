@@ -4,12 +4,17 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { DEFAULT_CONFIG } from '@draftorb/engine';
+
 import { openDb, migrate } from './db';
 import { seedPatches } from './patches.test-helpers';
 import { aggregateItemBuilds, type ItemBuildRow } from './aggregate-items';
 import type { ItemClassEntry } from './item-classes';
 
 const PATCH = '16.21';
+// Existing aggregation tests use one player per context; keep the D-102
+// distinct-player gate off here (the D-102 tests below set it explicitly).
+const AGG_CONFIG = { ...DEFAULT_CONFIG, evidenceMinDistinctPlayers: 1 };
 
 // Test classes: 9001/9002 completed, 3865 quest_line starter, 9003 component,
 // 3078 completed, 5001 quest_reward, 5002 jungle_path, 2003 consumable.
@@ -242,6 +247,7 @@ describe('aggregateItemBuilds', () => {
         tagsPath,
         fetchFn: mockFetch(),
         itemClasses: TEST_CLASSES,
+        config: AGG_CONFIG,
       });
       // 4 item rows + 1 path row.
       expect(rows.length).toBe(5);
@@ -286,6 +292,7 @@ describe('aggregateItemBuilds', () => {
         tagsPath,
         fetchFn: mockFetch(),
         itemClasses: TEST_CLASSES,
+        config: AGG_CONFIG,
       });
       const itemRows = rows.filter((r) => r.decisionKind === 'item');
       // slot0 starter + one completed (9001) at slot1; 9002 undo never counts.
@@ -307,6 +314,7 @@ describe('aggregateItemBuilds', () => {
         tagsPath,
         fetchFn: mockFetch(),
         itemClasses: TEST_CLASSES,
+        config: AGG_CONFIG,
       });
       const bundle = db
         .prepare(
@@ -333,6 +341,7 @@ describe('aggregateItemBuilds', () => {
         tagsPath,
         fetchFn: mockFetch(),
         itemClasses: TEST_CLASSES,
+        config: AGG_CONFIG,
       });
       expect(rows).toHaveLength(1);
     });
@@ -346,7 +355,12 @@ describe('aggregateItemBuilds', () => {
           { ts: 400_000, itemId: 9001 },
         ],
       });
-      const opts = { tagsPath, fetchFn: mockFetch(), itemClasses: TEST_CLASSES };
+      const opts = {
+        tagsPath,
+        fetchFn: mockFetch(),
+        itemClasses: TEST_CLASSES,
+        config: AGG_CONFIG,
+      };
       const first = await aggregateItemBuilds(db, opts);
       const second = await aggregateItemBuilds(db, opts);
       expect(second).toEqual(first);
@@ -368,6 +382,7 @@ describe('aggregateItemBuilds', () => {
         tagsPath,
         fetchFn: mockFetch(),
         itemClasses: TEST_CLASSES,
+        config: AGG_CONFIG,
       });
       expect(rows).toHaveLength(0);
       const stored = db.prepare('SELECT COUNT(*) AS n FROM item_build').get() as { n: number };
@@ -391,6 +406,7 @@ describe('aggregateItemBuilds', () => {
         tagsPath,
         fetchFn: mockFetch(),
         itemClasses: TEST_CLASSES,
+        config: AGG_CONFIG,
       });
       const row = findRow(
         rows,
@@ -400,6 +416,42 @@ describe('aggregateItemBuilds', () => {
       if (row === undefined) return;
       expect(row.gamesW2).toBeLessThan(row.gamesW * row.gamesW);
       expect(row.gamesW2).toBeGreaterThan(0);
+    });
+  });
+
+  it('caps each player weight and counts distinct players (D-102)', async () => {
+    await withDbAsync(async (db, tagsPath) => {
+      seedGame(db, 'm1', { events: [{ ts: 10_000, itemId: 3865 }] });
+      seedGame(db, 'm2', { events: [{ ts: 10_000, itemId: 3865 }] });
+      seedGame(db, 'm3', { events: [{ ts: 10_000, itemId: 3865 }] });
+      const rows = await aggregateItemBuilds(db, {
+        tagsPath,
+        fetchFn: mockFetch(),
+        itemClasses: TEST_CLASSES,
+        config: {
+          ...DEFAULT_CONFIG,
+          evidencePlayerWeightCap: 2,
+          evidenceMinDistinctPlayers: 1,
+        },
+      });
+      const row = findRow(rows, (r) => r.itemId === 3865 && r.slotIdx === 0);
+      expect(row?.players).toBe(1);
+      expect(row?.gamesW).toBeCloseTo(2);
+      expect(row?.winsW).toBeCloseTo(2);
+    });
+  });
+
+  it('suppresses item rows below the distinct-player minimum (D-102)', async () => {
+    await withDbAsync(async (db, tagsPath) => {
+      seedGame(db, 'm1', { events: [{ ts: 10_000, itemId: 3865 }] });
+      const rows = await aggregateItemBuilds(db, {
+        tagsPath,
+        fetchFn: mockFetch(),
+        itemClasses: TEST_CLASSES,
+        config: { ...DEFAULT_CONFIG, evidenceMinDistinctPlayers: 2 },
+      });
+      expect(findRow(rows, (r) => r.itemId === 3865)).toBeUndefined();
+      expect(db.prepare('SELECT COUNT(*) AS n FROM item_build').get()).toMatchObject({ n: 0 });
     });
   });
 });

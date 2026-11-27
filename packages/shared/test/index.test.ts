@@ -267,7 +267,7 @@ describe('shared schemas', () => {
       roles: ['SUPPORT'],
       minimalRoles: [],
       files: [{ path: 'champions.json' }],
-      schemaVersion: 5,
+      schemaVersion: 6,
     };
     expect(manifestSchema.parse(manifest)).toEqual(manifest);
   });

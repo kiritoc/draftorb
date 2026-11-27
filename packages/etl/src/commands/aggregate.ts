@@ -97,10 +97,18 @@ async function runAggregate(args: string[]): Promise<void> {
       );
     }
 
-    const runeRows = aggregateRunesByContext(db, { patch });
+    let runeCtxWritten = false;
+    const runeRows = aggregateRunesByContext(db, {
+      patch,
+      onWrite: () => {
+        runeCtxWritten = true;
+      },
+    });
     if (runeRows.length === 0) {
       console.log(
-        `No contributing games${patch === undefined ? '' : ` up to patch ${patch}`}; rune_ctx left unchanged.`,
+        runeCtxWritten
+          ? `All contributing rune contexts were suppressed by the evidence rule${patch === undefined ? '' : ` up to patch ${patch}`}; rune_ctx cleared.`
+          : `No contributing games${patch === undefined ? '' : ` up to patch ${patch}`}; rune_ctx left unchanged.`,
       );
     } else {
       const champions = new Set(runeRows.map((row) => row.championId)).size;
@@ -109,13 +117,19 @@ async function runAggregate(args: string[]): Promise<void> {
       );
     }
 
+    let itemBuildWritten = false;
     const itemRows = await aggregateItemBuilds(db, {
       patch,
       onWarn: (message) => console.log(`[ETL] Warning: ${message}`),
+      onWrite: () => {
+        itemBuildWritten = true;
+      },
     });
     if (itemRows.length === 0) {
       console.log(
-        `No item purchases${patch === undefined ? '' : ` up to patch ${patch}`}; item_build left unchanged.`,
+        itemBuildWritten
+          ? `All contributing item builds were suppressed by the evidence rule${patch === undefined ? '' : ` up to patch ${patch}`}; item_build cleared.`
+          : `No item purchases${patch === undefined ? '' : ` up to patch ${patch}`}; item_build left unchanged.`,
       );
     } else {
       const champions = new Set(itemRows.map((row) => row.championId)).size;

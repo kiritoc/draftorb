@@ -16,6 +16,9 @@ import {
 
 const PATCH_16_20 = '16.20';
 const PATCH_16_21 = '16.21';
+// Existing aggregation tests use one player per context; keep the D-102
+// distinct-player gate off here (the D-102 tests below set it explicitly).
+const TEST_CONFIG = { ...DEFAULT_CONFIG, evidenceMinDistinctPlayers: 1 };
 
 interface Participant {
   teamId: number;
@@ -257,7 +260,7 @@ export function withSeededDb(
 describe('aggregateRunesByContext', () => {
   it('accumulates a lane-context rune row for a support game', () => {
     withSeededDb([{ patch: PATCH_16_21 }], (db) => {
-      const rows = aggregateRunesByContext(db);
+      const rows = aggregateRunesByContext(db, { config: TEST_CONFIG });
       // Me = Soraka 412 SUPPORT won. Context = ally ADC 21 + enemy support 266 + enemy ADC 22.
       const lane = requireFullLaneRow(rows, 412, 'SUPPORT');
       expect(lane.contextKey.slice('lane:'.length).split(',').sort()).toEqual([
@@ -276,7 +279,7 @@ describe('aggregateRunesByContext', () => {
 
   it('produces all three back-off context levels (lane, damagemix, global)', () => {
     withSeededDb([{ patch: PATCH_16_21 }], (db) => {
-      const rows = aggregateRunesByContext(db);
+      const rows = aggregateRunesByContext(db, { config: TEST_CONFIG });
       const supportRows = rows.filter(
         (r) => r.championId === 412 && r.myRole === 'SUPPORT' && r.rankBucket === 'DIAMOND',
       );
@@ -295,7 +298,7 @@ describe('aggregateRunesByContext', () => {
   it('applies expertWeight per user rank bucket (below excluded, above boosted)', () => {
     // Seeded games are DIAMOND (avg_rank_score 6.5, bucket index 6).
     withSeededDb([{ patch: PATCH_16_21 }], (db) => {
-      const global = aggregateRunesByContext(db).filter(
+      const global = aggregateRunesByContext(db, { config: TEST_CONFIG }).filter(
         (r) => r.championId === 412 && r.myRole === 'SUPPORT' && r.contextKey === 'global',
       );
       const byBucket = new Map(global.map((r) => [r.rankBucket, r.gamesW]));
@@ -322,7 +325,12 @@ describe('aggregateRunesByContext', () => {
           ]),
         });
         setMastery.run(DEFAULT_CONFIG.minMasteryPoints - 1, 'p-low');
-        const row = requireRow(aggregateRunesByContext(db), 412, 'SUPPORT', 'global');
+        const row = requireRow(
+          aggregateRunesByContext(db, { config: TEST_CONFIG }),
+          412,
+          'SUPPORT',
+          'global',
+        );
         expect(row.players).toBe(1);
         expect(row.gamesW).toBeCloseTo(1);
       } finally {
@@ -333,7 +341,9 @@ describe('aggregateRunesByContext', () => {
 
   it('assigns lane levels from slot count alone, for every role', () => {
     withSeededDb([{ patch: PATCH_16_21 }], (db) => {
-      const lanes = aggregateRunesByContext(db).filter((r) => r.contextKey.startsWith('lane:'));
+      const lanes = aggregateRunesByContext(db, { config: TEST_CONFIG }).filter((r) =>
+        r.contextKey.startsWith('lane:'),
+      );
       expect(lanes.length).toBeGreaterThan(0);
       for (const r of lanes) {
         expect(r.contextLevel).toBe(4 - r.contextKey.split(',').length);
@@ -350,7 +360,7 @@ describe('aggregateRunesByContext', () => {
           patch: PATCH_16_21,
           participants: baseParticipants([{ teamId: 100, championId: 412, championGames: 10 }]),
         });
-        const rows = aggregateRunesByContext(db);
+        const rows = aggregateRunesByContext(db, { config: TEST_CONFIG });
         expect(rows.find((r) => r.championId === 412 && r.myRole === 'SUPPORT')).toBeUndefined();
       } finally {
         db.close();
@@ -365,7 +375,7 @@ describe('aggregateRunesByContext', () => {
         { patch: PATCH_16_21, rankKnownCount: 2 },
       ],
       (db) => {
-        const rows = aggregateRunesByContext(db);
+        const rows = aggregateRunesByContext(db, { config: TEST_CONFIG });
         const lane = requireFullLaneRow(rows, 412, 'SUPPORT');
         // 16.20 (index 0, recency 0.85) + 16.21 (index 1, recency 1.0); me wins both.
         expect(lane.gamesW).toBeCloseTo(1.85);
@@ -382,7 +392,11 @@ describe('aggregateRunesByContext', () => {
 
   it('down-weights games where only the seed rank is known', () => {
     withSeededDb([{ patch: PATCH_16_21, rankKnownCount: 1 }], (db) => {
-      const lane = requireFullLaneRow(aggregateRunesByContext(db), 412, 'SUPPORT');
+      const lane = requireFullLaneRow(
+        aggregateRunesByContext(db, { config: TEST_CONFIG }),
+        412,
+        'SUPPORT',
+      );
       expect(lane.gamesW).toBeCloseTo(DEFAULT_CONFIG.unknownRankFactor);
       expect(lane.gamesW2).toBeCloseTo(DEFAULT_CONFIG.unknownRankFactor ** 2);
     });
@@ -395,8 +409,8 @@ describe('aggregateRunesByContext', () => {
         migrate(db);
         seedMatch(db, { patch: PATCH_16_20 });
         seedMatch(db, { patch: PATCH_16_21 });
-        const first = aggregateRunesByContext(db);
-        const second = aggregateRunesByContext(db);
+        const first = aggregateRunesByContext(db, { config: TEST_CONFIG });
+        const second = aggregateRunesByContext(db, { config: TEST_CONFIG });
         expect(second).toEqual(first);
         expect(db.prepare('SELECT COUNT(*) AS count FROM rune_ctx').get()).toMatchObject({
           count: first.length,
@@ -409,7 +423,7 @@ describe('aggregateRunesByContext', () => {
 
   it('preserves existing rows when the snapshot predates all stored matches', () => {
     withSeededDb([{ patch: PATCH_16_21 }], (db) => {
-      const before = aggregateRunesByContext(db);
+      const before = aggregateRunesByContext(db, { config: TEST_CONFIG });
       expect(before.length).toBeGreaterThan(0);
       seedPatches(db, ['16.1']);
       expect(aggregateRunesByContext(db, { patch: '16.1' })).toEqual([]);
@@ -426,7 +440,10 @@ describe('aggregateRunesByContext', () => {
         { patch: PATCH_16_21, rankKnownCount: 2 },
       ],
       (db) => {
-        const rows = aggregateRunesByContext(db, { patch: PATCH_16_20 });
+        const rows = aggregateRunesByContext(db, {
+          patch: PATCH_16_20,
+          config: TEST_CONFIG,
+        });
         // Only 16.20 contributes: one game, weight 1.
         const lane = requireFullLaneRow(rows, 412, 'SUPPORT');
         expect(lane.gamesW).toBeCloseTo(1);
@@ -437,7 +454,7 @@ describe('aggregateRunesByContext', () => {
 
   it('rejects a malformed patch and leaves the table untouched', () => {
     withSeededDb([{ patch: PATCH_16_21 }], (db) => {
-      const before = aggregateRunesByContext(db);
+      const before = aggregateRunesByContext(db, { config: TEST_CONFIG });
       expect(() => aggregateRunesByContext(db, { patch: '16' })).toThrow(/Invalid patch/);
       expect(db.prepare('SELECT COUNT(*) AS count FROM rune_ctx').get()).toMatchObject({
         count: before.length,
@@ -456,7 +473,10 @@ describe('aggregateRunesByContext', () => {
         ]);
         seedMatch(db, { patch: PATCH_16_20, participants });
         seedMatch(db, { patch: PATCH_16_21, participants });
-        const rows = aggregateRunesByContext(db, { patch: PATCH_16_20 });
+        const rows = aggregateRunesByContext(db, {
+          patch: PATCH_16_20,
+          config: TEST_CONFIG,
+        });
         expect(rows.find((r) => r.championId === 412 && r.myRole === 'SUPPORT')).toBeUndefined();
       } finally {
         db.close();
@@ -518,12 +538,72 @@ describe('aggregateRunesByContext', () => {
     expect(damageMix([1, 2], tagsApNone)).toBe('AP');
   });
 
+  it('caps each player weight inside a context and reports distinct players (D-102)', () => {
+    withFreshDb((dbPath) => {
+      const db = openDb(dbPath);
+      try {
+        migrate(db);
+        const participants = baseParticipants([
+          { teamId: 100, championId: 412, puuid: 'p-one', win: 1, championGames: 100 },
+        ]);
+        seedMatch(db, { patch: PATCH_16_21, participants });
+        seedMatch(db, { patch: PATCH_16_21, participants });
+        seedMatch(db, { patch: PATCH_16_21, participants });
+        const rows = aggregateRunesByContext(db, {
+          config: {
+            ...DEFAULT_CONFIG,
+            evidencePlayerWeightCap: 2,
+            evidenceMinDistinctPlayers: 1,
+          },
+        });
+        const global = requireRow(rows, 412, 'SUPPORT', 'global');
+        expect(global.players).toBe(1);
+        expect(global.gamesW).toBeCloseTo(2);
+        expect(global.winsW).toBeCloseTo(2);
+      } finally {
+        db.close();
+      }
+    });
+  });
+
+  it('suppresses rune context rows below the distinct-player minimum (D-102)', () => {
+    withFreshDb((dbPath) => {
+      const db = openDb(dbPath);
+      try {
+        migrate(db);
+        const participants = baseParticipants([
+          { teamId: 100, championId: 412, puuid: 'p-one', win: 1, championGames: 100 },
+        ]);
+        seedMatch(db, { patch: PATCH_16_21, participants });
+        const suppressed = aggregateRunesByContext(db, {
+          config: { ...DEFAULT_CONFIG, evidenceMinDistinctPlayers: 2 },
+        });
+        expect(
+          suppressed.find(
+            (r) =>
+              r.championId === 412 &&
+              r.myRole === 'SUPPORT' &&
+              r.contextKey === 'global' &&
+              r.rankBucket === 'DIAMOND',
+          ),
+        ).toBeUndefined();
+
+        const allowed = aggregateRunesByContext(db, {
+          config: { ...DEFAULT_CONFIG, evidenceMinDistinctPlayers: 1 },
+        });
+        expect(requireRow(allowed, 412, 'SUPPORT', 'global').players).toBe(1);
+      } finally {
+        db.close();
+      }
+    });
+  });
+
   it('leaves rune_ctx empty when there are no participants', () => {
     withFreshDb((dbPath) => {
       const db = openDb(dbPath);
       try {
         migrate(db);
-        const rows = aggregateRunesByContext(db);
+        const rows = aggregateRunesByContext(db, { config: TEST_CONFIG });
         expect(rows).toEqual([]);
         expect(db.prepare('SELECT COUNT(*) AS count FROM rune_ctx').get()).toMatchObject({
           count: 0,

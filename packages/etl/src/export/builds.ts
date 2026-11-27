@@ -35,6 +35,7 @@ export interface ItemBuildRow {
   winsW: number;
   gamesW: number;
   gamesW2: number;
+  players?: number;
 }
 
 export interface BuildFilesOptions {
@@ -42,6 +43,8 @@ export interface BuildFilesOptions {
   subdirectory?: string;
   /** Champion tags for the lane-archetype backoff field (D-086). */
   championTags?: ChampionTagsMap;
+  /** D-102: minimum distinct players required behind an exported item row. */
+  minDistinctPlayers?: number;
 }
 
 interface ItemBuildEntryWithKey {
@@ -51,6 +54,7 @@ interface ItemBuildEntryWithKey {
   gamesW2: number;
   winrate: number;
   pickShare: number;
+  players?: number;
 }
 
 interface ItemBuildContextWithKey {
@@ -75,6 +79,7 @@ export function buildBuildFiles(
 ): RuneBuildFiles {
   const subdirectory = options.subdirectory ?? 'builds';
   const tags = options.championTags;
+  const minDistinctPlayers = options.minDistinctPlayers ?? 1;
   const roleSet = new Set(roles);
   // Group by (championId, myRole) (B6).
   const byGroup = new Map<string, { myRole: string; rows: ItemBuildRow[] }>();
@@ -129,6 +134,7 @@ export function buildBuildFiles(
         gamesW2: row.gamesW2,
         winrate: row.gamesW > 0 ? row.winsW / row.gamesW : 0,
         pickShare: 0,
+        ...(row.players === undefined ? {} : { players: row.players }),
       });
     }
     const contexts: ItemBuildContextWithKey[] = [];
@@ -137,7 +143,11 @@ export function buildBuildFiles(
       for (const item of ctx.items) {
         item.pickShare = gamesWTotal > 0 ? Math.min(1, item.gamesW / gamesWTotal) : 0;
       }
-      ctx.items = ctx.items.filter((item) => passesGate(item.gamesW, item.gamesW2, exportMinGames));
+      ctx.items = ctx.items.filter(
+        (item) =>
+          (item.players ?? 0) >= minDistinctPlayers &&
+          passesGate(item.gamesW, item.gamesW2, exportMinGames),
+      );
       if (ctx.items.length === 0) continue;
       for (const item of ctx.items) {
         item.winsW = round6(item.winsW);
@@ -181,6 +191,7 @@ export function buildBuildFiles(
             gamesW2: item.gamesW2,
             winrate: item.winrate,
             pickShare: item.pickShare,
+            ...(item.players === undefined ? {} : { players: item.players }),
           })),
         }),
       ),

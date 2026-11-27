@@ -24,6 +24,7 @@ import {
   stateScaleExportSchema,
   manifestSchema,
   manifestSchemaV4,
+  manifestSchemaV5,
   type ChampionTagsMap,
   type Latest,
   type Manifest,
@@ -101,8 +102,9 @@ function all<T>(db: Database.Database, sql: string, params: readonly unknown[] =
 }
 
 /** Published manifest shapes the pointer guard accepts, newest first: the
- *  current schema, then the frozen v4 layout from before the BL-024 v5 bump. */
-const PUBLISHED_MANIFEST_SCHEMAS = [manifestSchema, manifestSchemaV4] as const;
+ *  current schema, then the frozen v5 layout from before the BL-013a v6 bump,
+ *  then the frozen v4 layout from before the BL-024 v5 bump. */
+const PUBLISHED_MANIFEST_SCHEMAS = [manifestSchema, manifestSchemaV5, manifestSchemaV4] as const;
 
 /** Latest-patch pointer already published in `publicDir`, or undefined when
  *  `latest.json` is absent or does not validate against latestSchema.
@@ -219,7 +221,8 @@ export function exportJson(db: Database.Database, options: ExportOptions = {}): 
            time_bucket AS timeBucket, state_bucket AS stateBucket,
            profile_key AS profileKey, lane_key AS laneKey,
            decision_kind AS decisionKind,
-           item_id AS itemId, wins_w AS winsW, games_w AS gamesW, games_w2 AS gamesW2
+           item_id AS itemId, wins_w AS winsW, games_w AS gamesW, games_w2 AS gamesW2,
+           players AS players
      FROM item_build ORDER BY champion_id, my_role, slot_idx, time_bucket, state_bucket, profile_key, lane_key`,
   );
   // Path rows (quest rewards, jungle pet upgrades) export to build-paths/,
@@ -274,7 +277,12 @@ export function exportJson(db: Database.Database, options: ExportOptions = {}): 
     );
   }
 
-  const runeResult = buildRuneFiles(runeRows, fullLayoutRoles, exportMinGames);
+  const runeResult = buildRuneFiles(
+    runeRows,
+    fullLayoutRoles,
+    exportMinGames,
+    config.evidenceMinDistinctPlayers,
+  );
   filesToWrite.push(...runeResult.files);
   const skippedRunePages = runeResult.skippedRunePages;
   if (skippedRunePages > 0) {
@@ -284,10 +292,14 @@ export function exportJson(db: Database.Database, options: ExportOptions = {}): 
   }
 
   filesToWrite.push(
-    ...buildBuildFiles(itemBuildRows, fullLayoutRoles, exportMinGames, { championTags }).files,
+    ...buildBuildFiles(itemBuildRows, fullLayoutRoles, exportMinGames, {
+      championTags,
+      minDistinctPlayers: config.evidenceMinDistinctPlayers,
+    }).files,
     ...buildBuildFiles(pathBuildRows, fullLayoutRoles, exportMinGames, {
       subdirectory: 'build-paths',
       championTags,
+      minDistinctPlayers: config.evidenceMinDistinctPlayers,
     }).files,
   );
 

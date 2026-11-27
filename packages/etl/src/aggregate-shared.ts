@@ -116,6 +116,65 @@ export interface WeightedCounts {
   gamesW2: number;
 }
 
+/** Per-player weighted counts for the D-102 evidence rule. */
+export type PlayerWeight = WeightedCounts;
+
+/** Aggregation row that keeps one PlayerWeight per distinct puuid. */
+export interface EvidenceWeighted extends WeightedCounts {
+  playerWeights: Map<string, PlayerWeight>;
+}
+
+/**
+ * Get-or-create an evidence row, then add `w`/`win` to `puuid`'s share only.
+ * Row-level winsW/gamesW/gamesW2 stay zero until `finalizeEvidenceCounts`
+ * applies the per-player cap.
+ */
+export function accumulatePlayerWeighted<T extends EvidenceWeighted>(
+  map: Map<string, T>,
+  key: string,
+  puuid: string,
+  w: number,
+  win: number,
+  create: () => T,
+): T {
+  let row = map.get(key);
+  if (row === undefined) {
+    row = create();
+    map.set(key, row);
+  }
+  let player = row.playerWeights.get(puuid);
+  if (player === undefined) {
+    player = { winsW: 0, gamesW: 0, gamesW2: 0 };
+    row.playerWeights.set(puuid, player);
+  }
+  player.winsW += w * win;
+  player.gamesW += w;
+  player.gamesW2 += w * w;
+  return row;
+}
+
+/**
+ * Apply the D-102 per-player cap: each player's gamesW is capped at `cap`,
+ * and that player's winsW/gamesW2 are scaled by the same factor so ratios and
+ * n_eff are preserved. Returns row counts plus the distinct player count.
+ */
+export function finalizeEvidenceCounts(
+  row: EvidenceWeighted,
+  cap: number,
+): { winsW: number; gamesW: number; gamesW2: number; players: number } {
+  let winsW = 0;
+  let gamesW = 0;
+  let gamesW2 = 0;
+  for (const player of row.playerWeights.values()) {
+    const capped = Math.min(player.gamesW, cap);
+    const scale = player.gamesW > 0 ? capped / player.gamesW : 0;
+    winsW += player.winsW * scale;
+    gamesW += capped;
+    gamesW2 += player.gamesW2 * scale * scale;
+  }
+  return { winsW, gamesW, gamesW2, players: row.playerWeights.size };
+}
+
 /**
  * Get-or-create `map.get(key)` via `create()` (which returns the row with
  * zeroed counts), then add winsW += w*win, gamesW += w, gamesW2 += w*w.

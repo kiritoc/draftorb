@@ -123,6 +123,15 @@ describe('rank weighting config', () => {
     expect(() => rankWeightingConfigSchema.parse({ ...DEFAULT_CONFIG, eps: 0 })).toThrow();
     expect(() => rankWeightingConfigSchema.parse({ ...DEFAULT_CONFIG, eps: 0.6 })).toThrow();
     expect(() => rankWeightingConfigSchema.parse({ ...DEFAULT_CONFIG, contextSlots: 0 })).toThrow();
+    expect(() =>
+      rankWeightingConfigSchema.parse({ ...DEFAULT_CONFIG, evidencePlayerWeightCap: 0 }),
+    ).toThrow();
+    expect(() =>
+      rankWeightingConfigSchema.parse({ ...DEFAULT_CONFIG, evidenceMinDistinctPlayers: 0 }),
+    ).toThrow();
+    expect(() =>
+      rankWeightingConfigSchema.parse({ ...DEFAULT_CONFIG, evidenceMinDistinctPlayers: 1.5 }),
+    ).toThrow();
   });
 });
 

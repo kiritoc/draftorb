@@ -59,7 +59,7 @@ function seedCache(
   const manifest = {
     patch: '16.22',
     generatedAt: '2026-11-21T00:00:00Z',
-    schemaVersion: 5,
+    schemaVersion: 6,
     region: 'euw',
     rankBuckets: ['IRON'],
     roles: overrides.roles ?? ['SUPPORT'],
@@ -236,7 +236,7 @@ describe('loadPickData', () => {
         return JSON.stringify({
           patch: '16.21',
           generatedAt: '2026-11-21T00:00:00Z',
-          schemaVersion: 5,
+          schemaVersion: 6,
           region: 'euw',
           rankBuckets: ['IRON'],
           roles: ['SUPPORT'],

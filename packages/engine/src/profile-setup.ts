@@ -19,6 +19,7 @@ import {
   type FallbackLevel,
   type PersonalizeConfig,
   type PersonalizeContext,
+  personalizeScopeRole,
 } from './personalize.js';
 
 const DAY_MS = 86_400_000;
@@ -117,7 +118,9 @@ function aggregateSetup(
     let rawGames = 0;
     for (const weighted of games) {
       const game = weighted.game;
-      if (game.championId !== championId || game.role !== 'SUPPORT') continue;
+      // The pool is already scoped to the drafted role (D-097); only the
+      // champion and setup identity are checked here.
+      if (game.championId !== championId) continue;
       if (setupKey(game) !== key) continue;
       if (!predicate(game, weighted.enemySignature)) continue;
       sumW += weighted.weight;
@@ -140,6 +143,7 @@ function aggregateSetup(
 
 function buildWeightedGames(
   profile: ProfileExport,
+  context: PersonalizeContext,
   data: RecommendData,
   nowMs: number,
   halfLifeDays: number,
@@ -147,9 +151,12 @@ function buildWeightedGames(
   const nowDays = nowMs / DAY_MS;
   const signatureCache = new Map<number, string>();
   const tags = data.tags;
+  // Same role scope as `personalize()`: only games played in the drafted
+  // role, and only when that role is in scope (SUPPORT/TOP/JUNGLE, D-097).
+  const scopeRole = personalizeScopeRole(context.role);
   const weighted: WeightedProfileGame[] = [];
   for (const game of profile.games) {
-    if (game.role !== 'SUPPORT') continue;
+    if (scopeRole === null || game.role !== scopeRole) continue;
     const ageDays = Math.max(0, nowDays - game.createdAtDay);
     const signature = new Set<string>();
     for (const championId of game.enemyChampionIds) {
@@ -171,7 +178,7 @@ function buildWeightedGames(
   return weighted;
 }
 
-/** Champion-level base WR (all in-scope games on the champion) for shrinkage. */
+/** Champion-level base WR (in-scope games on the champion) for shrinkage. */
 function championBaseWinRate(games: readonly WeightedProfileGame[], championId: number): number {
   let winsW = 0;
   let gamesW = 0;
@@ -211,7 +218,7 @@ export function recommendProfileRunes(
   const config = options.config ?? DEFAULT_PERSONALIZE_CONFIG;
   const minGames = options.minSetupGames ?? DEFAULT_MIN_SETUP_GAMES;
   const topPicks = options.topPicks ?? DEFAULT_SETUP_PICKS;
-  const games = buildWeightedGames(profile, data, nowMs, config.halfLifeDays);
+  const games = buildWeightedGames(profile, context, data, nowMs, config.halfLifeDays);
   const base = championBaseWinRate(games, championId);
 
   // Group the champion's rune-carrying games by page identity.
@@ -300,7 +307,7 @@ export function recommendProfileSpells(
   const config = options.config ?? DEFAULT_PERSONALIZE_CONFIG;
   const minGames = options.minSetupGames ?? DEFAULT_MIN_SETUP_GAMES;
   const topPicks = options.topPicks ?? DEFAULT_SETUP_PICKS;
-  const games = buildWeightedGames(profile, data, nowMs, config.halfLifeDays);
+  const games = buildWeightedGames(profile, context, data, nowMs, config.halfLifeDays);
   const base = championBaseWinRate(games, championId);
 
   const pairs = new Map<string, { spells: [number, number]; games: number }>();

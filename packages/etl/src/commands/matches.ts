@@ -1,10 +1,32 @@
+import Database from 'better-sqlite3';
+import { existsSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 
+import type { PoolConfig } from '@draftorb/shared';
+
 import { ingestMatches } from '../matches';
-import { resolveDbPath } from '../config/paths';
-import { openDb } from '../db';
+import { poolChampionRolePairs, selectPlayers } from '../matches-select';
+import { loadPoolConfig, poolConfigPathFromEnv } from '../pool-config';
+import { dbPathFromEnv, resolveDbPath } from '../config/paths';
+import { getMigrationStatusReadOnly, openDb } from '../db';
 import { CliError, UsageError, parseStrictPositiveInt } from '../cli-args';
 import { log, parsePlatform, type Command } from './shared';
+
+const USAGE =
+  'matches [platform] [--since-patch=16.19] [--per-player=20] [--limit=N] [--queue=420] [--min-duration=900] [--reset] [--reset-tombstones] [--refresh] [--call-budget=N] [--time-budget=MIN] [--dry-run]';
+
+/** Load the pool file for pool-driven prioritization; warn and continue without it. */
+function loadPoolConfigOrWarn(configPath: string): PoolConfig | null {
+  try {
+    return loadPoolConfig(configPath);
+  } catch (error) {
+    log.info(
+      `Warning: pool config ignored (${error instanceof Error ? error.message : String(error)}); ` +
+        'selection falls back to rank order.',
+    );
+    return null;
+  }
+}
 
 async function runMatches(args: string[]): Promise<void> {
   let parsed: ReturnType<typeof parseArgs>;
@@ -25,17 +47,16 @@ async function runMatches(args: string[]): Promise<void> {
         refresh: { type: 'boolean', default: false },
         'call-budget': { type: 'string' },
         'time-budget': { type: 'string' },
+        'dry-run': { type: 'boolean', default: false },
       },
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new UsageError(
-      `${message}\nUsage: etl matches [platform] [--since-patch=16.19] [--per-player=20] [--limit=N] [--queue=420] [--min-duration=900] [--reset] [--reset-tombstones] [--refresh] [--call-budget=N] [--time-budget=MIN]`,
-    );
+    throw new UsageError(`${message}\nUsage: etl ${USAGE}`);
   }
   const { values, positionals } = parsed;
   if (positionals.length > 1) {
-    throw new UsageError('Too many positional arguments.\nUsage: etl matches [platform]');
+    throw new UsageError(`Too many positional arguments.\nUsage: etl ${USAGE}`);
   }
 
   const [platformArg] = positionals;
@@ -75,20 +96,72 @@ async function runMatches(args: string[]): Promise<void> {
   const resetValue = values.reset === true;
   const resetTombstonesValue = values['reset-tombstones'] === true;
   const refreshValue = values.refresh === true;
+  const dryRun = values['dry-run'] === true;
   if (refreshValue && resetValue) {
     throw new UsageError(
       '--refresh cannot be combined with --reset (reset clears the cursors --refresh selects on).\n' +
-        'Usage: etl matches [platform] [--since-patch=16.19] [--per-player=20] [--limit=N] [--queue=420] [--min-duration=900] [--reset] [--reset-tombstones] [--refresh]',
+        `Usage: etl ${USAGE}`,
     );
   }
 
-  log.info(
-    `Ingesting ranked matches for platform "${platform}"` +
-      `${sincePatch ? ` (patches >= ${sincePatch})` : ''}...`,
-  );
+  const poolConfigPath = poolConfigPathFromEnv();
+
+  if (dryRun) {
+    // Selection preview only: no Riot calls, no patch resolution, and no
+    // writes — the database is opened read-only and never migrated, so a
+    // preview cannot apply destructive pending migrations (e.g. 017).
+    const dryRunDbPath = dbPathFromEnv();
+    if (!existsSync(dryRunDbPath)) {
+      throw new CliError(`No database at ${dryRunDbPath}. Run \`pnpm etl migrate\` first.`);
+    }
+    // Sidecars (-wal/-shm) are left to SQLite: deleting them manually could
+    // discard commits from a concurrent writer that shares the WAL.
+    const roDb = new Database(dryRunDbPath, { readonly: true, fileMustExist: true });
+    try {
+      // Read-only status: safe on pre-checksum `_migrations` ledgers, unlike
+      // getMigrationStatus which would try to ALTER the table.
+      if (getMigrationStatusReadOnly(roDb).pending > 0) {
+        throw new CliError(
+          `Database at ${dryRunDbPath} has pending migrations. ` +
+            'Run `pnpm etl migrate` first; --dry-run never migrates.',
+        );
+      }
+      const poolConfig = loadPoolConfigOrWarn(poolConfigPath);
+      const selected = selectPlayers(roDb, platform, {
+        reset: resetValue,
+        refresh: refreshValue,
+        playerLimit,
+        poolConfig,
+      });
+      const pairs = poolChampionRolePairs(poolConfig);
+      log.info(
+        `Dry run: ${selected.length} player(s) selected for platform "${platform}"` +
+          (pairs.size > 0
+            ? ` (${pairs.size} pool champion×role pairs from ${poolConfigPath})`
+            : ' (no pool config)') +
+          '.',
+      );
+      for (const [index, player] of selected.entries()) {
+        log.detail(
+          `${index + 1}. [${player.poolMatch ? 'pool' : 'rank'}] ${player.puuid} ` +
+            `rank_score=${player.rank_score} ${player.done ? 'done' : 'pending'}`,
+        );
+      }
+    } finally {
+      roDb.close();
+    }
+    return;
+  }
+
   const dbPath = resolveDbPath();
   const db = openDb(dbPath);
   try {
+    const poolConfig = loadPoolConfigOrWarn(poolConfigPath);
+
+    log.info(
+      `Ingesting ranked matches for platform "${platform}"` +
+        `${sincePatch ? ` (patches >= ${sincePatch})` : ''}...`,
+    );
     const result = await ingestMatches({
       platform,
       sincePatch,
@@ -101,6 +174,8 @@ async function runMatches(args: string[]): Promise<void> {
       refresh: refreshValue,
       callBudget,
       timeBudgetMs: timeBudgetMinutes !== undefined ? timeBudgetMinutes * 60_000 : undefined,
+      poolConfig,
+      poolConfigPath,
       db,
       onProgress: (message) => log.info(message),
     });
@@ -132,11 +207,11 @@ async function runMatches(args: string[]): Promise<void> {
 
 export const matchesCommand: Command = {
   name: 'matches',
-  usage:
-    'matches [platform] [--since-patch=16.19] [--per-player=20] [--limit=N] [--queue=420] [--min-duration=900] [--reset] [--reset-tombstones] [--refresh] [--call-budget=N] [--time-budget=MIN]',
+  usage: USAGE,
   description:
     'Ingest ranked solo matches for discovered players (resumable, Ctrl+C safe). ' +
     '--reset-tombstones clears pruned tombstones: pruned matches become fetchable again. ' +
-    '--refresh only processes players that already have an ingest cursor',
+    '--refresh only processes players that already have an ingest cursor. ' +
+    '--dry-run prints the selected players and their pool-priority reason without API calls.',
   run: runMatches,
 };

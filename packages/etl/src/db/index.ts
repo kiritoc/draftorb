@@ -1,1 +1,1 @@
-export { openDb, migrate, getMigrationStatus } from './migrate.js';
+export { openDb, migrate, getMigrationStatus, getMigrationStatusReadOnly } from './migrate.js';

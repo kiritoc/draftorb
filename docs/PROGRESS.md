@@ -16,6 +16,17 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 ## Current handoff
 
 - Date: 2026-11-26
+- Branch/PR: `feat/bl-023-pool-collection` / PR #157 / BL-023 (#88)
+- State: REVIEW
+- Done: pool-driven collection for match ingestion (D-102, D-114). New `pool-config.ts` loads/validates `data/pool.config.json` via the shared `poolConfigSchema` (missing file → `null`, invalid → throws; `DRAFTORB_POOL_CONFIG_PATH` env override mirrors `DRAFTORB_DB_PATH`). New `matches-select.ts` extracts player selection from `ingestMatches`: pending-first ordering unchanged, and when pool pairs exist, players with `participants` rows matching a pool champion×role pair (joined to `matches` for platform) move to the front of their pending/done group; `rank_score` remains the fallback. `ingestMatches` takes `poolConfig` and logs a pool-priority summary. `etl matches` loads the repo pool file (warn + rank-order fallback on invalid), passes it through, and gains `--dry-run`: prints every selected player with `[pool]`/`[rank]` reason, pending/done status and rank_score, with zero Riot calls (read-only DB, refuses pending migrations). SETUP.md updated.
+- Files touched: `packages/etl/src/{pool-config.ts,pool-config.test.ts,matches-select.ts,matches-select.test.ts,matches.ts,matches.test.ts,matches.test-helpers.ts,commands/matches.ts,commands/matches.test.ts,db/migrate.ts,db/index.ts,status.ts}`, `docs/{SETUP,PROGRESS}.md`.
+- Tests: new `matches-select.test.ts` (5: pool priority, rank fallback/empty pool, pending-vs-done groups, platform scoping, refresh cursor scope), `pool-config.test.ts` (4), `commands/matches.test.ts` (dry-run incl. sidecar cleanup + pre-checksum ledger), one `ingestMatches` end-to-end order test; `pnpm check` green.
+- Blockers / next step: PR #157 open, CI green, Devin Review findings addressed. `data/pool.config.json` does not exist yet — the owner commits it via the program's "Export to repo file" (BL-016a/BL-006 hand-off); until then behavior is identical to before.
+- Pitfalls: pool priority keys on `(champion_id, role)` pairs — a pool champion seen in another role does not count; `participants` rows come from already-ingested matches, so a never-seen player cannot match (cold-start limitation, inherent to the design). A read-only SQLite connection on a WAL database creates `-shm`/`-wal` sidecars it cannot checkpoint on close; `matches --dry-run` removes only the ones it created.
+
+### Previous handoff (BL-050)
+
+- Date: 2026-11-26
 - Branch/PR: `feat/bl-050-role-enablement` / PR #154 / BL-050 (#153)
 - State: REVIEW
 - Done: role enablement is now data-driven (D-126). New `apps/desktop/ui/src/data/role-coverage.ts`: pure `enabledRolesFromFiles` (distinct champions with a `baseline.json` row at `n_eff >= minGames` in the DIAMOND bucket, >= 50 to enable) plus `loadEnabledRoles` reading only the baseline files through the shared `loadCachedRelease` helper extracted from `export-data.ts`. `App` recomputes on `dataReadyNonce` and feeds `enabledRoles` to `AppShell`/`RoleSelector`; `DEFAULT_ENABLED_ROLES` remains the no-data fallback. `roleNeedsData` string updated ("Not enough champion data for this role"); ADC/MID keep the minimal-roles reason. Review follow-ups (Devin Review + bot commits): active-role fallback to first eligible role, per-role JSON parse in `loadEnabledRoles`, `loadPickData` skips other roles' corrupt files, `loadChampionCatalog` keeps the pool editor's champion picker usable with no eligible role, dropped-champion notice in the fallback editor.

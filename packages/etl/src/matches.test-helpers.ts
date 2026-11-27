@@ -26,6 +26,26 @@ export function seedPlayer(db: ReturnType<typeof openDb>, puuid: string, rankSco
   ).run(puuid, rankScore);
 }
 
+/** Insert a match row plus one participant row (pool-priority test seam). */
+export function seedParticipant(
+  db: ReturnType<typeof openDb>,
+  opts: { matchId: string; puuid: string; championId: number; role: string; platform?: string },
+): void {
+  const platform = opts.platform ?? PLATFORM;
+  db.prepare(
+    `INSERT INTO matches (match_id, platform, patch, queue_id, duration, created_at,
+      avg_rank_score, rank_known_count)
+     VALUES (?, ?, '16.21', 420, 1800, 1, 6.5, 1)`,
+  ).run(opts.matchId, platform);
+  db.prepare(
+    `INSERT INTO participants (
+      match_id, puuid, team_id, champion_id, role, win, rank_score,
+      champion_games, keystone, primary_style, sub_style, perks_json,
+      items_json, kills, deaths, assists
+    ) VALUES (?, ?, 100, ?, ?, 1, NULL, 0, 8000, 8000, 8000, '{}', '[]', 0, 0, 0)`,
+  ).run(opts.matchId, opts.puuid, opts.championId, opts.role);
+}
+
 function asParticipantOverride(value: unknown): Record<string, unknown> | undefined {
   if (typeof value !== 'object' || value === null) return undefined;
   return value as Record<string, unknown>;

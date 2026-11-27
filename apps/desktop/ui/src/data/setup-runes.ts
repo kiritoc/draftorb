@@ -32,9 +32,20 @@ import { loadCachedRelease } from './export-data';
 import type { PickData } from './export-data';
 
 /**
+ * First manifest schema whose rune exports apply the D-102 evidence rule
+ * (per-player weight cap, minimum distinct players, `players` field —
+ * BL-013a claimed schema v6). A v5 cache predates the mechanism entirely:
+ * its rune figures cannot be verified against the evidence rules the
+ * result reports, so they are treated as absent and the labeled D-103
+ * broader-statistic fallback shows instead (fail-closed).
+ */
+const MIN_RUNE_EVIDENCE_MANIFEST_VERSION = 6;
+
+/**
  * Loads `roles/<role>/runes/<championId>.json` from the data cache.
- * Returns null when nothing is cached or the champion has no export;
- * throws on a corrupt file (fail-closed, like every manifest file).
+ * Returns null when nothing is cached, the champion has no export, or the
+ * cached release predates the D-102 rune evidence rule; throws on a
+ * corrupt file (fail-closed, like every manifest file).
  */
 export async function loadRuneExport(
   role: Role,
@@ -42,6 +53,9 @@ export async function loadRuneExport(
 ): Promise<RuneExport | null> {
   const release = await loadCachedRelease();
   if (release === null) return null;
+  if (release.manifest.schemaVersion < MIN_RUNE_EVIDENCE_MANIFEST_VERSION) {
+    return null;
+  }
   const raw = await cacheRead(
     `${release.latest.patch}/roles/${role}/runes/${championId}.json`,
   );

@@ -8,7 +8,8 @@
  * page shape so the UI renders either source without a restart (D-134).
  *
  * Evidence display rules (D-102/D-103): every figure carries its sample size
- * (`nEff`, `games`) and, for expert evidence, the distinct-player count
+ * (`nEff`; `games` for profile figures — the expert export stores weights,
+ * not raw game counts) and, for expert evidence, the distinct-player count
  * (`players`); win rate and pick share are separate fields; the Master+ tier
  * restriction is an optional toggle, off by default; thin contexts fall back
  * to a broader statistic that is always labeled via `source` /

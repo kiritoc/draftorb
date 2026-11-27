@@ -9,13 +9,13 @@
  * a pure re-query — no restart, no hidden state.
  *
  * Both modes normalize to `SetupRuneResult`: every page carries its sample
- * size (`nEff`, `games`) and, for expert figures, the distinct-player count
- * (`players`); win rate and pick share stay separate fields; the evidence
- * block reports the applied D-102 rule (per-player cap, minimum distinct
- * players, Master+ toggle off by default and labeled optional). When the
- * mode's primary data is too thin, `broaderStatistic` carries the labeled
- * D-103 fallback (champion win rate in the role) instead of a bare empty
- * state.
+ * size (`nEff`; `games` for profile figures) and, for expert figures, the
+ * distinct-player count (`players`); win rate and pick share stay separate
+ * fields; the evidence block reports the applied D-102 rule (per-player cap,
+ * minimum distinct players, Master+ toggle off by default and labeled
+ * optional). When the mode's primary data is too thin — no page clears the
+ * evidence gate — `broaderStatistic` carries the labeled D-103 fallback
+ * (champion win rate in the role) instead of a bare empty state.
  *
  * No DOM, no Node APIs, no network, no file I/O, no randomness.
  */
@@ -96,7 +96,10 @@ function profilePageSource(fallbackLevel: number | null): SetupPageSource {
   return fallbackLevel <= 3 ? 'profileMatchup' : 'profileChampion';
 }
 
-function expertPages(result: ReturnType<typeof recommendRunes>): SetupRunePage[] {
+function expertPages(
+  result: ReturnType<typeof recommendRunes>,
+  config: RankWeightingConfig,
+): SetupRunePage[] {
   return result.pages.map((page) => ({
     keystoneId: page.keystoneId,
     primaryStyleId: page.primaryStyleId,
@@ -107,7 +110,15 @@ function expertPages(result: ReturnType<typeof recommendRunes>): SetupRunePage[]
     nEff: page.nEff,
     ...(page.players !== undefined ? { players: page.players } : {}),
     pickShare: page.pickShare,
-    insufficientData: false,
+    // D-102/D-103: a page only counts as sufficient evidence when it clears
+    // the distinct-player gate and is not flagged lowData by recommendRunes.
+    // A missing `players` count cannot prove the D-102 minimum, so it fails
+    // closed. Thin pages stay listed but labeled `insufficientData`, and the
+    // D-103 broader statistic surfaces when no page is sufficient.
+    insufficientData:
+      page.lowData ||
+      page.players === undefined ||
+      page.players < config.evidenceMinDistinctPlayers,
     source: expertPageSource(page.contextLevel),
     sourceLevel: page.contextLevel,
   }));
@@ -234,15 +245,21 @@ export function recommendSetupRunes(
     masterPlusOnly: config.evidenceMasterPlusOnly,
     masterPlusOptional: true,
   };
+  const pages = expertPages(result, config);
+  // `recommendRunes` reports dataAvailable for any matched context, even
+  // when every page is thin; here availability means at least one page
+  // clears the D-102/D-103 evidence gate, otherwise the labeled broader
+  // statistic replaces the rune pages (D-103).
+  const dataAvailable = pages.some((page) => !page.insufficientData);
   return {
     ...base,
     mode: 'topPlayers',
     dataSource: 'expertAggregate',
     evidence,
-    pages: expertPages(result),
-    broaderStatistic: result.dataAvailable
+    pages,
+    broaderStatistic: dataAvailable
       ? null
       : championRoleBroaderStatistic(input, championId, data, config),
-    dataAvailable: result.dataAvailable,
+    dataAvailable,
   };
 }

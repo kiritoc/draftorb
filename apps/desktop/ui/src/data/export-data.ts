@@ -176,7 +176,13 @@ export async function loadPickData(role: Role): Promise<PickData | null> {
   // Archive-root entries ('/latest.json', '/champion-tags.json') are already
   // loaded through their dedicated paths above/below; only patch-relative
   // entries belong to the RecommendData file map.
-  const patchEntries = manifest.files.filter((file) => !file.path.startsWith('/'));
+  // Per-champion rune exports (`roles/<ROLE>/runes/<championId>.json`) are
+  // not part of RecommendData: the setup screen reads them lazily per
+  // champion (setup-runes.ts), so parsing every manifest-listed rune file
+  // here would defeat that and slow startup.
+  const patchEntries = manifest.files.filter(
+    (file) => !file.path.startsWith('/') && !file.path.includes('/runes/'),
+  );
   // A corrupt file under another role's folder must not break this role
   // (D-126 already treats it as zero coverage for that role); anything
   // shared or belonging to `role` still fails loudly.

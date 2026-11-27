@@ -213,6 +213,85 @@ describe('recommendSetupRunes — topPlayers mode', () => {
     expect(() => setupRuneResultSchema.parse(result)).not.toThrow();
   });
 
+  it('flags pages below the distinct-player gate as insufficient and shows the D-103 fallback', () => {
+    const thinCtx: RuneContextEntry = {
+      rankBucket: 'DIAMOND',
+      contextKey: 'global',
+      contextLevel: 5,
+      pages: [runePage({ players: 2 })],
+    };
+    const result = recommendSetupRunes(draft(), CHAMP, setupData(), {
+      mode: 'topPlayers',
+      runeExport: runeExport([thinCtx]),
+      nowMs: NOW_MS,
+    });
+    // recommendRunes still returns the page, but it cannot count as
+    // sufficient evidence: the broader statistic replaces it (D-103).
+    expect(result.pages).toHaveLength(1);
+    expect(result.pages[0]?.insufficientData).toBe(true);
+    expect(result.dataAvailable).toBe(false);
+    expect(result.broaderStatistic?.kind).toBe('championRoleWinRate');
+    expect(result.broaderStatistic?.winRate).not.toBeNull();
+    expect(() => setupRuneResultSchema.parse(result)).not.toThrow();
+  });
+
+  it('flags lowData pages as insufficient and keeps sufficient pages usable', () => {
+    // nEff = gamesW^2 / gamesW2 = 100 / 10 = 10 < minGames (25) -> lowData.
+    // A distinct keystone keeps it a separate displayed page from GLOBAL_CTX.
+    const thinPage = runePage({
+      keystoneId: 9923,
+      winsW: 5,
+      gamesW: 10,
+      gamesW2: 10,
+      players: 12,
+    });
+    const thinCtx: RuneContextEntry = {
+      rankBucket: 'DIAMOND',
+      contextKey: 'lane:a.ADC:10',
+      contextLevel: 3,
+      pages: [thinPage],
+    };
+    const allThin = recommendSetupRunes(draft(), CHAMP, setupData(), {
+      mode: 'topPlayers',
+      runeExport: runeExport([thinCtx]),
+      nowMs: NOW_MS,
+    });
+    expect(allThin.pages[0]?.insufficientData).toBe(true);
+    expect(allThin.dataAvailable).toBe(false);
+    expect(allThin.broaderStatistic?.kind).toBe('championRoleWinRate');
+
+    // A sufficient page alongside a thin one keeps dataAvailable true.
+    const mixed = recommendSetupRunes(draft(), CHAMP, setupData(), {
+      mode: 'topPlayers',
+      runeExport: runeExport([thinCtx, GLOBAL_CTX]),
+      nowMs: NOW_MS,
+    });
+    expect(mixed.dataAvailable).toBe(true);
+    expect(mixed.broaderStatistic).toBeNull();
+    const insufficient = mixed.pages.filter((p) => p.insufficientData);
+    expect(insufficient.length).toBeGreaterThan(0);
+    expect(mixed.pages.some((p) => !p.insufficientData)).toBe(true);
+  });
+
+  it('treats a page without a players count as below the evidence gate (fail-closed)', () => {
+    const noPlayers = runePage();
+    delete (noPlayers as { players?: number }).players;
+    const ctx: RuneContextEntry = {
+      rankBucket: 'DIAMOND',
+      contextKey: 'global',
+      contextLevel: 5,
+      pages: [noPlayers],
+    };
+    const result = recommendSetupRunes(draft(), CHAMP, setupData(), {
+      mode: 'topPlayers',
+      runeExport: runeExport([ctx]),
+      nowMs: NOW_MS,
+    });
+    expect(result.pages[0]?.insufficientData).toBe(true);
+    expect(result.dataAvailable).toBe(false);
+    expect(result.broaderStatistic?.kind).toBe('championRoleWinRate');
+  });
+
   it('reports an insufficient broader statistic when the baseline is thin', () => {
     const data = makeData({
       champions: [7, 10, 20, 30],

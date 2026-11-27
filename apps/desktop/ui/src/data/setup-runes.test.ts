@@ -122,11 +122,14 @@ function makeProfile(games: ProfileGame[]): ProfileExport {
   };
 }
 
-function seedCache(files: Record<string, unknown>): void {
+function seedCache(
+  files: Record<string, unknown>,
+  manifestSchemaVersion = 7,
+): void {
   const manifest = {
     patch: PATCH,
     generatedAt: '2026-11-21T00:00:00Z',
-    schemaVersion: 7,
+    schemaVersion: manifestSchemaVersion,
     region: 'euw',
     rankBuckets: ['DIAMOND'],
     roles: ['SUPPORT'],
@@ -180,6 +183,20 @@ describe('loadRuneExport', () => {
     );
     await expect(loadRuneExport('SUPPORT', 7)).rejects.toThrow();
   });
+
+  it('rejects rune exports from a pre-D-102 (v5) cache as unverifiable', async () => {
+    // Manifest v5 predates BL-013a: its rune files carry no players count,
+    // no weight cap and no distinct-player gate, so the evidence rules the
+    // setup result reports cannot be honored. Degrade to "no rune data".
+    seedCache({ 'roles/SUPPORT/runes/7.json': runeExport }, 5);
+    expect(await loadRuneExport('SUPPORT', 7)).toBeNull();
+  });
+
+  it('accepts rune exports from a v6 cache (first evidence-rule layout)', async () => {
+    seedCache({ 'roles/SUPPORT/runes/7.json': runeExport }, 6);
+    const loaded = await loadRuneExport('SUPPORT', 7);
+    expect(loaded?.contexts).toHaveLength(1);
+  });
 });
 
 describe('loadSetupRunes', () => {
@@ -212,6 +229,20 @@ describe('loadSetupRunes', () => {
     expect(result.dataAvailable).toBe(false);
     expect(result.broaderStatistic?.kind).toBe('championRoleWinRate');
     expect(result.broaderStatistic?.winRate).not.toBeNull();
+  });
+
+  it('topPlayers mode on a v5 cache falls back instead of trusting legacy rune figures', async () => {
+    seedCache({ 'roles/SUPPORT/runes/7.json': runeExport }, 5);
+    const result = await loadSetupRunes({
+      mode: 'topPlayers',
+      championId: 7,
+      draft,
+      pickData,
+      nowMs: NOW_MS,
+    });
+    expect(result.dataAvailable).toBe(false);
+    expect(result.pages).toEqual([]);
+    expect(result.broaderStatistic?.kind).toBe('championRoleWinRate');
   });
 
   it('myData mode reads the profile and never touches the rune export', async () => {

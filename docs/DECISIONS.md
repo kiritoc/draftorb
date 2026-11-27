@@ -1561,4 +1561,3 @@ D-106 asks to check the effect of Top's role-quest Teleport upgrade (live since 
 - If the verdict is GO (per source: LCU, Live Client Data API), the design consequences are: register/annotate the product in the Developer Portal with endpoint disclosure; a kill switch disabling LCU features without rewrite; re-verification of the verdict each major patch; and the empirical field check — the owner runs `scripts/live-client-probe.mjs` during a real game and attaches the output to #180 before sign-off.
 - If NO-GO or ambiguous: default is NO-GO per the ticket; M3 scope reduces to manual input + screenshot fallback evaluation (D-007/D-105 plan B).
 - Status: **PROPOSED** — awaiting owner review of the cited passages and the probe output; the per-source verdict is recorded here on decision.
-

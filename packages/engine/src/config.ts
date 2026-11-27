@@ -134,9 +134,8 @@ export const DEFAULT_CONFIG: RankWeightingConfig = rankWeightingConfigSchema.par
   alpha: 0.25,
   wMax: 2.0,
   exportMinGames: 10,
-  // D-102 placeholder priors pending the BL-013b measured values.
-  evidencePlayerWeightCap: 100,
-  evidenceMinDistinctPlayers: 2,
+  evidencePlayerWeightCap: 30,
+  evidenceMinDistinctPlayers: 3,
   evidenceMasterPlusOnly: false,
   pairMainEffectAdjust: false,
   influence: {

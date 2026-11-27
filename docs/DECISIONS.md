@@ -1477,7 +1477,7 @@ The D-023 gate failed on the first real report (BL-014): on holdout patch 16.22 
 
 (Renumbered D-129→D-130 after BL-017 took D-129 on main, then D-130→D-133 after BL-025 claimed D-130 on `feat/bl-025-windows-installer`; D-131 is BL-052 and D-132 is BL-013.)
 
-### D-135 — Top Teleport quest check: summoner advice unchanged (BL-031a, D-106) — RECORDED
+### D-137 — Top Teleport quest check: summoner advice unchanged (BL-031a, D-106) — RECORDED
 
 D-106 asks to check the effect of Top's role-quest Teleport upgrade (live since public patch 26.1) on summoner advice. Verified against real match-v5 data, not assumed:
 

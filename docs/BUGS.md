@@ -6,6 +6,7 @@ Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATI
 
 | ID    | Sev | Area    | Title                                                                                                                                                                                                                                        | Status | Found by/date              | Ticket  |
 | ----- | --- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | -------------------------- | ------- |
+| B-081 | S3  | engine  | `recommendProfileRunes`/`recommendProfileSpells` filtered profile games to `role === 'SUPPORT'` only, so the "my data" setup path silently returned nothing for TOP/JUNGLE (D-097 scope)                                                     | FIXED  | Devin/2026-11-28           | BL-030a |
 | B-079 | S3  | etl     | ETL end-to-end on Windows is unverified (AUDIT §5j): the Windows CI job proves install + `pnpm check` + better-sqlite3 prebuilt, but no ticket runs the real pipeline there                                                                  | OPEN   | Devin/2026-11-26           | BL-003  |
 | B-078 | S4  | etl     | `aggregate.test.ts` timed out twice at the 15s vitest limit on `windows-latest` CI (plus a vitest worker RPC timeout); passed on rerun with no code change — suspected slow-runner flake                                                     | OPEN   | Devin/2026-11-26           | BL-026  |
 | B-080 | S3  | desktop | Matchup layers pinned off: the backtest report is not part of the aggregate archive, so `PickScreen` cannot drive `matchupEnabled` from `backtest-draft.json` yet                                                                            | OPEN   | Devin/2026-11-26           | BL-014  |
@@ -45,6 +46,14 @@ Review notes that predate the bug log live in [Review history](#review-history) 
 ```
 
 ## Fixed
+
+### B-081 — Profile setup functions ignored non-SUPPORT games — FIXED
+
+- Severity / Area: S3 / engine (`profile-setup.ts`, BL-030a)
+- Steps to reproduce: call `recommendProfileRunes`/`recommendProfileSpells` for a TOP or JUNGLE champion with profile games recorded in that role.
+- Expected / Actual: expected the profile's own games in the picked role to count; actual both `buildWeightedGames` and `aggregateSetup` hardcoded `game.role !== 'SUPPORT'`, so every non-SUPPORT game was dropped and the picks came back empty/insufficient.
+- Suspected cause: T-097 implemented the profile setup path while profile scope was still Support-only (pre-D-097).
+- Fix (commit/ticket): both functions take an explicit `role: Role` parameter (callers pass `input.userRole`); `SetupRunesData`/profile fallback levels unchanged — TOP/JUNGLE matchup contexts remain support-shaped, logged as D-135 PROPOSED.
 
 ### B-076 — `publish-public` shipped files the manifest does not cover — FIXED
 

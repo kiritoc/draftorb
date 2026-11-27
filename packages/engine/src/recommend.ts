@@ -98,7 +98,7 @@ export function recommend(
 ): DraftResult {
   const userBucket = rankToBucket(input.userRank);
   const myRole = input.userRole;
-  // D-130: with matchup layers off the score is exactly the baseline prior.
+  // D-133: with matchup layers off the score is exactly the baseline prior.
   const matchupOn = config.matchupEnabled;
   // Minimal roles (ADC/MID, D-097/BL-024) rank on champion-level statistics
   // only: no role inference and no pair, lane, comp or blind layers.
@@ -297,7 +297,7 @@ export function recommend(
       ...hardCounterWarnings(pairInfo.deltas, rc.hardCounterDeltaPp),
     ];
 
-    // D-130: with matchup layers off (report flag or minimal role) the score
+    // D-133: with matchup layers off (report flag or minimal role) the score
     // IS the baseline prior — no logit/sigmoid round-trip, so it equals
     // `championBaseline` exactly.
     scored.push({

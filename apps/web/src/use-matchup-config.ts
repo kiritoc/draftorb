@@ -1,5 +1,5 @@
 /**
- * @draftorb/web — Matchup-layer config hook (D-130, BL-014).
+ * @draftorb/web — Matchup-layer config hook (D-133, BL-014).
  *
  * Resolves the engine matchup config from the backtest report once the
  * current export patch is known: the report must validate the role on the

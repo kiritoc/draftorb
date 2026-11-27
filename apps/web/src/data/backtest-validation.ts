@@ -7,7 +7,7 @@ export interface MatchupConfig {
 }
 
 /**
- * D-130: the matchup layers run only when the backtest report explicitly
+ * D-133: the matchup layers run only when the backtest report explicitly
  * validates them (`validationStatus: 'validated'` + `matchup.enabled`) AND
  * the report covers the role being drafted AND was validated on the same
  * patch as the loaded aggregate export. Anything else — missing report,

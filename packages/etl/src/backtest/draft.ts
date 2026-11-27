@@ -140,7 +140,7 @@ export interface BacktestReport {
   calibration: CalibrationBin[];
   perRole: Record<Role, RoleMetrics>;
   gate: BacktestGate | null;
-  /** D-130 matchup experiment result; null when the report is insufficient
+  /** D-133 matchup experiment result; null when the report is insufficient
    *  or the command did not run the experiment. */
   matchup: MatchupExperiment | null;
   insufficientData: boolean;
@@ -157,7 +157,7 @@ export interface MatchupCandidateResult {
 }
 
 /**
- * D-130 matchup experiment: `matchupShrinkK` candidates are selected on the
+ * D-133 matchup experiment: `matchupShrinkK` candidates are selected on the
  * last training patch only (never the holdout), then evaluated once on the
  * holdout through the paired-bootstrap gate. `enabled` is true only when
  * the selected variant beats the champion baseline significantly.
@@ -607,7 +607,7 @@ export interface PatchEvaluation {
 /**
  * Evaluate one patch's matches through the engine with the given role set —
  * the same scoring path as the holdout report, usable for train-only
- * validation (D-130 k selection) and single-shot holdout variant checks.
+ * validation (D-133 k selection) and single-shot holdout variant checks.
  */
 export function evaluatePatch(
   rows: readonly DraftRow[],

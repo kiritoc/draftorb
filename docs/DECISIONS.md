@@ -1435,7 +1435,7 @@ Open question for the owner: none blocking — if ADC/MID later get full matchup
 
 (Renumbered from the branch's original D-127 after BL-051/BL-024 took D-127/D-128 on main.)
 
-### D-130 — Matchup layers behind a report-driven flag; champion baseline is the default ranking — ACCEPTED (owner, 2026-11-26, BL-014)
+### D-133 — Matchup layers behind a report-driven flag; champion baseline is the default ranking — ACCEPTED (owner, 2026-11-26, BL-014)
 
 The D-023 gate failed on the first real report (BL-014): on holdout patch 16.22 the deployed engine's log-loss (0.6972) is significantly _worse_ than the champion-baseline-only model (0.6950); paired bootstrap Δ = −0.0023, 95% CI [−0.0029, −0.0016] on the `match` unit and [−0.0028, −0.0018] on the `player` unit (repeat appearances clustered by player id). The owner rejected both ticket fallback options (champion-level stats only / keep the unvalidated ranking) and chose a third: **baseline by default, matchups behind a flag driven by the backtest report**.
 
@@ -1449,4 +1449,4 @@ The D-023 gate failed on the first real report (BL-014): on holdout patch 16.22 
 - **Scope links**: extends D-097 (ADC/MID already champion-level only — now the default for every role until validated) and amends the D-100 "unvalidated model" label semantics: the label is replaced by the baseline-ranking banner while `matchup.enabled` is false. SPECS §5 documents the two new config params. Composes with D-128 (minimal roles): ADC/MID skip the layers unconditionally, so the flag only governs SUPPORT/TOP/JUNGLE.
 - **First run (BL-014, patch 16.22 holdout)**: the train-only CV on patch 16.21 selected variant `off` — champion baseline log-loss 0.6958 beat every matchup variant (k=0: 0.6962; k=25..400: 0.6962–0.6963). Shrinkage did not recover the signal, so `matchup.enabled = false`, `validationStatus = 'unvalidated'` and the app stays on the champion-baseline ranking. The negative result is kept in `backtest-draft.json` (`matchup.candidates`) for the ×3/×10 revisit.
 
-(Renumbered from the branch's original D-129 after BL-017 took D-129 on main.)
+(Renumbered D-129→D-130 after BL-017 took D-129 on main, then D-130→D-133 after BL-025 claimed D-130 on `feat/bl-025-windows-installer`; D-131 is BL-052 and D-132 is BL-013.)

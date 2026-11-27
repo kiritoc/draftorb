@@ -60,7 +60,7 @@ export const ETL_CONFIG = Object.freeze({
      */
     minHoldoutMatches: 30,
     /**
-     * D-130 `matchupShrinkK` candidates tried on the last training patch
+     * D-133 `matchupShrinkK` candidates tried on the last training patch
      * (train-only selection); 'off' (matchup layers disabled) is always
      * evaluated first as the baseline candidate.
      */

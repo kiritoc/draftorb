@@ -197,19 +197,6 @@ export function PoolEditor({
           </button>
         </div>
 
-        {message !== null && (
-          <p
-            role={message.kind === 'error' ? 'alert' : 'status'}
-            className={`mb-4 rounded border px-3 py-2 text-sm ${
-              message.kind === 'error'
-                ? 'border-red-300 bg-red-50 text-red-700 dark:border-red-500/40 dark:bg-red-900/30 dark:text-red-300'
-                : 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-500/40 dark:bg-indigo-900/30 dark:text-indigo-300'
-            }`}
-          >
-            {message.text}
-          </p>
-        )}
-
         <PoolAddForm
           champions={champions}
           iconVersion={iconVersion}
@@ -238,6 +225,7 @@ export function PoolEditor({
           pool={working}
           dirty={dirty}
           repoFolder={repoFolder}
+          message={message}
           onApplyJson={handleApplyJson}
           onRepoImport={() => void handleRepoImport()}
           onRepoExport={() => void handleRepoExport()}

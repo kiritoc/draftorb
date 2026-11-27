@@ -8,6 +8,7 @@ import { useState, type ReactElement } from 'react';
 
 import type { PoolConfig } from '@draftorb/shared';
 import { strings } from '../strings';
+import type { PoolEditorMessage } from '../pool/pool-editor-state';
 import { serializePoolConfig } from '../pool/pool-model';
 
 export interface PoolTransferSectionProps {
@@ -15,6 +16,8 @@ export interface PoolTransferSectionProps {
   /** True when the working copy differs from the stored pool: repo export is refused. */
   dirty: boolean;
   repoFolder?: string;
+  /** Status feedback for the transfer actions, rendered next to the buttons that produced it. */
+  message: PoolEditorMessage | null;
   /** Validates and adopts pasted JSON; returns false when invalid. */
   onApplyJson: (text: string) => boolean;
   onRepoImport: () => void;
@@ -26,6 +29,7 @@ export function PoolTransferSection({
   pool,
   dirty,
   repoFolder,
+  message,
   onApplyJson,
   onRepoImport,
   onRepoExport,
@@ -54,6 +58,19 @@ export function PoolTransferSection({
         </div>
       ) : (
         <p className="text-xs text-slate-500 dark:text-slate-400">{strings.poolRepoNeedFolder}</p>
+      )}
+
+      {message !== null && (
+        <p
+          role={message.kind === 'error' ? 'alert' : 'status'}
+          className={`rounded border px-3 py-2 text-sm ${
+            message.kind === 'error'
+              ? 'border-red-300 bg-red-50 text-red-700 dark:border-red-500/40 dark:bg-red-900/30 dark:text-red-300'
+              : 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-500/40 dark:bg-indigo-900/30 dark:text-indigo-300'
+          }`}
+        >
+          {message.text}
+        </p>
       )}
 
       <details className="rounded-lg border border-slate-200 p-3 dark:border-slate-700">

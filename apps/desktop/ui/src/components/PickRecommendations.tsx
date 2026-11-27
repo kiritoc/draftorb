@@ -118,6 +118,7 @@ export function PickRecommendations({
           recommendations={visiblePoolRecommendations}
           resetKey={resetKey}
           poolIds={poolSet}
+          poolMembershipImplied
           unavailable={poolUnavailableItems}
           cardContext={cardContext}
         />

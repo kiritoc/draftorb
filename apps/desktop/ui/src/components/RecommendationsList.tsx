@@ -49,6 +49,9 @@ export interface RecommendationsListProps {
   pageSize?: number;
   resetKey: unknown;
   poolIds?: ReadonlySet<number>;
+  /** Set on the "From your pool" list: every unavailable card is a pool member
+   *  by construction, so the "In your pool" tag would be redundant (SPECS §7.1). */
+  poolMembershipImplied?: boolean;
   unavailable?: readonly UnavailableItem[];
   cardContext: RecommendationCardContext;
 }
@@ -59,6 +62,7 @@ export function RecommendationsList({
   pageSize = RECOMMENDATION_PAGE_SIZE,
   resetKey,
   poolIds,
+  poolMembershipImplied = false,
   unavailable,
   cardContext,
 }: RecommendationsListProps) {
@@ -116,7 +120,7 @@ export function RecommendationsList({
                   championId={entry.item.championId}
                   reason={entry.item.reason}
                   sample={entry.item.sample}
-                  inPool={poolIds?.has(entry.item.championId) ?? false}
+                  inPool={!poolMembershipImplied && (poolIds?.has(entry.item.championId) ?? false)}
                   champions={cardContext.champions}
                   iconVersion={cardContext.iconVersion}
                   profileLoad={cardContext.profileLoad}

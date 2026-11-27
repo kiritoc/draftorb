@@ -1435,6 +1435,12 @@ Open question for the owner: none blocking — if ADC/MID later get full matchup
 
 (Renumbered from the branch's original D-127 after BL-051/BL-024 took D-127/D-128 on main.)
 
+### D-130 — Windows installer shipped unsigned via GitHub releases (BL-025) — ACCEPTED (owner, 2026-11-27)
+
+The desktop app ships as an NSIS installer built by `.github/workflows/release.yml` on `windows-latest`: pushing a `v*` tag creates a GitHub release with the installer attached, and `workflow_dispatch` uploads the same artifact without a release. `tauri.conf.json` enables `bundle.active` with `targets: ["nsis"]` (BL-002 left bundling off and delegated the choice to this ticket; NSIS gives a single per-machine/per-user installer with no extra runner dependencies — the Tauri bundler fetches its own NSIS toolchain).
+
+The artifact is **unsigned** — owner-approved shipping state (confirmed 2026-11-27; consistent with the 2026-11-16 note on issue #113 that Smart App Control is disabled on the owner machine and signing becomes mandatory only if the app is shared). Windows SmartScreen shows the expected "Windows protected your PC" warning; the documented safe path is More info → Run anyway (SETUP.md > Installing the Windows app). No code signing, no auto-update (updates = install the newer release), no macOS/Linux builds, no secrets in the workflow or artifact. New CI-only dependencies in the workflow: `dtolnay/rust-toolchain@stable` (Rust toolchain, channel-pinned — the D-115 exception covers the Rust toolchain for `apps/desktop` builds) and `Swatinem/rust-cache@v2` (cargo build cache). Both are GitHub Actions of a few KB each (`dtolnay/rust-toolchain` MIT, `Swatinem/rust-cache` LGPL-3.0 — CI-only, never shipped), pinned to a major tag like the rest of the workflow; they add no runtime footprint and use no secrets.
+
 ### D-133 — Matchup layers behind a report-driven flag; champion baseline is the default ranking — ACCEPTED (owner, 2026-11-26, BL-014)
 
 The D-023 gate failed on the first real report (BL-014): on holdout patch 16.22 the deployed engine's log-loss (0.6972) is significantly _worse_ than the champion-baseline-only model (0.6950); paired bootstrap Δ = −0.0023, 95% CI [−0.0029, −0.0016] on the `match` unit and [−0.0028, −0.0018] on the `player` unit (repeat appearances clustered by player id). The owner rejected both ticket fallback options (champion-level stats only / keep the unvalidated ranking) and chose a third: **baseline by default, matchups behind a flag driven by the backtest report**.

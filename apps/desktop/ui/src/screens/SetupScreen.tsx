@@ -13,8 +13,10 @@
  * Draft-slot context (allies/enemies) is intentionally not entered here
  * yet (D-138 PROPOSED): pages resolve at the broader labeled contexts
  * (damage mix / global for experts, champion level for the profile).
- * BL-031b (#93) adds the summoners and starters sections below this one —
- * keep new setup sections additive under the same shell.
+ * BL-031b (#93) added the summoner-spells and starter-items sections below
+ * the runes one — they share the same mode switch and Master+ toggle and
+ * query their own mode-switched loaders (`loadSetupSpells`,
+ * `loadSetupStarters`) on the same inputs.
  */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -30,12 +32,16 @@ import {
   type RuneTrees,
   type SetupMode,
   type SetupRuneResult,
+  type SetupSpellsResult,
+  type SetupStartersResult,
 } from '@draftorb/shared';
 
 import { championName } from '../champion-name';
 import { ChampionPicker } from '../components/ChampionPicker';
 import { RoleSelector } from '../components/RoleSelector';
 import { SetupRunePages } from '../components/SetupRunePages';
+import { SetupSpells } from '../components/SetupSpells';
+import { SetupStarters } from '../components/SetupStarters';
 import { ROLE_ORDER } from '../config';
 import { loadChampionIconVersion } from '../data/champion-icons';
 import {
@@ -44,15 +50,19 @@ import {
   type ChampionCatalog,
   type PickData,
 } from '../data/export-data';
+import { buildItemIndex, loadItemCatalog, type ItemIconInfo } from '../data/items';
 import { buildRuneIconIndex, loadRuneCatalog, type RuneIconInfo } from '../data/runes';
 import { loadSetupRoles } from '../data/setup-roles';
 import { loadSetupRunes } from '../data/setup-runes';
+import { loadSetupSpells } from '../data/setup-spells';
+import { loadSetupStarters } from '../data/setup-starters';
 import type { ProfileLoad } from '../profile/profile-export';
 import { strings } from '../strings';
 
 const DEFAULT_RANK: Rank = 'DIAMOND';
 const SETUP_MODES: readonly SetupMode[] = ['topPlayers', 'myData'];
 const EMPTY_ICONS: ReadonlyMap<number, RuneIconInfo> = new Map();
+const EMPTY_ITEMS: ReadonlyMap<number, ItemIconInfo> = new Map();
 
 export interface SetupScreenProps {
   /** Role picked on the pick screen; used as the initial setup role. */
@@ -81,7 +91,12 @@ export function SetupScreen({
   const [catalog, setCatalog] = useState<ChampionCatalog | null>(null);
   const [iconVersion, setIconVersion] = useState<string | null>(null);
   const [runeTrees, setRuneTrees] = useState<RuneTrees | null>(null);
+  const [itemCatalog, setItemCatalog] = useState<ReadonlyMap<number, ItemIconInfo> | null>(null);
   const [result, setResult] = useState<SetupRuneResult | null>(null);
+  const [spellsResult, setSpellsResult] = useState<SetupSpellsResult | null>(null);
+  const [startersResult, setStartersResult] = useState<SetupStartersResult | null>(null);
+  const [spellsError, setSpellsError] = useState<string | null>(null);
+  const [startersError, setStartersError] = useState<string | null>(null);
   const [queryPending, setQueryPending] = useState(false);
   const [noData, setNoData] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -116,6 +131,10 @@ export function SetupScreen({
     let cancelled = false;
     setPickData(null);
     setResult(null);
+    setSpellsResult(null);
+    setStartersResult(null);
+    setSpellsError(null);
+    setStartersError(null);
     setNoData(false);
     setLoadError(null);
     void loadPickData(role)
@@ -181,6 +200,25 @@ export function SetupScreen({
     };
   }, [dataPatch]);
 
+  // Item catalog (`<patch>/items.json`): display-only for the starter
+  // bundles, same degradation contract as the rune catalog — a missing or
+  // unreadable catalog degrades to id-only bundles instead of failing the
+  // starter query (unlike the fail-closed manifest files).
+  useEffect(() => {
+    if (dataPatch === undefined) return;
+    let cancelled = false;
+    void loadItemCatalog(dataPatch)
+      .then((items) => {
+        if (!cancelled) setItemCatalog(items === null ? null : buildItemIndex(items));
+      })
+      .catch(() => {
+        if (!cancelled) setItemCatalog(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [dataPatch]);
+
   const champions: Champion[] = useMemo(
     () => catalog?.champions ?? pickData?.champions ?? [],
     [pickData, catalog],
@@ -189,6 +227,7 @@ export function SetupScreen({
     () => (runeTrees === null ? EMPTY_ICONS : buildRuneIconIndex(runeTrees)),
     [runeTrees],
   );
+  const items = useMemo(() => itemCatalog ?? EMPTY_ITEMS, [itemCatalog]);
 
   // The setup screen enters no draft slots yet (D-138): allies/enemies stay
   // empty so lane/matchup contexts simply do not match and pages resolve at
@@ -216,38 +255,66 @@ export function SetupScreen({
     [masterPlus],
   );
 
-  // Mode switch re-queries the chosen source: `loadSetupRunes` re-reads the
-  // rune export only for topPlayers and re-aggregates the profile for
-  // myData, with no restart and no hidden state (D-134).
+  // Mode switch re-queries the chosen source for every setup section
+  // (BL-030b runes, BL-031b summoners + starters): each loader re-reads its
+  // per-champion export only for topPlayers and re-aggregates the profile
+  // for myData, with no restart and no hidden state (D-134). The three
+  // queries run together on the same inputs; each section keeps its own
+  // error state so one corrupt export cannot hide the others (fail-closed
+  // per file, like the rune loader).
   useEffect(() => {
     if (championId === null || pickData === null) {
       setResult(null);
+      setSpellsResult(null);
+      setStartersResult(null);
+      setSpellsError(null);
+      setStartersError(null);
       setQueryPending(false);
       return;
     }
     let cancelled = false;
     setQueryPending(true);
-    void loadSetupRunes({
+    const base = {
       mode,
       championId,
       draft,
       pickData,
       ...(profile !== undefined ? { profile } : {}),
       config: runeConfig,
-    })
-      .then((loaded) => {
-        if (cancelled) return;
-        setResult(loaded);
+    } as const;
+    void Promise.allSettled([
+      loadSetupRunes(base),
+      loadSetupSpells(base),
+      loadSetupStarters(base),
+    ]).then(([runes, spells, starters]) => {
+      if (cancelled) return;
+      if (runes.status === 'fulfilled') {
+        setResult(runes.value);
         setLoadError(null);
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
+      } else {
         setResult(null);
-        setLoadError(err instanceof Error ? err.message : String(err));
-      })
-      .finally(() => {
-        if (!cancelled) setQueryPending(false);
-      });
+        setLoadError(runes.reason instanceof Error ? runes.reason.message : String(runes.reason));
+      }
+      if (spells.status === 'fulfilled') {
+        setSpellsResult(spells.value);
+        setSpellsError(null);
+      } else {
+        setSpellsResult(null);
+        setSpellsError(
+          spells.reason instanceof Error ? spells.reason.message : String(spells.reason),
+        );
+      }
+      if (starters.status === 'fulfilled') {
+        setStartersResult(starters.value);
+        setStartersError(null);
+      } else {
+        setStartersResult(null);
+        setStartersError(
+          starters.reason instanceof Error ? starters.reason.message : String(starters.reason),
+        );
+      }
+      setQueryPending(false);
+    });
     return () => {
       cancelled = true;
     };
@@ -344,18 +411,46 @@ export function SetupScreen({
             <p className="text-slate-600 dark:text-slate-300">{strings.setupPickChampion}</p>
           ) : queryPending ? (
             <p className="text-slate-500 dark:text-slate-400">{strings.loading}</p>
-          ) : loadError !== null ? (
-            <p className="text-red-600 dark:text-red-400">{strings.loadFailed(loadError)}</p>
-          ) : result !== null ? (
-            <SetupRunePages
-              result={result}
-              championName={selectedName ?? strings.championFallback(championId)}
-              roleName={strings.roleNames[result.myRole]}
-              {...(profileLabel !== undefined ? { profileLabel } : {})}
-              icons={runeIcons}
-              iconVersion={iconVersion}
-            />
-          ) : null}
+          ) : (
+            <div className="space-y-8">
+              {loadError !== null ? (
+                <p className="text-red-600 dark:text-red-400">{strings.loadFailed(loadError)}</p>
+              ) : result !== null ? (
+                <SetupRunePages
+                  result={result}
+                  championName={selectedName ?? strings.championFallback(championId)}
+                  roleName={strings.roleNames[result.myRole]}
+                  {...(profileLabel !== undefined ? { profileLabel } : {})}
+                  icons={runeIcons}
+                  iconVersion={iconVersion}
+                />
+              ) : null}
+              {spellsError !== null ? (
+                <p className="text-red-600 dark:text-red-400">{strings.loadFailed(spellsError)}</p>
+              ) : spellsResult !== null ? (
+                <SetupSpells
+                  result={spellsResult}
+                  championName={selectedName ?? strings.championFallback(championId)}
+                  roleName={strings.roleNames[spellsResult.myRole]}
+                  {...(profileLabel !== undefined ? { profileLabel } : {})}
+                />
+              ) : null}
+              {startersError !== null ? (
+                <p className="text-red-600 dark:text-red-400">
+                  {strings.loadFailed(startersError)}
+                </p>
+              ) : startersResult !== null ? (
+                <SetupStarters
+                  result={startersResult}
+                  championName={selectedName ?? strings.championFallback(championId)}
+                  roleName={strings.roleNames[startersResult.myRole]}
+                  {...(profileLabel !== undefined ? { profileLabel } : {})}
+                  items={items}
+                  iconVersion={iconVersion}
+                />
+              ) : null}
+            </div>
+          )}
         </>
       )}
     </div>

@@ -13,10 +13,13 @@ export {
   DRAFT_RESULT_SCHEMA_VERSION,
   RUNE_RESULT_SCHEMA_VERSION,
   SUMMONER_RESULT_SCHEMA_VERSION,
+  STARTER_RESULT_SCHEMA_VERSION,
   PROFILE_CONFIG_SCHEMA_VERSION,
   PROFILE_EXPORT_SCHEMA_VERSION,
   PERSONAL_RESULT_SCHEMA_VERSION,
   SETUP_RESULT_SCHEMA_VERSION,
+  SETUP_SPELLS_RESULT_SCHEMA_VERSION,
+  SETUP_STARTERS_RESULT_SCHEMA_VERSION,
 } from './schemas/core.js';
 export { RUNE_CONTEXT_LEVELS } from './rune-context.js';
 
@@ -242,6 +245,9 @@ export {
   starterContextEntrySchema,
   starterChampionExportSchema,
   starterRoleExportSchema,
+  starterRecommendDataSchema,
+  starterPickSchema,
+  starterRecommendationResultSchema,
 } from './schemas/starters.js';
 export type {
   StarterBundleItem,
@@ -249,6 +255,9 @@ export type {
   StarterContextEntry,
   StarterChampionExport,
   StarterRoleExport,
+  StarterRecommendData,
+  StarterPick,
+  StarterRecommendationResult,
 } from './schemas/starters.js';
 
 export {
@@ -261,6 +270,11 @@ export {
   setupRunePageSchema,
   setupBroaderStatisticSchema,
   setupRuneResultSchema,
+  setupSpellPickSchema,
+  setupSpellsResultSchema,
+  setupStarterSourceSchema,
+  setupStarterPickSchema,
+  setupStartersResultSchema,
 } from './schemas/setup.js';
 export type {
   SetupMode,
@@ -272,6 +286,11 @@ export type {
   SetupRunePage,
   SetupBroaderStatistic,
   SetupRuneResult,
+  SetupSpellPick,
+  SetupSpellsResult,
+  SetupStarterSource,
+  SetupStarterPick,
+  SetupStartersResult,
 } from './schemas/setup.js';
 
 export {

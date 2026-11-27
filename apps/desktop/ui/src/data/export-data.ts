@@ -147,6 +147,22 @@ export async function loadCachedRelease(): Promise<CachedRelease | null> {
   return { latest, manifest };
 }
 
+/**
+ * True when the cached manifest lists `path` (patch-relative, e.g.
+ * `roles/SUPPORT/starters/7.json`; a leading `/` marks archive-root
+ * entries). The download overwrites only the files the new archive
+ * contains and a same-patch refresh keeps the whole patch directory, so a
+ * cache file absent from the manifest may be a stale leftover from an
+ * older release — callers must treat it as missing instead of serving
+ * retired recommendations (BL-031b review).
+ */
+export function manifestListsFile(
+  manifest: { readonly files: readonly { readonly path: string }[] },
+  path: string,
+): boolean {
+  return manifest.files.some((file) => file.path === path || file.path === `/${path}`);
+}
+
 export interface ChampionCatalog {
   patch: string;
   champions: Champion[];
@@ -181,12 +197,19 @@ export async function loadPickData(role: Role): Promise<PickData | null> {
   // Archive-root entries ('/latest.json', '/champion-tags.json') are already
   // loaded through their dedicated paths above/below; only patch-relative
   // entries belong to the RecommendData file map.
-  // Per-champion rune exports (`roles/<ROLE>/runes/<championId>.json`) are
-  // not part of RecommendData: the setup screen reads them lazily per
-  // champion (setup-runes.ts), so parsing every manifest-listed rune file
-  // here would defeat that and slow startup.
+  // Per-champion setup exports (`roles/<ROLE>/runes/<championId>.json`,
+  // `.../summoners/...`, `.../starters/...`) are not part of RecommendData:
+  // the setup screen reads them lazily per champion (setup-runes.ts,
+  // setup-spells.ts, setup-starters.ts), so parsing every manifest-listed
+  // per-champion file here would defeat that and slow startup. The role-level
+  // `roles/<ROLE>/starters.json` fallback stays in the eager set (one small
+  // file per role, needed by the starters query).
   const patchEntries = manifest.files.filter(
-    (file) => !file.path.startsWith('/') && !file.path.includes('/runes/'),
+    (file) =>
+      !file.path.startsWith('/') &&
+      !file.path.includes('/runes/') &&
+      !file.path.includes('/summoners/') &&
+      !file.path.includes('/starters/'),
   );
   // A corrupt file under another role's folder must not break this role
   // (D-126 already treats it as zero coverage for that role); anything

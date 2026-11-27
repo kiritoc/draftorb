@@ -189,6 +189,25 @@ describe('recommendSummoners', () => {
     expect(result.pairs[1]?.winRate).toBeCloseTo((9 + (40 * 60) / 140) / 50, 6);
   });
 
+  it('never lets a thin pair outrank a sufficient one', () => {
+    // A high-scoring pair without a verifiable player count (fails the
+    // D-102 gate closed) must not push a sufficient pair out of the
+    // topPairs slots (BL-031b review).
+    const thinGlobal = mkPair(4, 7, 55, 100, 100);
+    const sufficientLane = mkPair(4, 14, 20, 40, 40, { players: 9 });
+    const exportData = summonerExp([
+      ctx(LANE3_KEY, 1, [sufficientLane]),
+      ctx('global', 5, [thinGlobal]),
+    ]);
+
+    const result = recommendSummoners(draft(), CHAMP, exportData, summonerData());
+
+    expect(result.pairs[0]?.summoner1Id).toBe(4);
+    expect(result.pairs[0]?.summoner2Id).toBe(14);
+    expect(result.pairs[0]?.contextKey).toBe(LANE3_KEY);
+    expect(result.pairs[1]?.summoner2Id).toBe(7);
+  });
+
   it('shrinks toward 0.5 when the pair has no broader context', () => {
     const pair = mkPair(4, 14, 9, 10, 10);
     const exportData = summonerExp([ctx(LANE3_KEY, 1, [pair])]);

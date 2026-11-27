@@ -20,8 +20,9 @@ import type { SetupRunePage, SetupRuneResult } from '@draftorb/shared';
 
 import type { RuneIconInfo } from '../data/runes';
 import { runeIconUrl } from '../data/runes';
-import { broaderStatsText, dataSourceLabel, pageSourceLabel, pageStatsText } from '../setup/format';
+import { dataSourceLabel, pageSourceLabel, pageStatsText } from '../setup/format';
 import { strings } from '../strings';
+import { BroaderStatisticBlock, setupEvidenceText } from './SetupEvidence';
 
 export interface SetupRunePagesProps {
   result: SetupRuneResult;
@@ -85,49 +86,6 @@ function pageTitle(page: SetupRunePage, icons: ReadonlyMap<number, RuneIconInfo>
   return parts.join(' · ');
 }
 
-function evidenceText(result: SetupRuneResult): string {
-  const base =
-    result.evidence.kind === 'expert'
-      ? strings.setupEvidenceExpert(
-          result.evidence.minDistinctPlayers,
-          result.evidence.playerWeightCap,
-        )
-      : strings.setupEvidenceProfile(result.evidence.minSetupGames);
-  return result.evidence.kind === 'expert' && result.evidence.masterPlusOnly
-    ? `${base} · ${strings.setupMasterPlusTag}`
-    : base;
-}
-
-function BroaderStatisticBlock({
-  result,
-  championName,
-  roleName,
-}: {
-  result: SetupRuneResult;
-  championName: string;
-  roleName: string;
-}) {
-  const stat = result.broaderStatistic;
-  if (stat === null) return null;
-  const label =
-    stat.kind === 'championRoleWinRate'
-      ? strings.setupBroaderChampionRole(championName, roleName)
-      : strings.setupBroaderProfileChampion(championName);
-  return (
-    <div
-      role="note"
-      className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 dark:border-amber-500/40 dark:bg-amber-900/20"
-    >
-      <p className="text-sm font-medium text-amber-900 dark:text-amber-200">
-        {strings.setupBroaderTitle}
-      </p>
-      <p className="mt-1 text-sm text-amber-900/90 dark:text-amber-100/90">
-        {label}: {broaderStatsText(stat)}
-      </p>
-    </div>
-  );
-}
-
 function RunePageCard({
   page,
   rank,
@@ -182,8 +140,15 @@ export function SetupRunePages({
           {strings.setupDataSource(dataSourceLabel(result.dataSource, profileLabel))}
         </p>
       </div>
-      <p className="text-xs text-slate-500 dark:text-slate-400">{evidenceText(result)}</p>
-      <BroaderStatisticBlock result={result} championName={championName} roleName={roleName} />
+      <p className="text-xs text-slate-500 dark:text-slate-400">
+        {setupEvidenceText(result.evidence)}
+      </p>
+      <BroaderStatisticBlock
+        stat={result.broaderStatistic}
+        championName={championName}
+        roleName={roleName}
+        scope={strings.setupBroaderScopeRunes}
+      />
       {result.pages.length > 0 ? (
         <ol className="grid grid-cols-1 gap-4 md:grid-cols-3">
           {result.pages.map((page, index) => (

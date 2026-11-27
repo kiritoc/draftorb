@@ -16,7 +16,14 @@
 
 import { z } from 'zod';
 
-import { championIdSchema, itemIdSchema, rankBucketSchema, roleSchema } from './core.js';
+import {
+  STARTER_RESULT_SCHEMA_VERSION,
+  championIdSchema,
+  itemIdSchema,
+  rankBucketSchema,
+  roleSchema,
+} from './core.js';
+import { championRoleProbabilitiesSchema } from './champions.js';
 
 // --- Starter export schemas (starter_ctx table) ---
 
@@ -74,3 +81,53 @@ export const starterRoleExportSchema = z
   })
   .strict();
 export type StarterRoleExport = z.infer<typeof starterRoleExportSchema>;
+
+// --- Starter recommendation schemas (engine output, BL-031b) ---
+
+/**
+ * Data the starter recommender needs: only role probabilities, for the
+ * lane-context slot inference (`lane:<slots>` level). The champion/role/
+ * global levels carry no matchup signal.
+ */
+export const starterRecommendDataSchema = z
+  .object({
+    /** championId -> { role: prob } (same table as `RecommendData.roleProb`). */
+    roleProb: championRoleProbabilitiesSchema,
+  })
+  .strict();
+export type StarterRecommendData = z.infer<typeof starterRecommendDataSchema>;
+
+/**
+ * One recommended starter bundle. `winRate` is the shrunk estimate and
+ * `nEff`/`players` are the effective sample size and distinct expert count
+ * of the most specific context the bundle was scored in — a win rate is
+ * never reported without its sample size (SPECS §8.1 evidence rules).
+ */
+export const starterPickSchema = z
+  .object({
+    /** The bundle items, sorted by itemId (`starterBundleKey` grouping). */
+    items: z.array(starterBundleItemSchema).min(1),
+    winRate: z.number().min(0).max(1),
+    nEff: z.number().nonnegative(),
+    players: z.number().int().nonnegative().optional(),
+    pickShare: z.number().min(0).max(1),
+    lowData: z.boolean(),
+    /** Most specific back-off context the bundle was scored in. */
+    contextKey: z.string().min(1),
+    contextLevel: z.number().int().nonnegative(),
+  })
+  .strict();
+export type StarterPick = z.infer<typeof starterPickSchema>;
+
+export const starterRecommendationResultSchema = z
+  .object({
+    schemaVersion: z.literal(STARTER_RESULT_SCHEMA_VERSION),
+    championId: championIdSchema,
+    myRole: roleSchema,
+    /** Top bundles by shrunk win rate (at most the configured bundle count). */
+    bundles: z.array(starterPickSchema),
+    /** False when no starter export (or no context for the rank bucket) exists. */
+    dataAvailable: z.boolean(),
+  })
+  .strict();
+export type StarterRecommendationResult = z.infer<typeof starterRecommendationResultSchema>;

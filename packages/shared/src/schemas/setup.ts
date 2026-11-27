@@ -18,7 +18,14 @@
 
 import { z } from 'zod';
 
-import { SETUP_RESULT_SCHEMA_VERSION, championIdSchema, roleSchema } from './core.js';
+import {
+  SETUP_RESULT_SCHEMA_VERSION,
+  SETUP_SPELLS_RESULT_SCHEMA_VERSION,
+  SETUP_STARTERS_RESULT_SCHEMA_VERSION,
+  championIdSchema,
+  roleSchema,
+} from './core.js';
+import { starterBundleItemSchema } from './starters.js';
 
 /** Setup screen data modes (D-134): expert aggregate vs the player's own games. */
 export const setupModeSchema = z.enum(['topPlayers', 'myData']);
@@ -137,3 +144,93 @@ export const setupRuneResultSchema = z
   })
   .strict();
 export type SetupRuneResult = z.infer<typeof setupRuneResultSchema>;
+
+/**
+ * One recommended summoner-spell pair, normalized across both modes like
+ * `SetupRunePage`: `spell1Id`/`spell2Id` are the unordered pair normalized
+ * to `[min, max]` (SPECS §18.5). Same sample-size and evidence fields —
+ * `players`/`pickShare` for expert figures, `games` for profile figures.
+ */
+export const setupSpellPickSchema = z
+  .object({
+    spell1Id: z.number().int().positive(),
+    spell2Id: z.number().int().positive(),
+    winRate: z.number().min(0).max(1).nullable(),
+    nEff: z.number().nonnegative(),
+    games: z.number().int().nonnegative().optional(),
+    players: z.number().int().nonnegative().optional(),
+    pickShare: z.number().min(0).max(1).optional(),
+    insufficientData: z.boolean(),
+    source: setupPageSourceSchema,
+    sourceLevel: z.number().int().nullable(),
+  })
+  .strict();
+export type SetupSpellPick = z.infer<typeof setupSpellPickSchema>;
+
+export const setupSpellsResultSchema = z
+  .object({
+    schemaVersion: z.literal(SETUP_SPELLS_RESULT_SCHEMA_VERSION),
+    championId: championIdSchema,
+    myRole: roleSchema,
+    mode: setupModeSchema,
+    dataSource: setupDataSourceSchema,
+    evidence: setupEvidenceSchema,
+    picks: z.array(setupSpellPickSchema),
+    broaderStatistic: setupBroaderStatisticSchema.nullable(),
+    /** False when the mode's data source has nothing usable for this champion. */
+    dataAvailable: z.boolean(),
+  })
+  .strict();
+export type SetupSpellsResult = z.infer<typeof setupSpellsResultSchema>;
+
+/**
+ * The statistic a starter-bundle figure was computed from. The starter
+ * back-off chain (D-134/D-086 bundle half) differs from the rune chain:
+ * exact lane matchup -> champion -> role -> global, so it gets its own
+ * label set. `none` marks a bundle with no sufficient evidence.
+ */
+export const setupStarterSourceSchema = z.enum([
+  'laneContext',
+  'championContext',
+  'roleContext',
+  'global',
+  'none',
+]);
+export type SetupStarterSource = z.infer<typeof setupStarterSourceSchema>;
+
+/**
+ * One recommended starter bundle (`starterBundleKey` "itemId:count" set),
+ * normalized across modes like `SetupRunePage`. Expert figures carry
+ * `players`/`pickShare`; there is no profile starter source, so `games`
+ * only appears if a future profile export records starter bundles.
+ */
+export const setupStarterPickSchema = z
+  .object({
+    items: z.array(starterBundleItemSchema).min(1),
+    winRate: z.number().min(0).max(1).nullable(),
+    nEff: z.number().nonnegative(),
+    games: z.number().int().nonnegative().optional(),
+    players: z.number().int().nonnegative().optional(),
+    pickShare: z.number().min(0).max(1).optional(),
+    insufficientData: z.boolean(),
+    source: setupStarterSourceSchema,
+    sourceLevel: z.number().int().nullable(),
+  })
+  .strict();
+export type SetupStarterPick = z.infer<typeof setupStarterPickSchema>;
+
+export const setupStartersResultSchema = z
+  .object({
+    schemaVersion: z.literal(SETUP_STARTERS_RESULT_SCHEMA_VERSION),
+    championId: championIdSchema,
+    myRole: roleSchema,
+    mode: setupModeSchema,
+    dataSource: setupDataSourceSchema,
+    evidence: setupEvidenceSchema,
+    picks: z.array(setupStarterPickSchema),
+    broaderStatistic: setupBroaderStatisticSchema.nullable(),
+    /** False when the mode's data source has nothing usable for this champion. */
+    dataAvailable: z.boolean(),
+  })
+  .strict();
+export type SetupStartersResult = z.infer<typeof setupStartersResultSchema>;

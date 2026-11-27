@@ -31,7 +31,7 @@ import type {
 } from '@draftorb/shared';
 import { DEFAULT_CONFIG, DEFAULT_SUMMONER_CONFIG, rankToBucket } from './config.js';
 import type { RankWeightingConfig, SummonerConfig } from './config.js';
-import { isLowData } from './levels.js';
+import { isLowData, meetsEvidenceGate } from './levels.js';
 import { shrink, toEquivalentCounts } from './weighting.js';
 import { computeEnemyDamageMix, contextKeys } from './runes-context.js';
 
@@ -241,11 +241,20 @@ export function recommendSummoners(
     }
   }
 
+  // Sufficient picks (D-102 gate) fill the display slots first: a thin
+  // pair never outranks one that meets the evidence threshold, so the
+  // setup screen cannot report insufficient data while a usable
+  // recommendation was pushed out of the top `topPairs` (BL-031b review).
+  // Within each class the shrunk score ranks, pick share breaks ties.
   const ranked = [...scored.entries()]
     .map(([key, s]) => ({ key, ...s }))
     .sort(
       (a, b) =>
-        b.score - a.score || b.agg.pickShare - a.agg.pickShare || a.key.localeCompare(b.key),
+        Number(meetsEvidenceGate(b.agg.gamesE, b.agg.players, config)) -
+          Number(meetsEvidenceGate(a.agg.gamesE, a.agg.players, config)) ||
+        b.score - a.score ||
+        b.agg.pickShare - a.agg.pickShare ||
+        a.key.localeCompare(b.key),
     )
     .slice(0, Math.max(0, summonerConfig.topPairs));
 

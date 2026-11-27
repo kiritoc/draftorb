@@ -8,12 +8,16 @@ import { describe, expect, it } from 'vitest';
 
 import type { SetupRunePage } from '@draftorb/shared';
 
+import type { ItemIconInfo } from '../data/items';
 import {
   broaderStatsText,
   dataSourceLabel,
   formatPercent,
   pageSourceLabel,
   pageStatsText,
+  pickStatsText,
+  starterItemsLabel,
+  starterSourceLabel,
 } from './format';
 
 function page(overrides: Partial<SetupRunePage> = {}): SetupRunePage {
@@ -112,5 +116,60 @@ describe('dataSourceLabel', () => {
     expect(dataSourceLabel('expertAggregate')).toBe('expert aggregate (top players)');
     expect(dataSourceLabel('profile')).toBe('your profile export');
     expect(dataSourceLabel('profile', "KiriToc's picks")).toBe("your profile — KiriToc's picks");
+  });
+});
+
+describe('pickStatsText', () => {
+  it('shares the honest-numbers rules across spell pairs and starter bundles', () => {
+    expect(
+      pickStatsText({
+        winRate: 0.542,
+        nEff: 38.4,
+        players: 12,
+        pickShare: 0.315,
+        insufficientData: false,
+      }),
+    ).toBe('Win rate 54.2% · n≈38 · 12 players · Pick share 31.5%');
+    expect(
+      pickStatsText({
+        winRate: null,
+        nEff: 3.2,
+        games: 4,
+        insufficientData: true,
+      }),
+    ).toBe('Not enough data · n≈3 · 4 games');
+  });
+});
+
+describe('starterSourceLabel', () => {
+  it('labels every starter back-off level', () => {
+    expect(starterSourceLabel('laneContext', 1)).toBe('Lane context · level 1');
+    expect(starterSourceLabel('championContext', 2)).toBe('Champion context · level 2');
+    expect(starterSourceLabel('roleContext', 3)).toBe('Role context · level 3');
+    expect(starterSourceLabel('global', 4)).toBe('Global context');
+    expect(starterSourceLabel('none', null)).toBe('No matching context');
+  });
+});
+
+describe('starterItemsLabel', () => {
+  const catalog = new Map<number, ItemIconInfo>([
+    [2052, { id: 2052, name: "Doran's Blade", icon: '2052.png' }],
+    [3340, { id: 3340, name: 'Health Potion', icon: '3340.png' }],
+  ]);
+
+  it('joins catalog names and marks stacked counts', () => {
+    expect(
+      starterItemsLabel(
+        [
+          { itemId: 2052, count: 1 },
+          { itemId: 3340, count: 2 },
+        ],
+        catalog,
+      ),
+    ).toBe("Doran's Blade + Health Potion ×2");
+  });
+
+  it('falls back to a labeled id for uncatalogued items', () => {
+    expect(starterItemsLabel([{ itemId: 9999, count: 1 }], catalog)).toBe('Item 9999');
   });
 });

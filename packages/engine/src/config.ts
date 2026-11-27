@@ -72,6 +72,21 @@ export const rankWeightingConfigSchema = z
     wMax: z.number().gte(1),
     exportMinGames: z.number().nonnegative(),
     /**
+     * D-102 evidence rule (runes/summoners/items): cap on one player's total
+     * weight inside a single aggregated context row. Set by BL-013b audit.
+     */
+    evidencePlayerWeightCap: z.number().positive(),
+    /**
+     * D-102 evidence rule: minimum distinct expert players behind any exported
+     * rune/item number. Set by BL-013b audit.
+     */
+    evidenceMinDistinctPlayers: z.number().int().min(1),
+    /**
+     * D-102 optional UI toggle (off by default): when enabled, rune evidence
+     * uses only the MASTER_PLUS rank bucket regardless of the user's rank.
+     */
+    evidenceMasterPlusOnly: z.boolean().default(false),
+    /**
      * D-088 (PROPOSED): subtract each known slot's mean pair term (the opponent
      * main effect) so pair terms measure the candidate-relative interaction.
      * Default off until the D-023 backtest gate passes.
@@ -132,6 +147,9 @@ export const DEFAULT_CONFIG: RankWeightingConfig = rankWeightingConfigSchema.par
   alpha: 0.25,
   wMax: 2.0,
   exportMinGames: 10,
+  evidencePlayerWeightCap: 30,
+  evidenceMinDistinctPlayers: 3,
+  evidenceMasterPlusOnly: false,
   pairMainEffectAdjust: false,
   matchupEnabled: true,
   matchupShrinkK: 0,

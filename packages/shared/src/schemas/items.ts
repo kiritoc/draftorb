@@ -66,6 +66,8 @@ export const itemBuildEntrySchema = z
     gamesW2: z.number().nonnegative(),
     winrate: z.number().min(0).max(1),
     pickShare: z.number().min(0).max(1),
+    /** D-102: distinct expert players behind this item's counts (optional for legacy exports). */
+    players: z.number().int().nonnegative().optional(),
   })
   .strict();
 export type ItemBuildEntry = z.infer<typeof itemBuildEntrySchema>;

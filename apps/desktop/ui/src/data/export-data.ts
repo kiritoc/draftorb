@@ -20,6 +20,7 @@ import {
   latestSchema,
   manifestSchema,
   manifestSchemaV5,
+  manifestSchemaV6,
   pickRateSamplesSchema,
   pickRateSchema,
   type AllyPairTable,
@@ -31,6 +32,7 @@ import {
   type LaneVsTable,
   type Manifest,
   type ManifestV5,
+  type ManifestV6,
   type PickRateSamples,
   type RecommendData,
   type Role,
@@ -105,13 +107,14 @@ export function createRecommendData(
   };
 }
 
-/** Manifest shapes the cache accepts: the current schema plus the frozen v5
- *  layout published before `pick-rate-samples.json` existed (BL-052). A v5
- *  cache stays fully usable — the samples file is optional, so pick share is
- *  simply absent until the next republish. Older layouts (v4 and below) are
- *  still rejected: they predate `minimalRoles` and cannot drive the loader. */
-const cachedManifestSchema = manifestSchema.or(manifestSchemaV5);
-type CachedManifest = Manifest | ManifestV5;
+/** Manifest shapes the cache accepts: the current schema plus the frozen v6
+ *  and v5 layouts published before `pick-rate-samples.json` existed
+ *  (BL-052 merged onto BL-013a's v6). A v5/v6 cache stays fully usable —
+ *  the samples file is optional, so pick share is simply absent until the
+ *  next republish. Older layouts (v4 and below) are still rejected: they
+ *  predate `minimalRoles` and cannot drive the loader. */
+const cachedManifestSchema = manifestSchema.or(manifestSchemaV6).or(manifestSchemaV5);
+type CachedManifest = Manifest | ManifestV6 | ManifestV5;
 
 interface CachedRelease {
   latest: Latest;

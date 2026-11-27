@@ -220,7 +220,7 @@ describe('exportJson', () => {
         gamesW: 10,
         gamesW2: 10,
         winsW: 6,
-        players: 2,
+        players: 3,
       },
     ]);
     seed(suite.db, 'itemBuild', [

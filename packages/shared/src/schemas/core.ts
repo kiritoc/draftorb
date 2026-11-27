@@ -16,9 +16,11 @@ export const SHARED_VERSION = '0.0.1' as const;
  * Bumped on every export format change. v2: 6th baseline column `games` (T-023, B-025).
  * v3: rune contexts retain their source `rankBucket` (T-019 review).
  * v5: manifest gains `minimalRoles` (ADC/MID baseline-only exports, BL-024).
- * v6: `pick-rate-samples.json` export added (pick-share denominators, BL-052).
+ * v6: item build entries gain `players` (D-102 evidence rule, BL-013a).
+ * v7: `pick-rate-samples.json` export added (pick-share denominators,
+ * BL-052); merges the BL-013a v6 shape so both features ship together.
  */
-export const MANIFEST_SCHEMA_VERSION = 6;
+export const MANIFEST_SCHEMA_VERSION = 7;
 
 /**
  * Version of the engine output contract (`DraftResult`, SPECS §7). Bumped on every

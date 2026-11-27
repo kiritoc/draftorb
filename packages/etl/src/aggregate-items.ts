@@ -36,7 +36,8 @@
  * aggregation. Weight = recencyFactor * reliabilityFactor.
  *
  * All derived tables are cleared and rewritten in one transaction:
- * idempotent. When no purchase contributes, `item_build` is left untouched.
+ * idempotent. When no purchase contributes, `item_build` is left untouched;
+ * contributions suppressed by the evidence gate still clear it.
  */
 
 import type Database from 'better-sqlite3';
@@ -68,11 +69,13 @@ import { defaultManualDataDir } from './config/paths';
 import { createItemCatalogLoader } from './item-catalog';
 import { loadItemClasses, type ItemClassEntry } from './item-classes';
 import {
-  accumulateWeighted,
+  accumulatePlayerWeighted,
   assertPatchFormat,
+  finalizeEvidenceCounts,
   groupRowsByMatch,
   loadPatchWindow,
   partitionByTeam,
+  type EvidenceWeighted,
 } from './aggregate-shared';
 import {
   contextSlots,
@@ -94,6 +97,7 @@ export interface ItemBuildRow {
   winsW: number;
   gamesW: number;
   gamesW2: number;
+  players: number;
 }
 
 export interface AggregateItemBuildsOptions {
@@ -109,6 +113,8 @@ export interface AggregateItemBuildsOptions {
   /** Data Dragon `fetch` override (tests). */
   fetchFn?: typeof fetch;
   onWarn?: (message: string) => void;
+  /** Called after `item_build` is cleared and rewritten (including an empty rewrite). */
+  onWrite?: () => void;
 }
 
 interface MatchParticipantRow extends MatchParticipant {
@@ -142,7 +148,7 @@ interface KillEventRow {
   victim_pid: number;
 }
 
-interface ItemBuildAccum {
+interface ItemBuildAccum extends EvidenceWeighted {
   championId: number;
   myRole: string;
   slotIdx: number;
@@ -152,9 +158,6 @@ interface ItemBuildAccum {
   laneKey: string;
   decisionKind: 'item' | 'path';
   itemId: number;
-  winsW: number;
-  gamesW: number;
-  gamesW2: number;
 }
 
 function loadChampionTagsMap(tagsPath: string): ChampionTagsMap {
@@ -179,8 +182,8 @@ function writeItemBuildRows(db: Database.Database, rows: readonly ItemBuildRow[]
   const insert = db.prepare(
     `INSERT INTO item_build (
       champion_id, my_role, slot_idx, time_bucket, state_bucket,
-      profile_key, lane_key, decision_kind, item_id, wins_w, games_w, games_w2
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      profile_key, lane_key, decision_kind, item_id, wins_w, games_w, games_w2, players
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
   const write = db.transaction(() => {
     clear.run();
@@ -198,6 +201,7 @@ function writeItemBuildRows(db: Database.Database, rows: readonly ItemBuildRow[]
         row.winsW,
         row.gamesW,
         row.gamesW2,
+        row.players,
       );
     }
   });
@@ -367,6 +371,7 @@ export async function aggregateItemBuilds(
   );
 
   const accum = new Map<string, ItemBuildAccum>();
+  let sawContribution = false;
   const starterRows: Array<{
     matchId: string;
     participantId: number;
@@ -582,7 +587,7 @@ export async function aggregateItemBuilds(
           const key =
             `${me.championId}|${me.role}|${slotIdx}|${timeBucket}|${sb}|` +
             `${profileKey}|${laneKey}|${kind}|${ev.item_id}`;
-          accumulateWeighted(accum, key, baseW, me.win, () => ({
+          accumulatePlayerWeighted(accum, key, me.puuid, baseW, me.win, () => ({
             championId: me.championId,
             myRole: me.role,
             slotIdx,
@@ -595,7 +600,9 @@ export async function aggregateItemBuilds(
             winsW: 0,
             gamesW: 0,
             gamesW2: 0,
+            playerWeights: new Map(),
           }));
+          sawContribution = true;
         };
 
         if (cls === 'completed' || cls === 'boots') {
@@ -628,6 +635,8 @@ export async function aggregateItemBuilds(
 
   const result: ItemBuildRow[] = [];
   for (const entry of accum.values()) {
+    const counts = finalizeEvidenceCounts(entry, config.evidencePlayerWeightCap);
+    if (counts.players < config.evidenceMinDistinctPlayers) continue;
     result.push({
       championId: entry.championId,
       myRole: entry.myRole,
@@ -638,17 +647,19 @@ export async function aggregateItemBuilds(
       laneKey: entry.laneKey,
       decisionKind: entry.decisionKind,
       itemId: entry.itemId,
-      winsW: entry.winsW,
-      gamesW: entry.gamesW,
-      gamesW2: entry.gamesW2,
+      winsW: counts.winsW,
+      gamesW: counts.gamesW,
+      gamesW2: counts.gamesW2,
+      players: counts.players,
     });
   }
 
   writeParticipantStarters(db, starterRows);
 
-  if (result.length === 0) return result;
+  if (result.length === 0 && !sawContribution) return result;
 
   writeItemBuildRows(db, result);
+  options.onWrite?.();
 
   return result;
 }

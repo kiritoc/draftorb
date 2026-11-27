@@ -103,6 +103,7 @@ export function buildRuneFiles(
   rows: readonly RuneCtxRow[],
   roles: readonly string[],
   exportMinGames: number,
+  minDistinctPlayers = 1,
 ): RuneBuildFiles {
   const roleSet = new Set(roles);
   let skipped = 0;
@@ -154,6 +155,7 @@ export function buildRuneFiles(
       const pages: RunePageWithHash[] = [];
       const gamesWTotal = ctxRows.reduce((sum, row) => sum + row.gamesW, 0);
       for (const row of ctxRows) {
+        if (row.players < minDistinctPlayers) continue;
         if (!passesGate(row.gamesW, row.gamesW2, exportMinGames)) continue;
         const page = parseRunePage(row.perksJson);
         if (page === null) {

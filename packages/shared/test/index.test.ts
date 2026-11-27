@@ -31,6 +31,7 @@ import {
   laneVsEntrySchema,
   manifestSchema,
   manifestSchemaV5,
+  manifestSchemaV6,
   pickRateSamplesSchema,
   rankBucketSchema,
   rankSchema,
@@ -269,10 +270,15 @@ describe('shared schemas', () => {
       roles: ['SUPPORT'],
       minimalRoles: [],
       files: [{ path: 'champions.json' }],
-      schemaVersion: 6,
+      schemaVersion: 7,
     };
     expect(manifestSchema.parse(manifest)).toEqual(manifest);
-    // The frozen v5 layout still parses (latest-pointer guard, BL-052).
+    // The frozen v6 layout still parses (latest-pointer guard, BL-052 merge).
+    expect(manifestSchemaV6.parse({ ...manifest, schemaVersion: 6 })).toMatchObject({
+      schemaVersion: 6,
+    });
+    expect(() => manifestSchemaV6.parse(manifest)).toThrow();
+    // The frozen v5 layout still parses (latest-pointer guard, BL-013a/BL-052).
     expect(manifestSchemaV5.parse({ ...manifest, schemaVersion: 5 })).toMatchObject({
       schemaVersion: 5,
     });

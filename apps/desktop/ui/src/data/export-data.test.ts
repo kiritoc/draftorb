@@ -60,7 +60,7 @@ function seedCache(
   const manifest = {
     patch: '16.22',
     generatedAt: '2026-11-21T00:00:00Z',
-    schemaVersion: overrides.schemaVersion ?? 6,
+    schemaVersion: overrides.schemaVersion ?? 7,
     region: 'euw',
     rankBuckets: ['IRON'],
     roles: overrides.roles ?? ['SUPPORT'],
@@ -238,6 +238,16 @@ describe('loadPickData', () => {
     expect(pick?.pickRateSamples).toBeUndefined();
   });
 
+  it('still loads a cached v6 manifest (BL-013a export, pre-samples) without pick share', async () => {
+    // BL-013a published schema v6 (item `players` fields) before BL-052
+    // landed as v7: that cache shape is identical for the manifest and must
+    // keep loading, with pick share absent until the next republish.
+    seedCache({ schemaVersion: 6 });
+    const pick = await loadPickData('SUPPORT');
+    expect(pick?.data.baselines).toHaveLength(1);
+    expect(pick?.pickRateSamples).toBeUndefined();
+  });
+
   it('rejects a malformed pick-rate-samples.json (fail-closed)', async () => {
     seedCache({
       patchFiles: { 'pick-rate-samples.json': { SUPPORT: { '412': -1 } } },
@@ -273,7 +283,7 @@ describe('loadPickData', () => {
         return JSON.stringify({
           patch: '16.21',
           generatedAt: '2026-11-21T00:00:00Z',
-          schemaVersion: 6,
+          schemaVersion: 7,
           region: 'euw',
           rankBuckets: ['IRON'],
           roles: ['SUPPORT'],

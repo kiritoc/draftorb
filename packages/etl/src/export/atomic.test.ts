@@ -116,7 +116,7 @@ describe('exportJson', () => {
         gamesW: 10,
         gamesW2: 10,
         winsW: 6,
-        players: 1,
+        players: 3,
       },
     ]);
 
@@ -290,6 +290,75 @@ describe('exportJson', () => {
         region: 'euw1',
         rankBuckets: [],
         roles: [],
+        files: [],
+      }),
+    );
+    const result = suite.exportOnce();
+
+    expect(result.latestPath).toBeNull();
+    expect(result.warnings.some((w) => w.includes('newer patch 16.22'))).toBe(true);
+    expect(readLatestPatch()).toBe('16.22');
+  });
+
+  it('keeps a newer published latest.json whose manifest uses schema v5', () => {
+    // BL-013a review: a complete v5 manifest (pre-`players` item entries)
+    // must still count as intact for the same pointer-guard reason as v4.
+    seed(suite.db, 'match', [{}]);
+    mkdirSync(join(suite.publicDir, '16.22'), { recursive: true });
+    writeFileSync(
+      join(suite.publicDir, 'latest.json'),
+      JSON.stringify({
+        schemaVersion: 1,
+        patch: '16.22',
+        manifest: '16.22/manifest.json',
+        generatedAt: FIXED_NOW.toISOString(),
+      }),
+    );
+    writeFileSync(
+      join(suite.publicDir, '16.22', 'manifest.json'),
+      JSON.stringify({
+        schemaVersion: 5,
+        patch: '16.22',
+        generatedAt: FIXED_NOW.toISOString(),
+        region: 'euw1',
+        rankBuckets: [],
+        roles: [],
+        minimalRoles: [],
+        files: [],
+      }),
+    );
+    const result = suite.exportOnce();
+
+    expect(result.latestPath).toBeNull();
+    expect(result.warnings.some((w) => w.includes('newer patch 16.22'))).toBe(true);
+    expect(readLatestPatch()).toBe('16.22');
+  });
+
+  it('keeps a newer published latest.json whose manifest uses schema v6', () => {
+    // BL-052 merge review: a complete v6 manifest (BL-013a `players` fields,
+    // pre-`pick-rate-samples.json`) must still count as intact for the same
+    // pointer-guard reason as v5/v4.
+    seed(suite.db, 'match', [{}]);
+    mkdirSync(join(suite.publicDir, '16.22'), { recursive: true });
+    writeFileSync(
+      join(suite.publicDir, 'latest.json'),
+      JSON.stringify({
+        schemaVersion: 1,
+        patch: '16.22',
+        manifest: '16.22/manifest.json',
+        generatedAt: FIXED_NOW.toISOString(),
+      }),
+    );
+    writeFileSync(
+      join(suite.publicDir, '16.22', 'manifest.json'),
+      JSON.stringify({
+        schemaVersion: 6,
+        patch: '16.22',
+        generatedAt: FIXED_NOW.toISOString(),
+        region: 'euw1',
+        rankBuckets: [],
+        roles: [],
+        minimalRoles: [],
         files: [],
       }),
     );

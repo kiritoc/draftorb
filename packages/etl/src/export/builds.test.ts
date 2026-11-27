@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { DEFAULT_CONFIG } from '@draftorb/engine';
 import { itemBuildExportSchema, runeExportSchema } from '@draftorb/shared';
 import { seed, supportBuildRow, supportRuneRow } from './export.fixtures.js';
 import { createExportTestSuite } from './export.test-utils.js';
@@ -77,6 +78,27 @@ describe('exportJson', () => {
     const firstItem = startCtx.items[0];
     if (firstItem === undefined) throw new Error('missing first item');
     expect(firstItem.itemId).toBe(3340);
+  });
+
+  it('exports item players and suppresses rows below the configured distinct-player minimum (D-102)', () => {
+    seed(suite.db, 'match', [{}]);
+    seed(suite.db, 'itemBuild', [
+      supportBuildRow({ itemId: 3340, players: 1 }),
+      supportBuildRow({ itemId: 3047, players: 4 }),
+    ]);
+    suite.exportOnce({
+      config: { ...DEFAULT_CONFIG, evidenceMinDistinctPlayers: 2 },
+    });
+    const builds = suite.readFile('roles/SUPPORT/builds/412.json') as {
+      contexts: Array<{
+        items: Array<{ itemId: number; players?: number; winrate: number; pickShare: number }>;
+      }>;
+    };
+    const items = builds.contexts[0]?.items ?? [];
+    expect(items.map((item) => item.itemId)).toEqual([3047]);
+    expect(items[0]?.players).toBe(4);
+    expect(items[0]?.winrate).toBe(0.6);
+    expect(items[0]?.pickShare).toBe(0.5);
   });
 
   it('uses the raw context total before gating build rows (X3)', () => {

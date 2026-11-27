@@ -19,7 +19,8 @@
  * (`players`) are accumulated per row.
  *
  * The table is cleared and rewritten, so the command is idempotent. When no
- * participant contributes, `rune_ctx` is left untouched.
+ * participant contributes, `rune_ctx` is left untouched; contributions that
+ * all fail the evidence gate still clear it.
  */
 
 import type Database from 'better-sqlite3';
@@ -38,12 +39,14 @@ import {
 import { lookupPatchIndex } from './patches';
 import { defaultManualDataDir } from './config/paths';
 import {
-  accumulateWeighted,
+  accumulatePlayerWeighted,
   assertPatchFormat,
+  finalizeEvidenceCounts,
   gameBucketIndex,
   groupRowsByMatch,
   loadPatchWindow,
   partitionByTeam,
+  type EvidenceWeighted,
 } from './aggregate-shared';
 import {
   canonicalPerksJson,
@@ -78,9 +81,11 @@ export interface AggregateRunesOptions {
   patch?: string;
   /** Champion tags file for the damage-mix context; defaults to data/manual/champion-tags.json. */
   tagsPath?: string;
+  /** Called after `rune_ctx` is cleared and rewritten (including an empty rewrite). */
+  onWrite?: () => void;
 }
 
-interface RuneAccum {
+interface RuneAccum extends EvidenceWeighted {
   championId: number;
   myRole: string;
   rankBucket: RankBucket;
@@ -88,10 +93,6 @@ interface RuneAccum {
   contextLevel: number;
   perksHash: string;
   perksJson: string;
-  winsW: number;
-  gamesW: number;
-  gamesW2: number;
-  puuids: Set<string>;
 }
 
 interface MatchParticipantRow extends MatchParticipant {
@@ -171,6 +172,7 @@ export function aggregateRunesByContext(
 
   // Key: `${championId}|${myRole}|${contextKey}|${perksHash}`
   const accum = new Map<string, RuneAccum>();
+  let sawContribution = false;
 
   const rows = db
     .prepare(
@@ -257,7 +259,7 @@ export function aggregateRunesByContext(
       );
       for (const { rankBucket, w, ctx } of targets) {
         const key = `${me.championId}|${me.role}|${rankBucket}|${ctx.contextKey}|${phash}`;
-        accumulateWeighted(accum, key, w, me.win, () => ({
+        accumulatePlayerWeighted(accum, key, me.puuid, w, me.win, () => ({
           championId: me.championId,
           myRole: me.role,
           rankBucket,
@@ -268,8 +270,9 @@ export function aggregateRunesByContext(
           winsW: 0,
           gamesW: 0,
           gamesW2: 0,
-          puuids: new Set<string>(),
-        })).puuids.add(me.puuid);
+          playerWeights: new Map(),
+        }));
+        sawContribution = true;
       }
     }
   };
@@ -281,6 +284,8 @@ export function aggregateRunesByContext(
 
   const result: RuneCtxRow[] = [];
   for (const entry of accum.values()) {
+    const counts = finalizeEvidenceCounts(entry, config.evidencePlayerWeightCap);
+    if (counts.players < config.evidenceMinDistinctPlayers) continue;
     result.push({
       championId: entry.championId,
       myRole: entry.myRole,
@@ -289,17 +294,19 @@ export function aggregateRunesByContext(
       contextLevel: entry.contextLevel,
       perksHash: entry.perksHash,
       perksJson: entry.perksJson,
-      winsW: entry.winsW,
-      gamesW: entry.gamesW,
-      gamesW2: entry.gamesW2,
-      players: entry.puuids.size,
+      winsW: counts.winsW,
+      gamesW: counts.gamesW,
+      gamesW2: counts.gamesW2,
+      players: counts.players,
     });
   }
 
   // No contributing games: leave existing rows unchanged (same as baseline / pairs).
-  if (result.length === 0) return result;
+  // Contributing games suppressed by the evidence rule still clear the table.
+  if (result.length === 0 && !sawContribution) return result;
 
   writeRuneCtxRows(db, result);
+  options.onWrite?.();
 
   return result;
 }

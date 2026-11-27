@@ -23,7 +23,7 @@ function tempDir(): string {
   return dir;
 }
 afterEach(() => {
-  while (tempDirs.length > 0) rmSync(tempDirs.pop()!, { recursive: true, force: true });
+  for (const dir of tempDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
 function touch(root: string, ...parts: string[]): void {

@@ -106,8 +106,16 @@ function tempDir(): string {
   return dir;
 }
 afterEach(() => {
-  while (tempDirs.length > 0) rmSync(tempDirs.pop()!, { recursive: true, force: true });
+  for (const dir of tempDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
+
+/** Narrows a possibly-undefined lookup in tests (no-non-null-assertion). */
+function must<T>(value: T | null | undefined): T {
+  if (value === null || value === undefined) {
+    throw new Error('expected a defined value');
+  }
+  return value;
+}
 
 describe('buildProfileExport', () => {
   it('exports only whitelisted fields — no match ids or foreign identifiers', () => {
@@ -126,7 +134,7 @@ describe('buildProfileExport', () => {
     expect(serialized).not.toContain('puuid-secret');
     expect(serialized).not.toContain('matchId');
     expect(serialized).not.toContain('puuid');
-    const game = exported.games[0]!;
+    const game = must(exported.games[0]);
     expect(game.itemsOrdered).toEqual([3858, 2055]);
     expect(game.runes?.keystoneId).toBe(8112);
     expect(game.runes?.perkIds).toEqual([8112, 9111]);
@@ -166,7 +174,7 @@ describe('buildProfileExport', () => {
       perksJson: null,
     });
     const exported = buildProfileExport(db, ENTRY, NOW_MS);
-    expect(exported.games[0]!.runes).toBeNull();
+    expect(must(exported.games[0]).runes).toBeNull();
     db.close();
   });
 });

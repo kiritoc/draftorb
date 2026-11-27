@@ -19,7 +19,8 @@ describe('extractProfileGame', () => {
     const match = profileMatch('EUW1_1');
     const result = extractProfileGame(match, PROFILE_PUUID);
     expect(result).not.toBeNull();
-    const { row, participantId } = result!;
+    if (result === null) throw new Error('expected a profile game');
+    const { row, participantId } = result;
     expect(participantId).toBe(5);
     expect(row.match_id).toBe('EUW1_1');
     expect(row.created_at).toBe(1_760_000_000_000);

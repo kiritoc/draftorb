@@ -37,7 +37,7 @@ export interface TarEntryInfo {
 function readOctal(field: Buffer): number {
   // Base-256 encoding (first byte & 0x80) for sizes beyond octal range.
   if ((field[0] ?? 0) & 0x80) {
-    let value = field[0]! & 0x7f;
+    let value = (field[0] ?? 0) & 0x7f;
     for (let i = 1; i < field.length; i += 1) {
       value = value * 256 + (field[i] ?? 0);
     }

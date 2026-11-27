@@ -2,6 +2,8 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import type Database from 'better-sqlite3';
+
 import { profileExportSchema, profileIndexSchema } from '@draftorb/shared';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -23,8 +25,16 @@ function tempDir(): string {
   return dir;
 }
 afterEach(() => {
-  while (tempDirs.length > 0) rmSync(tempDirs.pop()!, { recursive: true, force: true });
+  for (const dir of tempDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
+
+/** Narrows a possibly-undefined lookup in tests (no-non-null-assertion). */
+function must<T>(value: T | null | undefined): T {
+  if (value === null || value === undefined) {
+    throw new Error('expected a defined value');
+  }
+  return value;
+}
 
 function writeConfig(dir: string, profileMaxGames?: number): string {
   const path = join(dir, 'profiles.config.json');
@@ -113,7 +123,7 @@ function baseOptions(
   dir: string,
   client: RiotClient,
   overrides: Partial<ProfileSyncOptions> = {},
-): ProfileSyncOptions {
+): ProfileSyncOptions & { db: Database.Database } {
   return {
     configPath: writeConfig(dir),
     exportDir: join(dir, 'out'),
@@ -137,9 +147,9 @@ describe('syncProfiles', () => {
       mastery: [{ championId: 412, championPoints: 5000, championLevel: 3 }],
     });
     const options = baseOptions(dir, client);
-    migrate(options.db!);
+    migrate(options.db);
     const result = await syncProfiles(options);
-    options.db!.close();
+    options.db.close();
 
     expect(result.profiles).toHaveLength(1);
     expect(result.profiles[0]).toMatchObject({
@@ -153,7 +163,7 @@ describe('syncProfiles', () => {
       JSON.parse(readFileSync(join(dir, 'out', 'test-profile.json'), 'utf-8')),
     );
     expect(exported.gameCount).toBe(2);
-    expect(exported.games[0]!.itemsOrdered).toEqual([3340, 3858]);
+    expect(must(exported.games[0]).itemsOrdered).toEqual([3340, 3858]);
     expect(exported.mastery[0]).toMatchObject({ championId: 412, points: 5000 });
     const serialized = JSON.stringify(exported);
     expect(serialized).not.toContain('M1');
@@ -162,7 +172,7 @@ describe('syncProfiles', () => {
     const index = profileIndexSchema.parse(
       JSON.parse(readFileSync(join(dir, 'out', 'index.json'), 'utf-8')),
     );
-    expect(index.profiles[0]!.file).toBe('test-profile.json');
+    expect(must(index.profiles[0]).file).toBe('test-profile.json');
     expect(result.written.length).toBeGreaterThan(0);
   });
 
@@ -171,16 +181,16 @@ describe('syncProfiles', () => {
     const matches = { M1: profileMatch('M1', NOW_MS - DAY_MS) };
     const client = mockClient({ ids: ['M1'], matches });
     const options = baseOptions(dir, client);
-    migrate(options.db!);
+    migrate(options.db);
     await syncProfiles(options);
     const callsAfterFirst = (client.getMatch as ReturnType<typeof vi.fn>).mock.calls.length;
     expect(callsAfterFirst).toBe(1);
 
     // Second run: same DB (re-open via same instance), same ids -> all duplicates.
     const result2 = await syncProfiles({ ...options, db: options.db });
-    options.db!.close();
-    expect(result2.profiles[0]!.stored).toBe(0);
-    expect(result2.profiles[0]!.duplicates).toBe(1);
+    options.db.close();
+    expect(must(result2.profiles[0]).stored).toBe(0);
+    expect(must(result2.profiles[0]).duplicates).toBe(1);
     expect((client.getMatch as ReturnType<typeof vi.fn>).mock.calls.length).toBe(callsAfterFirst);
   });
 
@@ -192,18 +202,18 @@ describe('syncProfiles', () => {
     };
     const client = mockClient({ ids: ['M1', 'M2'], matches });
     const options = baseOptions(dir, client, { maxGames: 1 });
-    migrate(options.db!);
+    migrate(options.db);
     const first = await syncProfiles(options);
     // maxGames=1: only the newest match (M2? ids order M1,M2 — listed order) is fetched.
-    expect(first.profiles[0]!.stored).toBe(1);
+    expect(must(first.profiles[0]).stored).toBe(1);
 
     const second = await syncProfiles({ ...options, db: options.db });
-    options.db!.close();
+    options.db.close();
     const exported = profileExportSchema.parse(
       JSON.parse(readFileSync(join(dir, 'out', 'test-profile.json'), 'utf-8')),
     );
     expect(exported.gameCount).toBe(2);
-    expect(second.profiles[0]!.stored + second.profiles[0]!.duplicates).toBe(1);
+    expect(must(second.profiles[0]).stored + must(second.profiles[0]).duplicates).toBe(1);
   });
 
   it('keeps the previous export and stored rows when a Riot call fails', async () => {
@@ -216,7 +226,7 @@ describe('syncProfiles', () => {
     };
     const client = mockClient({ ids: ['M1', 'M2'], matches, failOn: ['M2'] });
     const options = baseOptions(dir, client);
-    migrate(options.db!);
+    migrate(options.db);
 
     // First successful run with only M1.
     const client1 = mockClient({ ids: ['M1'], matches });
@@ -227,7 +237,7 @@ describe('syncProfiles', () => {
     // Second run: M2 appears but its detail fetch fails -> whole sync fails,
     // previous export untouched, M1 row still stored.
     await expect(syncProfiles({ ...options, db: options.db, client })).rejects.toThrow(CliError);
-    options.db!.close();
+    options.db.close();
     expect(readFileSync(exportPath, 'utf-8')).toBe(before);
   });
 
@@ -236,7 +246,7 @@ describe('syncProfiles', () => {
     const matches = { M1: profileMatch('M1', NOW_MS - 2 * DAY_MS) };
     const client1 = mockClient({ ids: ['M1'], matches });
     const options = baseOptions(dir, client1);
-    migrate(options.db!);
+    migrate(options.db);
     await syncProfiles(options);
     const exportPath = join(dir, 'out', 'test-profile.json');
     const syncedAtBefore = profileExportSchema.parse(
@@ -253,7 +263,7 @@ describe('syncProfiles', () => {
     await expect(
       syncProfiles({ ...options, db: options.db, client: failing, now: () => later }),
     ).rejects.toThrow(CliError);
-    options.db!.close();
+    options.db.close();
     const syncedAtAfter = profileExportSchema.parse(
       JSON.parse(readFileSync(exportPath, 'utf-8')),
     ).syncedAt;
@@ -268,10 +278,10 @@ describe('syncProfiles', () => {
     };
     const client = mockClient({ ids: ['NEW', 'OLD'], matches });
     const options = baseOptions(dir, client);
-    migrate(options.db!);
+    migrate(options.db);
     const result = await syncProfiles(options);
-    options.db!.close();
-    expect(result.profiles[0]!.stored).toBe(1);
+    options.db.close();
+    expect(must(result.profiles[0]).stored).toBe(1);
     const exported = profileExportSchema.parse(
       JSON.parse(readFileSync(join(dir, 'out', 'test-profile.json'), 'utf-8')),
     );
@@ -288,9 +298,9 @@ describe('syncProfiles', () => {
       throw new RiotAuthError('unauthorized', 401, 'https://example.test');
     });
     const options = baseOptions(dir, client);
-    migrate(options.db!);
+    migrate(options.db);
     await expect(syncProfiles(options)).rejects.toThrow(RiotAuthError);
-    options.db!.close();
+    options.db.close();
     // No export files at all: a bad key must not publish partial state (D-070).
     expect(() => readFileSync(join(dir, 'out', 'test-profile.json'), 'utf-8')).toThrow();
   });
@@ -299,8 +309,8 @@ describe('syncProfiles', () => {
     const dir = tempDir();
     const client = mockClient({ ids: [], matches: {} });
     const options = baseOptions(dir, client, { profileId: 'nope' });
-    migrate(options.db!);
+    migrate(options.db);
     await expect(syncProfiles(options)).rejects.toThrow(/Unknown profile id/);
-    options.db!.close();
+    options.db.close();
   });
 });

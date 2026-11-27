@@ -32,8 +32,16 @@ function tempDir(): string {
   return dir;
 }
 afterEach(() => {
-  while (tempDirs.length > 0) rmSync(tempDirs.pop()!, { recursive: true, force: true });
+  for (const dir of tempDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
+
+/** Narrows a possibly-undefined lookup in tests (no-non-null-assertion). */
+function must<T>(value: T | null | undefined): T {
+  if (value === null || value === undefined) {
+    throw new Error('expected a defined value');
+  }
+  return value;
+}
 
 function touch(root: string, rel: string, content = '{}'): void {
   const abs = join(root, ...rel.split('/'));
@@ -235,12 +243,12 @@ describe('augmentManifestWithRootFiles', () => {
     const entries = augmentManifestWithRootFiles(archiveEntries());
     const manifest = entries.find((e) => e.name === '16.22/manifest.json');
     expect(manifest).toBeDefined();
-    const parsed = JSON.parse(manifest!.data.toString('utf8')) as {
+    const parsed = JSON.parse(must(manifest).data.toString('utf8')) as {
       files: Array<{ path: string; sha256?: string }>;
     };
     const byPath = new Map(parsed.files.map((f) => [f.path, f.sha256]));
-    const latest = entries.find((e) => e.name === 'latest.json')!;
-    const tags = entries.find((e) => e.name === 'champion-tags.json')!;
+    const latest = must(entries.find((e) => e.name === 'latest.json'));
+    const tags = must(entries.find((e) => e.name === 'champion-tags.json'));
     const sha = (buf: Buffer) => createHash('sha256').update(buf).digest('hex');
     expect(byPath.get('/latest.json')).toBe(sha(latest.data));
     expect(byPath.get('/champion-tags.json')).toBe(sha(tags.data));
@@ -263,7 +271,7 @@ describe('augmentManifestWithRootFiles', () => {
         { rel: 'champion-tags.json', abs: tagsPath, size: 11 },
       ]),
     );
-    const manifest = entries.find((e) => e.name === '16.22/manifest.json')!;
+    const manifest = must(entries.find((e) => e.name === '16.22/manifest.json'));
     const parsed = JSON.parse(manifest.data.toString('utf8')) as {
       files: Array<{ path: string }>;
     };

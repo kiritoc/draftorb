@@ -19,7 +19,13 @@ import {
   personalizeContext,
   type PersonalizeContext,
 } from '../src/personalize.js';
-import { makeChampionTags, makeData, makeInput, makeTag } from '../src/recommend-test-utils.js';
+import {
+  makeChampionTags,
+  makeData,
+  makeInput,
+  makeTag,
+  must,
+} from '../src/recommend-test-utils.js';
 
 const DAY_MS = 86_400_000;
 // Day-aligned clock: games created "today" get weight exactly 1.
@@ -89,7 +95,7 @@ describe('personalize: fallback levels and shrinkage', () => {
   it('matches L1 when ally ADC and enemy support align', () => {
     const games = [1, 2, 3].map(() => makeGame());
     const result = personalize([rec(1, 1, 0.55)], makeProfile(games), L1_CONTEXT, data, NOW_MS);
-    const entry = result.entries[0]!;
+    const entry = must(result.entries[0]);
     expect(entry.fallbackLevel).toBe(1);
     expect(entry.insufficientData).toBe(false);
     expect(entry.nEff).toBeCloseTo(3, 5);
@@ -109,13 +115,13 @@ describe('personalize: fallback levels and shrinkage', () => {
       () => makeGame({ allyAdcId: 99 }), // different ally ADC -> L1 impossible
     );
     const result = personalize([rec(1, 1, 0.55)], makeProfile(games), L1_CONTEXT, data, NOW_MS);
-    expect(result.entries[0]!.fallbackLevel).toBe(2);
+    expect(must(result.entries[0]).fallbackLevel).toBe(2);
   });
 
   it('falls back to L4 (champion overall) when no context matches', () => {
     const games = [1, 2, 3].map(() => makeGame({ allyAdcId: 99, enemySupportId: 88 }));
     const result = personalize([rec(1, 1, 0.55)], makeProfile(games), L1_CONTEXT, data, NOW_MS);
-    expect(result.entries[0]!.fallbackLevel).toBe(4);
+    expect(must(result.entries[0]).fallbackLevel).toBe(4);
   });
 
   it('L3 matches on the enemy damage/archetype signature', () => {
@@ -133,7 +139,7 @@ describe('personalize: fallback levels and shrinkage', () => {
       rankBucket: 'DIAMOND',
     };
     const result = personalize([rec(1, 1, 0.55)], makeProfile(games), context, tagData, NOW_MS);
-    expect(result.entries[0]!.fallbackLevel).toBe(3);
+    expect(must(result.entries[0]).fallbackLevel).toBe(3);
   });
 
   it('shrinks the profile WR toward the profile global rate', () => {
@@ -152,9 +158,9 @@ describe('personalize: fallback levels and shrinkage', () => {
       data,
       NOW_MS,
     );
-    const champ1 = result.entries.find((e) => e.championId === 1)!;
+    const champ1 = must(result.entries.find((e) => e.championId === 1));
     expect(champ1.profileWinRate).toBeCloseTo(7.5 / 18, 5);
-    const champ2 = result.entries.find((e) => e.championId === 2)!;
+    const champ2 = must(result.entries.find((e) => e.championId === 2));
     expect(champ2.profileWinRate).toBeCloseTo((3 + 7.5) / 18, 5);
   });
 
@@ -169,7 +175,7 @@ describe('personalize: fallback levels and shrinkage', () => {
       makeGame({ createdAtDay: Math.round(NOW_DAYS) - 120, win: false }),
     ];
     const result = personalize([rec(1, 1, 0.5)], makeProfile(games), EMPTY_CONTEXT, data, NOW_MS);
-    const entry = result.entries[0]!;
+    const entry = must(result.entries[0]);
     expect(entry.nEff).toBeCloseTo((3.25 * 3.25) / 3.0625, 3);
     expect(entry.nEff).toBeLessThan(3.6);
     expect(entry.fallbackLevel).toBe(4);
@@ -184,7 +190,7 @@ describe('personalize: fallback levels and shrinkage', () => {
       data,
       NOW_MS,
     );
-    const champ1 = result.entries.find((e) => e.championId === 1)!;
+    const champ1 = must(result.entries.find((e) => e.championId === 1));
     expect(champ1.insufficientData).toBe(true);
     expect(champ1.profileWinRate).toBeNull();
     expect(champ1.deltaVsBaselinePp).toBeNull();
@@ -193,7 +199,7 @@ describe('personalize: fallback levels and shrinkage', () => {
     expect(champ1.nEff).toBeCloseTo(1, 5);
     expect(champ1.personalizedScore).toBe(1); // metaNorm for rank 1 of 2
     // Champ 2 has zero games -> also insufficient, n_eff 0.
-    const champ2 = result.entries.find((e) => e.championId === 2)!;
+    const champ2 = must(result.entries.find((e) => e.championId === 2));
     expect(champ2.insufficientData).toBe(true);
     expect(champ2.nEff).toBe(0);
     expect(champ2.personalizedScore).toBe(0); // metaNorm for rank 2 of 2
@@ -215,9 +221,9 @@ describe('personalize: ordering, trust and purity', () => {
       NOW_MS,
     );
     expect(result.entries.map((e) => e.championId)).toEqual([1, 2]);
-    expect(result.entries[0]!.rank).toBe(1);
-    expect(result.entries[0]!.personalizedScore).toBeGreaterThan(
-      result.entries[1]!.personalizedScore,
+    expect(must(result.entries[0]).rank).toBe(1);
+    expect(must(result.entries[0]).personalizedScore).toBeGreaterThan(
+      must(result.entries[1]).personalizedScore,
     );
   });
 
@@ -229,12 +235,12 @@ describe('personalize: ordering, trust and purity', () => {
     const profileFew = makeProfile(wins(6));
     const profileMany = makeProfile(wins(60));
     const recs = [rec(1, 1, 0.5)];
-    const fewResult = personalize(recs, profileFew, EMPTY_CONTEXT, data, NOW_MS).entries[0]!;
-    const manyResult = personalize(recs, profileMany, EMPTY_CONTEXT, data, NOW_MS).entries[0]!;
+    const fewResult = must(personalize(recs, profileFew, EMPTY_CONTEXT, data, NOW_MS).entries[0]);
+    const manyResult = must(personalize(recs, profileMany, EMPTY_CONTEXT, data, NOW_MS).entries[0]);
     // metaNorm = 1 for a single-entry list; p ≈ 0.5 < 1, so a larger trust
     // pulls personalizedScore further below metaNorm.
     expect(manyResult.nEff).toBeGreaterThan(fewResult.nEff);
-    expect(manyResult.profileWinRate).toBeCloseTo(fewResult.profileWinRate!, 5);
+    expect(manyResult.profileWinRate).toBeCloseTo(must(fewResult.profileWinRate), 5);
     expect(manyResult.personalizedScore).toBeLessThan(fewResult.personalizedScore);
     expect(manyResult.fallbackLevel).toBe(fewResult.fallbackLevel);
   });
@@ -260,9 +266,9 @@ describe('personalize: ordering, trust and purity', () => {
       NOW_MS,
     );
     const byChamp = new Map(result.entries.map((e) => [e.championId, e]));
-    expect(byChamp.get(1)!.personalizedScore).toBe(1);
-    expect(byChamp.get(2)!.personalizedScore).toBeCloseTo(0.5, 5);
-    expect(byChamp.get(3)!.personalizedScore).toBe(0);
+    expect(must(byChamp.get(1)).personalizedScore).toBe(1);
+    expect(must(byChamp.get(2)).personalizedScore).toBeCloseTo(0.5, 5);
+    expect(must(byChamp.get(3)).personalizedScore).toBe(0);
   });
 });
 
@@ -276,7 +282,7 @@ describe('personalize: D-080 baseline badge', () => {
     ];
     // pProfile = 2/3; p = (2 + 15*(2/3)) / (3 + 15) = 12/18 = 2/3.
     const result = personalize([rec(1, 1, 0.55)], makeProfile(games), EMPTY_CONTEXT, data, NOW_MS);
-    const entry = result.entries[0]!;
+    const entry = must(result.entries[0]);
     expect(entry.profileWinRate).toBeCloseTo(2 / 3, 5);
     // Baseline [1,'DIAMOND',30,50,0.1,50]: w0 = 15010/25020.
     const w0 = 15010 / 25020;
@@ -296,7 +302,7 @@ describe('personalize: D-080 baseline badge', () => {
       noRows,
       NOW_MS,
     );
-    const entry = result.entries[0]!;
+    const entry = must(result.entries[0]);
     expect(entry.insufficientData).toBe(false);
     expect(entry.baselineWinRate).toBeNull();
     expect(entry.baselineBucket).toBeNull();
@@ -311,7 +317,7 @@ describe('personalize: D-080 baseline badge', () => {
     });
     const games = [1, 2, 3].map(() => makeGame());
     const result = personalize([rec(1, 1, 0.55)], makeProfile(games), EMPTY_CONTEXT, weak, NOW_MS);
-    const entry = result.entries[0]!;
+    const entry = must(result.entries[0]);
     expect(entry.baselineWinRate).toBeNull();
     expect(entry.deltaVsBaselinePp).toBeNull();
   });
@@ -323,8 +329,8 @@ describe('personalize: D-080 baseline badge', () => {
     });
     const games = [1, 2, 3].map(() => makeGame());
     const result = personalize([rec(1, 1, 0.55)], makeProfile(games), EMPTY_CONTEXT, empty, NOW_MS);
-    expect(result.entries[0]!.baselineWinRate).toBeNull();
-    expect(result.entries[0]!.deltaVsBaselinePp).toBeNull();
+    expect(must(result.entries[0]).baselineWinRate).toBeNull();
+    expect(must(result.entries[0]).deltaVsBaselinePp).toBeNull();
   });
 
   it('ignores baseline rows from other rank buckets', () => {
@@ -340,7 +346,7 @@ describe('personalize: D-080 baseline badge', () => {
       otherBucket,
       NOW_MS,
     );
-    expect(result.entries[0]!.baselineBucket).toBeNull();
+    expect(must(result.entries[0]).baselineBucket).toBeNull();
   });
 });
 
@@ -402,7 +408,7 @@ describe('personalize: logit blendMode (D-089)', () => {
       NOW_MS,
       cfg,
     );
-    const entry = result.entries[0]!;
+    const entry = must(result.entries[0]);
     expect(entry.insufficientData).toBe(true);
     expect(entry.personalizedScore).toBe(0.42);
   });

@@ -25,6 +25,17 @@ import type {
   Role,
 } from '@draftorb/shared';
 
+/**
+ * Narrows a possibly-undefined lookup in tests: throws instead of relying on
+ * a non-null assertion (`@typescript-eslint/no-non-null-assertion`).
+ */
+export function must<T>(value: T | null | undefined): T {
+  if (value === null || value === undefined) {
+    throw new Error('expected a defined value');
+  }
+  return value;
+}
+
 /** gamesW=50, gamesW2=0.1 -> n_eff = 25000, well above minGames. */
 export const HIGH_GAMES = { winsW: 30, gamesW: 50, gamesW2: 0.1 } as const;
 

@@ -12,8 +12,8 @@ describe('createTarGz', () => {
     ];
     const parsed = parseTar(gunzipSync(createTarGz(entries)));
     expect(parsed.map((e) => e.name)).toEqual(entries.map((e) => e.name));
-    for (let i = 0; i < entries.length; i += 1) {
-      expect(parsed[i]?.data.equals(entries[i]!.data)).toBe(true);
+    for (const [i, entry] of entries.entries()) {
+      expect(parsed[i]?.data.equals(entry.data)).toBe(true);
       expect(parsed[i]?.type).toBe('0');
     }
   });

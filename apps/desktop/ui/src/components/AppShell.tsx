@@ -10,6 +10,7 @@ import type { ProfileLoad } from '../profile/profile-export';
 import { RoleSelector } from './RoleSelector';
 import { SettingsScreen } from './SettingsScreen';
 import { PickScreen } from '../screens/PickScreen';
+import { SetupScreen } from '../screens/SetupScreen';
 
 export interface AppShellProps {
   screen: ScreenId;
@@ -82,7 +83,15 @@ export function AppShell(props: AppShellProps) {
             profileStatus={props.profileStatus}
           />
         )}
-        {(props.screen === 'setup' || props.screen === 'game') && (
+        {props.screen === 'setup' && (
+          <SetupScreen
+            preferredRole={props.role}
+            dataReadyNonce={props.dataReadyNonce}
+            profileLoad={props.profileLoad ?? { kind: 'none', reason: 'noFolder' }}
+            profileStatus={props.profileStatus}
+          />
+        )}
+        {props.screen === 'game' && (
           <section className="space-y-6">
             <RoleSelector
               selected={props.role}

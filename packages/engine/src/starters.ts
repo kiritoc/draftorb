@@ -40,7 +40,7 @@ import type {
 } from '@draftorb/shared';
 import { DEFAULT_CONFIG, DEFAULT_STARTER_CONFIG, rankToBucket } from './config.js';
 import type { RankWeightingConfig, StarterConfig } from './config.js';
-import { isLowData } from './levels.js';
+import { isLowData, meetsEvidenceGate } from './levels.js';
 import { shrink, toEquivalentCounts } from './weighting.js';
 import { selectLaneContextSlots } from './runes-context.js';
 
@@ -284,11 +284,23 @@ export function recommendStarters(
     }
   }
 
+  // Fill the display slots from the narrowest evidence first (D-134):
+  // sufficient picks (D-102 gate) always outrank thin ones, and within each
+  // class the back-off level decides before the shrunk score — the `role`
+  // and `global` levels pool every champion (global pools every role), so
+  // a cross-role bundle can never displace lane/champion/role advice; they
+  // only take the slots narrower evidence leaves open. Broader contexts
+  // still shape every score through the shrinkage priors above.
   const ranked = [...scored.entries()]
     .map(([key, s]) => ({ key, ...s }))
     .sort(
       (a, b) =>
-        b.score - a.score || b.agg.pickShare - a.agg.pickShare || a.key.localeCompare(b.key),
+        Number(meetsEvidenceGate(b.agg.gamesE, b.agg.players, config)) -
+          Number(meetsEvidenceGate(a.agg.gamesE, a.agg.players, config)) ||
+        a.ctx.contextLevel - b.ctx.contextLevel ||
+        b.score - a.score ||
+        b.agg.pickShare - a.agg.pickShare ||
+        a.key.localeCompare(b.key),
     )
     .slice(0, Math.max(0, starterConfig.topBundles));
 

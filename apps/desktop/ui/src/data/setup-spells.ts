@@ -29,7 +29,7 @@ import {
 } from '@draftorb/engine';
 
 import { cacheRead } from './aggregates';
-import { loadCachedRelease } from './export-data';
+import { loadCachedRelease, manifestListsFile } from './export-data';
 import type { PickData } from './export-data';
 
 /**
@@ -44,8 +44,10 @@ const MIN_SUMMONER_EVIDENCE_MANIFEST_VERSION = 8;
 
 /**
  * Loads `roles/<role>/summoners/<championId>.json` from the data cache.
- * Returns null when nothing is cached, the champion has no export, or the
- * cached release predates the summoner exports; throws on a corrupt file
+ * Returns null when nothing is cached, the champion has no export, the
+ * cached release predates the summoner exports, or the file is absent
+ * from the current manifest (a same-patch refresh may have dropped it —
+ * the stale cache copy must not be served); throws on a corrupt file
  * (fail-closed, like every manifest file).
  */
 export async function loadSummonerExport(
@@ -57,9 +59,9 @@ export async function loadSummonerExport(
   if (release.manifest.schemaVersion < MIN_SUMMONER_EVIDENCE_MANIFEST_VERSION) {
     return null;
   }
-  const raw = await cacheRead(
-    `${release.latest.patch}/roles/${role}/summoners/${championId}.json`,
-  );
+  const path = `roles/${role}/summoners/${championId}.json`;
+  if (!manifestListsFile(release.manifest, path)) return null;
+  const raw = await cacheRead(`${release.latest.patch}/${path}`);
   if (raw === null) return null;
   return summonerExportSchema.parse(JSON.parse(raw));
 }

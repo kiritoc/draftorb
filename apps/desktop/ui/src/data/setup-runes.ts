@@ -28,7 +28,7 @@ import {
 } from '@draftorb/engine';
 
 import { cacheRead } from './aggregates';
-import { loadCachedRelease } from './export-data';
+import { loadCachedRelease, manifestListsFile } from './export-data';
 import type { PickData } from './export-data';
 
 /**
@@ -43,9 +43,11 @@ const MIN_RUNE_EVIDENCE_MANIFEST_VERSION = 6;
 
 /**
  * Loads `roles/<role>/runes/<championId>.json` from the data cache.
- * Returns null when nothing is cached, the champion has no export, or the
- * cached release predates the D-102 rune evidence rule; throws on a
- * corrupt file (fail-closed, like every manifest file).
+ * Returns null when nothing is cached, the champion has no export, the
+ * cached release predates the D-102 rune evidence rule, or the file is
+ * absent from the current manifest (a same-patch refresh may have dropped
+ * it — the stale cache copy must not be served); throws on a corrupt file
+ * (fail-closed, like every manifest file).
  */
 export async function loadRuneExport(
   role: Role,
@@ -56,9 +58,9 @@ export async function loadRuneExport(
   if (release.manifest.schemaVersion < MIN_RUNE_EVIDENCE_MANIFEST_VERSION) {
     return null;
   }
-  const raw = await cacheRead(
-    `${release.latest.patch}/roles/${role}/runes/${championId}.json`,
-  );
+  const path = `roles/${role}/runes/${championId}.json`;
+  if (!manifestListsFile(release.manifest, path)) return null;
+  const raw = await cacheRead(`${release.latest.patch}/${path}`);
   if (raw === null) return null;
   return runeExportSchema.parse(JSON.parse(raw));
 }

@@ -33,7 +33,7 @@ import {
 } from '@draftorb/engine';
 
 import { cacheRead } from './aggregates';
-import { loadCachedRelease } from './export-data';
+import { loadCachedRelease, manifestListsFile } from './export-data';
 import type { PickData } from './export-data';
 
 /**
@@ -55,9 +55,11 @@ export interface StarterExports {
  * `roles/<role>/starters.json` from the data cache. Each file is optional:
  * a missing champion file drops the lane/champion levels, a missing role
  * file drops the role/global levels — the recommender back-offs over
- * whatever exists. Returns empty exports when nothing is cached or the
- * release predates the starter exports; throws on a corrupt file
- * (fail-closed, like every manifest file).
+ * whatever exists. A file absent from the current manifest is treated as
+ * missing even when a stale cache copy survives a same-patch refresh.
+ * Returns empty exports when nothing is cached or the release predates
+ * the starter exports; throws on a corrupt file (fail-closed, like every
+ * manifest file).
  */
 export async function loadStarterExports(
   role: Role,
@@ -69,9 +71,15 @@ export async function loadStarterExports(
     return {};
   }
   const patch = release.latest.patch;
+  const championPath = `roles/${role}/starters/${championId}.json`;
+  const rolePath = `roles/${role}/starters.json`;
   const [championRaw, roleRaw] = await Promise.all([
-    cacheRead(`${patch}/roles/${role}/starters/${championId}.json`),
-    cacheRead(`${patch}/roles/${role}/starters.json`),
+    manifestListsFile(release.manifest, championPath)
+      ? cacheRead(`${patch}/${championPath}`)
+      : Promise.resolve(null),
+    manifestListsFile(release.manifest, rolePath)
+      ? cacheRead(`${patch}/${rolePath}`)
+      : Promise.resolve(null),
   ]);
   return {
     ...(championRaw !== null

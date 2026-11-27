@@ -114,7 +114,11 @@ function makeProfile(games: ProfileGame[]): ProfileExport {
   };
 }
 
-function seedCache(files: Record<string, unknown>, manifestSchemaVersion = 8): void {
+function seedCache(
+  files: Record<string, unknown>,
+  manifestSchemaVersion = 8,
+  manifestPaths: string[] = Object.keys(files),
+): void {
   const manifest = {
     patch: PATCH,
     generatedAt: '2026-11-21T00:00:00Z',
@@ -123,7 +127,7 @@ function seedCache(files: Record<string, unknown>, manifestSchemaVersion = 8): v
     rankBuckets: ['DIAMOND'],
     roles: ['SUPPORT'],
     minimalRoles: [],
-    files: [],
+    files: manifestPaths.map((path) => ({ path })),
   };
   const latest = {
     schemaVersion: 1,
@@ -162,13 +166,20 @@ describe('loadSummonerExport', () => {
   });
 
   it('throws on a corrupt summoner export (fail-closed)', async () => {
-    seedCache({});
+    seedCache({ 'roles/SUPPORT/summoners/7.json': summonerExport });
     const base = mockRead.getMockImplementation();
     if (base === undefined) throw new Error('expected seeded mock');
     mockRead.mockImplementation(async (name: string) =>
       name === `${PATCH}/roles/SUPPORT/summoners/7.json` ? '{not json' : base(name),
     );
     await expect(loadSummonerExport('SUPPORT', 7)).rejects.toThrow();
+  });
+
+  it('ignores a cached summoner file the current manifest no longer lists', async () => {
+    // A same-patch refresh dropped the export: the stale copy survives in
+    // the patch directory but must not be served (BL-031b review).
+    seedCache({ 'roles/SUPPORT/summoners/7.json': summonerExport }, 8, []);
+    expect(await loadSummonerExport('SUPPORT', 7)).toBeNull();
   });
 
   it('rejects summoner exports from a pre-v8 cache as unverifiable', async () => {

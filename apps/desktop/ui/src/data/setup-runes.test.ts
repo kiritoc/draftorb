@@ -125,6 +125,7 @@ function makeProfile(games: ProfileGame[]): ProfileExport {
 function seedCache(
   files: Record<string, unknown>,
   manifestSchemaVersion = 7,
+  manifestPaths: string[] = Object.keys(files),
 ): void {
   const manifest = {
     patch: PATCH,
@@ -134,7 +135,7 @@ function seedCache(
     rankBuckets: ['DIAMOND'],
     roles: ['SUPPORT'],
     minimalRoles: [],
-    files: [],
+    files: manifestPaths.map((path) => ({ path })),
   };
   const latest = {
     schemaVersion: 1,
@@ -175,13 +176,20 @@ describe('loadRuneExport', () => {
   });
 
   it('throws on a corrupt rune export (fail-closed)', async () => {
-    seedCache({});
+    seedCache({ 'roles/SUPPORT/runes/7.json': runeExport });
     const base = mockRead.getMockImplementation();
     if (base === undefined) throw new Error('expected seeded mock');
     mockRead.mockImplementation(async (name: string) =>
       name === `${PATCH}/roles/SUPPORT/runes/7.json` ? '{not json' : base(name),
     );
     await expect(loadRuneExport('SUPPORT', 7)).rejects.toThrow();
+  });
+
+  it('ignores a cached rune file the current manifest no longer lists', async () => {
+    // A same-patch refresh dropped the export: the stale copy survives in
+    // the patch directory but must not be served (BL-031b review).
+    seedCache({ 'roles/SUPPORT/runes/7.json': runeExport }, 7, []);
+    expect(await loadRuneExport('SUPPORT', 7)).toBeNull();
   });
 
   it('rejects rune exports from a pre-D-102 (v5) cache as unverifiable', async () => {

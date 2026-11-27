@@ -57,7 +57,7 @@ import {
   type StarterConfig,
   type SummonerConfig,
 } from './config.js';
-import { baselinePrior, isLowData } from './levels.js';
+import { baselinePrior, isLowData, meetsEvidenceGate } from './levels.js';
 import {
   DEFAULT_PERSONALIZE_CONFIG,
   personalizeContext,
@@ -128,14 +128,13 @@ function expertPages(
     ...(page.players !== undefined ? { players: page.players } : {}),
     pickShare: page.pickShare,
     // D-102/D-103: a page only counts as sufficient evidence when it clears
-    // the distinct-player gate and is not flagged lowData by recommendRunes.
-    // A missing `players` count cannot prove the D-102 minimum, so it fails
-    // closed. Thin pages stay listed but labeled `insufficientData`, and the
-    // D-103 broader statistic surfaces when no page is sufficient.
-    insufficientData:
-      page.lowData ||
-      page.players === undefined ||
-      page.players < config.evidenceMinDistinctPlayers,
+    // the distinct-player gate and is not flagged lowData by recommendRunes
+    // (`nEff` is the effective sample `lowData` was computed from, so
+    // `meetsEvidenceGate` is the same check — a missing `players` count
+    // cannot prove the D-102 minimum and fails closed). Thin pages stay
+    // listed but labeled `insufficientData`, and the D-103 broader
+    // statistic surfaces when no page is sufficient.
+    insufficientData: !meetsEvidenceGate(page.nEff, page.players, config),
     source: expertPageSource(page.contextLevel),
     sourceLevel: page.contextLevel,
   }));
@@ -332,15 +331,6 @@ export interface RecommendSetupStartersOptions {
   readonly minSetupGames?: number;
 }
 
-/** D-102 sufficiency gate shared by every expert setup pick. */
-function expertPickInsufficientData(
-  lowData: boolean,
-  players: number | undefined,
-  config: RankWeightingConfig,
-): boolean {
-  return lowData || players === undefined || players < config.evidenceMinDistinctPlayers;
-}
-
 function expertEvidence(config: RankWeightingConfig): SetupEvidence {
   return {
     kind: 'expert',
@@ -366,7 +356,7 @@ function expertSpellPicks(
     nEff: pick.nEff,
     ...(pick.players !== undefined ? { players: pick.players } : {}),
     pickShare: pick.pickShare,
-    insufficientData: expertPickInsufficientData(pick.lowData, pick.players, config),
+    insufficientData: !meetsEvidenceGate(pick.nEff, pick.players, config),
     source: expertPageSource(pick.contextLevel),
     sourceLevel: pick.contextLevel,
   }));
@@ -409,7 +399,7 @@ function expertStarterPicks(
     nEff: pick.nEff,
     ...(pick.players !== undefined ? { players: pick.players } : {}),
     pickShare: pick.pickShare,
-    insufficientData: expertPickInsufficientData(pick.lowData, pick.players, config),
+    insufficientData: !meetsEvidenceGate(pick.nEff, pick.players, config),
     source: starterPageSource(pick.contextLevel),
     sourceLevel: pick.contextLevel,
   }));

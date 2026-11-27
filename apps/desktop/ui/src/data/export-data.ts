@@ -147,6 +147,22 @@ export async function loadCachedRelease(): Promise<CachedRelease | null> {
   return { latest, manifest };
 }
 
+/**
+ * True when the cached manifest lists `path` (patch-relative, e.g.
+ * `roles/SUPPORT/starters/7.json`; a leading `/` marks archive-root
+ * entries). The download overwrites only the files the new archive
+ * contains and a same-patch refresh keeps the whole patch directory, so a
+ * cache file absent from the manifest may be a stale leftover from an
+ * older release — callers must treat it as missing instead of serving
+ * retired recommendations (BL-031b review).
+ */
+export function manifestListsFile(
+  manifest: { readonly files: readonly { readonly path: string }[] },
+  path: string,
+): boolean {
+  return manifest.files.some((file) => file.path === path || file.path === `/${path}`);
+}
+
 export interface ChampionCatalog {
   patch: string;
   champions: Champion[];

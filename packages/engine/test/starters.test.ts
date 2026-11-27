@@ -210,11 +210,59 @@ describe('recommendStarters', () => {
     );
 
     expect(result.bundles).toHaveLength(2);
-    // Same math as recommendSummoners: globalOther wins the shrunk ranking.
+    // The shrunk estimates are unchanged, but the narrower back-off level
+    // claims the first slot (D-134 fill order): the lane bundle outranks
+    // the higher-scoring global-only bundle.
+    expect(result.bundles[0]?.items).toEqual(BLADE);
+    expect(result.bundles[0]?.contextKey).toBe(LANE_KEY);
+    expect(result.bundles[0]?.winRate).toBeCloseTo((9 + (40 * 60) / 140) / 50, 6);
+    expect(result.bundles[1]?.items).toEqual(SERRATED);
+    expect(result.bundles[1]?.winRate).toBeCloseTo(75 / 140, 6);
+  });
+
+  it('never lets a thin pick outrank a sufficient one', () => {
+    // Thin champion pick with a perfect shrunk score vs a sufficient role
+    // pick: the sufficient pick keeps the first slot (D-102 gate).
+    const thinChamp = mkBundle(BLADE, 30, 40, 40); // no players -> fails closed
+    const sufficientRole = mkBundle(SERRATED, 20, 40, 40, { players: 9 });
+    const result = recommendStarters(
+      draft(),
+      CHAMP,
+      champExp([ctx('champion', 2, [thinChamp])]),
+      roleExp([ctx('role', 3, [sufficientRole])]),
+      starterData(),
+    );
+
     expect(result.bundles[0]?.items).toEqual(SERRATED);
-    expect(result.bundles[0]?.winRate).toBeCloseTo(75 / 140, 6);
-    expect(result.bundles[1]?.contextKey).toBe(LANE_KEY);
-    expect(result.bundles[1]?.winRate).toBeCloseTo((9 + (40 * 60) / 140) / 50, 6);
+    expect(result.bundles[0]?.contextLevel).toBe(3);
+    expect(result.bundles[1]?.items).toEqual(BLADE);
+    expect(result.bundles[1]?.lowData).toBe(false);
+  });
+
+  it('fills slots from narrower levels before cross-role global bundles', () => {
+    // Three sufficient role bundles plus a stronger global (cross-role)
+    // bundle: the global pick can only take a slot the role level leaves.
+    const roleBundles = [BLADE, SERRATED, BOOTS_PAIR].map((b, i) =>
+      mkBundle(b, 20 - i * 2, 40, 40, { players: 8, pickShare: 0.3 - i * 0.05 }),
+    );
+    const globalPet = mkBundle(items([9999, 1]), 39, 40, 40, {
+      players: 30,
+      pickShare: 0.9,
+    });
+    const result = recommendStarters(
+      draft(),
+      CHAMP,
+      undefined,
+      roleExp([ctx('role', 3, roleBundles), ctx('global', 4, [globalPet])]),
+      starterData(),
+      DEFAULT_CONFIG,
+      { ...DEFAULT_STARTER_CONFIG, topBundles: 4 },
+    );
+
+    expect(result.bundles).toHaveLength(4);
+    expect(result.bundles.slice(0, 3).every((b) => b.contextLevel === 3)).toBe(true);
+    expect(result.bundles[3]?.contextLevel).toBe(4);
+    expect(result.bundles[3]?.items).toEqual(items([9999, 1]));
   });
 
   it('merges duplicate bundle keys within one context', () => {

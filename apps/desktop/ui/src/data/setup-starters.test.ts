@@ -132,7 +132,11 @@ function makeProfile(games: ProfileGame[]): ProfileExport {
   };
 }
 
-function seedCache(files: Record<string, unknown>, manifestSchemaVersion = 8): void {
+function seedCache(
+  files: Record<string, unknown>,
+  manifestSchemaVersion = 8,
+  manifestPaths: string[] = Object.keys(files),
+): void {
   const manifest = {
     patch: PATCH,
     generatedAt: '2026-11-21T00:00:00Z',
@@ -141,7 +145,7 @@ function seedCache(files: Record<string, unknown>, manifestSchemaVersion = 8): v
     rankBuckets: ['DIAMOND'],
     roles: ['SUPPORT'],
     minimalRoles: [],
-    files: [],
+    files: manifestPaths.map((path) => ({ path })),
   };
   const latest = {
     schemaVersion: 1,
@@ -185,13 +189,44 @@ describe('loadStarterExports', () => {
   });
 
   it('throws on a corrupt starter export (fail-closed)', async () => {
-    seedCache({});
+    seedCache({
+      'roles/SUPPORT/starters/7.json': championExport,
+      'roles/SUPPORT/starters.json': roleExport,
+    });
     const base = mockRead.getMockImplementation();
     if (base === undefined) throw new Error('expected seeded mock');
     mockRead.mockImplementation(async (name: string) =>
       name === `${PATCH}/roles/SUPPORT/starters.json` ? '{not json' : base(name),
     );
     await expect(loadStarterExports('SUPPORT', 7)).rejects.toThrow();
+  });
+
+  it('ignores cached starter files the current manifest no longer lists', async () => {
+    // A same-patch refresh dropped both exports: the stale copies survive
+    // in the patch directory but must not be served (BL-031b review).
+    seedCache(
+      {
+        'roles/SUPPORT/starters/7.json': championExport,
+        'roles/SUPPORT/starters.json': roleExport,
+      },
+      8,
+      [],
+    );
+    expect(await loadStarterExports('SUPPORT', 7)).toEqual({});
+
+    // The role fallback may still be listed while the champion file was
+    // dropped: each file is checked against the manifest independently.
+    seedCache(
+      {
+        'roles/SUPPORT/starters/7.json': championExport,
+        'roles/SUPPORT/starters.json': roleExport,
+      },
+      8,
+      ['roles/SUPPORT/starters.json'],
+    );
+    const partial = await loadStarterExports('SUPPORT', 7);
+    expect(partial.championExport).toBeUndefined();
+    expect(partial.roleExport?.contexts).toHaveLength(2);
   });
 
   it('rejects starter exports from a pre-v8 cache as unverifiable', async () => {

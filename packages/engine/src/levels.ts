@@ -100,6 +100,28 @@ export function isLowData(nEff: number, minGames: number): boolean {
 }
 
 /**
+ * D-102/D-103 evidence gate for a single expert pick (rune page, spell
+ * pair, starter bundle): the pick is usable evidence only when its
+ * effective sample clears `minGames` AND its distinct-player count meets
+ * `evidenceMinDistinctPlayers`. A missing `players` count fails closed —
+ * exports that predate the field cannot prove the rule. Thin picks are
+ * still returned (flagged `lowData`, surfaced as `insufficientData` by
+ * the setup adapters) but must never outrank sufficient ones when the
+ * display slots are filled (BL-031b review).
+ */
+export function meetsEvidenceGate(
+  gamesE: number,
+  players: number | undefined,
+  config: RankWeightingConfig,
+): boolean {
+  return (
+    !isLowData(gamesE, config.minGames) &&
+    players !== undefined &&
+    players >= config.evidenceMinDistinctPlayers
+  );
+}
+
+/**
  * A layer's log-odds term plus its lowData flag (SPECS §5): a lowData term is
  * 0 and its reason must be flagged `lowData`.
  */

@@ -341,6 +341,28 @@ export const DEFAULT_SUMMONER_CONFIG: SummonerConfig = Object.freeze({
   laneGroups: DEFAULT_LANE_GROUPS,
 });
 
+// --- Starter recommendation config (SPECS §8.3/§18.5, BL-031b) ---
+
+/**
+ * Starter-bundle recommender config. Same shape as `SummonerConfig`: the
+ * shrinkage prior, the number of bundles returned and the lane groups used
+ * for the exact-lane context key. Prior values until calibrated.
+ */
+export interface StarterConfig {
+  /** Prior strength (equivalent games) for context-to-context shrinkage. */
+  readonly kStarter: number;
+  /** Number of top bundles returned. */
+  readonly topBundles: number;
+  /** Lane groups per role (exact-lane context slots, D-021). */
+  readonly laneGroups: Readonly<Record<Role, LaneGroup>>;
+}
+
+export const DEFAULT_STARTER_CONFIG: StarterConfig = Object.freeze({
+  kStarter: 40,
+  topBundles: 3,
+  laneGroups: DEFAULT_LANE_GROUPS,
+});
+
 // --- Threat score config (SPECS §8.2 step 2, T-053) ---
 
 /**

@@ -184,9 +184,15 @@ export const strings = {
   // --- Setup screen: runes (BL-030b, SPECS §18.5, D-134) ---
   setupRunesTitle: (champion: string) => `Runes — ${champion}`,
   setupChampionLabel: 'Champion',
-  setupPickChampion: 'Pick a champion to see rune recommendations.',
+  setupPickChampion: 'Pick a champion to see setup recommendations.',
   setupNoSetupRoles: 'No role has setup data in the current export.',
   setupNoPages: 'Not enough data for rune recommendations on this champion and role.',
+  setupNoSpells: 'Not enough data for summoner spell recommendations on this champion and role.',
+  setupNoStarters: 'Not enough data for starting item recommendations on this champion and role.',
+  setupSpellsTitle: (champion: string) => `Summoner spells — ${champion}`,
+  setupStartersTitle: (champion: string) => `Starting items — ${champion}`,
+  setupStartersNoProfileData:
+    'Your profile export does not record starter-window purchases, so "my data" has no starting items to rank. Switch to "Top players" for starter recommendations.',
   setupModeLabel: 'Data mode',
   setupModeTopPlayers: 'Top players',
   setupModeMyData: 'My data',
@@ -201,7 +207,7 @@ export const strings = {
   setupEvidenceExpert: (minPlayers: number, cap: number) =>
     `Evidence rule: at least ${minPlayers} distinct players · per-player weight cap ${cap}`,
   setupEvidenceProfile: (minGames: number) =>
-    `Evidence rule: at least ${minGames} effective games per rune page`,
+    `Evidence rule: at least ${minGames} effective games per pick`,
   setupWinRate: (percent: string) => `Win rate ${percent}%`,
   setupPickShare: (percent: string) => `Pick share ${percent}%`,
   setupNEff: (nEff: number) => `n≈${Math.round(nEff)}`,
@@ -213,9 +219,17 @@ export const strings = {
   setupContextGlobal: 'Champion global context',
   setupContextMatchup: (level: number) => `Matchup context · level ${level}`,
   setupContextChampionRecord: (level: number) => `Champion record · level ${level}`,
+  setupContextChampionLevel: (level: number) => `Champion context · level ${level}`,
+  setupContextRoleLevel: (level: number) => `Role context · level ${level}`,
+  setupContextGlobalAll: 'Global context',
   setupContextNone: 'No matching context',
   setupBroaderTitle: 'Broader statistic (D-103 fallback)',
-  setupBroaderChampionRole: (champion: string, role: string) =>
-    `${champion} win rate in ${role} (all rune pages)`,
+  setupBroaderChampionRole: (champion: string, role: string, scope: string) =>
+    `${champion} win rate in ${role} (${scope})`,
+  setupBroaderScopeRunes: 'all rune pages',
+  setupBroaderScopeSpells: 'all spell pairs',
+  setupBroaderScopeStarters: 'all starter bundles',
   setupBroaderProfileChampion: (champion: string) => `Your win rate on ${champion}`,
+  summonerSpellFallback: (id: number) => `Spell ${id}`,
+  itemFallback: (id: number) => `Item ${id}`,
 } as const;

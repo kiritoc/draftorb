@@ -12,8 +12,11 @@ import type {
   SetupDataSource,
   SetupPageSource,
   SetupRunePage,
+  SetupStarterSource,
+  StarterBundleItem,
 } from '@draftorb/shared';
 
+import type { ItemIconInfo } from '../data/items';
 import { strings } from '../strings';
 
 /** Fraction -> one-decimal percent text without the `%` sign (`0.542` -> `54.2`). */
@@ -51,26 +54,46 @@ export function pageSourceLabel(source: SetupPageSource, sourceLevel: number | n
 }
 
 /**
- * One-line stats for a rune page. Sufficient pages lead with the shrunk win
- * rate; insufficient pages show "Not enough data" and never a bare rate
- * (D-075/D-102). Every number carries its sample: `n≈` effective games,
- * distinct expert players or raw profile games, plus pick share for expert
- * figures — and only when the page clears the evidence gate.
+ * The sample-size fields every setup pick shares (rune page, spell pair,
+ * starter bundle). `players`/`pickShare` exist only for expert figures;
+ * `games` only for profile figures.
  */
-export function pageStatsText(page: SetupRunePage): string {
+export interface SetupPickStats {
+  readonly winRate: number | null;
+  readonly nEff: number;
+  readonly games?: number;
+  readonly players?: number;
+  readonly pickShare?: number;
+  readonly insufficientData: boolean;
+}
+
+/**
+ * One-line stats for any setup pick (rune page, spell pair, starter
+ * bundle). Sufficient picks lead with the shrunk win rate; insufficient
+ * picks show "Not enough data" and never a bare rate (D-075/D-102). Every
+ * number carries its sample: `n≈` effective games, distinct expert players
+ * or raw profile games, plus pick share for expert figures — and only when
+ * the pick clears the evidence gate.
+ */
+export function pickStatsText(pick: SetupPickStats): string {
   const parts: string[] = [];
-  if (!page.insufficientData && page.winRate !== null) {
-    parts.push(strings.setupWinRate(formatPercent(page.winRate)));
+  if (!pick.insufficientData && pick.winRate !== null) {
+    parts.push(strings.setupWinRate(formatPercent(pick.winRate)));
   } else {
     parts.push(strings.setupNotEnoughData);
   }
-  parts.push(strings.setupNEff(page.nEff));
-  if (page.players !== undefined) parts.push(strings.setupPlayers(page.players));
-  if (page.games !== undefined) parts.push(strings.poolSampleGames(page.games));
-  if (!page.insufficientData && page.pickShare !== undefined) {
-    parts.push(strings.setupPickShare(formatPercent(page.pickShare)));
+  parts.push(strings.setupNEff(pick.nEff));
+  if (pick.players !== undefined) parts.push(strings.setupPlayers(pick.players));
+  if (pick.games !== undefined) parts.push(strings.poolSampleGames(pick.games));
+  if (!pick.insufficientData && pick.pickShare !== undefined) {
+    parts.push(strings.setupPickShare(formatPercent(pick.pickShare)));
   }
   return parts.join(' · ');
+}
+
+/** One-line stats for a rune page (kept for the rune section call sites). */
+export function pageStatsText(page: SetupRunePage): string {
+  return pickStatsText(page);
 }
 
 /**
@@ -96,4 +119,47 @@ export function dataSourceLabel(source: SetupDataSource, profileLabel?: string):
   return source === 'expertAggregate'
     ? strings.setupDataSourceExpert
     : strings.setupDataSourceProfile(profileLabel);
+}
+
+/**
+ * "Based on" label of the statistic behind a starter bundle (the D-103
+ * adaptation hint): the starter back-off chain is exact lane -> champion ->
+ * role -> global (D-134/D-086 bundle half), distinct from the rune chain.
+ */
+export function starterSourceLabel(source: SetupStarterSource, sourceLevel: number | null): string {
+  switch (source) {
+    case 'laneContext':
+      return sourceLevel === null
+        ? strings.setupContextNone
+        : strings.setupContextLane(sourceLevel);
+    case 'championContext':
+      return sourceLevel === null
+        ? strings.setupContextNone
+        : strings.setupContextChampionLevel(sourceLevel);
+    case 'roleContext':
+      return sourceLevel === null
+        ? strings.setupContextNone
+        : strings.setupContextRoleLevel(sourceLevel);
+    case 'global':
+      return strings.setupContextGlobalAll;
+    case 'none':
+      return strings.setupContextNone;
+  }
+}
+
+/**
+ * Display label of a starter bundle: catalog item names joined by ` + `,
+ * with `×N` for stacked counts. Unknown ids fall back to a labeled
+ * `Item <id>` (golden rule 8 — never a blank or invented name).
+ */
+export function starterItemsLabel(
+  bundleItems: readonly StarterBundleItem[],
+  catalog: ReadonlyMap<number, ItemIconInfo>,
+): string {
+  return bundleItems
+    .map((item) => {
+      const name = catalog.get(item.itemId)?.name ?? strings.itemFallback(item.itemId);
+      return item.count > 1 ? `${name} ×${item.count}` : name;
+    })
+    .join(' + ');
 }

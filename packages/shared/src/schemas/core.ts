@@ -49,6 +49,14 @@ export const RUNE_RESULT_SCHEMA_VERSION = 1;
 export const SUMMONER_RESULT_SCHEMA_VERSION = 1;
 
 /**
+ * Version of the engine starter-bundle recommendation output contract
+ * (SPECS §8.3/§18.5, BL-031b). Bumped on every breaking change so consumers
+ * fail loudly instead of misreading fields.
+ * v1: initial `StarterRecommendationResult`.
+ */
+export const STARTER_RESULT_SCHEMA_VERSION = 1;
+
+/**
  * Version of `data/profiles.config.json` (D-068). Bumped on every breaking
  * change to the committed profile configuration format.
  */
@@ -77,6 +85,22 @@ export const PERSONAL_RESULT_SCHEMA_VERSION = 2;
  * v1: initial mode-switched rune setup result (top players / my data).
  */
 export const SETUP_RESULT_SCHEMA_VERSION = 1;
+
+/**
+ * Version of the engine setup-screen summoner-spell output contract
+ * (`SetupSpellsResult`, SPECS §18.5, BL-031b). Bumped on every breaking
+ * change so consumers fail loudly instead of misreading fields.
+ * v1: initial mode-switched summoner setup result (top players / my data).
+ */
+export const SETUP_SPELLS_RESULT_SCHEMA_VERSION = 1;
+
+/**
+ * Version of the engine setup-screen starter-item output contract
+ * (`SetupStartersResult`, SPECS §18.5, BL-031b). Bumped on every breaking
+ * change so consumers fail loudly instead of misreading fields.
+ * v1: initial mode-switched starter setup result (top players / my data).
+ */
+export const SETUP_STARTERS_RESULT_SCHEMA_VERSION = 1;
 
 export const roleSchema = z.enum(['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT']);
 export type Role = z.infer<typeof roleSchema>;

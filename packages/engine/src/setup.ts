@@ -22,6 +22,8 @@
 
 import {
   SETUP_RESULT_SCHEMA_VERSION,
+  SETUP_SPELLS_RESULT_SCHEMA_VERSION,
+  SETUP_STARTERS_RESULT_SCHEMA_VERSION,
   type BaselineTable,
   type ChampionId,
   type DraftInput,
@@ -34,14 +36,26 @@ import {
   type SetupPageSource,
   type SetupRunePage,
   type SetupRuneResult,
+  type SetupSpellPick,
+  type SetupSpellsResult,
+  type SetupStarterPick,
+  type SetupStarterSource,
+  type SetupStartersResult,
+  type StarterChampionExport,
+  type StarterRoleExport,
+  type SummonerExport,
 } from '@draftorb/shared';
 
 import {
   DEFAULT_CONFIG,
   DEFAULT_RUNE_CONFIG,
+  DEFAULT_STARTER_CONFIG,
+  DEFAULT_SUMMONER_CONFIG,
   rankToBucket,
   type RankWeightingConfig,
   type RuneConfig,
+  type StarterConfig,
+  type SummonerConfig,
 } from './config.js';
 import { baselinePrior, isLowData } from './levels.js';
 import {
@@ -51,10 +65,13 @@ import {
 } from './personalize.js';
 import { indexBaselines } from './recommend-indexes.js';
 import { recommendRunes } from './runes.js';
+import { recommendSummoners } from './summoners.js';
+import { recommendStarters } from './starters.js';
 import {
   DEFAULT_MIN_SETUP_GAMES,
   profileChampionWinRate,
   recommendProfileRunes,
+  recommendProfileSpells,
 } from './profile-setup.js';
 
 /**
@@ -257,6 +274,323 @@ export function recommendSetupRunes(
     dataSource: 'expertAggregate',
     evidence,
     pages,
+    broaderStatistic: dataAvailable
+      ? null
+      : championRoleBroaderStatistic(input, championId, data, config),
+    dataAvailable,
+  };
+}
+
+// --- Summoner spells and starter items (BL-031b, SPECS §18.5) ---
+//
+// Both sections reuse the rune result contract: the same `SetupMode`
+// switch, `SetupEvidence` block, `SetupBroaderStatistic` D-103 fallback and
+// `dataAvailable` semantics. Expert picks go through the D-102 gate
+// (lowData OR missing/insufficient `players` -> `insufficientData`), exactly
+// like `expertPages` above.
+
+/** The data the spell/starter setup paths need (rune data + baselines). */
+export type SetupSpellsData = SetupRunesData;
+export type SetupStartersData = SetupRunesData;
+
+export interface RecommendSetupSpellsOptions {
+  /** Active setup mode; switching it is a pure re-query (D-134). */
+  readonly mode: SetupMode;
+  /** `roles/<ROLE>/summoners/<championId>.json` export (topPlayers mode). */
+  readonly summonerExport?: SummonerExport;
+  /** Configured profile export (myData mode); absent -> insufficient state. */
+  readonly profile?: ProfileExport;
+  readonly nowMs: number;
+  readonly config?: RankWeightingConfig;
+  readonly summonerConfig?: SummonerConfig;
+  readonly personalizeConfig?: PersonalizeConfig;
+  /** D-075 minimum effective games for profile figures. */
+  readonly minSetupGames?: number;
+  /** Profile pick count (mirrors `topPairs`/`topPicks`). */
+  readonly topPicks?: number;
+}
+
+export interface RecommendSetupStartersOptions {
+  /** Active setup mode; switching it is a pure re-query (D-134). */
+  readonly mode: SetupMode;
+  /** `roles/<ROLE>/starters/<championId>.json` export (topPlayers mode). */
+  readonly championExport?: StarterChampionExport;
+  /** `roles/<ROLE>/starters.json` role/global fallback export. */
+  readonly roleExport?: StarterRoleExport;
+  /**
+   * Configured profile export (myData mode). The profile export records no
+   * starter-window purchases, so myData starters always report the
+   * insufficient-data state — the profile only feeds the labeled D-103
+   * broader statistic (D-139 PROPOSED).
+   */
+  readonly profile?: ProfileExport;
+  readonly nowMs: number;
+  readonly config?: RankWeightingConfig;
+  readonly starterConfig?: StarterConfig;
+  readonly personalizeConfig?: PersonalizeConfig;
+  /** D-075 minimum effective games for the profile broader statistic. */
+  readonly minSetupGames?: number;
+}
+
+/** D-102 sufficiency gate shared by every expert setup pick. */
+function expertPickInsufficientData(
+  lowData: boolean,
+  players: number | undefined,
+  config: RankWeightingConfig,
+): boolean {
+  return lowData || players === undefined || players < config.evidenceMinDistinctPlayers;
+}
+
+function expertEvidence(config: RankWeightingConfig): SetupEvidence {
+  return {
+    kind: 'expert',
+    playerWeightCap: config.evidencePlayerWeightCap,
+    minDistinctPlayers: config.evidenceMinDistinctPlayers,
+    masterPlusOnly: config.evidenceMasterPlusOnly,
+    masterPlusOptional: true,
+  };
+}
+
+function profileEvidence(minSetupGames: number): SetupEvidence {
+  return { kind: 'profile', minSetupGames };
+}
+
+function expertSpellPicks(
+  result: ReturnType<typeof recommendSummoners>,
+  config: RankWeightingConfig,
+): SetupSpellPick[] {
+  return result.pairs.map((pick) => ({
+    spell1Id: Math.min(pick.summoner1Id, pick.summoner2Id),
+    spell2Id: Math.max(pick.summoner1Id, pick.summoner2Id),
+    winRate: pick.winRate,
+    nEff: pick.nEff,
+    ...(pick.players !== undefined ? { players: pick.players } : {}),
+    pickShare: pick.pickShare,
+    insufficientData: expertPickInsufficientData(pick.lowData, pick.players, config),
+    source: expertPageSource(pick.contextLevel),
+    sourceLevel: pick.contextLevel,
+  }));
+}
+
+function profileSpellPicks(picks: ReturnType<typeof recommendProfileSpells>): SetupSpellPick[] {
+  return picks.map((pick) => ({
+    spell1Id: Math.min(pick.spells[0], pick.spells[1]),
+    spell2Id: Math.max(pick.spells[0], pick.spells[1]),
+    winRate: pick.winRate,
+    nEff: pick.nEff,
+    games: pick.games,
+    insufficientData: pick.insufficientData,
+    source: profilePageSource(pick.fallbackLevel),
+    sourceLevel: pick.fallbackLevel,
+  }));
+}
+
+/** Map a starter back-off level (1 lane, 2 champion, 3 role, 4 global). */
+function starterPageSource(contextLevel: number): SetupStarterSource {
+  switch (contextLevel) {
+    case 1:
+      return 'laneContext';
+    case 2:
+      return 'championContext';
+    case 3:
+      return 'roleContext';
+    default:
+      return 'global';
+  }
+}
+
+function expertStarterPicks(
+  result: ReturnType<typeof recommendStarters>,
+  config: RankWeightingConfig,
+): SetupStarterPick[] {
+  return result.bundles.map((pick) => ({
+    items: pick.items.map((item) => ({ itemId: item.itemId, count: item.count })),
+    winRate: pick.winRate,
+    nEff: pick.nEff,
+    ...(pick.players !== undefined ? { players: pick.players } : {}),
+    pickShare: pick.pickShare,
+    insufficientData: expertPickInsufficientData(pick.lowData, pick.players, config),
+    source: starterPageSource(pick.contextLevel),
+    sourceLevel: pick.contextLevel,
+  }));
+}
+
+/**
+ * Mode-switched summoner-spell setup result for the picked champion
+ * (SPECS §18.5, BL-031b). `topPlayers` consumes the expert summoner export
+ * through `recommendSummoners`; `myData` consumes the profile export through
+ * `recommendProfileSpells` (unordered normalized pair, profile win rate).
+ */
+export function recommendSetupSpells(
+  input: DraftInput,
+  championId: ChampionId,
+  data: SetupSpellsData,
+  options: RecommendSetupSpellsOptions,
+): SetupSpellsResult {
+  const myRole = input.userRole;
+  const base = {
+    schemaVersion: SETUP_SPELLS_RESULT_SCHEMA_VERSION,
+    championId,
+    myRole,
+  } as const;
+
+  if (options.mode === 'myData') {
+    const minSetupGames = options.minSetupGames ?? DEFAULT_MIN_SETUP_GAMES;
+    const personalizeConfig = options.personalizeConfig ?? DEFAULT_PERSONALIZE_CONFIG;
+    const evidence = profileEvidence(minSetupGames);
+    const profile = options.profile;
+    if (profile === undefined) {
+      return {
+        ...base,
+        mode: 'myData',
+        dataSource: 'profile',
+        evidence,
+        picks: [],
+        broaderStatistic: null,
+        dataAvailable: false,
+      };
+    }
+    const context = personalizeContext(input, data);
+    const profilePicks = recommendProfileSpells(
+      profile,
+      championId,
+      myRole,
+      context,
+      data,
+      options.nowMs,
+      {
+        config: personalizeConfig,
+        minSetupGames,
+        ...(options.topPicks !== undefined ? { topPicks: options.topPicks } : {}),
+      },
+    );
+    const picks = profileSpellPicks(profilePicks);
+    const dataAvailable = picks.some((pick) => !pick.insufficientData);
+    const stat = profileChampionWinRate(profile, championId, myRole, data, options.nowMs, {
+      config: personalizeConfig,
+      minSetupGames,
+    });
+    const broaderStatistic: SetupBroaderStatistic = {
+      kind: 'profileChampionWinRate',
+      winRate: stat.winRate,
+      nEff: stat.nEff,
+      games: stat.games,
+      insufficientData: stat.insufficientData,
+    };
+    return {
+      ...base,
+      mode: 'myData',
+      dataSource: 'profile',
+      evidence,
+      picks,
+      broaderStatistic: dataAvailable ? null : broaderStatistic,
+      dataAvailable,
+    };
+  }
+
+  const config = options.config ?? DEFAULT_CONFIG;
+  const summonerConfig = options.summonerConfig ?? DEFAULT_SUMMONER_CONFIG;
+  const result = recommendSummoners(
+    input,
+    championId,
+    options.summonerExport,
+    data,
+    config,
+    summonerConfig,
+  );
+  const picks = expertSpellPicks(result, config);
+  const dataAvailable = picks.some((pick) => !pick.insufficientData);
+  return {
+    ...base,
+    mode: 'topPlayers',
+    dataSource: 'expertAggregate',
+    evidence: expertEvidence(config),
+    picks,
+    broaderStatistic: dataAvailable
+      ? null
+      : championRoleBroaderStatistic(input, championId, data, config),
+    dataAvailable,
+  };
+}
+
+/**
+ * Mode-switched starter-item setup result for the picked champion
+ * (SPECS §18.5, BL-031b). `topPlayers` consumes the expert starter exports
+ * (`starter_ctx` bundles within `starterWindowSeconds`, D-086/D-134) through
+ * `recommendStarters`; `myData` has no profile starter source — the profile
+ * export records no starter-window purchases, so it always reports the
+ * insufficient-data state with the labeled D-103 profile broader statistic
+ * (D-139 PROPOSED).
+ */
+export function recommendSetupStarters(
+  input: DraftInput,
+  championId: ChampionId,
+  data: SetupStartersData,
+  options: RecommendSetupStartersOptions,
+): SetupStartersResult {
+  const myRole = input.userRole;
+  const base = {
+    schemaVersion: SETUP_STARTERS_RESULT_SCHEMA_VERSION,
+    championId,
+    myRole,
+  } as const;
+
+  if (options.mode === 'myData') {
+    const minSetupGames = options.minSetupGames ?? DEFAULT_MIN_SETUP_GAMES;
+    const personalizeConfig = options.personalizeConfig ?? DEFAULT_PERSONALIZE_CONFIG;
+    const profile = options.profile;
+    if (profile === undefined) {
+      return {
+        ...base,
+        mode: 'myData',
+        dataSource: 'profile',
+        evidence: profileEvidence(minSetupGames),
+        picks: [],
+        broaderStatistic: null,
+        dataAvailable: false,
+      };
+    }
+    const stat = profileChampionWinRate(profile, championId, myRole, data, options.nowMs, {
+      config: personalizeConfig,
+      minSetupGames,
+    });
+    const broaderStatistic: SetupBroaderStatistic = {
+      kind: 'profileChampionWinRate',
+      winRate: stat.winRate,
+      nEff: stat.nEff,
+      games: stat.games,
+      insufficientData: stat.insufficientData,
+    };
+    return {
+      ...base,
+      mode: 'myData',
+      dataSource: 'profile',
+      evidence: profileEvidence(minSetupGames),
+      picks: [],
+      broaderStatistic,
+      dataAvailable: false,
+    };
+  }
+
+  const config = options.config ?? DEFAULT_CONFIG;
+  const starterConfig = options.starterConfig ?? DEFAULT_STARTER_CONFIG;
+  const result = recommendStarters(
+    input,
+    championId,
+    options.championExport,
+    options.roleExport,
+    data,
+    config,
+    starterConfig,
+  );
+  const picks = expertStarterPicks(result, config);
+  const dataAvailable = picks.some((pick) => !pick.insufficientData);
+  return {
+    ...base,
+    mode: 'topPlayers',
+    dataSource: 'expertAggregate',
+    evidence: expertEvidence(config),
+    picks,
     broaderStatistic: dataAvailable
       ? null
       : championRoleBroaderStatistic(input, championId, data, config),

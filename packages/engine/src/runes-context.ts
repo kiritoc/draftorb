@@ -49,7 +49,7 @@ export function computeEnemyDamageMix(
   return 'mixed';
 }
 
-interface LaneContextSlot {
+export interface LaneContextSlot {
   readonly championId: ChampionId;
   /** 'a' for ally, 'e' for enemy — matches the exported `formatSlot` keys. */
   readonly side: 'a' | 'e';
@@ -66,7 +66,7 @@ interface LaneContextSlot {
  * (SPECS §8.1, D-020/D-022). Only champions whose role was resolved are
  * eligible; unknown slots simply produce no key.
  */
-function selectLaneContextSlots(
+export function selectLaneContextSlots(
   input: DraftInput,
   myRole: Role,
   roleProb: RuneRecommendData['roleProb'],

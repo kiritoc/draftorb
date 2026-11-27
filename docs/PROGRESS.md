@@ -24,6 +24,17 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 - Blockers / next step: owner review; BL-030b (#91) builds the runes UI on `SetupRuneResult`; BL-031a (#92) covers summoners + starters exports and the D-134 backoff chain.
 - Pitfalls: `recommendProfileRunes`/`recommendProfileSpells` signatures gained a `role` param — update callers; profile fallback levels L1..L3 reuse the support-shaped matchup context (ally ADC / enemy support) for every role, so TOP/JUNGLE mostly resolve at L4/L5 champion level until per-role contexts exist (assumption logged as D-135 PROPOSED). `broaderStatistic` shows a rate whenever weighted evidence exists and flags `insufficientData` below `minGames` (D-129 convention), while page `winRate` is null only when a profile setup is insufficient (D-075).
 
+### Previous handoff (BL-032)
+
+- Date: 2026-11-28
+- Branch/PR: `feat/bl-032-personalization-roles` (worktree `draftorb-bl032`) / BL-032 (#94)
+- State: REVIEW
+- Done: personalization is role-generic for SUPPORT/TOP/JUNGLE (D-097, D-136 PROPOSED). `PersonalizeContext` gains a required `role` field filled from `DraftInput.userRole` by `personalizeContext`; new `PERSONALIZE_IN_SCOPE_ROLES` + `personalizeScopeRole()` scope the weighted game pool to games played in the drafted role — ADC/MID drafts (and any out-of-scope role) get an empty pool and every entry reports insufficient data. `personalize()` drops the `role !== 'SUPPORT'` filters (pool filter + `matchesLevel` champion check); `profile-setup.ts` `buildWeightedGames` takes the context and applies the same scope, `aggregateSetup` relies on the pre-filtered pool. `p_profile`, L1..L5 and rune/spell setups all draw from the drafted-role pool; L4/L5 stay identical until a later phase widens L5 across roles. SPECS §18.2/§18.5 clarified (drafted-role scope, ADC/MID insufficient data). Stale profile export (`gameCount: 0` vs 278 stored games, AUDIT §4.3) is ops-handled outside this PR — verified the code path: `buildProfileExport` sets `gameCount = games.length` over `profile_games` rows after the 180-day/`profileMaxGames` caps, so a refresh produces `gameCount` == exported row count.
+- Files touched: `packages/engine/src/{personalize,profile-setup}.ts`, `packages/engine/test/{personalize,profile-setup}.test.ts`, `docs/{SPECS,DECISIONS,PROGRESS}.md`.
+- Tests: `pnpm check` green (1712 tests, 161 files); new TOP/JUNGLE personalization + rune/spell cases, cross-role isolation, ADC/MID insufficient-data, `p_profile` drafted-role scoping; SUPPORT regression tests unchanged and passing.
+- Blockers / next step: owner review; D-136 PROPOSED needs confirmation. Open gap flagged in D-136 (not implemented): export-time `favorites` are still a single SUPPORT-only recency list while SPECS §18.4/GLOSSARY describe per-role favorites — needs a schema decision first. BL-033 (#95) implements `blendMode: 'logit'` on top of this.
+- Pitfalls: `PersonalizeContext` is a required-field breaking change for hand-built contexts (tests updated; `apps/web` builds it via `personalizeContext` so it is unaffected). Do not widen the pool to all in-scope roles without revisiting D-136 — cross-role champion stats were deliberately rejected.
+
 ### Previous handoff (BL-052)
 
 - Date: 2026-11-28

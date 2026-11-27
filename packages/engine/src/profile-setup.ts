@@ -19,6 +19,7 @@ import {
   type FallbackLevel,
   type PersonalizeConfig,
   type PersonalizeContext,
+  personalizeScopeRole,
 } from './personalize.js';
 
 const DAY_MS = 86_400_000;
@@ -112,7 +113,6 @@ interface SetupStats {
 function aggregateSetup(
   games: readonly WeightedProfileGame[],
   championId: number,
-  role: Role,
   setupKey: (game: ProfileGame) => string | null,
   key: string,
   context: PersonalizeContext,
@@ -127,7 +127,9 @@ function aggregateSetup(
     let rawGames = 0;
     for (const weighted of games) {
       const game = weighted.game;
-      if (game.championId !== championId || game.role !== role) continue;
+      // The pool is already scoped to the in-scope role (D-097); only the
+      // champion and setup identity are checked here.
+      if (game.championId !== championId) continue;
       if (setupKey(game) !== key) continue;
       if (!predicate(game, weighted.enemySignature)) continue;
       sumW += weighted.weight;
@@ -158,9 +160,14 @@ function buildWeightedGames(
   const nowDays = nowMs / DAY_MS;
   const signatureCache = new Map<number, string>();
   const tags = data.tags;
+  // Same role scope as `personalize()` (D-097, D-136): only games played in
+  // the requested role, and only when that role is in scope
+  // (SUPPORT/TOP/JUNGLE). ADC/MID or any out-of-scope role yields an empty
+  // pool, so every pick reports insufficient data.
+  const scopeRole = personalizeScopeRole(role);
   const weighted: WeightedProfileGame[] = [];
   for (const game of profile.games) {
-    if (game.role !== role) continue;
+    if (scopeRole === null || game.role !== scopeRole) continue;
     const ageDays = Math.max(0, nowDays - game.createdAtDay);
     const signature = new Set<string>();
     for (const championId of game.enemyChampionIds) {
@@ -182,7 +189,7 @@ function buildWeightedGames(
   return weighted;
 }
 
-/** Champion-level base WR (all in-scope games on the champion) for shrinkage. */
+/** Champion-level base WR (in-scope games on the champion) for shrinkage. */
 function championBaseWinRate(games: readonly WeightedProfileGame[], championId: number): number {
   let winsW = 0;
   let gamesW = 0;
@@ -206,8 +213,8 @@ function spellPairKey(spells: readonly [number, number]): string {
  * "Profile's best" rune pages for `championId` in `role` (SPECS §18.5): the
  * profile's own rune pages ranked by shrunk win rate under the current draft
  * context, with the same fallback/shrinkage rules as the champion list.
- * Only games recorded in `role` count (D-097: profile scope is not
- * Support-only).
+ * Only in-scope games recorded in `role` count: SUPPORT/TOP/JUNGLE only,
+ * an out-of-scope role yields no picks (D-097/D-136).
  */
 export function recommendProfileRunes(
   profile: ProfileExport,
@@ -247,7 +254,6 @@ export function recommendProfileRunes(
     const { stats, level, bestNEff } = aggregateSetup(
       games,
       championId,
-      role,
       (game) => (game.runes === null ? null : runePageKey(game.runes)),
       key,
       context,
@@ -299,7 +305,7 @@ export function recommendProfileRunes(
 /**
  * "Profile's best" summoner-spell pairs for `championId` in `role`
  * (SPECS §18.5): same shrinkage/fallback/insufficient rules as the rune
- * pages. Only games recorded in `role` count.
+ * pages. Only in-scope games recorded in `role` count (D-097/D-136).
  */
 export function recommendProfileSpells(
   profile: ProfileExport,
@@ -339,7 +345,6 @@ export function recommendProfileSpells(
     const { stats, level, bestNEff } = aggregateSetup(
       games,
       championId,
-      role,
       (game) => spellPairKey(game.summonerSpells),
       key,
       context,

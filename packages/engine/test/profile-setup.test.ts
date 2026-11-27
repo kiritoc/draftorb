@@ -67,6 +67,7 @@ function makeProfile(games: ProfileGame[]): ProfileExport {
 }
 
 const EMPTY_CONTEXT: PersonalizeContext = {
+  role: 'SUPPORT',
   allyAdcId: null,
   enemySupportId: null,
   enemySignature: new Set(),
@@ -74,6 +75,7 @@ const EMPTY_CONTEXT: PersonalizeContext = {
 };
 
 const L1_CONTEXT: PersonalizeContext = {
+  role: 'SUPPORT',
   allyAdcId: 10,
   enemySupportId: 200,
   enemySignature: new Set(),
@@ -194,5 +196,80 @@ describe('recommendProfileSpells', () => {
     const a = recommendProfileSpells(profile, 1, 'SUPPORT', EMPTY_CONTEXT, data, NOW_MS);
     const b = recommendProfileSpells(profile, 1, 'SUPPORT', EMPTY_CONTEXT, data, NOW_MS);
     expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+  });
+});
+
+describe('role scope (D-097, BL-032)', () => {
+  const contextFor = (role: PersonalizeContext['role']): PersonalizeContext => ({
+    ...EMPTY_CONTEXT,
+    role,
+  });
+
+  it('recommends runes from TOP games for a TOP draft', () => {
+    const games = Array.from({ length: 6 }, () => makeGame({ role: 'TOP' }));
+    const picks = recommendProfileRunes(
+      makeProfile(games),
+      1,
+      'TOP',
+      contextFor('TOP'),
+      data,
+      NOW_MS,
+    );
+    expect(picks).toHaveLength(1);
+    expect(must(picks[0]).insufficientData).toBe(false);
+    expect(must(picks[0]).fallbackLevel).toBe(4);
+  });
+
+  it('recommends spells from JUNGLE games for a JUNGLE draft', () => {
+    const games = Array.from({ length: 6 }, () => makeGame({ role: 'JUNGLE' }));
+    const picks = recommendProfileSpells(
+      makeProfile(games),
+      1,
+      'JUNGLE',
+      contextFor('JUNGLE'),
+      data,
+      NOW_MS,
+    );
+    expect(picks).toHaveLength(1);
+    expect(must(picks[0]).insufficientData).toBe(false);
+    expect(must(picks[0]).spells).toEqual([4, 7]);
+  });
+
+  it('ignores games played in other roles', () => {
+    // Six SUPPORT games must not feed a TOP draft's "Profile's best".
+    const games = Array.from({ length: 6 }, () => makeGame({ role: 'SUPPORT' }));
+    const runePicks = recommendProfileRunes(
+      makeProfile(games),
+      1,
+      'TOP',
+      contextFor('TOP'),
+      data,
+      NOW_MS,
+    );
+    expect(runePicks).toHaveLength(0);
+    const spellPicks = recommendProfileSpells(
+      makeProfile(games),
+      1,
+      'JUNGLE',
+      contextFor('JUNGLE'),
+      data,
+      NOW_MS,
+    );
+    expect(spellPicks).toHaveLength(0);
+  });
+
+  it('reports insufficient data for ADC/MID drafts', () => {
+    for (const role of ['ADC', 'MID'] as const) {
+      const games = Array.from({ length: 6 }, () => makeGame({ role }));
+      const picks = recommendProfileRunes(
+        makeProfile(games),
+        1,
+        role,
+        contextFor(role),
+        data,
+        NOW_MS,
+      );
+      expect(picks).toHaveLength(0);
+    }
   });
 });

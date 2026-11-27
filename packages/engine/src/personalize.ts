@@ -18,6 +18,7 @@ import {
   type RankBucket,
   type Recommendation,
   type RecommendData,
+  type Role,
 } from '@draftorb/shared';
 
 import { DEFAULT_CONFIG, rankToBucket } from './config.js';
@@ -69,8 +70,28 @@ export const DEFAULT_PERSONALIZE_CONFIG: PersonalizeConfig = Object.freeze({
 /** Log-odds clamp for the D-089 blend (same scale as the engine `eps`). */
 const BLEND_EPS = 1e-4;
 
+/**
+ * Roles whose profile games feed personalization (D-097, SPECS §18.1):
+ * SUPPORT, TOP and JUNGLE in full; ADC/MID games are stored but ignored by
+ * the engine until a later phase.
+ */
+export const PERSONALIZE_IN_SCOPE_ROLES: readonly Role[] = ['SUPPORT', 'TOP', 'JUNGLE'];
+
+const IN_SCOPE_ROLE_SET: ReadonlySet<Role> = new Set(PERSONALIZE_IN_SCOPE_ROLES);
+
+/**
+ * The drafted role when it is personalization in-scope, else null — an
+ * ADC/MID draft (or any out-of-scope role) yields no profile games and every
+ * entry reports insufficient data (SPECS §18.1/§18.2).
+ */
+export function personalizeScopeRole(role: Role): Role | null {
+  return IN_SCOPE_ROLE_SET.has(role) ? role : null;
+}
+
 /** Draft-side context the fallback levels match against (SPECS §18.2). */
 export interface PersonalizeContext {
+  /** Drafted role (`DraftInput.userRole`); selects the profile games used. */
+  readonly role: Role;
   /** Resolved ally ADC champion id; null when the draft does not reveal it. */
   readonly allyAdcId: number | null;
   /** Resolved enemy support champion id; null when unknown. */
@@ -150,6 +171,7 @@ export function personalizeContext(
     }
   }
   return {
+    role: input.userRole,
     allyAdcId,
     enemySupportId,
     enemySignature,
@@ -184,9 +206,10 @@ function matchesLevel(
 ): boolean {
   const g = game.game;
   // Every level is champion-scoped (games the profile played ON the
-  // candidate); levels widen the matchup context (D-073 interpretation,
-  // see DECISIONS.md).
-  if (g.championId !== championId || g.role !== 'SUPPORT') return false;
+  // candidate in the drafted role — the role filter is applied when the
+  // weighted pool is built); levels widen the matchup context (D-073
+  // interpretation, see DECISIONS.md).
+  if (g.championId !== championId) return false;
   switch (level) {
     case 1:
       return (
@@ -205,11 +228,13 @@ function matchesLevel(
       return true;
     }
     case 4:
-      // Role overall: every in-scope (SUPPORT) game on the champion.
+      // Role overall: every in-scope game on the champion in the drafted
+      // role (any matchup context).
       return true;
     case 5:
-      // Champion overall: identical to L4 while phase 1 stores/uses only
-      // SUPPORT games (SPECS §18.1); kept distinct for later phases.
+      // Champion overall: identical to L4 while personalization is scoped
+      // to the drafted role's games (SPECS §18.1/§18.2); kept distinct for
+      // later phases that widen the pool across roles.
       return true;
     default:
       return false;
@@ -270,10 +295,13 @@ export function personalize(
   const baselineMinGames = config.baselineMinGames ?? DEFAULT_CONFIG.minGames;
   const baselineK0 = config.baselineK0 ?? DEFAULT_CONFIG.k0;
 
-  // In-scope games: Support games only in phase 1 (SPECS §18.1).
+  // In-scope games: only games the profile played in the drafted role, and
+  // only when that role is in scope (SUPPORT/TOP/JUNGLE, D-097). Other
+  // roles' games — including ADC/MID — never enter the pool (SPECS §18.1).
+  const scopeRole = personalizeScopeRole(context.role);
   const weighted: WeightedGame[] = [];
   for (const game of profile.games) {
-    if (game.role !== 'SUPPORT') continue;
+    if (scopeRole === null || game.role !== scopeRole) continue;
     const ageDays = Math.max(0, nowDays - game.createdAtDay);
     weighted.push({
       game,

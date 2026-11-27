@@ -105,7 +105,7 @@ export function DraftScreen() {
   const [runeIcons, setRuneIcons] = useState<ReadonlyMap<number, RuneIconInfo> | null>(null);
   const [runesResult, setRunesResult] = useState<RuneRecommendationResult | null>(null);
   const [runesLoading, setRunesLoading] = useState(false);
-  // D-129: matchup layers run only when the backtest report validates them
+  // D-130: matchup layers run only when the backtest report validates them
   // for SUPPORT on the loaded patch; anything else keeps the baseline ranking.
   const matchupConfig = useMatchupConfig(USER_ROLE);
   const runeExportCache = useRef(new Map<number, Promise<RuneExport | null>>());

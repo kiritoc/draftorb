@@ -82,7 +82,7 @@ The cron schedule is ENABLED again (owner decision 2026-11-13): the repo is publ
 
 `pnpm etl pull` downloads the newest state release and extracts `public-exports.tar.gz` into `data/public` (uses the `gh` CLI, no new dependency). Re-run it whenever you want fresh data locally.
 
-Backtest re-check (D-129): after every data refresh, re-run `pnpm etl backtest draft --roles=SUPPORT,TOP,JUNGLE` so `data/public/backtest-draft.json` reflects the new data; the app's matchup layers stay disabled unless the report validates them. Revisit the gate when match volume reaches ~×3 and ~×10 of the 24k-match baseline.
+Backtest re-check (D-130): after every data refresh, re-run `pnpm etl backtest draft --roles=SUPPORT,TOP,JUNGLE` so `data/public/backtest-draft.json` reflects the new data; the app's matchup layers stay disabled unless the report validates them. Revisit the gate when match volume reaches ~×3 and ~×10 of the 24k-match baseline.
 
 ## Migrating off `etl-db` (D-078 point 8)
 

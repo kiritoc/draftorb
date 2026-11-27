@@ -14,7 +14,7 @@ const VALIDATED = {
   },
 };
 
-describe('matchupConfigFromReport (D-129)', () => {
+describe('matchupConfigFromReport (D-130)', () => {
   it('returns null for a missing or malformed report (fail-safe off)', () => {
     expect(matchupConfigFromReport(null, 'SUPPORT', '16.22')).toBeNull();
     expect(matchupConfigFromReport('nope', 'SUPPORT', '16.22')).toBeNull();

@@ -1,5 +1,5 @@
 /**
- * @draftorb/web — Backtest report loader (D-129, BL-014).
+ * @draftorb/web — Backtest report loader (D-130, BL-014).
  *
  * Fetches `backtest-draft.json` once per page load and caches the promise.
  * A missing or unreadable report resolves to `null` — consumers must treat

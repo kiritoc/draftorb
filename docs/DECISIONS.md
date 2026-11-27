@@ -1427,7 +1427,15 @@ Implements the BL-024 half of D-097/D-126: ADC and MID become selectable roles b
 
 Open question for the owner: none blocking — if ADC/MID later get full matchup exports, dropping them from `minimalRoles` (engine config + manifest field) restores the full pipeline without code changes.
 
-### D-129 — Matchup layers behind a report-driven flag; champion baseline is the default ranking — ACCEPTED (owner, 2026-11-26, BL-014)
+### D-129 — Thin-data cards render in "Best overall" for every gated candidate — PROPOSED (BL-017)
+
+- Context: D-103 requires thin-data picks to show a broader statistic clearly labeled as broader, but SPECS §7.1 only placed insufficient-data cards in the pool list; non-pool champions below the baseline `n_eff` gate had no rendering surface and showed nothing.
+- Decision (implemented, pending owner OK): every `DraftResult.insufficientData` entry renders as an unavailable card appended after the ranked "Best overall" entries — the same card and pagination pattern as the §7.1 pool unavailable cards — showing `nEff`, `rawGames` when known, and the baseline win rate labeled "Broader win rate" only when weighted baseline evidence exists (`games_e > 0`, D-054). A champion with no baseline row shows "insufficient data" with `nEff` 0 and no percentage. Pool members appear in both lists, mirroring scored pool champions; "Hide my pool" filters them from Best overall too. SPECS §7 thin-data paragraph updated to match.
+- Alternatives: a separate "Insufficient data" section (rejected: adds a third list the spec does not define); rendering only pool thin champions (rejected: non-pool candidates would still show nothing, violating D-103); showing the raw unshrunk win rate (rejected by D-054: tiny samples can read 0%/100%).
+
+(Renumbered from the branch's original D-127 after BL-051/BL-024 took D-127/D-128 on main.)
+
+### D-130 — Matchup layers behind a report-driven flag; champion baseline is the default ranking — ACCEPTED (owner, 2026-11-26, BL-014)
 
 The D-023 gate failed on the first real report (BL-014): on holdout patch 16.22 the deployed engine's log-loss (0.6972) is significantly _worse_ than the champion-baseline-only model (0.6950); paired bootstrap Δ = −0.0023, 95% CI [−0.0029, −0.0016] on the `match` unit and [−0.0028, −0.0018] on the `player` unit (repeat appearances clustered by player id). The owner rejected both ticket fallback options (champion-level stats only / keep the unvalidated ranking) and chose a third: **baseline by default, matchups behind a flag driven by the backtest report**.
 
@@ -1440,3 +1448,5 @@ The D-023 gate failed on the first real report (BL-014): on holdout patch 16.22 
 - **Re-check**: re-run `pnpm etl backtest draft --roles=SUPPORT,TOP,JUNGLE` after every data refresh (noted in SETUP.md); revisit when match volume is ~×3 and ~×10 of the 24k-match baseline. If shrinkage does not help, stay on baseline and reconsider option 1 (champion-level statistics only, no ranking) with the negative result in hand.
 - **Scope links**: extends D-097 (ADC/MID already champion-level only — now the default for every role until validated) and amends the D-100 "unvalidated model" label semantics: the label is replaced by the baseline-ranking banner while `matchup.enabled` is false. SPECS §5 documents the two new config params. Composes with D-128 (minimal roles): ADC/MID skip the layers unconditionally, so the flag only governs SUPPORT/TOP/JUNGLE.
 - **First run (BL-014, patch 16.22 holdout)**: the train-only CV on patch 16.21 selected variant `off` — champion baseline log-loss 0.6958 beat every matchup variant (k=0: 0.6962; k=25..400: 0.6962–0.6963). Shrinkage did not recover the signal, so `matchup.enabled = false`, `validationStatus = 'unvalidated'` and the app stays on the champion-baseline ranking. The negative result is kept in `backtest-draft.json` (`matchup.candidates`) for the ×3/×10 revisit.
+
+(Renumbered from the branch's original D-129 after BL-017 took D-129 on main.)

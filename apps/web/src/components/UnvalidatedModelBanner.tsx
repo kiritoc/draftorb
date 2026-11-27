@@ -1,5 +1,5 @@
 /**
- * @draftorb/web — Baseline-ranking banner (D-129, BL-014).
+ * @draftorb/web — Baseline-ranking banner (D-130, BL-014).
  *
  * Shown while the matchup layers are disabled: the ranking is the champion
  * baseline win rate and the backtest has not validated matchup advice. The

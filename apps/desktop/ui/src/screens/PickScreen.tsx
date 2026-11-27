@@ -222,7 +222,7 @@ export function PickScreen({
   useEffect(() => {
     if (pickData === null) return;
     try {
-      // D-129: the backtest report is not part of the aggregate archive yet,
+      // D-130: the backtest report is not part of the aggregate archive yet,
       // so the matchup flag stays off (champion-baseline ranking) until it is
       // shipped and wired like the web app.
       const result = recommend(draftInput, pickData.data, {

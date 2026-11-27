@@ -13,12 +13,41 @@ export function personalRecord(
   championId: number,
   role: Role,
 ): PersonalRecord {
-  let games = 0;
-  let wins = 0;
-  for (const game of profile.games) {
-    if (game.championId !== championId || game.role !== role) continue;
-    games += 1;
-    if (game.win) wins += 1;
-  }
+  return personalStats(profile, championId, role).role;
+}
+
+export interface PersonalStats {
+  /** All profile games on the champion, every role (BL-051). */
+  readonly overall: PersonalRecord;
+  /** Profile games on the champion in the drafted role (D-119). */
+  readonly role: PersonalRecord;
+}
+
+function record(games: number, wins: number): PersonalRecord {
   return { games, wins, winRate: games >= RECORD_MIN_GAMES ? wins / games : null };
+}
+
+/** Personal record of a champion in a role plus across all roles (BL-051, D-119). */
+export function personalStats(
+  profile: ProfileExport,
+  championId: number,
+  role: Role,
+): PersonalStats {
+  let allGames = 0;
+  let allWins = 0;
+  let roleGames = 0;
+  let roleWins = 0;
+  for (const game of profile.games) {
+    if (game.championId !== championId) continue;
+    allGames += 1;
+    if (game.win) allWins += 1;
+    if (game.role === role) {
+      roleGames += 1;
+      if (game.win) roleWins += 1;
+    }
+  }
+  return {
+    overall: record(allGames, allWins),
+    role: record(roleGames, roleWins),
+  };
 }

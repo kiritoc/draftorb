@@ -3,11 +3,14 @@
  * with a "Not recommended" badge (port of the web component, SPECS §7.1).
  */
 
-import type { Champion, InsufficientDataEntry } from '@draftorb/shared';
+import type { Champion, InsufficientDataEntry, RankBucket, Role } from '@draftorb/shared';
+import type { ProfileLoad } from '../profile/profile-export';
+import type { BaselineIndex } from '../pick/baseline-record';
 import { strings } from '../strings';
 import { championName } from '../champion-name';
 import { championIconUrl } from '../data/champion-icons';
 import { ChampionPortrait } from './ChampionPortrait';
+import { RecordBadge } from './RecordBadge';
 
 export interface UnavailableChampionCardProps {
   championId: number;
@@ -15,6 +18,11 @@ export interface UnavailableChampionCardProps {
   sample?: InsufficientDataEntry;
   champions: Champion[];
   iconVersion?: string | null;
+  /** Record badge inputs (BL-051); both undefined hides the badge. */
+  profileLoad?: ProfileLoad;
+  role?: Role;
+  baselineIndex?: BaselineIndex;
+  rankBucket?: RankBucket;
 }
 
 const REASON_LABEL: Record<UnavailableChampionCardProps['reason'], string> = {
@@ -30,6 +38,10 @@ export function UnavailableChampionCard({
   sample,
   champions,
   iconVersion = null,
+  profileLoad,
+  role,
+  baselineIndex,
+  rankBucket,
 }: UnavailableChampionCardProps) {
   const champion = champions.find((c) => c.id === championId);
   const name = championName(champions, championId);
@@ -59,6 +71,15 @@ export function UnavailableChampionCard({
             </>
           )}
         </span>
+        {profileLoad !== undefined && role !== undefined && (
+          <RecordBadge
+            load={profileLoad}
+            championId={championId}
+            role={role}
+            baselineIndex={baselineIndex}
+            rankBucket={rankBucket}
+          />
+        )}
       </div>
     </div>
   );

@@ -1,8 +1,6 @@
 import type Database from 'better-sqlite3';
-import { readdirSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
+import { getMigrationStatusReadOnly } from './db';
 import type { Platform } from './riot';
 
 export interface MigrationStatusSummary {
@@ -58,40 +56,12 @@ function columnExists(db: Database.Database, tableName: string, columnName: stri
   return columns.some((col) => col.name === columnName);
 }
 
-function getDiskMigrationVersions(): string[] {
-  const migrationsDir = join(dirname(fileURLToPath(import.meta.url)), '../migrations');
-  return readdirSync(migrationsDir)
-    .filter((f) => f.endsWith('.sql'))
-    .sort()
-    .map((f) => f.replace('.sql', ''));
-}
-
-function getReadOnlyMigrationStatus(db: Database.Database): MigrationStatusSummary {
-  const diskVersions = getDiskMigrationVersions();
-  if (!tableExists(db, '_migrations')) {
-    return { applied: 0, pending: diskVersions.length, missingVersions: [] };
-  }
-
-  const appliedRows = db.prepare('SELECT version FROM _migrations ORDER BY version').all() as {
-    version: string;
-  }[];
-  const appliedVersions = appliedRows.map((r) => r.version);
-  const appliedSet = new Set(appliedVersions);
-  const diskSet = new Set(diskVersions);
-
-  return {
-    applied: appliedVersions.length,
-    pending: diskVersions.filter((v) => !appliedSet.has(v)).length,
-    missingVersions: appliedVersions.filter((v) => !diskSet.has(v)),
-  };
-}
-
 /**
  * Returns summary counts and migration status from the ETL database.
  * Purely read-only, using parameterized SQL queries.
  */
 export function getEtlStatus(db: Database.Database, platform?: Platform | string): EtlStatus {
-  const migrations = getReadOnlyMigrationStatus(db);
+  const migrations = getMigrationStatusReadOnly(db);
 
   let players: PlayerTierCount[] = [];
   if (tableExists(db, 'players')) {

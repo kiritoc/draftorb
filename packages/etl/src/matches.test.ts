@@ -12,6 +12,7 @@ import {
   mockClient,
   PLATFORM,
   seedMatchPatches,
+  seedParticipant,
   seedPlayer,
 } from './matches.test-helpers';
 import { RiotApiError, RiotRateLimitError, RiotSchemaError } from './riot';
@@ -551,6 +552,40 @@ describe('match ingestion', () => {
     expect(c2.getMatch).toHaveBeenCalledWith('euw1', 'EUW1_2');
     const count = db.prepare('SELECT COUNT(*) AS n FROM matches').get() as { n: number };
     expect(count.n).toBe(2);
+    db.close();
+  });
+
+  it('ingests pool-matching players first when poolConfig is provided (BL-023)', async () => {
+    const db = openDb(':memory:');
+    migrate(db);
+    seedMatchPatches(db);
+    seedPlayer(db, 'p-high', 9);
+    seedPlayer(db, 'p-low', 5);
+    // p-low was already seen playing a pool champion×role pair.
+    seedParticipant(db, {
+      matchId: 'EUW1_SEED',
+      puuid: 'p-low',
+      championId: 267,
+      role: 'SUPPORT',
+    });
+
+    const lines: string[] = [];
+    const client = mockClient(
+      { 'p-high': ['EUW1_H'], 'p-low': ['EUW1_L'] },
+      { EUW1_H: makeMatch('EUW1_H'), EUW1_L: makeMatch('EUW1_L') },
+    );
+    const result = await ingestMatches({
+      platform: PLATFORM,
+      db,
+      client,
+      poolConfig: { schemaVersion: 1, pools: { SUPPORT: [{ championId: 267 }] } },
+      onProgress: (m) => lines.push(m),
+    });
+
+    expect(result.playerResults.map((r) => r.puuid)).toEqual(['p-low', 'p-high']);
+    expect(lines.some((l) => l.includes('Pool priority'))).toBe(true);
+    expect(lines.some((l) => l.includes('[1/2] [pool]'))).toBe(true);
+    expect(lines.some((l) => l.includes('[2/2] [rank]'))).toBe(true);
     db.close();
   });
 

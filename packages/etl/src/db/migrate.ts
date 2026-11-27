@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MIGRATIONS_DIR = join(__dirname, '../../migrations');
+const MIGRATIONS_LEDGER_EXISTS_SQL =
+  "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = '_migrations'";
 
 /**
  * Migration interface
@@ -151,6 +153,39 @@ export function migrate(db: Database.Database): string[] {
   }
 
   return appliedNow;
+}
+
+/**
+ * Read-only migration status for connections that must not write (e.g. a
+ * `readonly` preview): never creates or alters `_migrations`, so it is safe
+ * on ledgers from before the checksum column existed. Pending counts every
+ * disk migration not recorded as applied; a missing ledger means all are
+ * pending.
+ */
+export function getMigrationStatusReadOnly(db: Database.Database): {
+  applied: number;
+  pending: number;
+  missingVersions: string[];
+} {
+  const diskVersions = getMigrations().map((m) => m.version);
+  const hasLedger = db.prepare(MIGRATIONS_LEDGER_EXISTS_SQL).get() !== undefined;
+  if (!hasLedger) {
+    return { applied: 0, pending: diskVersions.length, missingVersions: [] };
+  }
+
+  const appliedVersions = (
+    db.prepare('SELECT version FROM _migrations ORDER BY version').all() as {
+      version: string;
+    }[]
+  ).map((row) => row.version);
+  const appliedSet = new Set(appliedVersions);
+  const diskSet = new Set(diskVersions);
+
+  return {
+    applied: appliedVersions.length,
+    pending: diskVersions.filter((v) => !appliedSet.has(v)).length,
+    missingVersions: appliedVersions.filter((v) => !diskSet.has(v)),
+  };
 }
 
 /**

@@ -24,6 +24,7 @@ import type { ProfileLoad } from '../profile/profile-export';
 import type { BaselineIndex } from '../pick/baseline-record';
 import { excludePick, excludedRanks } from '../pick/exclude-pick';
 import { hidePoolChampions } from '../pick/hide-my-pool';
+import { buildInsufficientItems } from '../pick/insufficient-items';
 import { buildPoolUnavailableItems } from '../pick/pool-unavailable';
 import { championName } from '../champion-name';
 import { RecommendationsList, type RecommendationCardContext } from './RecommendationsList';
@@ -104,6 +105,13 @@ export function PickRecommendations({
     () => buildPoolUnavailableItems(poolUnavailable, insufficientData, userChampionId ?? undefined),
     [poolUnavailable, insufficientData, userChampionId],
   );
+  // Thin-data fallback (BL-017, D-103): every champion below the baseline
+  // gate renders as an unavailable card with the broader statistic after the
+  // ranked entries. "Hide my pool" filters pool members here too.
+  const overallUnavailable = useMemo(() => {
+    const items = buildInsufficientItems(insufficientData, userChampionId ?? undefined);
+    return hideMyPool ? items.filter((item) => !poolSet.has(item.championId)) : items;
+  }, [insufficientData, userChampionId, hideMyPool, poolSet]);
   const cardContext = useMemo<RecommendationCardContext>(
     () => ({
       champions,
@@ -135,6 +143,7 @@ export function PickRecommendations({
           recommendations={visiblePoolRecommendations}
           resetKey={resetKey}
           poolIds={poolSet}
+          poolMembershipImplied
           unavailable={poolUnavailableItems}
           cardContext={cardContext}
         />
@@ -180,6 +189,7 @@ export function PickRecommendations({
         recommendations={overallRecommendations}
         resetKey={resetKey}
         poolIds={poolSet}
+        unavailable={overallUnavailable}
         cardContext={cardContext}
       />
 

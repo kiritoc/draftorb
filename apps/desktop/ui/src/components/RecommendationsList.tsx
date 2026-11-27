@@ -20,7 +20,7 @@ import { pickShareDisplay } from '../pick/pick-share';
 import { strings } from '../strings';
 import { RECOMMENDATION_PAGE_SIZE } from '../config';
 import { paginate } from '../pick/pagination';
-import type { PoolUnavailableItem } from '../pick/pool-unavailable';
+import type { UnavailableItem } from '../pick/pool-unavailable';
 import { RecommendationCard } from './RecommendationCard';
 import { UnavailableChampionCard } from './UnavailableChampionCard';
 
@@ -38,7 +38,7 @@ export function pageCountReducer(pageCount: number, action: PaginationAction): n
 
 type ListEntry =
   | { readonly type: 'recommendation'; readonly recommendation: Recommendation }
-  | { readonly type: 'unavailable'; readonly item: PoolUnavailableItem };
+  | { readonly type: 'unavailable'; readonly item: UnavailableItem };
 
 /** Everything a recommendation or unavailable card needs to render. */
 export interface RecommendationCardContext {
@@ -60,7 +60,10 @@ export interface RecommendationsListProps {
   pageSize?: number;
   resetKey: unknown;
   poolIds?: ReadonlySet<number>;
-  unavailable?: readonly PoolUnavailableItem[];
+  /** Set on the "From your pool" list: every unavailable card is a pool member
+   *  by construction, so the "In your pool" tag would be redundant (SPECS §7.1). */
+  poolMembershipImplied?: boolean;
+  unavailable?: readonly UnavailableItem[];
   cardContext: RecommendationCardContext;
 }
 
@@ -70,6 +73,7 @@ export function RecommendationsList({
   pageSize = RECOMMENDATION_PAGE_SIZE,
   resetKey,
   poolIds,
+  poolMembershipImplied = false,
   unavailable,
   cardContext,
 }: RecommendationsListProps) {
@@ -137,6 +141,7 @@ export function RecommendationsList({
                   championId={entry.item.championId}
                   reason={entry.item.reason}
                   sample={entry.item.sample}
+                  inPool={!poolMembershipImplied && (poolIds?.has(entry.item.championId) ?? false)}
                   champions={cardContext.champions}
                   iconVersion={cardContext.iconVersion}
                   profileLoad={cardContext.profileLoad}

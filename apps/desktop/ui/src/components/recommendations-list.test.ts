@@ -119,10 +119,10 @@ describe('RecommendationsList', () => {
     expect(markup).toContain('Showing 2 of 2');
     expect(markup).toContain('Soraka');
     expect(markup).toContain('Not recommended');
-    // Insufficient-data card carries n_eff, raw games and baseline win rate.
+    // Insufficient-data card carries n_eff, raw games and the broader win rate.
     expect(markup).toContain('Sample 20.0');
     expect(markup).toContain('30 games');
-    expect(markup).toContain('Win rate 51.0%');
+    expect(markup).toContain('Broader win rate 51.0%');
     expect(markup.indexOf('Leona')).toBeLessThan(markup.indexOf('Soraka'));
   });
 
@@ -161,6 +161,51 @@ describe('RecommendationsList', () => {
       }),
     );
     expect(markup).not.toContain('Pick share');
+  });
+
+  it('tags a pool champion on an unavailable card in the overall list', () => {
+    const markup = renderToStaticMarkup(
+      createElement(RecommendationsList, {
+        title: 'Best overall',
+        recommendations: [rec(89, 1)],
+        resetKey: 'draft',
+        poolIds: new Set([16]),
+        unavailable: [
+          {
+            championId: 16,
+            reason: 'insufficientData',
+            sample: { championId: 16, nEff: 20, rawGames: 30, winRate: 0.51 },
+          },
+        ],
+        cardContext,
+      }),
+    );
+    // Soraka is a pool member: her thin-data card carries the pool tag (SPECS §7.1).
+    expect(markup).toContain('Soraka');
+    expect(markup).toContain('In your pool');
+    expect(markup.match(/In your pool/g)?.length).toBe(1);
+  });
+
+  it('omits the redundant pool tag when membership is implied by the list', () => {
+    const markup = renderToStaticMarkup(
+      createElement(RecommendationsList, {
+        title: 'From your pool',
+        recommendations: [],
+        resetKey: 'draft',
+        poolIds: new Set([16]),
+        poolMembershipImplied: true,
+        unavailable: [
+          {
+            championId: 16,
+            reason: 'insufficientData',
+            sample: { championId: 16, nEff: 20, rawGames: 30, winRate: 0.51 },
+          },
+        ],
+        cardContext,
+      }),
+    );
+    expect(markup).toContain('Soraka');
+    expect(markup).not.toContain('In your pool');
   });
 
   it('renders the empty state', () => {

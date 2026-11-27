@@ -1427,6 +1427,14 @@ Implements the BL-024 half of D-097/D-126: ADC and MID become selectable roles b
 
 Open question for the owner: none blocking — if ADC/MID later get full matchup exports, dropping them from `minimalRoles` (engine config + manifest field) restores the full pipeline without code changes.
 
+### D-129 — Thin-data cards render in "Best overall" for every gated candidate — PROPOSED (BL-017)
+
+- Context: D-103 requires thin-data picks to show a broader statistic clearly labeled as broader, but SPECS §7.1 only placed insufficient-data cards in the pool list; non-pool champions below the baseline `n_eff` gate had no rendering surface and showed nothing.
+- Decision (implemented, pending owner OK): every `DraftResult.insufficientData` entry renders as an unavailable card appended after the ranked "Best overall" entries — the same card and pagination pattern as the §7.1 pool unavailable cards — showing `nEff`, `rawGames` when known, and the baseline win rate labeled "Broader win rate" only when weighted baseline evidence exists (`games_e > 0`, D-054). A champion with no baseline row shows "insufficient data" with `nEff` 0 and no percentage. Pool members appear in both lists, mirroring scored pool champions; "Hide my pool" filters them from Best overall too. SPECS §7 thin-data paragraph updated to match.
+- Alternatives: a separate "Insufficient data" section (rejected: adds a third list the spec does not define); rendering only pool thin champions (rejected: non-pool candidates would still show nothing, violating D-103); showing the raw unshrunk win rate (rejected by D-054: tiny samples can read 0%/100%).
+
+(Renumbered from the branch's original D-127 after BL-051/BL-024 took D-127/D-128 on main.)
+
 ### D-131 — Pick share with sample denominator on cards, all roles (BL-052) — PROPOSED
 
 Resolves the D-128 deferral and issue #163. Owner decision (approved in session): show pick share WITH its sample denominator on champion cards for **all** roles, full and minimal alike, consistently.
@@ -1436,3 +1444,4 @@ Resolves the D-128 deferral and issue #163. Owner decision (approved in session)
 - **Display**: `RecommendationCard` shows `Pick share P% · n≈N · all ranks` next to `Sample n_eff` — the `all ranks` tag marks the difference from the rank-bucketed win-rate sample. Below `DEFAULT_CONFIG.minGames` (25, the same reliability threshold as `lowData`) the card shows "not enough data" instead of a share; a champion with no gated row shows the same label. Exports without `pick-rate-samples.json` (legacy data) show no pick-share figure at all rather than a misleading fallback.
 - **Scope**: all five roles, not only ADC/MID — one consistent figure avoids a role-dependent card layout, and the underlying export is already global across roles.
 - **Cache compat**: the desktop loader accepts the frozen v5 manifest shape (`manifestSchemaV5`) so a pre-BL-052 offline cache keeps working — the samples file is simply absent and no pick-share figure shows. v4 and older manifests are still rejected (they predate `minimalRoles`). Sample keys are aligned to the emitted shares: a gated row whose share rounds to zero is excluded from both files.
+- **Merge note (PR #168)**: BL-017 (D-129, thin-data cards in "Best overall") merged to main while this branch was open; BL-013a (PR #166) also claims schema v6. The second of the two PRs to merge must move to `MANIFEST_SCHEMA_VERSION` 7 with a frozen intermediate v6 schema and update `PUBLISHED_MANIFEST_SCHEMAS` and all version fixtures.

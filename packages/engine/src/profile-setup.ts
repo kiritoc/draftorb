@@ -12,7 +12,7 @@
  * No DOM, no Node APIs, no network, no file I/O, no randomness.
  */
 
-import type { ProfileExport, ProfileGame, RecommendData } from '@draftorb/shared';
+import type { ChampionTagsMap, ProfileExport, ProfileGame, Role } from '@draftorb/shared';
 
 import {
   DEFAULT_PERSONALIZE_CONFIG,
@@ -27,6 +27,15 @@ const DAY_MS = 86_400_000;
 export const DEFAULT_MIN_SETUP_GAMES = 5;
 /** Number of rune pages / spell pairs returned (mirrors `topPages`). */
 export const DEFAULT_SETUP_PICKS = 3;
+
+/**
+ * Minimal data the profile setup aggregators need: champion tags for the
+ * L3 enemy signature. `RecommendData` satisfies this structurally, so the
+ * rune-only setup path does not have to load the pair/lane tables (BL-030a).
+ */
+export interface ProfileSetupData {
+  readonly tags: ChampionTagsMap;
+}
 
 export interface ProfileRunePick {
   readonly keystoneId: number;
@@ -103,6 +112,7 @@ interface SetupStats {
 function aggregateSetup(
   games: readonly WeightedProfileGame[],
   championId: number,
+  role: Role,
   setupKey: (game: ProfileGame) => string | null,
   key: string,
   context: PersonalizeContext,
@@ -117,7 +127,7 @@ function aggregateSetup(
     let rawGames = 0;
     for (const weighted of games) {
       const game = weighted.game;
-      if (game.championId !== championId || game.role !== 'SUPPORT') continue;
+      if (game.championId !== championId || game.role !== role) continue;
       if (setupKey(game) !== key) continue;
       if (!predicate(game, weighted.enemySignature)) continue;
       sumW += weighted.weight;
@@ -140,16 +150,17 @@ function aggregateSetup(
 
 function buildWeightedGames(
   profile: ProfileExport,
-  data: RecommendData,
+  data: ProfileSetupData,
   nowMs: number,
   halfLifeDays: number,
+  role: Role,
 ): WeightedProfileGame[] {
   const nowDays = nowMs / DAY_MS;
   const signatureCache = new Map<number, string>();
   const tags = data.tags;
   const weighted: WeightedProfileGame[] = [];
   for (const game of profile.games) {
-    if (game.role !== 'SUPPORT') continue;
+    if (game.role !== role) continue;
     const ageDays = Math.max(0, nowDays - game.createdAtDay);
     const signature = new Set<string>();
     for (const championId of game.enemyChampionIds) {
@@ -192,15 +203,18 @@ function spellPairKey(spells: readonly [number, number]): string {
 }
 
 /**
- * "Profile's best" rune pages for `championId` (SPECS §18.5): the profile's
- * own rune pages ranked by shrunk win rate under the current draft context,
- * with the same fallback/shrinkage rules as the champion list.
+ * "Profile's best" rune pages for `championId` in `role` (SPECS §18.5): the
+ * profile's own rune pages ranked by shrunk win rate under the current draft
+ * context, with the same fallback/shrinkage rules as the champion list.
+ * Only games recorded in `role` count (D-097: profile scope is not
+ * Support-only).
  */
 export function recommendProfileRunes(
   profile: ProfileExport,
   championId: number,
+  role: Role,
   context: PersonalizeContext,
-  data: RecommendData,
+  data: ProfileSetupData,
   nowMs: number,
   options: {
     config?: PersonalizeConfig;
@@ -211,7 +225,7 @@ export function recommendProfileRunes(
   const config = options.config ?? DEFAULT_PERSONALIZE_CONFIG;
   const minGames = options.minSetupGames ?? DEFAULT_MIN_SETUP_GAMES;
   const topPicks = options.topPicks ?? DEFAULT_SETUP_PICKS;
-  const games = buildWeightedGames(profile, data, nowMs, config.halfLifeDays);
+  const games = buildWeightedGames(profile, data, nowMs, config.halfLifeDays, role);
   const base = championBaseWinRate(games, championId);
 
   // Group the champion's rune-carrying games by page identity.
@@ -233,6 +247,7 @@ export function recommendProfileRunes(
     const { stats, level, bestNEff } = aggregateSetup(
       games,
       championId,
+      role,
       (game) => (game.runes === null ? null : runePageKey(game.runes)),
       key,
       context,
@@ -282,14 +297,16 @@ export function recommendProfileRunes(
 }
 
 /**
- * "Profile's best" summoner-spell pairs for `championId` (SPECS §18.5):
- * same shrinkage/fallback/insufficient rules as the rune pages.
+ * "Profile's best" summoner-spell pairs for `championId` in `role`
+ * (SPECS §18.5): same shrinkage/fallback/insufficient rules as the rune
+ * pages. Only games recorded in `role` count.
  */
 export function recommendProfileSpells(
   profile: ProfileExport,
   championId: number,
+  role: Role,
   context: PersonalizeContext,
-  data: RecommendData,
+  data: ProfileSetupData,
   nowMs: number,
   options: {
     config?: PersonalizeConfig;
@@ -300,7 +317,7 @@ export function recommendProfileSpells(
   const config = options.config ?? DEFAULT_PERSONALIZE_CONFIG;
   const minGames = options.minSetupGames ?? DEFAULT_MIN_SETUP_GAMES;
   const topPicks = options.topPicks ?? DEFAULT_SETUP_PICKS;
-  const games = buildWeightedGames(profile, data, nowMs, config.halfLifeDays);
+  const games = buildWeightedGames(profile, data, nowMs, config.halfLifeDays, role);
   const base = championBaseWinRate(games, championId);
 
   const pairs = new Map<string, { spells: [number, number]; games: number }>();
@@ -322,6 +339,7 @@ export function recommendProfileSpells(
     const { stats, level, bestNEff } = aggregateSetup(
       games,
       championId,
+      role,
       (game) => spellPairKey(game.summonerSpells),
       key,
       context,
@@ -356,4 +374,54 @@ export function recommendProfileSpells(
     return spellPairKey(a.spells).localeCompare(spellPairKey(b.spells));
   });
   return picks.slice(0, topPicks);
+}
+
+export interface ProfileChampionStat {
+  /** Recency-weighted profile win rate on the champion+role; null with no games. */
+  readonly winRate: number | null;
+  /** Effective sample size `(sum w)^2 / sum w^2` over the same games. */
+  readonly nEff: number;
+  /** Raw game count on the champion+role. */
+  readonly games: number;
+  /** True when `nEff` is below the setup minimum (D-075). */
+  readonly insufficientData: boolean;
+}
+
+/**
+ * The profile's own champion win rate in `role` (D-103 broader statistic):
+ * used by the setup result when no rune page reaches the evidence minimum,
+ * so the screen can still show a labeled fallback instead of nothing.
+ */
+export function profileChampionWinRate(
+  profile: ProfileExport,
+  championId: number,
+  role: Role,
+  data: ProfileSetupData,
+  nowMs: number,
+  options: {
+    config?: PersonalizeConfig;
+    minSetupGames?: number;
+  } = {},
+): ProfileChampionStat {
+  const config = options.config ?? DEFAULT_PERSONALIZE_CONFIG;
+  const minGames = options.minSetupGames ?? DEFAULT_MIN_SETUP_GAMES;
+  const games = buildWeightedGames(profile, data, nowMs, config.halfLifeDays, role);
+  let sumW = 0;
+  let sumW2 = 0;
+  let winsW = 0;
+  let rawGames = 0;
+  for (const weighted of games) {
+    if (weighted.game.championId !== championId) continue;
+    sumW += weighted.weight;
+    sumW2 += weighted.weight * weighted.weight;
+    if (weighted.game.win) winsW += weighted.weight;
+    rawGames += 1;
+  }
+  const nEff = sumW2 > 0 ? (sumW * sumW) / sumW2 : 0;
+  return {
+    winRate: sumW > 0 ? winsW / sumW : null,
+    nEff,
+    games: rawGames,
+    insufficientData: nEff < minGames,
+  };
 }

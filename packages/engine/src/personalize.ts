@@ -131,7 +131,13 @@ interface WeightedGame {
  * enemy support champion ids (via the same role inference as `recommend`)
  * and the enemy composition signature built from `champion-tags.json`.
  */
-export function personalizeContext(input: DraftInput, data: RecommendData): PersonalizeContext {
+/** Minimal shape `personalizeContext` reads: role probabilities + tags. */
+export type PersonalizeContextData = Pick<RecommendData, 'roleProb' | 'tags'>;
+
+export function personalizeContext(
+  input: DraftInput,
+  data: PersonalizeContextData,
+): PersonalizeContext {
   const allySlots = resolveKnownSlots(input.allies, 'ally', data.roleProb, [input.userRole]);
   const enemySlots = resolveKnownSlots(input.enemies, 'enemy', data.roleProb);
   const allyAdcId = allySlots.find((slot) => slot.role === 'ADC')?.championId ?? null;

@@ -299,6 +299,74 @@ describe('exportJson', () => {
     expect(readLatestPatch()).toBe('16.22');
   });
 
+  it('replaces a newer latest.json whose v5 manifest is malformed', () => {
+    // BL-024 review: a manifest that fails every known schema must not count
+    // as intact just because its patch field matches, or a recovery export
+    // deadlocks on the unusable pointer.
+    seed(suite.db, 'match', [{}]);
+    mkdirSync(join(suite.publicDir, '16.22'), { recursive: true });
+    writeFileSync(
+      join(suite.publicDir, 'latest.json'),
+      JSON.stringify({
+        schemaVersion: 1,
+        patch: '16.22',
+        manifest: '16.22/manifest.json',
+        generatedAt: FIXED_NOW.toISOString(),
+      }),
+    );
+    writeFileSync(
+      join(suite.publicDir, '16.22', 'manifest.json'),
+      JSON.stringify({
+        schemaVersion: MANIFEST_SCHEMA_VERSION,
+        patch: '16.22',
+        generatedAt: FIXED_NOW.toISOString(),
+        region: 'euw1',
+        rankBuckets: [],
+        roles: [],
+        minimalRoles: [],
+        // `files` omitted: fails manifestSchema.
+      }),
+    );
+    const result = suite.exportOnce();
+
+    expect(result.latestPath).not.toBeNull();
+    expect(result.warnings.some((w) => w.includes('manifest is missing or invalid'))).toBe(true);
+    expect(readLatestPatch()).toBe('16.21');
+  });
+
+  it('replaces a newer latest.json whose v4 manifest is malformed', () => {
+    // Same deadlock guard for the frozen legacy schema: a v4 manifest
+    // missing required fields is not intact either.
+    seed(suite.db, 'match', [{}]);
+    mkdirSync(join(suite.publicDir, '16.22'), { recursive: true });
+    writeFileSync(
+      join(suite.publicDir, 'latest.json'),
+      JSON.stringify({
+        schemaVersion: 1,
+        patch: '16.22',
+        manifest: '16.22/manifest.json',
+        generatedAt: FIXED_NOW.toISOString(),
+      }),
+    );
+    writeFileSync(
+      join(suite.publicDir, '16.22', 'manifest.json'),
+      JSON.stringify({
+        schemaVersion: 4,
+        patch: '16.22',
+        generatedAt: FIXED_NOW.toISOString(),
+        region: 'euw1',
+        rankBuckets: [],
+        roles: [],
+        // `files` omitted: fails manifestSchemaV4.
+      }),
+    );
+    const result = suite.exportOnce();
+
+    expect(result.latestPath).not.toBeNull();
+    expect(result.warnings.some((w) => w.includes('manifest is missing or invalid'))).toBe(true);
+    expect(readLatestPatch()).toBe('16.21');
+  });
+
   it('moves latest.json forward over an older published pointer', () => {
     seed(suite.db, 'match', [{}]);
     writeLatest('16.20');

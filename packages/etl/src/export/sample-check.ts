@@ -13,7 +13,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { recommend } from '@draftorb/engine';
+import { DEFAULT_CONFIG, nEff, recommend } from '@draftorb/engine';
 import {
   allyPairTableSchema,
   baselineTableSchema,
@@ -26,6 +26,7 @@ import {
   latestSchema,
   manifestSchema,
   pickRateSchema,
+  type BaselineTable,
   type ChampionId,
   type RecommendData,
   type Role,
@@ -36,6 +37,25 @@ import {
  *  recommendation list; other exported roles are reported as warnings so a
  *  thin TOP/JUNGLE sample never holds back SUPPORT data (BL-011, D-126). */
 export const RELEASE_BLOCKING_ROLES: readonly Role[] = ['SUPPORT'];
+
+/** D-126 enablement rule, mirrored from the desktop UI
+ *  (apps/desktop/ui/src/config.ts `ROLE_COVERAGE_*`): a role is selectable
+ *  only when this many distinct champions have a baseline row with
+ *  `n_eff >= minGames` in the DIAMOND bucket. The export check warns when a
+ *  role would stay disabled so thin ADC/MID coverage is visible before
+ *  publish (PR #161 review). */
+const ROLE_COVERAGE_MIN_CHAMPIONS = 50;
+const ROLE_COVERAGE_BUCKET = 'DIAMOND';
+
+/** Distinct champions clearing the D-126 baseline coverage gate. */
+function coveredChampionCount(baseline: BaselineTable): number {
+  const covered = new Set<number>();
+  for (const [championId, bucket, , gamesW, gamesW2] of baseline) {
+    if (bucket !== ROLE_COVERAGE_BUCKET) continue;
+    if (nEff(gamesW, gamesW2) >= DEFAULT_CONFIG.minGames) covered.add(championId);
+  }
+  return covered.size;
+}
 
 export interface PublishedExportCheckOptions {
   /** Root of the exported data tree (contains `latest.json` and `<patch>/`). */
@@ -155,6 +175,14 @@ export function checkPublishedExport(
       } else {
         warnings.push(`${message} (not enabled in the app; not release-blocking)`);
       }
+    }
+    const covered = coveredChampionCount(data.baselines);
+    if (covered < ROLE_COVERAGE_MIN_CHAMPIONS) {
+      warnings.push(
+        `Role ${role}: ${covered} champions pass the D-126 coverage gate ` +
+          `(< ${ROLE_COVERAGE_MIN_CHAMPIONS} at n_eff >= ${DEFAULT_CONFIG.minGames} ` +
+          `in ${ROLE_COVERAGE_BUCKET}); the role stays disabled in the app.`,
+      );
     }
   }
 

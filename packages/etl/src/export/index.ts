@@ -23,6 +23,7 @@ import {
   itemClassesExportSchema,
   stateScaleExportSchema,
   manifestSchema,
+  manifestSchemaV4,
   type ChampionTagsMap,
   type Latest,
   type Manifest,
@@ -99,11 +100,16 @@ function all<T>(db: Database.Database, sql: string, params: readonly unknown[] =
   return (params.length === 0 ? statement.all() : statement.all(...params)) as T[];
 }
 
+/** Published manifest shapes the pointer guard accepts, newest first: the
+ *  current schema, then the frozen v4 layout from before the BL-024 v5 bump. */
+const PUBLISHED_MANIFEST_SCHEMAS = [manifestSchema, manifestSchemaV4] as const;
+
 /** Latest-patch pointer already published in `publicDir`, or undefined when
  *  `latest.json` is absent or does not validate against latestSchema.
  *  `intact` is true only when the manifest the pointer references exists,
- *  validates against manifestSchema, and names the same patch: a dangling
- *  pointer (e.g. after a partial restore) must not block recovery exports. */
+ *  validates against a known manifest schema, and names the same patch: a
+ *  dangling or malformed pointer (e.g. after a partial restore) must not
+ *  block recovery exports. */
 function readPublishedPointer(publicDir: string): { patch: string; intact: boolean } | undefined {
   const latestPath = join(publicDir, 'latest.json');
   if (!existsSync(latestPath)) {
@@ -124,15 +130,12 @@ function readPublishedPointer(publicDir: string): { patch: string; intact: boole
   try {
     if (existsSync(manifestPath)) {
       const json: unknown = JSON.parse(readFileSync(manifestPath, 'utf8'));
-      const manifest = manifestSchema.safeParse(json);
-      if (manifest.success) {
-        intact = manifest.data.patch === latest.patch;
-      } else {
-        // A manifest written by another schema version (e.g. v4 before the
-        // v5 bump, BL-024) still proves the patch dir is intact: the pointer
-        // guard only needs the patch name to match.
-        const patch = (json as { patch?: unknown }).patch;
-        intact = typeof patch === 'string' && patch === latest.patch;
+      for (const schema of PUBLISHED_MANIFEST_SCHEMAS) {
+        const manifest = schema.safeParse(json);
+        if (manifest.success) {
+          intact = manifest.data.patch === latest.patch;
+          break;
+        }
       }
     }
   } catch {

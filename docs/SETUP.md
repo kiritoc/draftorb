@@ -29,9 +29,24 @@ The app is **local-only** (D-079): there is no hosting and no deploy workflow. `
 Needs the Rust toolchain (rustup; MSVC build tools on Windows) on top of Node + pnpm. The desktop app lives in `apps/desktop` (`ui/` is the React frontend, `src-tauri/` the thin Rust shell).
 
 - `pnpm --filter @draftorb/desktop tauri dev` runs the app with Vite hot reload.
-- `pnpm --filter @draftorb/desktop tauri build --no-bundle` builds the frontend and the release binary (`src-tauri/target/release/draftorb`); installers come with BL-025.
+- `pnpm --filter @draftorb/desktop tauri build --no-bundle` builds the frontend and the release binary (`src-tauri/target/release/draftorb`); `tauri build` without `--no-bundle` also produces the NSIS installer (see "Installing the Windows app" below).
 - A plain `cargo build` produces a dev-mode binary that loads the Vite dev URL and shows a connection error without a dev server; use `tauri build` for a production binary.
 - Settings live in the program's config directory as `settings.json` (not in the webview storage).
+
+## Installing the Windows app (release build, BL-025)
+
+The CI `Release` workflow (`.github/workflows/release.yml`) builds an unsigned NSIS installer on `windows-latest`:
+
+- Pushing a `v*` tag (e.g. `git tag v0.0.1 && git push origin v0.0.1`) creates a GitHub release with the installer attached.
+- Actions → Release → Run workflow builds the same installer and uploads it as a workflow artifact (`draftorb-windows-x64-setup-<ref>`) without creating a release.
+
+To install on a clean Windows 11 machine:
+
+1. Download the `*.exe` asset from the GitHub release (or the workflow artifact) — no GitHub account or token is needed for the public repo.
+2. Run the installer. Windows SmartScreen shows a warning because the binary is **unsigned** (owner decision D-128: no paid code signing — the free constraint stands). This is the expected shipping state, not a sign of tampering: proceed via **More info → Run anyway**. Do not disable SmartScreen globally.
+3. Launch **DraftOrb** from the Start menu. On first launch the app downloads the latest public aggregates from the `data-latest` release (D-111, D-123) — an internet connection is required once; afterwards the data is cached locally and the app still works offline (a stale-data notice is shown when the cache is old). No Riot key, Git or pnpm needed.
+
+Updates: there is no auto-update — download and run the installer of the newer release; it upgrades in place. Only Windows x64 is shipped; macOS/Linux builds are out of scope.
 
 ## Desktop app data folders (BL-006, SPECS §19)
 

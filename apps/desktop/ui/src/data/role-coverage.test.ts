@@ -115,10 +115,11 @@ describe('loadEnabledRoles', () => {
     const manifest = {
       patch: '16.22',
       generatedAt: '2026-11-26T00:00:00Z',
-      schemaVersion: 4,
+      schemaVersion: 5,
       region: 'euw',
       rankBuckets: ['DIAMOND'],
       roles,
+      minimalRoles: [],
       files: Object.keys(patchFiles).map((path) => ({
         path,
         sha256: '0'.repeat(64),

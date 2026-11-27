@@ -15,8 +15,9 @@ export const SHARED_VERSION = '0.0.1' as const;
  * Agreed schema version for the exported JSON layout (DATA_MODEL.md §Exported JSON).
  * Bumped on every export format change. v2: 6th baseline column `games` (T-023, B-025).
  * v3: rune contexts retain their source `rankBucket` (T-019 review).
+ * v5: manifest gains `minimalRoles` (ADC/MID baseline-only exports, BL-024).
  */
-export const MANIFEST_SCHEMA_VERSION = 4;
+export const MANIFEST_SCHEMA_VERSION = 5;
 
 /**
  * Version of the engine output contract (`DraftResult`, SPECS §7). Bumped on every

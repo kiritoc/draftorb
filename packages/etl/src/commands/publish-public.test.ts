@@ -60,6 +60,7 @@ function manifestJson(
     region: 'EUW1',
     rankBuckets: [],
     roles: [],
+    minimalRoles: [],
     files,
     schemaVersion: MANIFEST_SCHEMA_VERSION,
   });

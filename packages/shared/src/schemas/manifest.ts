@@ -27,11 +27,36 @@ export const manifestSchema = z
     region: z.string().min(1),
     rankBuckets: z.array(rankBucketSchema),
     roles: z.array(roleSchema),
+    /**
+     * Subset of `roles` exported at champion-level statistics only
+     * (baseline.json, no pair/lane/rune/build files) — ADC and MID (D-097,
+     * BL-024). Empty when every exported role has the full layout.
+     */
+    minimalRoles: z.array(roleSchema),
     files: z.array(manifestFileSchema),
     schemaVersion: z.literal(MANIFEST_SCHEMA_VERSION),
   })
   .strict();
 export type Manifest = z.infer<typeof manifestSchema>;
+
+/**
+ * Manifest schema version 4 — the layout published before BL-024 added
+ * `minimalRoles` (schema v5). Frozen on purpose: it must keep accepting
+ * exactly the v4 shape so the ETL latest-pointer guard can tell an intact
+ * older export from a corrupt one (PR #161 review).
+ */
+export const manifestSchemaV4 = z
+  .object({
+    patch: z.string().min(1),
+    generatedAt: z.string().min(1),
+    region: z.string().min(1),
+    rankBuckets: z.array(rankBucketSchema),
+    roles: z.array(roleSchema),
+    files: z.array(manifestFileSchema),
+    schemaVersion: z.literal(4),
+  })
+  .strict();
+export type ManifestV4 = z.infer<typeof manifestSchemaV4>;
 
 /**
  * Version of the `latest.json` patch pointer (D-051). Bumped when the pointer

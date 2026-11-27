@@ -37,22 +37,8 @@
   },
   "expected": {
     "recommendations": [
-      {
-        "championId": 11,
-        "rank": 1,
-        "reasons": [
-          { "type": "lane", "lowData": false },
-          { "type": "lane", "lowData": false }
-        ]
-      },
-      {
-        "championId": 12,
-        "rank": 2,
-        "reasons": [
-          { "type": "lane", "lowData": false },
-          { "type": "lane", "lowData": false }
-        ]
-      }
+      { "championId": 11, "rank": 1, "reasons": [], "allReasons": true },
+      { "championId": 12, "rank": 2, "reasons": [], "allReasons": true }
     ]
   }
 }

@@ -15,6 +15,17 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 
 ## Current handoff
 
+- Date: 2026-11-27
+- Branch/PR: `feat/bl-024-adc-mid-minimal` (worktree `draftorb-bl-024`) / BL-024 (#89)
+- State: DOING
+- Done: ADC/MID are now selectable minimal roles (D-097, D-128 PROPOSED). Engine: `RecommendConfig.minimalRoles` (default `['ADC','MID']`, `MINIMAL_ROLES`) makes `recommend()` skip role inference and all matchup layers (pairs, lane, comp, blind) — score is the shrunk baseline win rate; pool join, roleProb/pickRate candidate selection and `n_eff` gating unchanged. Shared: `manifest.minimalRoles` added, `MANIFEST_SCHEMA_VERSION` 4 -> 5. ETL: export writes `roles/ADC|MID/baseline.json` only; `manifest.roles` lists all five roles; `checkPublishedExport` validates minimal roles from baseline alone. UI: `createRecommendData` takes a `minimal` flag (empty pair/lane tables), `PickData.minimal` shows a "champion-level stats only" note, `roleAvailability` no longer hardcodes ADC/MID — D-126 coverage decides like every role. Backtest `RecommendData` mirrors the baseline-only export for minimal roles. Review fixes: `readPublishedPointer` accepts manifests validating against the current schema or the frozen `manifestSchemaV4` (malformed manifests no longer keep a newer pointer — recovery tests for malformed v5/v4 added); pick-share card display dropped — `pick-rate.json` has no exported sample denominator and SPECS §7 forbids a bare % (D-128); `validate-export` now warns per role when baseline coverage fails the D-126 gate (< 50 champions at `n_eff >= minGames` in DIAMOND), so thin ADC/MID exports are visible before publish.
+- Files touched: `packages/engine/src/{config,recommend}.ts` + tests (`recommend-minimal.test.ts` new, golden ADC/MID fixtures re-pinned, layer-mechanics tests opt out via `minimalRoles: []`), `packages/shared/src/schemas/{core,manifest,index}.ts`, `packages/etl/src/export/{index,manifest,sample-check}.ts` + tests, `apps/desktop/ui/src/{roles,strings}.ts`, `data/{export-data,role-coverage}.ts` + tests, `screens/PickScreen.tsx`, `apps/web` + shared/desktop manifest fixtures (schema v5), `docs/{DATA_MODEL,DECISIONS,PROGRESS}.md`.
+- Tests: `pnpm check` green (1643 tests, 158 files).
+- Blockers / next step: owner review; ADC/MID become selectable only after the next `pnpm etl publish-public` republish (v5 manifest) with sufficient baseline coverage.
+- Pitfalls: golden fixtures for ADC/MID now pin minimal (baseline-only) output — do not "fix" them back to full layers; layer-mechanics unit tests must pass `minimalRoles: []` to keep exercising pairs/lanes for ADC/MID. `manifest.minimalRoles` is required (strict schema) — every hand-written manifest fixture needs it.
+
+### Previous handoff (BL-050)
+
 - Date: 2026-11-26
 - Branch/PR: `feat/bl-023-pool-collection` / PR #157 / BL-023 (#88)
 - State: REVIEW

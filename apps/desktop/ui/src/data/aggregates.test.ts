@@ -87,6 +87,7 @@ function manifestFor(
     region: 'EUW1',
     rankBuckets: [],
     roles: [],
+    minimalRoles: [],
     files: entries,
     schemaVersion: MANIFEST_SCHEMA_VERSION,
   });

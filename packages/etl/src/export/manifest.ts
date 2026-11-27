@@ -26,6 +26,8 @@ export interface ManifestInput {
   generatedAt: string;
   region: string;
   roles: readonly string[];
+  /** Roles exported at champion-level statistics only (BL-024, D-097). */
+  minimalRoles: readonly string[];
   files: ExportFile[];
 }
 
@@ -37,6 +39,7 @@ export function buildManifest(input: ManifestInput): Manifest {
     region: input.region,
     rankBuckets: [...RANK_BUCKETS],
     roles: [...input.roles],
+    minimalRoles: [...input.minimalRoles],
     files: files.map((f) => ({ path: f.relativePath, sha256: f.sha256 })),
     schemaVersion: MANIFEST_SCHEMA_VERSION,
   });

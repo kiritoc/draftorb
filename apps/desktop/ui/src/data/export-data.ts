@@ -20,9 +20,13 @@ import {
   latestSchema,
   manifestSchema,
   pickRateSchema,
+  type AllyPairTable,
   type Champion,
   type ChampionTagsMap,
+  type EnemyPairTable,
   type Latest,
+  type LaneFullTable,
+  type LaneVsTable,
   type Manifest,
   type RecommendData,
   type Role,
@@ -34,6 +38,8 @@ export interface PickData {
   generatedAt: string;
   champions: Champion[];
   data: RecommendData;
+  /** True when the role is exported at champion-level statistics only (BL-024). */
+  minimal: boolean;
 }
 
 async function readJson(name: string): Promise<unknown> {
@@ -53,20 +59,33 @@ function requiredFile(files: Readonly<Record<string, unknown>>, path: string): u
 /**
  * Builds `RecommendData` for one role from the manifest file map
  * (`file.path` -> parsed JSON). Port of the web loader, role-parameterized.
+ * Minimal roles (BL-024) export `baseline.json` only; their pair/lane tables
+ * are empty and the engine skips the matchup layers for them.
  */
 export function createRecommendData(
   files: Readonly<Record<string, unknown>>,
   champions: readonly Champion[],
   tags: ChampionTagsMap,
   role: Role,
+  minimal = false,
 ): RecommendData {
   const prefix = `roles/${role}/`;
+  const pairTables = minimal
+    ? {
+        allyPairs: [] as AllyPairTable,
+        enemyPairs: [] as EnemyPairTable,
+        laneVs: [] as LaneVsTable,
+        laneFull: [] as LaneFullTable,
+      }
+    : {
+        allyPairs: allyPairTableSchema.parse(requiredFile(files, `${prefix}ally-pairs.json`)),
+        enemyPairs: enemyPairTableSchema.parse(requiredFile(files, `${prefix}enemy-pairs.json`)),
+        laneVs: laneVsTableSchema.parse(requiredFile(files, `${prefix}lane-vs.json`)),
+        laneFull: laneFullTableSchema.parse(requiredFile(files, `${prefix}lane-full.json`)),
+      };
   return {
     baselines: baselineTableSchema.parse(requiredFile(files, `${prefix}baseline.json`)),
-    allyPairs: allyPairTableSchema.parse(requiredFile(files, `${prefix}ally-pairs.json`)),
-    enemyPairs: enemyPairTableSchema.parse(requiredFile(files, `${prefix}enemy-pairs.json`)),
-    laneVs: laneVsTableSchema.parse(requiredFile(files, `${prefix}lane-vs.json`)),
-    laneFull: laneFullTableSchema.parse(requiredFile(files, `${prefix}lane-full.json`)),
+    ...pairTables,
     roleProb: championRoleProbabilitiesSchema.parse(requiredFile(files, 'role-prob.json')),
     ...(files['pick-rate.json'] !== undefined
       ? { pickRate: pickRateSchema.parse(files['pick-rate.json']) }
@@ -160,10 +179,12 @@ export async function loadPickData(role: Role): Promise<PickData | null> {
   );
   const tags = championTagsMapSchema.parse(await readJson('champion-tags.json'));
 
+  const minimal = manifest.minimalRoles.includes(role);
   return {
     patch: latest.patch,
     generatedAt: latest.generatedAt,
     champions,
-    data: createRecommendData(files, champions, tags, role),
+    data: createRecommendData(files, champions, tags, role, minimal),
+    minimal,
   };
 }

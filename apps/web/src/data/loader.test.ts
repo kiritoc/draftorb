@@ -13,12 +13,13 @@ const latestJson = {
 };
 
 const manifestJson = {
-  schemaVersion: 4,
+  schemaVersion: 5,
   patch: '16.21',
   generatedAt: '2026-11-04T16:47:00.000Z',
   region: 'euw1',
   rankBuckets: ['IRON', 'MASTER_PLUS'],
   roles: ['SUPPORT'],
+  minimalRoles: [],
   files: [
     { path: 'role-prob.json', sha256: 'abc' },
     { path: 'roles/SUPPORT/baseline.json', sha256: 'def' },

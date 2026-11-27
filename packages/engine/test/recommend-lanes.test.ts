@@ -6,6 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import type { LaneFullTable, LaneVsTable, Role } from '@draftorb/shared';
 import { recommend } from '../src/recommend.js';
+import { DEFAULT_CONFIG, DEFAULT_RECOMMEND_CONFIG } from '../src/config.js';
 import {
   BOT_ROLE_PROB,
   FIXED_BOT,
@@ -18,6 +19,10 @@ import {
 } from '../src/recommend-test-utils.js';
 
 type Rec = ReturnType<typeof recommend>['recommendations'][number];
+
+// ADC/MID are minimal roles by default (BL-024): these tests exercise the
+// lane-layer mechanics, so they opt every role out of the minimal skip.
+const FULL_ROLE_LAYERS = { ...DEFAULT_RECOMMEND_CONFIG, minimalRoles: [] };
 
 function laneReasons(rec: Rec | undefined): Rec['reasons'] {
   return rec?.reasons.filter((r) => r.type === 'lane') ?? [];
@@ -63,7 +68,9 @@ describe('recommend: bot lane', () => {
       allies: [{ championId: 20, role: 'SUPPORT' }],
       enemies: FIXED_BOT,
     });
-    const rec = recommend(input, data).recommendations.find((r) => r.championId === 11);
+    const rec = recommend(input, data, DEFAULT_CONFIG, FULL_ROLE_LAYERS).recommendations.find(
+      (r) => r.championId === 11,
+    );
     expect(laneReasons(rec).map((l) => l.with)).toEqual([
       [201, 200],
       [20, 201, 200],
@@ -95,6 +102,8 @@ describe('recommend: lane key order (contract for T-017)', () => {
       recommend(
         makeInput({ userRole, enemies: FIXED_BOT }),
         makeData({ champions: [c, 200, 201], roleProb: BOT_ROLE_PROB, laneVs }),
+        DEFAULT_CONFIG,
+        FULL_ROLE_LAYERS,
       ).recommendations.find((r) => r.championId === c),
     )[0];
 
@@ -192,6 +201,8 @@ describe('recommend: 1v1 lanes', () => {
     const result = recommend(
       makeInput({ userRole: role, enemies: [{ championId: 300, role }] }),
       data,
+      DEFAULT_CONFIG,
+      FULL_ROLE_LAYERS,
     );
     const rec = result.recommendations[0];
     expect(rec?.championId).toBe(1);

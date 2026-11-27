@@ -106,8 +106,8 @@ export {
 } from './schemas/tags.js';
 export type { ChampionTagsScaling, ChampionTags, ChampionTagsMap } from './schemas/tags.js';
 
-export { manifestFileSchema, manifestSchema } from './schemas/manifest.js';
-export type { Manifest } from './schemas/manifest.js';
+export { manifestFileSchema, manifestSchema, manifestSchemaV4 } from './schemas/manifest.js';
+export type { Manifest, ManifestV4 } from './schemas/manifest.js';
 export { LATEST_SCHEMA_VERSION, latestSchema } from './schemas/manifest.js';
 export type { Latest } from './schemas/manifest.js';
 

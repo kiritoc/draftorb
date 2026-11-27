@@ -183,7 +183,9 @@ describe('backtestCommand', () => {
     // Tiny synthetic data cannot pass the gate: matchups stay disabled.
     expect(report.matchup.enabled).toBe(false);
     expect(report.validationStatus).toBe('unvalidated');
-    expect(report.matchup.roles).toEqual(report.roles);
+    // Scored ADC/MID picks stay in headline coverage but not matchup coverage.
+    expect(report.roles).toEqual(expect.arrayContaining(['ADC', 'MID']));
+    expect(report.matchup.roles).toEqual(['TOP', 'JUNGLE', 'SUPPORT']);
   });
 
   it('pools the matchup experiment only over roles with scored holdout picks', async () => {
@@ -261,8 +263,14 @@ describe('backtestCommand', () => {
     expect(report.roles).not.toContain('MID');
     expect(report.roles.length).toBeGreaterThan(0);
     expect(report.matchup).not.toBeNull();
-    expect(report.matchup.roles).toEqual(report.roles);
+    // Minimal roles (ADC/MID) never run matchup layers: excluded from the
+    // experiment even when scored (ADC is scored here).
+    expect(report.roles).toContain('ADC');
+    expect(report.matchup.roles).toEqual(
+      report.roles.filter((r: string) => r !== 'ADC' && r !== 'MID'),
+    );
     expect(report.matchup.roles).not.toContain('MID');
+    expect(report.matchup.roles).not.toContain('ADC');
 
     // Tuning must not depend on holdout coverage: shrinking the gate role
     // set leaves the validation-patch candidate losses (and therefore the

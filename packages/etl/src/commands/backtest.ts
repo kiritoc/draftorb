@@ -14,7 +14,7 @@ import { existsSync } from 'node:fs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 
-import { DEFAULT_CONFIG } from '@draftorb/engine';
+import { DEFAULT_CONFIG, DEFAULT_RECOMMEND_CONFIG } from '@draftorb/engine';
 
 import { aggregateRoleProb } from '../aggregate';
 import { aggregateBaseline } from '../aggregate-baseline';
@@ -314,7 +314,18 @@ async function runBacktest(args: string[]): Promise<void> {
       // baseline prior carries no matchup evidence, so pooling it would
       // dilute the gate while the report's `roles` (and the web gate)
       // treat coverage as scored-only.
-      const matchup = runMatchupExperiment(dbPath, rows, engine, roles ?? ALL_ROLES, report.roles);
+      // Minimal roles (ADC/MID, D-128) never run matchup layers: their zero
+      // diffs would dilute the pooled gate, so they are neither tuned,
+      // gated nor published in `matchup.roles`.
+      const matchupEligible = (r: Role): boolean =>
+        !DEFAULT_RECOMMEND_CONFIG.minimalRoles.includes(r);
+      const matchup = runMatchupExperiment(
+        dbPath,
+        rows,
+        engine,
+        (roles ?? ALL_ROLES).filter(matchupEligible),
+        report.roles.filter(matchupEligible),
+      );
       if (matchup !== null) {
         const shadow = report.gate?.passed ? 'passed' : 'failed';
         finalReport = {

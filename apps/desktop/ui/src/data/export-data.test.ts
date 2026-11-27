@@ -267,6 +267,92 @@ describe('loadPickData', () => {
     await expect(loadPickData('SUPPORT')).rejects.toThrow();
   });
 
+  it('zod-validates every eagerly loaded manifest file, not only RecommendData inputs (B-075)', async () => {
+    seedCache({
+      patchFiles: {
+        'items.json': { '3001': { id: 3001, name: 'Sword', icon: '3072.png', goldTotal: 300, purchasable: true } },
+        'runes.json': [],
+        'item-classes.json': { patch: '16.22', items: { '3001': { cls: 'completed' } } },
+        'state-scale.json': {
+          patch: '16.22',
+          buckets: [{ timeBucket: '0-10', sampleCount: 5, goldSd: 120 }],
+        },
+        'patch-meta.json': {
+          patch: '16.22',
+          patchIndex: 1,
+          currentPatchIndex: 1,
+          patchesMaxIndex: 1,
+          aggregatedAt: '2026-11-21T00:00:00Z',
+        },
+        'roles/SUPPORT/starters.json': {
+          myRole: 'SUPPORT',
+          contexts: [
+            {
+              rankBucket: 'IRON',
+              contextKey: 'role',
+              contextLevel: 3,
+              bundles: [
+                {
+                  items: [{ itemId: 2001, count: 1 }],
+                  winsW: 1,
+                  gamesW: 2,
+                  gamesW2: 2,
+                  winrate: 0.5,
+                  pickShare: 1,
+                  players: 5,
+                },
+              ],
+            },
+          ],
+        },
+        'roles/SUPPORT/builds/412.json': {
+          championId: 412,
+          myRole: 'SUPPORT',
+          contexts: [
+            {
+              slotIdx: 0,
+              timeBucket: '0-10',
+              stateBucket: 'even',
+              profileKey: 'unknown',
+              items: [
+                {
+                  itemId: 2001,
+                  winsW: 1,
+                  gamesW: 2,
+                  gamesW2: 2,
+                  winrate: 0.5,
+                  pickShare: 0.5,
+                },
+              ],
+            },
+          ],
+        },
+      },
+    });
+    const pick = await loadPickData('SUPPORT');
+    expect(pick?.data.baselines).toHaveLength(1);
+  });
+
+  it('rejects a schema-invalid non-RecommendData file with the file and field named (B-075)', async () => {
+    seedCache({
+      patchFiles: {
+        // items.json is not a RecommendData input; before B-075 it was only
+        // JSON.parse'd, so a schema violation went unnoticed.
+        'items.json': { '3001': { id: 3001 } },
+      },
+    });
+    await expect(loadPickData('SUPPORT')).rejects.toThrow(/items\.json/);
+    await expect(loadPickData('SUPPORT')).rejects.toThrow(/Invalid cached aggregate file/);
+  });
+
+  it("skips a schema-invalid file under another role's folder (B-075)", async () => {
+    seedCache({
+      patchFiles: { 'roles/TOP/builds/412.json': { championId: 'not-a-number' } },
+    });
+    const pick = await loadPickData('SUPPORT');
+    expect(pick?.data.baselines).toHaveLength(1);
+  });
+
   it('accepts a manifest path without the patch prefix', async () => {
     seedCache();
     const base = mockRead.getMockImplementation();

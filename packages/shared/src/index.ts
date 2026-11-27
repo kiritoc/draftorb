@@ -128,8 +128,8 @@ export type {
   ManifestV6,
   ManifestV7,
 } from './schemas/manifest.js';
-export { LATEST_SCHEMA_VERSION, latestSchema } from './schemas/manifest.js';
-export type { Latest } from './schemas/manifest.js';
+export { LATEST_SCHEMA_VERSION, latestSchema, patchMetaSchema } from './schemas/manifest.js';
+export type { Latest, PatchMeta } from './schemas/manifest.js';
 
 export {
   supportBaselineEntrySchema,

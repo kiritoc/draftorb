@@ -1427,7 +1427,7 @@ Implements the BL-024 half of D-097/D-126: ADC and MID become selectable roles b
 
 Open question for the owner: none blocking — if ADC/MID later get full matchup exports, dropping them from `minimalRoles` (engine config + manifest field) restores the full pipeline without code changes.
 
-### D-129 — Evidence rule edge semantics: cap scope and pick-share denominator — PROPOSED (BL-013a, PR #166 review)
+### D-132 — Evidence rule edge semantics: cap scope and pick-share denominator — PROPOSED (BL-013a, PR #166 review)
 
 Two boundary questions raised by review of the D-102 mechanism (BL-013a); the implemented reading is recorded as the working assumption until the owner confirms.
 

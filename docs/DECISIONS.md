@@ -1414,12 +1414,6 @@ Extends D-119 (personal-record badge) per issue #158; owner confirmed the interp
 - Everything stays presentation: the badge reads `recommend()` output plus the profile export and baseline tables; it never feeds `DraftInput` and never changes `score(c)`, reasons or ranks (D-072/D-101 invariant, same as D-119).
 - Implementation note: `indexBaselines` is newly exported from `@draftorb/engine` so the UI reuses the exact baseline indexing/gating instead of duplicating it.
 
-### D-128 — Windows installer shipped unsigned via GitHub releases (BL-025) — ACCEPTED (owner, 2026-11-27)
-
-The desktop app ships as an NSIS installer built by `.github/workflows/release.yml` on `windows-latest`: pushing a `v*` tag creates a GitHub release with the installer attached, and `workflow_dispatch` uploads the same artifact without a release. `tauri.conf.json` enables `bundle.active` with `targets: ["nsis"]` (BL-002 left bundling off and delegated the choice to this ticket; NSIS gives a single per-machine/per-user installer with no extra runner dependencies — the Tauri bundler fetches its own NSIS toolchain).
-
-The artifact is **unsigned** — owner-approved shipping state (confirmed 2026-11-27; consistent with the 2026-11-16 note on issue #113 that Smart App Control is disabled on the owner machine and signing becomes mandatory only if the app is shared). Windows SmartScreen shows the expected "Windows protected your PC" warning; the documented safe path is More info → Run anyway (SETUP.md > Installing the Windows app). No code signing, no auto-update (updates = install the newer release), no macOS/Linux builds, no secrets in the workflow or artifact.
-
 ### D-128 — Minimal roles (ADC/MID): baseline-only export, champion-level recommendations — PROPOSED (BL-024)
 
 Implements the BL-024 half of D-097/D-126: ADC and MID become selectable roles backed by champion-level statistics only — no pair, lane, rune or build claims.
@@ -1432,3 +1426,9 @@ Implements the BL-024 half of D-097/D-126: ADC and MID become selectable roles b
 - **validate-export**: `checkPublishedExport` validates minimal roles from `baseline.json` alone (empty pair/lane tables) and keeps SUPPORT as the only release-blocking role.
 
 Open question for the owner: none blocking — if ADC/MID later get full matchup exports, dropping them from `minimalRoles` (engine config + manifest field) restores the full pipeline without code changes.
+
+### D-130 — Windows installer shipped unsigned via GitHub releases (BL-025) — ACCEPTED (owner, 2026-11-27)
+
+The desktop app ships as an NSIS installer built by `.github/workflows/release.yml` on `windows-latest`: pushing a `v*` tag creates a GitHub release with the installer attached, and `workflow_dispatch` uploads the same artifact without a release. `tauri.conf.json` enables `bundle.active` with `targets: ["nsis"]` (BL-002 left bundling off and delegated the choice to this ticket; NSIS gives a single per-machine/per-user installer with no extra runner dependencies — the Tauri bundler fetches its own NSIS toolchain).
+
+The artifact is **unsigned** — owner-approved shipping state (confirmed 2026-11-27; consistent with the 2026-11-16 note on issue #113 that Smart App Control is disabled on the owner machine and signing becomes mandatory only if the app is shared). Windows SmartScreen shows the expected "Windows protected your PC" warning; the documented safe path is More info → Run anyway (SETUP.md > Installing the Windows app). No code signing, no auto-update (updates = install the newer release), no macOS/Linux builds, no secrets in the workflow or artifact.

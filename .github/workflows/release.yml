@@ -1,11 +1,11 @@
 name: Release
 
-# BL-025 (D-128): builds the Windows desktop app into an NSIS installer and
+# BL-025 (D-130): builds the Windows desktop app into an NSIS installer and
 # publishes it. Pushing a `v*` tag creates a GitHub release with the installer
 # attached; `workflow_dispatch` builds the same artifact and uploads it as a
 # workflow artifact only (no release).
 #
-# The artifact is UNSIGNED by owner decision (D-128): Windows SmartScreen shows
+# The artifact is UNSIGNED by owner decision (D-130): Windows SmartScreen shows
 # a warning at install; users proceed via "More info" -> "Run anyway" (SETUP.md
 # > Installing the Windows app). No code signing, no auto-update, Windows only.
 #

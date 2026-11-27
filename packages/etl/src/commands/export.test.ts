@@ -86,7 +86,7 @@ describe('exportCommand', () => {
     db.close();
 
     await exportCommand.run([]);
-    expect(output()).toMatch(/schema v7/);
+    expect(output()).toMatch(/schema v8/);
     expect(output()).toMatch(/roles: SUPPORT, TOP, JUNGLE, ADC, MID/);
 
     const manifest = JSON.parse(

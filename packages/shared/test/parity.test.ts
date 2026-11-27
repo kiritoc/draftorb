@@ -23,7 +23,7 @@ describe('shared schema parity (D-011)', () => {
     expect(shared.damageTypeSchema).toBeDefined();
     expect(shared.championRangeSchema).toBeDefined();
     expect(shared.SHARED_VERSION).toBeDefined();
-    expect(shared.MANIFEST_SCHEMA_VERSION).toBe(7);
+    expect(shared.MANIFEST_SCHEMA_VERSION).toBe(8);
     expect(shared.DRAFT_RESULT_SCHEMA_VERSION).toBe(2);
   });
 
@@ -170,6 +170,7 @@ describe('shared schema parity (D-011)', () => {
     expect(shared.manifestSchemaV4).toBeDefined();
     expect(shared.manifestSchemaV5).toBeDefined();
     expect(shared.manifestSchemaV6).toBeDefined();
+    expect(shared.manifestSchemaV7).toBeDefined();
     const manifest = shared.manifestSchema.safeParse({
       patch: '14.23',
       generatedAt: '2026-01-01T00:00:00Z',
@@ -178,10 +179,10 @@ describe('shared schema parity (D-011)', () => {
       roles: ['SUPPORT'],
       minimalRoles: [],
       files: [{ path: 'champions.json' }],
-      schemaVersion: 7,
+      schemaVersion: 8,
     });
     expect(manifest.success).toBe(true);
-    expect(manifest.data).toMatchObject({ schemaVersion: 7 });
+    expect(manifest.data).toMatchObject({ schemaVersion: 8 });
     // v1 exports (5-column baselines) are rejected.
     expect(() =>
       shared.manifestSchema.parse({

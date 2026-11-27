@@ -59,11 +59,11 @@ export function prepareMatchPersist(db: Database.Database): MatchPersistStatemen
       `INSERT INTO participants (
           match_id, puuid, team_id, champion_id, role, win, rank_score, champion_games,
           mastery_points, is_expert, keystone, primary_style, sub_style, perks_json,
-          items_json, kills, deaths, assists
+          items_json, kills, deaths, assists, summoner1_id, summoner2_id
         ) VALUES (
           @match_id, @puuid, @team_id, @champion_id, @role, @win, @rank_score, @champion_games,
           @mastery_points, @is_expert, @keystone, @primary_style, @sub_style, @perks_json,
-          @items_json, @kills, @deaths, @assists
+          @items_json, @kills, @deaths, @assists, @summoner1_id, @summoner2_id
         )`,
     ),
     insertChallenge: db.prepare(
@@ -75,7 +75,7 @@ export function prepareMatchPersist(db: Database.Database): MatchPersistStatemen
     loadParticipantsForEnrichment: db.prepare(
       `SELECT match_id, puuid, team_id, champion_id, role, win, rank_score, champion_games,
               mastery_points, is_expert, keystone, primary_style, sub_style, perks_json,
-              items_json, kills, deaths, assists
+              items_json, kills, deaths, assists, summoner1_id, summoner2_id
        FROM participants WHERE match_id = ?`,
     ),
     insertReject: db.prepare(

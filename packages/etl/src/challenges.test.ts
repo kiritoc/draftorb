@@ -69,6 +69,8 @@ function seedMatch(db: ReturnType<typeof openDb>, matchId: string): void {
     kills: 0,
     deaths: 0,
     assists: 0,
+    summoner1_id: null,
+    summoner2_id: null,
   }));
   const stmts = prepareMatchPersist(db);
   db.transaction(() => {

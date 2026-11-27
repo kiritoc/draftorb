@@ -19,8 +19,10 @@ export const SHARED_VERSION = '0.0.1' as const;
  * v6: item build entries gain `players` (D-102 evidence rule, BL-013a).
  * v7: `pick-rate-samples.json` export added (pick-share denominators,
  * BL-052); merges the BL-013a v6 shape so both features ship together.
+ * v8: `roles/<ROLE>/summoners/<championId>.json`, `roles/<ROLE>/starters/`
+ * and `roles/<ROLE>/starters.json` exports added (BL-031a).
  */
-export const MANIFEST_SCHEMA_VERSION = 7;
+export const MANIFEST_SCHEMA_VERSION = 8;
 
 /**
  * Version of the engine output contract (`DraftResult`, SPECS §7). Bumped on every
@@ -37,6 +39,14 @@ export const DRAFT_RESULT_SCHEMA_VERSION = 2;
  * v1: initial `RuneRecommendationResult` (T-040).
  */
 export const RUNE_RESULT_SCHEMA_VERSION = 1;
+
+/**
+ * Version of the engine summoner-recommendation output contract (SPECS §8.1,
+ * BL-031a). Bumped on every breaking change so consumers fail loudly instead
+ * of misreading fields.
+ * v1: initial `SummonerRecommendationResult`.
+ */
+export const SUMMONER_RESULT_SCHEMA_VERSION = 1;
 
 /**
  * Version of `data/profiles.config.json` (D-068). Bumped on every breaking

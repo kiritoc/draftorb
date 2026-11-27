@@ -21,6 +21,9 @@ export interface ParticipantRow {
   kills: number;
   deaths: number;
   assists: number;
+  /** Summoner spell ids (match-v5 spell1Id/spell2Id); NULL until backfilled. */
+  summoner1_id: number | null;
+  summoner2_id: number | null;
 }
 
 /** Ranked solo/duo: five roles per team, two teams. */
@@ -111,6 +114,9 @@ function mapParticipant(
     kills: participant.kills,
     deaths: participant.deaths,
     assists: participant.assists,
+    // Newer game versions renamed spell1Id/spell2Id to summoner1Id/summoner2Id.
+    summoner1_id: participant.spell1Id ?? participant.summoner1Id ?? null,
+    summoner2_id: participant.spell2Id ?? participant.summoner2Id ?? null,
   };
 }
 

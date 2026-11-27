@@ -12,6 +12,7 @@ export {
   MANIFEST_SCHEMA_VERSION,
   DRAFT_RESULT_SCHEMA_VERSION,
   RUNE_RESULT_SCHEMA_VERSION,
+  SUMMONER_RESULT_SCHEMA_VERSION,
   PROFILE_CONFIG_SCHEMA_VERSION,
   PROFILE_EXPORT_SCHEMA_VERSION,
   PERSONAL_RESULT_SCHEMA_VERSION,
@@ -114,8 +115,15 @@ export {
   manifestSchemaV4,
   manifestSchemaV5,
   manifestSchemaV6,
+  manifestSchemaV7,
 } from './schemas/manifest.js';
-export type { Manifest, ManifestV4, ManifestV5, ManifestV6 } from './schemas/manifest.js';
+export type {
+  Manifest,
+  ManifestV4,
+  ManifestV5,
+  ManifestV6,
+  ManifestV7,
+} from './schemas/manifest.js';
 export { LATEST_SCHEMA_VERSION, latestSchema } from './schemas/manifest.js';
 export type { Latest } from './schemas/manifest.js';
 
@@ -209,6 +217,38 @@ export type {
   RuneAdaptationHint,
   RuneRecommendationResult,
 } from './schemas/runes.js';
+
+export {
+  summonerPairExportSchema,
+  summonerContextEntrySchema,
+  summonerExportSchema,
+  summonerRecommendDataSchema,
+  summonerPairPickSchema,
+  summonerRecommendationResultSchema,
+} from './schemas/summoners.js';
+export type {
+  SummonerPairExport,
+  SummonerContextEntry,
+  SummonerExport,
+  SummonerRecommendData,
+  SummonerPairPick,
+  SummonerRecommendationResult,
+} from './schemas/summoners.js';
+
+export {
+  starterBundleItemSchema,
+  starterBundlePickSchema,
+  starterContextEntrySchema,
+  starterChampionExportSchema,
+  starterRoleExportSchema,
+} from './schemas/starters.js';
+export type {
+  StarterBundleItem,
+  StarterBundlePick,
+  StarterContextEntry,
+  StarterChampionExport,
+  StarterRoleExport,
+} from './schemas/starters.js';
 
 export {
   profileIdSchema,

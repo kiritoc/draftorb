@@ -280,6 +280,23 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 
 ## Session log (newest first)
 
+### 2026-11-27 — Devin — BL-031a summoners + starter data path (issue #92)
+
+- Done:
+  - Migration `022_summoners_starters.sql`: `participants.summoner1_id/summoner2_id` (match-v5 `spell1Id`/`spell2Id`), new aggregate tables `summoner_ctx` (per champion/role/bucket/context/spell-pair, mirrors `rune_ctx`) and `starter_ctx` (per champion/role/bucket/context/bundle along exact-lane -> champion -> role -> global).
+  - Ingestion persists spell ids (`participants.ts`, `matches-persist.ts`); new resumable `pnpm etl backfill-summoners [--limit=N] [--call-budget=N]` refetches match-v5 details to fill NULL spell columns on pre-migration rows.
+  - Aggregators `aggregate-summoners.ts` (same D-021 back-off chain as runes) and `aggregate-starters.ts` (net `participant_starters` bundles, `starterBundleKey`), wired into `etl aggregate`.
+  - Exports `roles/<ROLE>/summoners/<championId>.json` and `roles/<ROLE>/starters/<championId>.json` + `roles/<ROLE>/starters.json` (role/global fallback) for SUPPORT/TOP/JUNGLE; same `exportMinGames` + `evidenceMinDistinctPlayers` gates and raw-denominator pick shares as the rune export. `MANIFEST_SCHEMA_VERSION` 7 -> 8 with frozen `manifestSchemaV7`; desktop offline cache accepts v5/v6/v7 manifests.
+  - Engine `recommendSummoners` (`packages/engine/src/summoners.ts`, mirrors `recommendRunes`: lane slots -> damage mix -> global shrinkage, D-102 fields, Master+ toggle) + `SummonerConfig`/`DEFAULT_SUMMONER_CONFIG` + `SUMMONER_RESULT_SCHEMA_VERSION`; shared zod schemas `schemas/summoners.ts`, `schemas/starters.ts`.
+  - D-106 Top Teleport check on real match-v5 data (newest 400 matches on 16.23 + 120-match samples of 16.13/16.16/16.19/16.21): TOP Teleport share ~27–40% across patches (31.0% on 16.23), Flash+Ignite stays modal (~45–50%); all collected patches postdate the quest (public 26.1), no pre-quest baseline exists. Finding recorded as D-135 — no advice change, SPECS §8.3 added documenting the data path.
+- Files touched: `packages/etl/{migrations/022_summoners_starters.sql,src/{participants,matches-persist,summoners-backfill,aggregate-summoners,aggregate-starters}.ts,src/commands/{aggregate,backfill-summoners}.ts,src/export/{index,summoners,starters,export.seed}.ts,src/cli.ts}`, `packages/shared/src/{index.ts,schemas/{core,manifest,summoners,starters}.ts}`, `packages/engine/src/{summoners,config,index}.ts` + `test/summoners.test.ts`, `apps/desktop/ui/src/data/export-data.ts`, fixtures in `apps/{web,desktop}` + `packages/shared/test`, `docs/{DATA_MODEL,SPECS,DECISIONS,PROGRESS}.md`.
+- Tests: `pnpm check` green — typecheck, lint, prettier, 1774 vitest tests.
+- State left: REVIEW — awaiting owner review / PR.
+- Next step: after merge, run `pnpm etl migrate && pnpm etl backfill-summoners` on the real DB (resumable, `--call-budget` to bound), then `pnpm etl aggregate && pnpm etl export` to publish v8 files; BL-031b (#93) builds the UI on these exports.
+- Pitfalls / notes for next AI: `participants` had NO summoner columns before migration 022 — the ticket premise was wrong; spell ids only exist in match-v5 detail payloads, so historical rows need the backfill (NULL pairs are skipped by aggregation). Code comments reference D-134 for the D-086 bundle acceptance, which lands in a parallel PR — if that PR renumbers, fix the references. `starter_ctx` uses COALESCE expression unique index because SQLite treats NULLs as distinct in PRIMARY KEYs. Teleport = spell id 12 (`_Jade` variant 712 unused in observed data); Smite = 11.
+
+## Session log (newest first)
+
 ### 2026-11-16 — Devin — BL-002 Windows 11 Tauri spike + benchmark report
 
 - Done:

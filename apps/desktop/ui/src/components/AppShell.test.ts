@@ -38,9 +38,9 @@ describe('AppShell', () => {
     expect(html).toContain('Patch');
   });
 
-  it('renders the nav with Setup and Game disabled', () => {
+  it('renders the nav with only Game disabled (BL-030b enables Setup)', () => {
     expect(buttonTag(html, 'Pick')).not.toMatch(DISABLED);
-    expect(buttonTag(html, 'Setup')).toMatch(DISABLED);
+    expect(buttonTag(html, 'Setup')).not.toMatch(DISABLED);
     expect(buttonTag(html, 'Game')).toMatch(DISABLED);
     expect(buttonTag(html, 'Settings')).not.toMatch(DISABLED);
   });

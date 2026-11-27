@@ -1007,7 +1007,7 @@ Mode flag `stateBucketMode` on aggregation options; default
 Update: `stateBucket`/`item_state_scale` in engine `item-context.ts` and
 `aggregate-items.ts`.
 
-### D-086 — Starter bundles and lane archetype backoff — PROPOSED
+### D-086 — Starter bundles and lane archetype backoff — PROPOSED, starter-bundle clause accepted by D-134 (lane-archetype clause superseded by D-095)
 
 `participant_starters` stores the net purchased bundle per
 (match, participant) within `starterWindowSeconds` (default 45 s, from the
@@ -1496,6 +1496,20 @@ The D-023 gate failed on the first real report (BL-014): on holdout patch 16.22 
 
 (Renumbered D-129→D-130 after BL-017 took D-129 on main, then D-130→D-133 after BL-025 claimed D-130 on `feat/bl-025-windows-installer`; D-131 is BL-052 and D-132 is BL-013.)
 
+### D-134 — Setup screen: mode switch, starter/summoner scope, M2 role enablement — ACCEPTED (owner, 2026-11-27)
+
+Owner decisions recorded for the runes/summoners/starters data path (BL-030a/BL-031a, amends SPECS §18.5).
+
+- **D-086 partially accepted for v2 — starter bundles only.** `participant_starters` stores the net starter bundle per (match, participant) within `starterWindowSeconds` = 45 s and `starterBundleKey()` produces the stable `"itemId:count"` grouping key. The lane-archetype clause of D-086 is **superseded by D-095**, which stays PROPOSED until M3.
+- **Setup-screen backoff chain for starters and summoner spells:** (champion, role, exact lane) -> (champion, role) -> role-only -> global. Exact-lane coverage must be measured first; the exact-lane level is dropped if it almost never passes the D-102 evidence gate.
+- **Mode switch, not columns.** The setup screen switches between "top players" and "my data" modes; switching re-queries the chosen source without a restart and each mode shows its data source. This replaces the side-by-side two-column layout previously described in SPECS §18.5.
+- **M2 role scope.** SUPPORT/TOP/JUNGLE only. Role enablement on the setup screen = `manifest.roles` minus `minimalRoles`, plus D-103 insufficient-data states when a role's setup data is thin. The BL-050/D-126 baseline-coverage enablement mechanism stays pick-screen-only.
+- **"Insufficient data" is a normal state**, handled by the D-103 broader-statistic fallback (labeled), never an error.
+
+### D-135 — Profile setup fallback levels are support-shaped for every role — PROPOSED (BL-030a)
+
+`recommendProfileRunes`/`recommendProfileSpells` reuse the D-073 L1..L5 matchup predicates (ally ADC id, enemy support id, enemy `damageType:archetype` signature) for every role, and BL-030a parameterized only the game-role filter (SUPPORT -> the picked role, D-097). For TOP/JUNGLE the lane-shaped L1..L3 contexts (bot-lane ally/enemy ids) rarely match profile games, so profile pages mostly resolve at L4/L5 champion level — honest under D-103 but possibly thinner than intended. Question for the owner: define per-role matchup contexts for the profile fallback (e.g. TOP vs enemy TOP, JUNGLE vs enemy JUNGLE) in a later ticket, or keep champion-level-only profile setup for non-SUPPORT roles until then. Working assumption until answered: keep the shared predicates; insufficient matchup data falls back to champion level, clearly labeled.
+
 ### D-136 — Personalization role scope: drafted-role games, in-scope roles SUPPORT/TOP/JUNGLE — PROPOSED (BL-032)
 
 - Context: D-097 widened the profile scope beyond Support, but SPECS §18.2 does not say explicitly which stored games feed `personalize()`/`recommendProfileRunes`/`recommendProfileSpells` for a TOP or JUNGLE draft, or what happens for ADC/MID drafts.
@@ -1515,3 +1529,10 @@ D-106 asks to check the effect of Top's role-quest Teleport upgrade (live since 
 - **Finding**: Teleport is a strong minority pick for TOP, not a default. Patch 16.23 TOP share carrying Teleport = 31.0% (248/800); per-patch TOP TP share = 53.8% (16.13, n=26 — too small to read), 39.5% (16.16), 34.6% (16.19), 27.5% (16.21), 37.1% (16.23) — no trend break, noise band roughly 27–40%. The modal TOP pair stays Flash+Ignite (`4:14`, ~45–50%); Teleport rides mostly as `4:12` (~28–36%) with small `6:12`/`12:14` tails. MID shows a similar ~36% Teleport share, unrelated to the Top quest. JUNGLE and SUPPORT never take Teleport.
 - **Coverage caveat**: every collected patch (internal 16.4–16.23, i.e. public 26.4–26.23 under the D-108 +10 mapping) postdates the quest introduction (public 26.1), so the database holds no pre-quest baseline; the observed shares are the post-quest equilibrium. The pair-based recommendation path (`summoner_ctx`, unordered `minId:maxId` pairs) needs no quest special-casing: whatever the quest does to Teleport's strength is already baked into the recorded picks, and a future patch that makes TP near-mandatory for Top would surface automatically as a dominant `*:*12` pair share.
 - **Conclusion**: no change to summoner advice, no SPECS update required by this check. Revisit only if a data refresh shows TOP Teleport share collapsing the pair distribution (e.g. `4:12` > ~70%) or a new upgraded-Teleport spell id appearing in `participants.summoner*_id`.
+
+### D-138 — Setup screen enters no draft-slot context in v1 — PROPOSED (BL-030b)
+
+- Context: `SetupRuneResult`/`recommendSetupRunes` consume a full `DraftInput`, and the rune recommender's lane/matchup contexts (SPECS §8.1 back-off chain, D-073 L1..L3) only match when allies/enemies are known. The pick screen keeps its draft state internal, so BL-030b had no locked-champion or draft handoff to reuse.
+- Decision (implementation assumption, BL-030b): the setup screen offers role, champion and rank selection only; `DraftInput.allies`/`enemies` stay empty. Expert pages therefore resolve at the `damagemix:`/`global` levels and profile pages at the champion-record levels — every page still labels its source via `source`/`sourceLevel` (D-103), and "insufficient data" remains a normal state. The optional Master+ toggle maps to `evidenceMasterPlusOnly` (D-102, off by default).
+- Alternatives: (a) lift the pick screen's draft state into shared state so the setup screen reuses the locked champion and slots — rejected for this ticket (pick-screen changes are out of scope; revisit when summoners/starters land in BL-031b, which need the same context); (b) duplicate draft-slot entry on the setup screen — deferred, doubles input work for marginal context gain.
+- Consequences: rune pages are honest but broader than they could be; a later ticket can add draft handoff or slot entry without changing the engine contract.

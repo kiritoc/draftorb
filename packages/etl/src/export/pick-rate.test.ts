@@ -106,6 +106,24 @@ describe('exportPickRateSamples', () => {
       /pick-rate-samples\.json/,
     );
   });
+
+  it('excludes a gated row whose share rounds to zero, keeping key parity (PR #168)', () => {
+    // Champ 1 passes the gate (nEff = 100) but its share 1/3_000_001 rounds to
+    // 0 in pick-rate.json, so it must not appear in the samples file either.
+    const rows = [
+      row(1, 'SUPPORT', 1, 0.01), // nEff = 100, share ~3.3e-7 -> dropped
+      row(2, 'SUPPORT', 3_000_000), // dominant pick
+    ];
+    const shares = exportPickRates(rows, 10);
+    expect(shares).toEqual({ SUPPORT: { '2': 1 } });
+    const samples = exportPickRateSamples(rows, 10);
+    expect(pickRateSamplesSchema.parse(samples)).toEqual({ SUPPORT: { '2': 3_000_000 } });
+    for (const role of Object.keys(shares)) {
+      expect(Object.keys(samples[role as keyof typeof samples] ?? {}).sort()).toEqual(
+        Object.keys(shares[role as keyof typeof shares] ?? {}).sort(),
+      );
+    }
+  });
 });
 
 describe('pickRateSamplesFile', () => {

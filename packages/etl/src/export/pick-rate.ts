@@ -56,10 +56,15 @@ function gatedRowsByRole(
   return byRole;
 }
 
-/** Exports per-role pick shares, gated and renormalized like role-prob.json. */
-export function exportPickRates(rows: readonly RoleProbRow[], exportMinGames: number): PickRate {
-  const byRole = gatedRowsByRole(rows, exportMinGames, 'pick-rate.json');
-
+/**
+ * Per-role pick shares over the gated rows, before schema validation. Both
+ * exports derive from this single computation so `pick-rate-samples.json`
+ * carries a denominator for exactly the champions `pick-rate.json` emits —
+ * a share that rounds to zero is dropped from both files (PR #168 review).
+ */
+function pickSharesByRole(
+  byRole: Map<string, GatedPickRow[]>,
+): Record<string, Record<string, number>> {
   const out: Record<string, Record<string, number>> = {};
   for (const [role, entries] of byRole) {
     const total = entries.reduce((acc, e) => acc + e.gamesW, 0);
@@ -90,6 +95,13 @@ export function exportPickRates(rows: readonly RoleProbRow[], exportMinGames: nu
     }
     out[role] = shares;
   }
+  return out;
+}
+
+/** Exports per-role pick shares, gated and renormalized like role-prob.json. */
+export function exportPickRates(rows: readonly RoleProbRow[], exportMinGames: number): PickRate {
+  const byRole = gatedRowsByRole(rows, exportMinGames, 'pick-rate.json');
+  const out = pickSharesByRole(byRole);
 
   try {
     return pickRateSchema.parse(out);
@@ -103,21 +115,28 @@ export function exportPickRates(rows: readonly RoleProbRow[], exportMinGames: nu
 /**
  * Exports the effective sample (`n_eff = games_w^2 / games_w2`) behind every
  * pick share, over the same gated rows as `exportPickRates` (BL-052). Rows
- * below `exportMinGames` are excluded exactly like the share.
+ * below `exportMinGames` are excluded exactly like the share, and a gated row
+ * whose share rounds to zero is excluded here too, so the two files always
+ * carry the same (role, champion) keys.
  */
 export function exportPickRateSamples(
   rows: readonly RoleProbRow[],
   exportMinGames: number,
 ): PickRateSamples {
   const byRole = gatedRowsByRole(rows, exportMinGames, 'pick-rate-samples.json');
+  const shares = pickSharesByRole(byRole);
 
   const out: Record<string, Record<string, number>> = {};
   for (const [role, entries] of byRole) {
+    const roleShares = shares[role];
+    if (roleShares === undefined) continue;
     const samples: Record<string, number> = {};
     for (const e of entries) {
-      samples[String(e.championId)] = round6(nEff(e.gamesW, e.gamesW2));
+      const key = String(e.championId);
+      if (roleShares[key] === undefined) continue;
+      samples[key] = round6(nEff(e.gamesW, e.gamesW2));
     }
-    out[role] = samples;
+    if (Object.keys(samples).length > 0) out[role] = samples;
   }
 
   try {

@@ -48,6 +48,7 @@ function seedCache(
     patchFiles?: Record<string, unknown>;
     roles?: ('SUPPORT' | 'ADC')[];
     minimalRoles?: ('SUPPORT' | 'ADC')[];
+    schemaVersion?: number;
   } = {},
 ): void {
   const patchFiles: Record<string, unknown> = {
@@ -59,7 +60,7 @@ function seedCache(
   const manifest = {
     patch: '16.22',
     generatedAt: '2026-11-21T00:00:00Z',
-    schemaVersion: 6,
+    schemaVersion: overrides.schemaVersion ?? 6,
     region: 'euw',
     rankBuckets: ['IRON'],
     roles: overrides.roles ?? ['SUPPORT'],
@@ -224,6 +225,16 @@ describe('loadPickData', () => {
   it('leaves pickRateSamples undefined on exports without the file', async () => {
     seedCache();
     const pick = await loadPickData('SUPPORT');
+    expect(pick?.pickRateSamples).toBeUndefined();
+  });
+
+  it('still loads a cached v5 manifest (pre-samples export) without pick share (BL-052)', async () => {
+    // Offline launch on a cache written before pick-rate-samples.json
+    // existed: the manifest validates against the frozen v5 schema and the
+    // optional file is simply absent (PR #168 review).
+    seedCache({ schemaVersion: 5 });
+    const pick = await loadPickData('SUPPORT');
+    expect(pick?.data.baselines).toHaveLength(1);
     expect(pick?.pickRateSamples).toBeUndefined();
   });
 

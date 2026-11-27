@@ -19,6 +19,7 @@ import {
   laneVsTableSchema,
   latestSchema,
   manifestSchema,
+  manifestSchemaV5,
   pickRateSamplesSchema,
   pickRateSchema,
   type AllyPairTable,
@@ -29,6 +30,7 @@ import {
   type LaneFullTable,
   type LaneVsTable,
   type Manifest,
+  type ManifestV5,
   type PickRateSamples,
   type RecommendData,
   type Role,
@@ -103,9 +105,17 @@ export function createRecommendData(
   };
 }
 
+/** Manifest shapes the cache accepts: the current schema plus the frozen v5
+ *  layout published before `pick-rate-samples.json` existed (BL-052). A v5
+ *  cache stays fully usable — the samples file is optional, so pick share is
+ *  simply absent until the next republish. Older layouts (v4 and below) are
+ *  still rejected: they predate `minimalRoles` and cannot drive the loader. */
+const cachedManifestSchema = manifestSchema.or(manifestSchemaV5);
+type CachedManifest = Manifest | ManifestV5;
+
 interface CachedRelease {
   latest: Latest;
-  manifest: Manifest;
+  manifest: CachedManifest;
 }
 
 /**
@@ -120,7 +130,7 @@ export async function loadCachedRelease(): Promise<CachedRelease | null> {
   const manifestPath = latest.manifest.startsWith(`${latest.patch}/`)
     ? latest.manifest
     : `${latest.patch}/${latest.manifest}`;
-  const manifest: Manifest = manifestSchema.parse(await readJson(manifestPath));
+  const manifest: CachedManifest = cachedManifestSchema.parse(await readJson(manifestPath));
   if (manifest.patch !== latest.patch) {
     throw new Error(
       `Latest pointer patch ${latest.patch} does not match manifest patch ${manifest.patch}`,

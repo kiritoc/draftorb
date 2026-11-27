@@ -1,7 +1,7 @@
 import type Database from 'better-sqlite3';
 
 import { RiotClient, RiotAuthError, type Platform } from './riot';
-import type { Role } from '@draftorb/shared';
+import type { PoolConfig, Role } from '@draftorb/shared';
 import { DEFAULT_CONFIG } from '@draftorb/engine';
 import { openDb, migrate } from './db';
 import { resolveDbPath } from './config/paths';
@@ -20,6 +20,7 @@ import {
   writeCursor,
 } from './matches-store';
 import { prepareMatchPersist } from './matches-persist';
+import { poolChampionRolePairs, selectPlayers } from './matches-select';
 import {
   isTransientMatchError,
   processMatch,
@@ -56,6 +57,14 @@ export interface MatchIngestionOptions {
   callBudget?: number;
   /** Stop before starting a new player once this many ms elapsed. */
   timeBudgetMs?: number;
+  /**
+   * Parsed `data/pool.config.json` (D-114). When set, pending players already
+   * seen playing pool champion×role pairs are ingested first (D-102). The
+   * pool never changes scores — it only reorders selection.
+   */
+  poolConfig?: PoolConfig | null;
+  /** Resolved path `poolConfig` was loaded from, for log messages only. */
+  poolConfigPath?: string;
 }
 
 export interface PlayerIngestionResult {
@@ -84,11 +93,6 @@ export interface MatchIngestionResult {
   filtered: number;
   invalid: number;
   playerResults: PlayerIngestionResult[];
-}
-
-interface PlayerRow {
-  puuid: string;
-  rank_score: number;
 }
 
 const ZERO_RUN: RunTotals = { stored: 0, duplicates: 0, filtered: 0, invalid: 0 };
@@ -177,37 +181,22 @@ export async function ingestMatches(
       );
     }
 
-    const allPlayers = db
-      .prepare(
-        'SELECT puuid, rank_score FROM players WHERE platform = ? AND rank_score IS NOT NULL ORDER BY rank_score DESC, puuid',
-      )
-      .all(platform) as PlayerRow[];
+    const players = selectPlayers(db, platform, {
+      reset: options.reset,
+      refresh: options.refresh,
+      playerLimit: options.playerLimit,
+      poolConfig: options.poolConfig,
+    });
 
-    const done = new Set<string>();
-    const hasCursor = new Set<string>();
-    if (!options.reset) {
-      for (const player of allPlayers) {
-        const cursor = readCursor(db, cursorKey(platform, player.puuid));
-        if (cursor !== null) hasCursor.add(player.puuid);
-        if (cursor?.status === 'done') {
-          done.add(player.puuid);
-        }
-      }
+    const poolPairs = poolChampionRolePairs(options.poolConfig);
+    const showPriority = poolPairs.size > 0;
+    if (showPriority) {
+      const poolCount = players.filter((p) => p.poolMatch).length;
+      log(
+        `Pool priority (${poolPairs.size} champion×role pairs from ` +
+          `${options.poolConfigPath ?? 'pool config'}): ${poolCount}/${players.length} selected players match.`,
+      );
     }
-
-    const ordered = [...allPlayers].sort(
-      (a, b) =>
-        Number(done.has(a.puuid)) - Number(done.has(b.puuid)) ||
-        b.rank_score - a.rank_score ||
-        (a.puuid < b.puuid ? -1 : a.puuid > b.puuid ? 1 : 0),
-    );
-    // --refresh: only players with an existing cursor (partial or done) are
-    // selected, so a run refreshes the already-ingested set instead of
-    // walking the whole discovered population (pending-first ordering,
-    // D-018). Done cursors still list incrementally via lastGameCreation.
-    const scoped = options.refresh ? ordered.filter((p) => hasCursor.has(p.puuid)) : ordered;
-    const players =
-      options.playerLimit !== undefined ? scoped.slice(0, options.playerLimit) : scoped;
 
     const playerResults: PlayerIngestionResult[] = [];
     let playersSkipped = 0;
@@ -239,6 +228,7 @@ export async function ingestMatches(
         log('Time budget reached; stopping.');
         break;
       }
+      const priorityTag = showPriority ? (player.poolMatch ? ' [pool]' : ' [rank]') : '';
       const key = cursorKey(platform, player.puuid);
       let cursor = options.reset ? null : readCursor(db, key);
 
@@ -284,7 +274,9 @@ export async function ingestMatches(
           playerResults.push(
             buildPlayerResult(player.puuid, 'failed', cursor?.snapshot.length ?? 0, ZERO_RUN),
           );
-          log(`[${index + 1}/${players.length}] transient failure while listing match ids`);
+          log(
+            `[${index + 1}/${players.length}]${priorityTag} transient failure while listing match ids`,
+          );
           if (consecutiveFailed >= 3) {
             stoppedEarly = true;
             break;
@@ -342,7 +334,7 @@ export async function ingestMatches(
         playersFailed += 1;
         consecutiveFailed += 1;
         playerResults.push(buildPlayerResult(player.puuid, 'failed', cursor.snapshot.length, run));
-        log(`[${index + 1}/${players.length}] transient failure (player failed)`);
+        log(`[${index + 1}/${players.length}]${priorityTag} transient failure (player failed)`);
         if (consecutiveFailed >= 3) {
           stoppedEarly = true;
           break;
@@ -357,7 +349,7 @@ export async function ingestMatches(
 
       playerResults.push(buildPlayerResult(player.puuid, 'done', cursor.snapshot.length, run));
       log(
-        `[${index + 1}/${players.length}] ` +
+        `[${index + 1}/${players.length}]${priorityTag} ` +
           `ids=${cursor.snapshot.length} stored=${run.stored} dup=${run.duplicates} ` +
           `filtered=${run.filtered} invalid=${run.invalid}`,
       );

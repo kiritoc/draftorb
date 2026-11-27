@@ -201,6 +201,7 @@ Order of preference (D-105):
 - Windows 11 desktop program (D-099, language decided after the audit, D-098); JSON data files < 5 MB each (gzip), lazy loaded, downloaded at launch.
 - Works offline after first load (nice-to-have).
 - Accessible UI, keyboard champion search; the pool editor and the "Show more" buttons are keyboard accessible.
+- Draft entry is keyboard-first (BL-022): one champion search fills the active slot and stays open for the next pick; digits `1`-`0` jump to the ten pick slots in entry order (you, allies, enemies); a ban pseudo-target appends to the ban list (max 10, Backspace with an empty query removes the last ban); role chips for the active slot sit one Tab away. Recommendations recompute on every slot change (engine < 50 ms, measured in the BL-022 PR).
 - The pool stays on the player's machine (never sent anywhere).
 - Show current patch + data freshness. The interface displays the public patch name (for example 26.22) mapped from the internal data label (for example 16.22, `major.minor`); the offset rule is unverified and must be checked against Data Dragon before it is coded (D-108).
 - Light/dark theme toggle that remembers the last choice; the first launch follows the Windows theme (D-107).

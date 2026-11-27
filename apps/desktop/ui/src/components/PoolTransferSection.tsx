@@ -8,13 +8,17 @@ import { useState, type ReactElement } from 'react';
 
 import type { PoolConfig } from '@draftorb/shared';
 import { strings } from '../strings';
+import type { PoolEditorMessage } from '../pool/pool-editor-state';
 import { serializePoolConfig } from '../pool/pool-model';
+import { PoolMessage } from './PoolMessage';
 
 export interface PoolTransferSectionProps {
   pool: PoolConfig;
   /** True when the working copy differs from the stored pool: repo export is refused. */
   dirty: boolean;
   repoFolder?: string;
+  /** Status feedback for the transfer actions, rendered next to the buttons that produced it. */
+  message: PoolEditorMessage | null;
   /** Validates and adopts pasted JSON; returns false when invalid. */
   onApplyJson: (text: string) => boolean;
   onRepoImport: () => void;
@@ -26,6 +30,7 @@ export function PoolTransferSection({
   pool,
   dirty,
   repoFolder,
+  message,
   onApplyJson,
   onRepoImport,
   onRepoExport,
@@ -55,6 +60,8 @@ export function PoolTransferSection({
       ) : (
         <p className="text-xs text-slate-500 dark:text-slate-400">{strings.poolRepoNeedFolder}</p>
       )}
+
+      {message !== null && <PoolMessage message={message} />}
 
       <details className="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
         <summary className="cursor-pointer text-sm font-semibold text-slate-600 dark:text-slate-300">

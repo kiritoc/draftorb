@@ -8,8 +8,9 @@ export const strings = {
   dataNone: 'No data loaded yet',
   dataLoaded: (generatedAt: string) => `Data generated ${generatedAt}`,
   dataStale: (generatedAt: string) => `Cached data generated ${generatedAt} (offline)`,
-  unvalidatedLabel: 'Unvalidated model',
-  unvalidatedHint: 'Rankings have not passed the offline backtest yet.',
+  baselineLabel: 'Baseline ranking',
+  baselineHint:
+    'Scores are champion win rates only - matchup advice is disabled (not validated by the backtest).',
   themeToggleToDark: 'Switch to dark theme',
   themeToggleToLight: 'Switch to light theme',
   navPick: 'Pick',

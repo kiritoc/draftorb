@@ -17,7 +17,7 @@ import {
   DRAFT_PHASE,
   getInfluence,
 } from './config.js';
-import { deltaPp, scorePair } from './levels.js';
+import { deltaPp, matchupShrink, scorePair } from './levels.js';
 import { makePairKey } from './recommend-indexes.js';
 import { roundDeltaPp } from './recommend-reasons.js';
 import { logit } from './weighting.js';
@@ -117,7 +117,9 @@ export function scorePairs(
     // D-088: remove the slot's shared main effect; lowData rows keep 0 so a
     // missing matchup is never penalized for the population average.
     const mean = mainEffects?.get(pairSlotKey(slot));
-    const term = mean !== undefined && !result.lowData ? result.term - mean : result.term;
+    const adjusted = mean !== undefined && !result.lowData ? result.term - mean : result.term;
+    // D-133: partial pooling pulls thin matchup cells toward 0.
+    const term = matchupShrink(adjusted, row.gamesE, config);
     const weightedTerm = config.s * slot.confidence * influence * term;
     const dPp = deltaPp(xRunning, weightedTerm);
     sum += slot.confidence * influence * term;
@@ -240,7 +242,10 @@ export function blindSafetyFromOpponents(
       // share, so a candidate is not rewarded for lacking data.
       const row = enemyIdx.get(makePairKey(c, e, role));
       const result = row ? scorePair(row.winsE, row.gamesE, p0, config) : null;
-      const term = result && !result.lowData ? result.term : 0;
+      const term =
+        row !== undefined && result !== null && !result.lowData
+          ? matchupShrink(result.term, row.gamesE, config)
+          : 0;
       shareTotal += share;
       weighted += share * term;
       if (term < minTerm) minTerm = term;

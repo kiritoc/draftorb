@@ -26,7 +26,7 @@ import {
   type RuneExport,
   type RuneRecommendationResult,
 } from '@draftorb/shared';
-import { recommend, recommendRunes } from '@draftorb/engine';
+import { DEFAULT_CONFIG, recommend, recommendRunes } from '@draftorb/engine';
 import {
   loadChampionTags,
   loadChampions,
@@ -43,6 +43,7 @@ import {
   type RuneIconInfo,
 } from '../data/runes.js';
 import { createRecommendData } from '../data/recommend-data.js';
+import { useMatchupConfig } from '../use-matchup-config.js';
 import { excludePick, excludedRanks } from '../data/exclude-pick.js';
 import { computePersonalizedEntries } from '../personalized.js';
 import { championsForSlot } from '../champion-availability.js';
@@ -104,7 +105,19 @@ export function DraftScreen() {
   const [runeIcons, setRuneIcons] = useState<ReadonlyMap<number, RuneIconInfo> | null>(null);
   const [runesResult, setRunesResult] = useState<RuneRecommendationResult | null>(null);
   const [runesLoading, setRunesLoading] = useState(false);
+  // D-133: matchup layers run only when the backtest report validates them
+  // for SUPPORT on the loaded patch; anything else keeps the baseline ranking.
+  const matchupConfig = useMatchupConfig(USER_ROLE);
   const runeExportCache = useRef(new Map<number, Promise<RuneExport | null>>());
+
+  const engineConfig = useMemo(
+    () => ({
+      ...DEFAULT_CONFIG,
+      matchupEnabled: matchupConfig?.enabled ?? false,
+      matchupShrinkK: matchupConfig?.shrinkK ?? 0,
+    }),
+    [matchupConfig],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -190,7 +203,7 @@ export function DraftScreen() {
     }
     let cancelled = false;
     try {
-      const result = recommend(draftInput, data);
+      const result = recommend(draftInput, data, engineConfig);
       if (!cancelled) {
         setRecommendations(result.recommendations);
         setPoolRecommendations(result.poolRecommendations ?? []);
@@ -210,7 +223,7 @@ export function DraftScreen() {
     return () => {
       cancelled = true;
     };
-  }, [draftInput, data]);
+  }, [draftInput, data, engineConfig]);
 
   const [poolUnavailable, setPoolUnavailable] = useState<PoolUnavailableEntry[]>([]);
   const [insufficientData, setInsufficientData] = useState<InsufficientDataEntry[]>([]);

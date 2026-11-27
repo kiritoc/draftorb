@@ -18,6 +18,7 @@ export default tseslint.config(
             'scripts/check-public-paths.mjs',
             'scripts/check-public-paths.test.ts',
             'scripts/check-pr-title.mjs',
+            'scripts/live-client-probe.mjs',
             'scripts/check-pr-title.test.ts',
             'scripts/items-smoke.ts',
             'scripts/hooks/check-pr-create.mjs',

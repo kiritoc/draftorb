@@ -28,6 +28,7 @@ import {
 } from '@draftorb/shared';
 import { strings } from '../strings';
 import { PoolAddForm } from './PoolAddForm';
+import { PoolMessage } from './PoolMessage';
 import { PoolRoleSection } from './PoolRoleSection';
 import { PoolTransferSection } from './PoolTransferSection';
 import {
@@ -36,6 +37,7 @@ import {
   initPoolEditorState,
   isPoolDirty,
   poolEditorReducer,
+  type PoolEditorMessageScope,
 } from '../pool/pool-editor-state';
 import { exportPoolToRepo, readRepoPool } from '../pool/repo-pool';
 
@@ -99,16 +101,26 @@ export function PoolEditor({
   // Canonical serialization makes "dirty" exact: reverting edits clears it.
   const dirty = isPoolDirty(working, pool);
 
-  const showError = (text: string) =>
-    dispatch({ type: 'message', message: { text, kind: 'error' } });
-  const showInfo = (text: string) => dispatch({ type: 'message', message: { text, kind: 'info' } });
+  // Route each message to the section that produced it (B-081).
+  const formMessage = message?.scope === 'form' ? message : null;
+  const transferMessage = message?.scope === 'transfer' ? message : null;
+  const footerMessage = message?.scope === 'footer' ? message : null;
+
+  // Each message renders next to the action that produced it (B-081).
+  const showError = (text: string, scope: PoolEditorMessageScope) =>
+    dispatch({ type: 'message', message: { text, kind: 'error', scope } });
+  const showInfo = (text: string, scope: PoolEditorMessageScope) =>
+    dispatch({ type: 'message', message: { text, kind: 'info', scope } });
 
   const handleSave = async () => {
     try {
       await onSave(working);
       onClose();
     } catch (error) {
-      showError(strings.poolSaveFailed(error instanceof Error ? error.message : String(error)));
+      showError(
+        strings.poolSaveFailed(error instanceof Error ? error.message : String(error)),
+        'footer',
+      );
     }
   };
 
@@ -119,11 +131,11 @@ export function PoolEditor({
       dispatch({
         type: 'replace',
         pool: parsed.data,
-        message: { text: strings.poolJsonImported, kind: 'info' },
+        message: { text: strings.poolJsonImported, kind: 'info', scope: 'transfer' },
       });
       return true;
     } catch {
-      showError(strings.poolJsonInvalid);
+      showError(strings.poolJsonInvalid, 'transfer');
       return false;
     }
   };
@@ -132,32 +144,32 @@ export function PoolEditor({
     if (repoFolder === undefined) return;
     const result = await readRepoPool(repoFolder);
     if (result.notice !== undefined) {
-      showError(result.notice);
+      showError(result.notice, 'transfer');
       return;
     }
     if (result.missing) {
-      showInfo(strings.poolRepoMissing);
+      showInfo(strings.poolRepoMissing, 'transfer');
       return;
     }
     dispatch({
       type: 'replace',
       pool: result.pool,
-      message: { text: strings.poolRepoImported, kind: 'info' },
+      message: { text: strings.poolRepoImported, kind: 'info', scope: 'transfer' },
     });
   };
 
   const handleRepoExport = async () => {
     if (repoFolder === undefined) return;
     if (!canExportToRepo(working, pool)) {
-      showError(strings.poolDirtyExport);
+      showError(strings.poolDirtyExport, 'transfer');
       return;
     }
     try {
       await exportPoolToRepo(repoFolder, working);
-      showInfo(strings.poolRepoExported);
+      showInfo(strings.poolRepoExported, 'transfer');
       onPoolChanged?.();
     } catch (error) {
-      showError(error instanceof Error ? error.message : String(error));
+      showError(error instanceof Error ? error.message : String(error), 'transfer');
     }
   };
 
@@ -208,6 +220,8 @@ export function PoolEditor({
           onApply={() => dispatch({ type: 'apply' })}
         />
 
+        {formMessage !== null && <PoolMessage message={formMessage} className="mb-4" />}
+
         <div className="mb-4 space-y-3">
           {roleEntries.map(({ role, entries }) => (
             <PoolRoleSection
@@ -225,36 +239,39 @@ export function PoolEditor({
           pool={working}
           dirty={dirty}
           repoFolder={repoFolder}
-          message={message}
+          message={transferMessage}
           onApplyJson={handleApplyJson}
           onRepoImport={() => void handleRepoImport()}
           onRepoExport={() => void handleRepoExport()}
         />
 
-        <div className="flex items-center justify-between border-t border-slate-200 pt-4 dark:border-slate-700">
-          <button
-            type="button"
-            onClick={() => dispatch({ type: 'clear' })}
-            disabled={totalCount === 0}
-            className="rounded-lg px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 disabled:pointer-events-none disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-900/30"
-          >
-            {strings.poolClear}
-          </button>
-          <div className="flex gap-2">
+        <div className="border-t border-slate-200 pt-4 dark:border-slate-700">
+          {footerMessage !== null && <PoolMessage message={footerMessage} className="mb-3" />}
+          <div className="flex items-center justify-between">
             <button
               type="button"
-              onClick={onClose}
-              className="rounded-lg border border-slate-300 px-4 py-1.5 text-sm text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
+              onClick={() => dispatch({ type: 'clear' })}
+              disabled={totalCount === 0}
+              className="rounded-lg px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 disabled:pointer-events-none disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-900/30"
             >
-              {strings.poolCancel}
+              {strings.poolClear}
             </button>
-            <button
-              type="button"
-              onClick={() => void handleSave()}
-              className="rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-indigo-500"
-            >
-              {strings.poolSave}
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-lg border border-slate-300 px-4 py-1.5 text-sm text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
+              >
+                {strings.poolCancel}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleSave()}
+                className="rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-indigo-500"
+              >
+                {strings.poolSave}
+              </button>
+            </div>
           </div>
         </div>
       </div>

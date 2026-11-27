@@ -47,6 +47,13 @@ Review notes that predate the bug log live in [Review history](#review-history) 
 
 ## Fixed
 
+### B-081 — Pool editor repo-file actions gave no visible feedback — FIXED
+
+- Severity / Area: S3 / desktop (pool editor modal)
+- Steps to reproduce: open the champion pool editor with a repo folder set, click "Export to repo file" (or Import).
+- Expected / Actual: expected a visible confirmation next to the buttons; actual the single status line rendered at the top of the modal while the transfer buttons sit at the bottom, so a successful export looked like a no-op.
+- Fix (commit/ticket): `PoolEditorMessage` gained a `scope` (`form` | `transfer` | `footer`) so each message renders next to the action that produced it: capacity warnings under `PoolAddForm`, repo/JSON feedback inside `PoolTransferSection` (new `message` prop + shared `PoolMessage` component), save errors above the footer buttons. Regression tests: `pool-editor-state.test.ts` (full-role rejection is scoped `form`) and `pool-transfer-section.test.ts` (message renders next to the repo actions).
+
 ### B-076 — `publish-public` shipped files the manifest does not cover — FIXED
 
 - Severity / Area: S2 / etl + desktop (public aggregates download, D-111)

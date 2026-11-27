@@ -34,14 +34,25 @@ describe('PoolTransferSection', () => {
   });
 
   it('renders an info message as a status next to the repo actions', () => {
-    const markup = render({ text: 'Pool exported to the repo file', kind: 'info' });
+    const markup = render({
+      text: 'Pool exported to the repo file',
+      kind: 'info',
+      scope: 'transfer',
+    });
     expect(markup).toContain('role="status"');
     expect(markup).toContain('Pool exported to the repo file');
-    expect(markup.indexOf('Export to repo file')).toBeLessThan(markup.indexOf('role="status"'));
+    const exportIndex = markup.indexOf('Export to repo file');
+    const statusIndex = markup.indexOf('role="status"');
+    expect(exportIndex).toBeGreaterThanOrEqual(0);
+    expect(statusIndex).toBeGreaterThan(exportIndex);
   });
 
   it('renders an error message as an alert', () => {
-    const markup = render({ text: 'Could not save the pool', kind: 'error' });
+    const markup = render({
+      text: 'Could not save the pool',
+      kind: 'error',
+      scope: 'transfer',
+    });
     expect(markup).toContain('role="alert"');
     expect(markup).toContain('Could not save the pool');
   });

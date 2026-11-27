@@ -1232,6 +1232,8 @@ The pool editor lets the player pick a champion once and tick the roles it appli
 
 Keep the expert filter (D-022). Add a per-player cap on each player's weight within a context and a minimum number of distinct players behind any number. Show win rate and pick share separately. "Master+ only" is an optional toggle, off by default. Collect extra data for the champion-role pairs in the player's pool (pool-driven collection); the draft ranking keeps using broad data. Values for the cap and minimum are set by the backtest. Amends D-021, D-022, D-045.
 
+BL-013b measured values (patch `16.22` evidence audit, `docs/reports/bl-013-evidence-rule.md`): `evidencePlayerWeightCap = 30` weighted games per player per context row, `evidenceMinDistinctPlayers = 3`, `evidenceMasterPlusOnly = false`. Revisit with the rune/item holdout harness (T-027.b).
+
 ### D-103 — Thin-data fallback — ACCEPTED (owner, 2026-11-15)
 
 When data is too thin: picks and runes show a broader statistic (for example the champion's win rate in that role), clearly labeled; items show a rule-based suggestion (D-093 analytic fallback), clearly labeled as a rule. D-054 stands. D-087 measured a median of 2 games per champion-and-slot cell for items.

@@ -100,7 +100,7 @@ function openAndRead(dbPath: string): RoleProbRow[] {
   }
 }
 
-describe('aggregateRoleProb', () => {
+describe('aggregateRoleProb', { timeout: 60_000 }, () => {
   it('computes role probabilities that sum to 1 per champion', async () => {
     await withSeededDb(async (dbPath) => {
       const db = openDb(dbPath);

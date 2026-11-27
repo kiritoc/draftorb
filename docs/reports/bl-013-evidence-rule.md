@@ -41,7 +41,7 @@ On the uncapped `16.22` rune-page audit, per-player average `games_w` (`gamesW /
 
 ## Gate result
 
-`DRAFTORB_DB_PATH=data/DraftOrb.sqlite DRAFTORB_PUBLIC_DIR=data/public pnpm etl aggregate` then `pnpm etl export` + `pnpm etl validate-export` on patch `16.22` with the final values: **PASSED** — SUPPORT 54, TOP 91, JUNGLE 70 recommendations; schema v4 exports include `players`, `winrate` and `pickShare`. The evidence rule reduced the patch `16.22` aggregates to `36,224` `rune_ctx` rows and `9,235` `item_build` rows (from `1,122,043` and `169,868` before the distinct-player minimum).
+`DRAFTORB_DB_PATH=data/DraftOrb.sqlite DRAFTORB_PUBLIC_DIR=data/public pnpm etl aggregate` then `pnpm etl export` + `pnpm etl validate-export` on patch `16.22` with the final values: **PASSED** — SUPPORT 54, TOP 91, JUNGLE 70 recommendations; schema v6 exports include `players`, `winrate` and `pickShare` on rune pages and build items. The evidence rule reduced the patch `16.22` aggregates to `36,224` `rune_ctx` rows and `9,235` `item_build` rows (from `1,122,043` and `169,868` before the distinct-player minimum).
 
 ## Caveat
 

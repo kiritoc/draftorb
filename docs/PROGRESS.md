@@ -38,6 +38,17 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 ### Previous handoff (BL-050)
 
 - Date: 2026-11-26
+- Branch/PR: `feat/bl-014-backtest-gate` / BL-014 (#78)
+- State: REVIEW
+- Done: first real `pnpm etl backtest draft --roles=SUPPORT,TOP,JUNGLE` on the private DB (holdout 16.22, 13 946 games) failed the new D-023 paired-bootstrap gate (engine log-loss 0.6972 vs baseline 0.6950, Δ −0.0023, 95% CI excludes 0 on match and player units). Per the owner's Option 3 directive, D-133 puts matchup layers behind a report-driven flag: engine `matchupEnabled`/`matchupShrinkK`, ETL train-only k CV + single holdout eval (`matchup` block in `backtest-draft.json`), web `matchupConfigFromReport` fail-safe + reworded banner, desktop pinned off (B-080). Shrinkage CV picked variant `off` — the app now ranks by champion win rates only.
+- Files touched: `packages/engine/src/{config,levels,recommend,recommend-terms}.ts` + `test/recommend-matchup-flag.test.ts`, `packages/etl/src/{backtest/draft.ts,backtest/draft.test.ts,commands/backtest.ts,commands/backtest.test.ts,config/etl-config.ts}`, `apps/web/src/{data/backtest-report.ts,data/backtest-validation.ts,data/backtest-validation.test.ts,components/{DraftScreen,UnvalidatedModelBanner}.tsx,strings.ts}`, `apps/desktop/ui/src/{screens/PickScreen.tsx,strings.ts,components/{Header,AppShell.test}.tsx/ts}`, `docs/{DECISIONS,SPECS,SETUP,BUGS,PROGRESS}.md`.
+- Tests: `pnpm check` green. Engine: flag off ⇒ score = baseline prior exactly, empty reasons, no matchup warnings; shrinkage monotonic. ETL: gate/bootstrap, `--roles`, matchup experiment on seeded DBs. Web: `matchupConfigFromReport` fail-safe cases.
+- Blockers / next step: PR pending. Gate thresholds in `ETL_CONFIG.backtest` are provisional (`thresholdsPendingOwnerConfirmation` in the report). Desktop needs the report shipped in the aggregate archive before `matchupEnabled` can be report-driven there (B-080). Re-run `pnpm etl backtest draft` after each data refresh (SETUP.md); revisit at ×3/×10 match volume.
+- Pitfalls: `data/public/` is gitignored — the report is generated, not committed; the PR body carries the numbers. `matchupEnabled` engine default stays `true` for backward compat; apps must pass the report-derived value. If `runMatchupExperiment` returns null (too few training patches) `validationStatus` falls back to the shadow gate — apps still stay off via `matchup.enabled`.
+
+### Previous handoff (BL-023)
+
+- Date: 2026-11-26
 - Branch/PR: `feat/bl-023-pool-collection` / PR #157 / BL-023 (#88)
 - State: REVIEW
 - Done: pool-driven collection for match ingestion (D-102, D-114). New `pool-config.ts` loads/validates `data/pool.config.json` via the shared `poolConfigSchema` (missing file → `null`, invalid → throws; `DRAFTORB_POOL_CONFIG_PATH` env override mirrors `DRAFTORB_DB_PATH`). New `matches-select.ts` extracts player selection from `ingestMatches`: pending-first ordering unchanged, and when pool pairs exist, players with `participants` rows matching a pool champion×role pair (joined to `matches` for platform) move to the front of their pending/done group; `rank_score` remains the fallback. `ingestMatches` takes `poolConfig` and logs a pool-priority summary. `etl matches` loads the repo pool file (warn + rank-order fallback on invalid), passes it through, and gains `--dry-run`: prints every selected player with `[pool]`/`[rank]` reason, pending/done status and rank_score, with zero Riot calls (read-only DB, refuses pending migrations). SETUP.md updated.

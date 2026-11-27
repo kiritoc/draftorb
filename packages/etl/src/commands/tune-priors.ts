@@ -128,7 +128,7 @@ async function runTunePriors(args: string[]): Promise<void> {
         `SELECT
            m.match_id AS matchId, m.patch AS patch, p.team_id AS teamId,
            p.champion_id AS championId, p.role AS role, p.win AS win,
-           m.avg_rank_score AS matchRankScore
+           m.avg_rank_score AS matchRankScore, p.puuid AS playerId
          FROM participants p
          JOIN matches m ON m.match_id = p.match_id`,
       )
@@ -146,7 +146,9 @@ async function runTunePriors(args: string[]): Promise<void> {
     let holdoutPatch: string | null = null;
     let trainingPatches: string[] = [];
     for (const config of gridConfigs(DEFAULT_GRID)) {
-      const bt = runBacktestDraft(rows, { dataByRole, config });
+      // The grid only reads point metrics: skip the paired-bootstrap gate
+      // (36 full resamples would be wasted work per configuration).
+      const bt = runBacktestDraft(rows, { dataByRole, config }, { skipGate: true });
       if (holdoutPatch === null && bt.holdoutPatch !== null) {
         holdoutPatch = bt.holdoutPatch;
         trainingPatches = bt.trainingPatches;

@@ -92,6 +92,19 @@ export const rankWeightingConfigSchema = z
      * Default off until the D-023 backtest gate passes.
      */
     pairMainEffectAdjust: z.boolean().default(false),
+    /**
+     * D-133: when false, every matchup context layer (pairs, lane_vs,
+     * lane_full, comp, blind) is skipped and score(c) is exactly the
+     * champion baseline prior p0. Apps derive this from the backtest report
+     * (`matchup.enabled`); the engine default preserves pre-flag behavior.
+     */
+    matchupEnabled: z.boolean().default(true),
+    /**
+     * D-133 partial pooling: table-derived matchup terms are multiplied by
+     * `gamesE / (gamesE + matchupShrinkK)`, pulling thin cells toward 0.
+     * 0 = no extra shrinkage. Prior until the D-023 gate selects a value.
+     */
+    matchupShrinkK: z.number().nonnegative().default(0),
     influence: influenceConfigSchema,
   })
   .strict()
@@ -139,6 +152,8 @@ export const DEFAULT_CONFIG: RankWeightingConfig = rankWeightingConfigSchema.par
   evidenceMinDistinctPlayers: 2,
   evidenceMasterPlusOnly: false,
   pairMainEffectAdjust: false,
+  matchupEnabled: true,
+  matchupShrinkK: 0,
   influence: {
     draft: createInfluenceMatrix(),
     lane: createInfluenceMatrix(),

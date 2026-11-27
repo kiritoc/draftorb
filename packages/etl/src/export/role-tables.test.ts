@@ -196,7 +196,7 @@ describe('exportJson', () => {
     ]);
   });
 
-  it('excludes non-SUPPORT role-keyed files while role-prob remains global (X2)', () => {
+  it('exports minimal roles with baseline only, while role-prob remains global (X2, BL-024)', () => {
     seed(suite.db, 'match', [{}]);
     seed(suite.db, 'baseline', [
       {
@@ -243,7 +243,12 @@ describe('exportJson', () => {
     ]);
 
     const result = suite.exportOnce();
-    expect(result.files.map((f) => f.relativePath)).not.toContain('roles/MID/baseline.json');
+    // BL-024: ADC/MID are minimal — baseline.json only, no pair/lane/rune/build files.
+    expect(result.files.map((f) => f.relativePath)).toContain('roles/MID/baseline.json');
+    expect(result.files.map((f) => f.relativePath)).not.toContain('roles/MID/ally-pairs.json');
+    expect(result.files.map((f) => f.relativePath)).not.toContain('roles/MID/enemy-pairs.json');
+    expect(result.files.map((f) => f.relativePath)).not.toContain('roles/MID/lane-vs.json');
+    expect(result.files.map((f) => f.relativePath)).not.toContain('roles/MID/lane-full.json');
     expect(result.files.map((f) => f.relativePath)).not.toContain('roles/MID/runes/412.json');
     expect(result.files.map((f) => f.relativePath)).not.toContain('roles/MID/builds/412.json');
     // role-prob.json is global, independent of the selected role-keyed files.

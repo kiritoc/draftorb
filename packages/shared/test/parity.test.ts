@@ -23,7 +23,7 @@ describe('shared schema parity (D-011)', () => {
     expect(shared.damageTypeSchema).toBeDefined();
     expect(shared.championRangeSchema).toBeDefined();
     expect(shared.SHARED_VERSION).toBeDefined();
-    expect(shared.MANIFEST_SCHEMA_VERSION).toBe(4);
+    expect(shared.MANIFEST_SCHEMA_VERSION).toBe(5);
     expect(shared.DRAFT_RESULT_SCHEMA_VERSION).toBe(2);
   });
 
@@ -171,11 +171,12 @@ describe('shared schema parity (D-011)', () => {
       region: 'EUW',
       rankBuckets: ['DIAMOND'],
       roles: ['SUPPORT'],
+      minimalRoles: [],
       files: [{ path: 'champions.json' }],
-      schemaVersion: 4,
+      schemaVersion: 5,
     });
     expect(manifest.success).toBe(true);
-    expect(manifest.data).toMatchObject({ schemaVersion: 4 });
+    expect(manifest.data).toMatchObject({ schemaVersion: 5 });
     // v1 exports (5-column baselines) are rejected.
     expect(() =>
       shared.manifestSchema.parse({

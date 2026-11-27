@@ -125,7 +125,7 @@ export function scorePair(
 }
 
 /**
- * D-128 partial pooling: shrink a matchup term toward 0 in proportion to its
+ * D-129 partial pooling: shrink a matchup term toward 0 in proportion to its
  * effective sample, `term * gamesE / (gamesE + matchupShrinkK)`. `gamesE` is
  * the context's equivalent game count (SPECS §5 shrinkage units). A `k` of 0
  * (or a zero term) returns the term unchanged.

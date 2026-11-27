@@ -118,7 +118,7 @@ export function scorePairs(
     // missing matchup is never penalized for the population average.
     const mean = mainEffects?.get(pairSlotKey(slot));
     const adjusted = mean !== undefined && !result.lowData ? result.term - mean : result.term;
-    // D-128: partial pooling pulls thin matchup cells toward 0.
+    // D-129: partial pooling pulls thin matchup cells toward 0.
     const term = matchupShrink(adjusted, row.gamesE, config);
     const weightedTerm = config.s * slot.confidence * influence * term;
     const dPp = deltaPp(xRunning, weightedTerm);

@@ -43,7 +43,13 @@ const roleFiles = {
   'roles/SUPPORT/lane-full.json': [[412, 22, 89, 22, 'IRON', 1, 3, 3]],
 };
 
-function seedCache(overrides: { patchFiles?: Record<string, unknown> } = {}): void {
+function seedCache(
+  overrides: {
+    patchFiles?: Record<string, unknown>;
+    roles?: ('SUPPORT' | 'ADC')[];
+    minimalRoles?: ('SUPPORT' | 'ADC')[];
+  } = {},
+): void {
   const patchFiles: Record<string, unknown> = {
     'champions.json': champions,
     'role-prob.json': { '412': { SUPPORT: 1 } },
@@ -53,10 +59,11 @@ function seedCache(overrides: { patchFiles?: Record<string, unknown> } = {}): vo
   const manifest = {
     patch: '16.22',
     generatedAt: '2026-11-21T00:00:00Z',
-    schemaVersion: 4,
+    schemaVersion: 5,
     region: 'euw',
     rankBuckets: ['IRON'],
-    roles: ['SUPPORT'],
+    roles: overrides.roles ?? ['SUPPORT'],
+    minimalRoles: overrides.minimalRoles ?? [],
     files: [...Object.keys(patchFiles), '/latest.json', '/champion-tags.json'].map((path) => ({
       path,
       sha256: '0'.repeat(64),
@@ -107,6 +114,26 @@ describe('createRecommendData', () => {
     expect(() =>
       createRecommendData({ ...rest, 'role-prob.json': { '412': { SUPPORT: 1 } } }, Object.values(champions), tags, 'SUPPORT'),
     ).toThrow('lane-full.json');
+  });
+
+  it('builds empty pair/lane tables for a minimal role without the files (BL-024)', () => {
+    const data = createRecommendData(
+      {
+        'roles/ADC/baseline.json': [[412, 'IRON', 6, 10, 10, 3]],
+        'role-prob.json': { '412': { ADC: 1 } },
+        'pick-rate.json': { ADC: { '412': 0.5, '1': 0.5 } },
+      },
+      Object.values(champions),
+      tags,
+      'ADC',
+      true,
+    );
+    expect(data.baselines).toHaveLength(1);
+    expect(data.allyPairs).toEqual([]);
+    expect(data.enemyPairs).toEqual([]);
+    expect(data.laneVs).toEqual([]);
+    expect(data.laneFull).toEqual([]);
+    expect(data.pickRate?.ADC?.['412']).toBe(0.5);
   });
 });
 
@@ -161,6 +188,26 @@ describe('loadPickData', () => {
     expect(readCounts.get('champion-tags.json')).toBe(1);
   });
 
+  it('loads a minimal role from baseline.json only and flags it (BL-024)', async () => {
+    seedCache({
+      roles: ['ADC'],
+      minimalRoles: ['ADC'],
+      patchFiles: {
+        'role-prob.json': { '412': { ADC: 1 } },
+        'roles/ADC/baseline.json': [[412, 'IRON', 6, 10, 10, 3]],
+        'pick-rate.json': { ADC: { '412': 1 } },
+      },
+    });
+    const pick = await loadPickData('ADC');
+    expect(pick?.minimal).toBe(true);
+    expect(pick?.data.baselines).toHaveLength(1);
+    expect(pick?.data.allyPairs).toEqual([]);
+    expect(pick?.data.enemyPairs).toEqual([]);
+    expect(pick?.data.laneVs).toEqual([]);
+    expect(pick?.data.laneFull).toEqual([]);
+    expect(pick?.data.pickRate?.ADC?.['412']).toBe(1);
+  });
+
   it('accepts a manifest path without the patch prefix', async () => {
     seedCache();
     const base = mockRead.getMockImplementation();
@@ -189,10 +236,11 @@ describe('loadPickData', () => {
         return JSON.stringify({
           patch: '16.21',
           generatedAt: '2026-11-21T00:00:00Z',
-          schemaVersion: 4,
+          schemaVersion: 5,
           region: 'euw',
           rankBuckets: ['IRON'],
           roles: ['SUPPORT'],
+          minimalRoles: [],
           files: [],
         });
       }

@@ -121,30 +121,30 @@ describe('exportJson', () => {
     seed(suite.db, 'match', [{}]);
     seed(suite.db, 'runeCtx', [
       supportRuneRow({ perksHash: 'support' }),
-      supportRuneRow({ myRole: 'MID', perksHash: 'mid' }),
+      supportRuneRow({ myRole: 'TOP', perksHash: 'mid' }),
     ]);
     seed(suite.db, 'itemBuild', [
       supportBuildRow(),
-      supportBuildRow({ myRole: 'MID', itemId: 3047 }),
+      supportBuildRow({ myRole: 'TOP', itemId: 3047 }),
     ]);
 
-    const result = suite.exportOnce({ roles: ['SUPPORT', 'MID'] });
+    const result = suite.exportOnce({ roles: ['SUPPORT', 'TOP'] });
     expect(result.files.map((file) => file.relativePath)).toContain('roles/SUPPORT/runes/412.json');
-    expect(result.files.map((file) => file.relativePath)).toContain('roles/MID/runes/412.json');
+    expect(result.files.map((file) => file.relativePath)).toContain('roles/TOP/runes/412.json');
     expect(result.files.map((file) => file.relativePath)).toContain(
       'roles/SUPPORT/builds/412.json',
     );
-    expect(result.files.map((file) => file.relativePath)).toContain('roles/MID/builds/412.json');
+    expect(result.files.map((file) => file.relativePath)).toContain('roles/TOP/builds/412.json');
 
     expect(runeExportSchema.parse(suite.readFile('roles/SUPPORT/runes/412.json')).myRole).toBe(
       'SUPPORT',
     );
-    expect(runeExportSchema.parse(suite.readFile('roles/MID/runes/412.json')).myRole).toBe('MID');
+    expect(runeExportSchema.parse(suite.readFile('roles/TOP/runes/412.json')).myRole).toBe('TOP');
     expect(
       itemBuildExportSchema.parse(suite.readFile('roles/SUPPORT/builds/412.json')).myRole,
     ).toBe('SUPPORT');
-    expect(itemBuildExportSchema.parse(suite.readFile('roles/MID/builds/412.json')).myRole).toBe(
-      'MID',
+    expect(itemBuildExportSchema.parse(suite.readFile('roles/TOP/builds/412.json')).myRole).toBe(
+      'TOP',
     );
   });
 

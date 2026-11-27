@@ -37,7 +37,7 @@ describe('exportJson', () => {
       },
       {
         championId: 412,
-        myRole: 'MID',
+        myRole: 'TOP',
         contextKey: 'global',
         contextLevel: RUNE_CONTEXT_LEVELS.global,
         perksHash: 'c',
@@ -78,7 +78,7 @@ describe('exportJson', () => {
         players: 1,
       }, // primaryStyleId <= 0
     ]);
-    const result = suite.exportOnce({ roles: ['SUPPORT', 'MID'] as const });
+    const result = suite.exportOnce({ roles: ['SUPPORT', 'TOP'] as const });
     const runes = suite.readFile('roles/SUPPORT/runes/412.json') as {
       championId: number;
       myRole: string;
@@ -111,8 +111,8 @@ describe('exportJson', () => {
     expect(result.warnings).toContain(
       `export: skipped ${result.skippedRunePages} rune page(s) with unparseable or invalid perks_json`,
     );
-    // B6: MID role file exists under roles/MID (separate group).
-    expect(result.files.map((f) => f.relativePath)).toContain('roles/MID/runes/412.json');
+    // B6: TOP role file exists under roles/TOP (separate group).
+    expect(result.files.map((f) => f.relativePath)).toContain('roles/TOP/runes/412.json');
   });
 
   it('gates a low-sample global context and uses the raw pre-gate context denominator (X1, X3)', () => {

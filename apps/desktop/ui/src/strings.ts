@@ -39,7 +39,7 @@ export const strings = {
   },
   roleNeedsData: 'Not enough champion data for this role',
   noEligibleRole: 'No role has enough champion data in the current export',
-  roleMinimal: 'Minimal roles come later (BL-024)',
+  pickMinimalNote: 'Champion-level stats only for this role — no synergy or matchup data yet.',
   pickPlaceholder: 'Setup and game screens coming in v2/v3',
   pickNoData: 'No aggregate data cached yet — check the connection and restart.',
   loading: 'Loading…',

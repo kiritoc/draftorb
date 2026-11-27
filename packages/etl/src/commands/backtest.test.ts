@@ -108,7 +108,7 @@ describe('backtestCommand', () => {
     expect(report.logLoss).toBeTypeOf('number');
   });
 
-  it('runs the D-128 matchup experiment when a train-only validation patch exists', async () => {
+  it('runs the D-129 matchup experiment when a train-only validation patch exists', async () => {
     const db = openDb(dbPath);
     migrate(db);
     seedPatches(db, ['16.19', '16.20', '16.21']);

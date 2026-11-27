@@ -78,14 +78,14 @@ export const rankWeightingConfigSchema = z
      */
     pairMainEffectAdjust: z.boolean().default(false),
     /**
-     * D-128: when false, every matchup context layer (pairs, lane_vs,
+     * D-129: when false, every matchup context layer (pairs, lane_vs,
      * lane_full, comp, blind) is skipped and score(c) is exactly the
      * champion baseline prior p0. Apps derive this from the backtest report
      * (`matchup.enabled`); the engine default preserves pre-flag behavior.
      */
     matchupEnabled: z.boolean().default(true),
     /**
-     * D-128 partial pooling: table-derived matchup terms are multiplied by
+     * D-129 partial pooling: table-derived matchup terms are multiplied by
      * `gamesE / (gamesE + matchupShrinkK)`, pulling thin cells toward 0.
      * 0 = no extra shrinkage. Prior until the D-023 gate selects a value.
      */
@@ -232,12 +232,21 @@ export const DEFAULT_LANE_GROUPS: Readonly<Record<Role, LaneGroup>> = Object.fre
 });
 
 /**
+ * Minimal roles (D-097, BL-024): champion-level statistics only. For these
+ * roles `recommend` skips role inference and every matchup layer (pairs,
+ * lane, comp, blind), so the score is the shrunk baseline win rate alone.
+ */
+export const MINIMAL_ROLES: readonly Role[] = ['ADC', 'MID'];
+
+/**
  * Recommendation-layer config (SPECS §5, D-030). Injected into `recommend`
  * so the T-027.a backtest can tune every weight (fixes B-027).
  */
 export interface RecommendConfig {
   /** Role probability threshold to enter the candidate set. */
   readonly roleProbThreshold: number;
+  /** Roles ranked on champion-level statistics only (D-097). */
+  readonly minimalRoles: readonly Role[];
   /**
    * Minimum opponent share for a champion to count as a likely unseen blind
    * opponent (pick share from `pick-rate.json`, roleProb fallback, B-026).
@@ -258,6 +267,7 @@ export interface RecommendConfig {
 
 export const DEFAULT_RECOMMEND_CONFIG: RecommendConfig = Object.freeze({
   roleProbThreshold: 0.05,
+  minimalRoles: MINIMAL_ROLES,
   blindOpponentMinShare: 0.05,
   wComp: 1.0,
   wBlind: 1.0,

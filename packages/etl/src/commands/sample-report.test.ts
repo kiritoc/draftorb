@@ -20,7 +20,8 @@ const MANIFEST = {
     'MASTER_PLUS',
   ],
   roles: ['SUPPORT', 'TOP', 'JUNGLE'],
-  schemaVersion: 4,
+  minimalRoles: [],
+  schemaVersion: 5,
   files: [
     { path: 'roles/TOP/baseline.json', sha256: 'x'.repeat(64) },
     { path: 'roles/JUNGLE/baseline.json', sha256: 'x'.repeat(64) },

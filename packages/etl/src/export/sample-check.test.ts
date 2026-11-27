@@ -53,8 +53,9 @@ function writeExport(publicDir: string, baseline: unknown): void {
     region: 'euw1',
     rankBuckets: ['DIAMOND'],
     roles: ['SUPPORT'],
+    minimalRoles: [],
     files: files.map((path) => ({ path })),
-    schemaVersion: 4,
+    schemaVersion: 5,
   });
   writeJson(join(patchDir, 'champions.json'), {
     '412': { id: 412, name: 'Thresh', icon: 'Thresh.png', roles: ['SUPPORT', 'TOP'] },
@@ -152,8 +153,68 @@ describe('checkPublishedExport', () => {
     expect(result.recommendationCounts['TOP']).toBe(0);
     expect(result.errors).toEqual([]);
     expect(result.warnings).toEqual([
+      'Role SUPPORT: 2 champions pass the D-126 coverage gate (< 50 at n_eff >= 25 in DIAMOND); the role stays disabled in the app.',
       'No "Best overall" recommendations for role TOP. (not enabled in the app; not release-blocking)',
+      'Role TOP: 0 champions pass the D-126 coverage gate (< 50 at n_eff >= 25 in DIAMOND); the role stays disabled in the app.',
     ]);
+  });
+
+  it('warns when a role fails the D-126 baseline coverage gate', () => {
+    writeExport(active().publicDir, [
+      [412, 'DIAMOND', 30, 50, 0.1, 50],
+      [432, 'DIAMOND', 25, 50, 0.1, 50],
+    ]);
+
+    const result = checkPublishedExport({
+      publicDir: active().publicDir,
+      tagsFilePath: active().tagsFilePath,
+    });
+
+    expect(result.warnings).toContain(
+      'Role SUPPORT: 2 champions pass the D-126 coverage gate (< 50 at n_eff >= 25 in DIAMOND); the role stays disabled in the app.',
+    );
+  });
+
+  it('does not warn when baseline coverage reaches the D-126 gate', () => {
+    const publicDir = join(active().directory, 'public-coverage');
+    const baseline = Array.from({ length: 50 }, (_, i) => [1000 + i, 'DIAMOND', 30, 50, 0.1, 50]);
+    writeExport(publicDir, baseline);
+
+    const result = checkPublishedExport({
+      publicDir,
+      tagsFilePath: active().tagsFilePath,
+    });
+
+    expect(result.warnings.some((w) => w.includes('coverage gate'))).toBe(false);
+  });
+
+  it('validates minimal roles from baseline.json alone (BL-024)', () => {
+    writeExport(active().publicDir, [
+      [412, 'DIAMOND', 30, 50, 0.1, 50],
+      [432, 'DIAMOND', 25, 50, 0.1, 50],
+    ]);
+    const patchDir = join(active().publicDir, PATCH);
+    // ADC is a minimal role: only baseline.json exists, no pair/lane files.
+    writeJson(join(patchDir, 'roles', 'ADC', 'baseline.json'), [[412, 'DIAMOND', 30, 50, 0.1, 50]]);
+    writeJson(join(patchDir, 'role-prob.json'), { '412': { ADC: 1 }, '432': { SUPPORT: 1 } });
+    const manifestPath = join(patchDir, 'manifest.json');
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
+      roles: string[];
+      minimalRoles: string[];
+      files: { path: string }[];
+    };
+    manifest.roles = ['SUPPORT', 'ADC'];
+    manifest.minimalRoles = ['ADC'];
+    manifest.files.push({ path: 'roles/ADC/baseline.json' });
+    writeFileSync(manifestPath, JSON.stringify(manifest), 'utf8');
+
+    const result = checkPublishedExport({
+      publicDir: active().publicDir,
+      tagsFilePath: active().tagsFilePath,
+    });
+
+    expect(result.recommendationCounts['ADC']).toBeGreaterThan(0);
+    expect(result.errors).toEqual([]);
   });
 
   it('throws when a required export file is missing from the manifest', () => {

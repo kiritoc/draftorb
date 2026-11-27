@@ -49,7 +49,7 @@ function resolveDbPathReadOnly(): string {
  * Rebuild the engine's per-role inputs from the training window only. The
  * source database is attached read-only into a throwaway in-memory database
  * that holds every match except the excluded patches (the holdout patch by
- * default; D-128 train-only validation also excludes the validation patch),
+ * default; D-129 train-only validation also excludes the validation patch),
  * then aggregated with the snapshot set to the last included patch — the
  * same code path as `pnpm etl aggregate`, so recency is relative to the
  * patch before the holdout (D-023).
@@ -133,7 +133,7 @@ export function buildEngineData(
 }
 
 /**
- * D-128 matchup experiment. `matchupShrinkK` candidates (plus 'off' =
+ * D-129 matchup experiment. `matchupShrinkK` candidates (plus 'off' =
  * matchup layers disabled) are scored on the LAST TRAINING PATCH ONLY —
  * engine data built from earlier patches — then the selected variant is
  * evaluated exactly once on the frozen holdout through the paired-bootstrap
@@ -291,7 +291,7 @@ async function runBacktest(args: string[]): Promise<void> {
       : engine;
     const report = runBacktestDraft(rows, evaluated, { roles });
 
-    // D-128: the report's headline metrics stay the shadow full-matchup
+    // D-129: the report's headline metrics stay the shadow full-matchup
     // evaluation; `matchup` carries the shrinkage experiment and decides
     // `validationStatus` (validated only when the gate passes).
     let finalReport = report;

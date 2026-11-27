@@ -70,13 +70,15 @@ describe('backtestCommand', () => {
 
     for (const match of matches) {
       insertMatch.run(match.matchId, match.patch, match.createdAt);
-      // TOP is champion 100 on both teams; other roles use one consistent champion per side.
+      // Each team fields a distinct champion per role: a real draft never
+      // repeats a champion across teams, and a shared pick would ban the
+      // champion from the evaluated side's candidates.
       for (const [teamId, teamWins] of [
         [100, match.blueWins],
         [200, !match.blueWins],
       ] as const) {
         for (const [i, role] of roles.entries()) {
-          const championId = i === 0 ? 100 : teamId * 10 + i;
+          const championId = teamId * 10 + i;
           insertParticipant.run(
             match.matchId,
             `puuid-${match.matchId}-${teamId}-${i}`,
@@ -154,7 +156,7 @@ describe('backtestCommand', () => {
             match.matchId,
             `puuid-${match.matchId}-${teamId}-${i}`,
             teamId,
-            i === 0 ? 100 : teamId * 10 + i,
+            teamId * 10 + i,
             role,
             teamWins ? 1 : 0,
           );
@@ -233,11 +235,7 @@ describe('backtestCommand', () => {
           // MID picks a unique champion per match: never enough baseline
           // games to be scored, so it carries no matchup evidence.
           const championId =
-            role === 'MID'
-              ? 9000 + matchSeq * 2 + (teamId === 100 ? 0 : 1)
-              : i === 0
-                ? 100
-                : teamId * 10 + i;
+            role === 'MID' ? 9000 + matchSeq * 2 + (teamId === 100 ? 0 : 1) : teamId * 10 + i;
           insertParticipant.run(
             match.matchId,
             `puuid-${match.matchId}-${teamId}-${i}`,

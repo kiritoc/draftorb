@@ -1,4 +1,9 @@
-import type { ProfileExport, ProfileGame, Role } from '@draftorb/shared';
+import {
+  PROFILE_EXPORT_SCHEMA_VERSION,
+  type ProfileExport,
+  type ProfileGame,
+  type Role,
+} from '@draftorb/shared';
 
 /** Minimal valid profile export for tests. */
 export function makeProfile(
@@ -20,13 +25,13 @@ export function makeProfile(
     summonerSpells: [4, 14],
   }));
   return {
-    schemaVersion: 1,
+    schemaVersion: PROFILE_EXPORT_SCHEMA_VERSION,
     id: 'kiritoctoc-euw1',
     riotId: { gameName: 'KiriToc', tagLine: 'Toc', platform: 'EUW1' },
     label: "KiriToc's picks",
     syncedAt: 1794900000,
     gameCount: full.length,
-    favorites: { combined: [], recency: [], mastery: [] },
+    favorites: {},
     games: full,
     mastery: [],
     ...overrides,

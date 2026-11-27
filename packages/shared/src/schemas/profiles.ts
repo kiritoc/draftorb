@@ -115,35 +115,80 @@ export const profileMasteryEntrySchema = z
   .strict();
 export type ProfileMasteryEntry = z.infer<typeof profileMasteryEntrySchema>;
 
-/** Favorites computed at export time (D-074). */
+/** Favorites computed at export time for one role (D-074). */
 export const profileFavoritesSchema = z
   .object({
     /** Deduplicated union of `recency` and `mastery`. */
     combined: z.array(championIdSchema),
-    /** Top champions by recency-weighted Support games in the last 90 days. */
+    /** Top champions by recency-weighted games in that role over the last 90 days. */
     recency: z.array(championIdSchema),
-    /** Top champions by mastery points. */
+    /** Top champions by mastery points (role-agnostic, unioned into every role). */
     mastery: z.array(championIdSchema),
   })
   .strict();
 export type ProfileFavorites = z.infer<typeof profileFavoritesSchema>;
 
-/** `data/public/profiles/<id>.json` — one file per configured profile. */
-export const profileExportSchema = z
+/**
+ * Per-role favorites keyed by role — champion x roles like the pool
+ * (D-101, D-136, BL-057). Only roles present in the exported game set get
+ * an entry; ADC/MID favorites exist when the profile has games in those
+ * roles even though personalization ignores them (D-097).
+ */
+export const profileFavoritesByRoleSchema = z.partialRecord(roleSchema, profileFavoritesSchema);
+export type ProfileFavoritesByRole = z.infer<typeof profileFavoritesByRoleSchema>;
+
+const profileExportSharedShape = {
+  id: profileIdSchema,
+  /** The profile owner's Riot ID — the owner's explicit choice (D-069). */
+  riotId: riotIdSchema.extend({ platform: z.string().min(1) }).strict(),
+  label: z.string().min(1),
+  syncedAt: z.number().int().nonnegative(),
+  gameCount: z.number().int().nonnegative(),
+  games: z.array(profileGameSchema),
+  mastery: z.array(profileMasteryEntrySchema),
+};
+
+/**
+ * Schema v2 — `favorites` is a per-role record (BL-057). This is the
+ * normalized shape every consumer sees.
+ */
+const profileExportV2Schema = z
   .object({
     schemaVersion: z.literal(PROFILE_EXPORT_SCHEMA_VERSION),
-    id: profileIdSchema,
-    /** The profile owner's Riot ID — the owner's explicit choice (D-069). */
-    riotId: riotIdSchema.extend({ platform: z.string().min(1) }).strict(),
-    label: z.string().min(1),
-    syncedAt: z.number().int().nonnegative(),
-    gameCount: z.number().int().nonnegative(),
-    favorites: profileFavoritesSchema,
-    games: z.array(profileGameSchema),
-    mastery: z.array(profileMasteryEntrySchema),
+    ...profileExportSharedShape,
+    favorites: profileFavoritesByRoleSchema,
   })
   .strict();
-export type ProfileExport = z.infer<typeof profileExportSchema>;
+export type ProfileExport = z.infer<typeof profileExportV2Schema>;
+
+/**
+ * Schema v1 — `favorites` was a single SUPPORT-scoped list (D-074).
+ * Still accepted so old exports keep loading; `profileExportSchema`
+ * normalizes them to the v2 shape (`{ SUPPORT: favorites }`).
+ */
+const profileExportV1Schema = z
+  .object({
+    schemaVersion: z.literal(1),
+    ...profileExportSharedShape,
+    favorites: profileFavoritesSchema,
+  })
+  .strict();
+
+/** `data/public/profiles/<id>.json` — one file per configured profile. */
+export const profileExportSchema = z
+  .union([profileExportV2Schema, profileExportV1Schema])
+  .transform((raw): ProfileExport => {
+    if (raw.schemaVersion === PROFILE_EXPORT_SCHEMA_VERSION) {
+      return raw;
+    }
+    // v1 favorites were computed from SUPPORT games only: they become the
+    // SUPPORT entry of the per-role record.
+    return {
+      ...raw,
+      schemaVersion: PROFILE_EXPORT_SCHEMA_VERSION,
+      favorites: { SUPPORT: raw.favorites },
+    };
+  });
 
 /** `data/public/profiles/index.json` entry pointing at one profile file. */
 export const profileIndexEntrySchema = z
@@ -162,7 +207,8 @@ export type ProfileIndexEntry = z.infer<typeof profileIndexEntrySchema>;
 
 export const profileIndexSchema = z
   .object({
-    schemaVersion: z.literal(PROFILE_EXPORT_SCHEMA_VERSION),
+    // v1 and v2 share the same entry shape; accept both so old indexes load.
+    schemaVersion: z.union([z.literal(1), z.literal(PROFILE_EXPORT_SCHEMA_VERSION)]),
     profiles: z.array(profileIndexEntrySchema),
   })
   .strict();

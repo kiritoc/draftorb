@@ -1051,8 +1051,7 @@ which blends `logit(metaScore)` and `logit(p)` and maps back through
 entries share probability units. Update:
 `packages/engine/src/personalize.ts`, tests in `personalize.test.ts`.
 
-Owner approval (2026-11-27, quoted from the ticket thread): D-089 is
-APPROVED with these amendments —
+Owner approval (2026-11-27): D-089 is APPROVED with these amendments —
 
 1. `blendMode: 'logit'` becomes the DEFAULT (replacing 'rankNorm' legacy
    behavior); 'rankNorm' stays selectable via the config.

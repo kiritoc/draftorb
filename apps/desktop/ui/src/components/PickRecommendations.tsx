@@ -102,9 +102,9 @@ export function PickRecommendations({
   // gate renders as an unavailable card with the broader statistic after the
   // ranked entries. "Hide my pool" filters pool members here too.
   const overallUnavailable = useMemo(() => {
-    const items = buildInsufficientItems(insufficientData);
+    const items = buildInsufficientItems(insufficientData, userChampionId ?? undefined);
     return hideMyPool ? items.filter((item) => !poolSet.has(item.championId)) : items;
-  }, [insufficientData, hideMyPool, poolSet]);
+  }, [insufficientData, userChampionId, hideMyPool, poolSet]);
   const cardContext = useMemo<RecommendationCardContext>(
     () => ({ champions, iconVersion, profileLoad, role, baselineIndex, rankBucket }),
     [champions, iconVersion, profileLoad, role, baselineIndex, rankBucket],

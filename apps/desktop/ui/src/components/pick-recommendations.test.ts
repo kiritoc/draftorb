@@ -98,4 +98,17 @@ describe('PickRecommendations', () => {
     expect(markup.indexOf('Soraka')).toBeLessThan(markup.indexOf('Twitch'));
     expect(markup.match(/Not recommended/g)?.length).toBe(2);
   });
+
+  it("never renders the user's own pick as an unavailable card (BL-017)", () => {
+    const markup = render({
+      champions: [...champions, { id: 4, name: 'Twitch', icon: 'Twitch.png', roles: ['ADC'] }],
+      userChampionId: 4,
+      recommendations: [rec(89, 1), rec(16, 2)],
+      insufficientData: [{ championId: 4, nEff: 18.5, rawGames: 21, winRate: 0.545 }],
+    });
+    // The locked pick is excluded from suggestions, scored or not.
+    expect(markup).not.toContain('Broader win rate');
+    expect(markup).not.toContain('Not recommended');
+    expect(markup.match(/Twitch/g)).toBeNull();
+  });
 });

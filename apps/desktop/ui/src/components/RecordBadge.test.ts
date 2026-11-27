@@ -70,7 +70,7 @@ describe('RecordBadge', () => {
       { kind: 'loaded', profile: makeProfile([]) },
       { baselineIndex: indexBaselines(thin, 'DIAMOND'), rankBucket: 'DIAMOND' },
     );
-    expect(html).toContain('Diamond avg: not enough data');
+    expect(html).toContain('Diamond avg: not enough data (n≈10)');
   });
 });
 

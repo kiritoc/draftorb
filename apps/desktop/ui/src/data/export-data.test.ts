@@ -295,7 +295,7 @@ describe('loadPickData', () => {
         return JSON.stringify({
           patch: '16.21',
           generatedAt: '2026-11-21T00:00:00Z',
-          schemaVersion: 7,
+          schemaVersion: 8,
           region: 'euw',
           rankBuckets: ['IRON'],
           roles: ['SUPPORT'],

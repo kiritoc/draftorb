@@ -26,6 +26,7 @@ import {
   manifestSchemaV4,
   manifestSchemaV5,
   manifestSchemaV6,
+  manifestSchemaV7,
   type ChampionTagsMap,
   type Latest,
   type Manifest,
@@ -40,6 +41,8 @@ import { loadItemClasses } from '../item-classes';
 import { buildManifest } from './manifest.js';
 import { buildRuneFiles } from './runes.js';
 import { buildBuildFiles } from './builds.js';
+import { buildSummonerFiles, type SummonerCtxRow as SummonerExportRow } from './summoners.js';
+import { buildStarterFiles, type StarterCtxRow as StarterExportRow } from './starters.js';
 import {
   buildTableFile,
   TABLE_SPECS,
@@ -108,6 +111,7 @@ function all<T>(db: Database.Database, sql: string, params: readonly unknown[] =
  *  the frozen v4 layout from before the BL-024 v5 bump. */
 const PUBLISHED_MANIFEST_SCHEMAS = [
   manifestSchema,
+  manifestSchemaV7,
   manifestSchemaV6,
   manifestSchemaV5,
   manifestSchemaV4,
@@ -222,6 +226,24 @@ export function exportJson(db: Database.Database, options: ExportOptions = {}): 
      FROM rune_ctx ORDER BY champion_id, my_role, rank_bucket, context_key, context_level`,
   );
 
+  const summonerRows = all<SummonerExportRow>(
+    db,
+    `SELECT champion_id AS championId, my_role AS myRole, rank_bucket AS rankBucket,
+           context_key AS contextKey, context_level AS contextLevel,
+           spell_pair AS spellPair,
+           wins_w AS winsW, games_w AS gamesW, games_w2 AS gamesW2, players AS players
+     FROM summoner_ctx ORDER BY champion_id, my_role, rank_bucket, context_key, context_level`,
+  );
+
+  const starterRows = all<StarterExportRow>(
+    db,
+    `SELECT champion_id AS championId, my_role AS myRole, rank_bucket AS rankBucket,
+           context_key AS contextKey, context_level AS contextLevel,
+           bundle_key AS bundleKey,
+           wins_w AS winsW, games_w AS gamesW, games_w2 AS gamesW2, players AS players
+     FROM starter_ctx ORDER BY champion_id, my_role, rank_bucket, context_key, context_level`,
+  );
+
   const buildRows = all<ItemBuildRow & { decisionKind: string }>(
     db,
     `SELECT champion_id AS championId, my_role AS myRole, slot_idx AS slotIdx,
@@ -296,6 +318,32 @@ export function exportJson(db: Database.Database, options: ExportOptions = {}): 
   if (skippedRunePages > 0) {
     warnings.push(
       `export: skipped ${skippedRunePages} rune page(s) with unparseable or invalid perks_json`,
+    );
+  }
+
+  const summonerResult = buildSummonerFiles(
+    summonerRows,
+    fullLayoutRoles,
+    exportMinGames,
+    config.evidenceMinDistinctPlayers,
+  );
+  filesToWrite.push(...summonerResult.files);
+  if (summonerResult.skippedSpellPairs > 0) {
+    warnings.push(
+      `export: skipped ${summonerResult.skippedSpellPairs} summoner row(s) with malformed spell_pair`,
+    );
+  }
+
+  const starterResult = buildStarterFiles(
+    starterRows,
+    fullLayoutRoles,
+    exportMinGames,
+    config.evidenceMinDistinctPlayers,
+  );
+  filesToWrite.push(...starterResult.files);
+  if (starterResult.skippedBundles > 0) {
+    warnings.push(
+      `export: skipped ${starterResult.skippedBundles} starter row(s) with malformed bundle_key`,
     );
   }
 

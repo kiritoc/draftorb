@@ -115,7 +115,7 @@ describe('loadEnabledRoles', () => {
     const manifest = {
       patch: '16.22',
       generatedAt: '2026-11-26T00:00:00Z',
-      schemaVersion: 7,
+      schemaVersion: 8,
       region: 'euw',
       rankBuckets: ['DIAMOND'],
       roles,

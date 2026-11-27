@@ -19,6 +19,7 @@ export * from './personalize.js';
 export * from './profile-setup.js';
 export * from './setup.js';
 export * from './runes.js';
+export * from './summoners.js';
 export * from './threat.js';
 export * from './item-context.js';
 export * from './items/index.js';

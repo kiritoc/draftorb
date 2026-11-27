@@ -100,6 +100,27 @@ export const manifestSchemaV6 = z
 export type ManifestV6 = z.infer<typeof manifestSchemaV6>;
 
 /**
+ * Manifest schema version 7 — the layout published by BL-052 before
+ * BL-031a added the summoner/starter export files (schema v8). Frozen on
+ * purpose: it must keep accepting exactly the v7 shape so the ETL
+ * latest-pointer guard and the desktop offline cache can tell an intact
+ * older export from a corrupt one.
+ */
+export const manifestSchemaV7 = z
+  .object({
+    patch: z.string().min(1),
+    generatedAt: z.string().min(1),
+    region: z.string().min(1),
+    rankBuckets: z.array(rankBucketSchema),
+    roles: z.array(roleSchema),
+    minimalRoles: z.array(roleSchema),
+    files: z.array(manifestFileSchema),
+    schemaVersion: z.literal(7),
+  })
+  .strict();
+export type ManifestV7 = z.infer<typeof manifestSchemaV7>;
+
+/**
  * Version of the `latest.json` patch pointer (D-051). Bumped when the pointer
  * format changes.
  */

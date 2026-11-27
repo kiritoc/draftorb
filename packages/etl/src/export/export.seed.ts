@@ -37,6 +37,23 @@ export type ItemBuildSeed = Omit<WeightedSeed, 'rankBucket'> & {
   itemId: number;
   players?: number;
 };
+export type SummonerCtxSeed = Omit<WeightedSeed, 'rankBucket'> & {
+  rankBucket?: string;
+  contextKey: string;
+  contextLevel: number;
+  /** Normalized unordered "minId:maxId". */
+  spellPair: string;
+  players: number;
+};
+export type StarterCtxSeed = Omit<WeightedSeed, 'rankBucket' | 'championId'> & {
+  championId: number | null;
+  myRole: string | null;
+  rankBucket?: string;
+  contextKey: string;
+  contextLevel: number;
+  bundleKey: string;
+  players: number;
+};
 
 interface SeedRows {
   match: MatchSeed;
@@ -48,6 +65,8 @@ interface SeedRows {
   laneFull: LaneFullSeed;
   runeCtx: RuneCtxSeed;
   itemBuild: ItemBuildSeed;
+  summonerCtx: SummonerCtxSeed;
+  starterCtx: StarterCtxSeed;
 }
 
 type SeedArgs = {
@@ -241,6 +260,60 @@ const TABLES = {
       row.players ?? 3,
     ],
   },
+  summonerCtx: {
+    table: 'summoner_ctx',
+    columns: [
+      'champion_id',
+      'my_role',
+      'rank_bucket',
+      'context_key',
+      'context_level',
+      'spell_pair',
+      'wins_w',
+      'games_w',
+      'games_w2',
+      'players',
+    ],
+    toRow: (row: SummonerCtxSeed) => [
+      row.championId,
+      row.myRole,
+      row.rankBucket ?? 'IRON',
+      row.contextKey,
+      row.contextLevel,
+      row.spellPair,
+      row.winsW,
+      row.gamesW,
+      row.gamesW2,
+      row.players,
+    ],
+  },
+  starterCtx: {
+    table: 'starter_ctx',
+    columns: [
+      'champion_id',
+      'my_role',
+      'rank_bucket',
+      'context_key',
+      'context_level',
+      'bundle_key',
+      'wins_w',
+      'games_w',
+      'games_w2',
+      'players',
+    ],
+    toRow: (row: StarterCtxSeed) => [
+      row.championId,
+      row.myRole,
+      row.rankBucket ?? 'IRON',
+      row.contextKey,
+      row.contextLevel,
+      row.bundleKey,
+      row.winsW,
+      row.gamesW,
+      row.gamesW2,
+      row.players,
+    ],
+  },
 } satisfies TableDefinitions;
 
 function insertRows(
@@ -300,5 +373,12 @@ export function seed(db: Database.Database, ...args: SeedArgs): void {
       return;
     case 'itemBuild':
       insertTableRows(db, TABLES.itemBuild, args[1]);
+      return;
+    case 'summonerCtx':
+      insertTableRows(db, TABLES.summonerCtx, args[1]);
+      return;
+    case 'starterCtx':
+      insertTableRows(db, TABLES.starterCtx, args[1]);
+      return;
   }
 }

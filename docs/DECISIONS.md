@@ -804,7 +804,7 @@ Owner decision 2026-11-07.
 
 Owner decision 2026-11-08.
 
-### D-073 — Profile statistics: recency weighting, shrinkage, fallback hierarchy, trust blend — ACCEPTED, amended by D-097
+### D-073 — Profile statistics: recency weighting, shrinkage, fallback hierarchy, trust blend — ACCEPTED, amended by D-097, D-089
 
 - Context: same statistical need as D-064, but the subject is the configured profile's Support games (phase 1), not "the user's" games. Constants are priors in engine config, tunable later; there is still no personalization backtest (open question).
 - Decision (carried over from D-064 with profile semantics):
@@ -818,6 +818,8 @@ Owner decision 2026-11-08.
 - Consequences: new pure engine module + `PersonalConfig`; golden tests pin the arithmetic (TESTING.md); constants are priors pending a personalization backtest.
 
 Update (2026-11-07, D-080): the 'Reason badge ... +d vs meta' clause is SUPERSEDED by D-080. See also D-076 for the champion-scoped levels.
+
+Update (2026-11-27, D-089, BL-033): the trust-blend formula in item 5 is AMENDED — the default `blendMode: 'logit'` computes `personalizedScore = sigmoid((1 - trust) * logit(metaScore) + trust * logit(p))` with log-odds clamped at `BLEND_EPS = 1e-4`, and insufficient-data entries keep `metaScore` (all entries share probability units). `blendMode: 'rankNorm'` preserves the original `(1 - trust) * metaNorm + trust * p` formula for comparison. `metaNorm` stays defined for the legacy mode and as documentation of the rank normalization.
 
 Owner decision 2026-11-07.
 
@@ -1005,7 +1007,7 @@ Mode flag `stateBucketMode` on aggregation options; default
 Update: `stateBucket`/`item_state_scale` in engine `item-context.ts` and
 `aggregate-items.ts`.
 
-### D-086 — Starter bundles and lane archetype backoff — PROPOSED
+### D-086 — Starter bundles and lane archetype backoff — PROPOSED, starter-bundle clause accepted by D-134 (lane-archetype clause superseded by D-095)
 
 `participant_starters` stores the net purchased bundle per
 (match, participant) within `starterWindowSeconds` (default 45 s, from the
@@ -1039,15 +1041,32 @@ dependent through the opponent distribution). Update:
 `packages/engine/src/{config,recommend,recommend-terms}.ts`, tests in
 `recommend-terms.test.ts` / `recommend-pairs.test.ts`.
 
-### D-089 — Personalization blend in log-odds space (`blendMode`) — PROPOSED
+### D-089 — Personalization blend in log-odds space (`blendMode`) — ACCEPTED (owner, 2026-11-27), implemented by BL-033
 
 Review finding F5: `personalizedScore = (1-trust)*metaNorm + trust*p` mixed
 an ordinal rank-position value in [0,1] with a win probability. New
-`PersonalizeConfig.blendMode`: `'rankNorm'` (default, legacy D-073) or
-`'logit'`, which blends `logit(metaScore)` and `logit(p)` and maps back
-through `sigmoid`; insufficient-data entries use `metaScore` directly so
-all entries share probability units. Update:
+`PersonalizeConfig.blendMode`: `'rankNorm'` (legacy D-073) or `'logit'`,
+which blends `logit(metaScore)` and `logit(p)` and maps back through
+`sigmoid`; insufficient-data entries use `metaScore` directly so all
+entries share probability units. Update:
 `packages/engine/src/personalize.ts`, tests in `personalize.test.ts`.
+
+Owner approval (2026-11-27): D-089 is APPROVED with these amendments —
+
+1. `blendMode: 'logit'` becomes the DEFAULT (replacing 'rankNorm' legacy
+   behavior); 'rankNorm' stays selectable via the config.
+2. Log-odds are CLAMPED at the edges: `logit` clamps its input to
+   `[BLEND_EPS, 1 - BLEND_EPS]` with `BLEND_EPS = 1e-4` (same scale as the
+   engine `eps`) so p = 0/1 never produces ±Infinity.
+3. D-073 is AMENDED accordingly (see the update note under D-073).
+4. Shrinkage/blend constants (`kShrink`, `kTrust`, `levelFactors`,
+   `halfLifeDays`, `BLEND_EPS`) are marked as PRIORS — tunable later, not
+   validated claims.
+5. Insufficient-data entries keep using `metaScore` directly (per the
+   original D-089 text) so all entries share probability units.
+
+Update: `packages/engine/src/personalize.ts`, `packages/engine/test/personalize.test.ts`,
+`packages/shared/src/schemas/personalized.ts` (doc comment only).
 
 ### D-090 — `pnpm etl tune-priors` grid search — PROPOSED
 
@@ -1264,7 +1283,7 @@ None is auto-approved; each needs an explicit owner OK when its phase starts.
 
 - Items and live game, kept as design direction: D-081, D-083, D-084, D-085, D-086, D-093.
 - Fold into the items rewrite: D-082, D-087, D-095.
-- Version 2: D-089.
+- Version 2: D-089 (approved by the owner 2026-11-27, implemented by BL-033).
 - Draft-model experiments, used only by the backtest until validated: D-088, D-090, D-092, D-092a.
 
 ### D-110 — ETL state upload gated on snapshot integrity — ACCEPTED (owner, 2026-11-15)
@@ -1477,6 +1496,20 @@ The D-023 gate failed on the first real report (BL-014): on holdout patch 16.22 
 
 (Renumbered D-129→D-130 after BL-017 took D-129 on main, then D-130→D-133 after BL-025 claimed D-130 on `feat/bl-025-windows-installer`; D-131 is BL-052 and D-132 is BL-013.)
 
+### D-134 — Setup screen: mode switch, starter/summoner scope, M2 role enablement — ACCEPTED (owner, 2026-11-27)
+
+Owner decisions recorded for the runes/summoners/starters data path (BL-030a/BL-031a, amends SPECS §18.5).
+
+- **D-086 partially accepted for v2 — starter bundles only.** `participant_starters` stores the net starter bundle per (match, participant) within `starterWindowSeconds` = 45 s and `starterBundleKey()` produces the stable `"itemId:count"` grouping key. The lane-archetype clause of D-086 is **superseded by D-095**, which stays PROPOSED until M3.
+- **Setup-screen backoff chain for starters and summoner spells:** (champion, role, exact lane) -> (champion, role) -> role-only -> global. Exact-lane coverage must be measured first; the exact-lane level is dropped if it almost never passes the D-102 evidence gate.
+- **Mode switch, not columns.** The setup screen switches between "top players" and "my data" modes; switching re-queries the chosen source without a restart and each mode shows its data source. This replaces the side-by-side two-column layout previously described in SPECS §18.5.
+- **M2 role scope.** SUPPORT/TOP/JUNGLE only. Role enablement on the setup screen = `manifest.roles` minus `minimalRoles`, plus D-103 insufficient-data states when a role's setup data is thin. The BL-050/D-126 baseline-coverage enablement mechanism stays pick-screen-only.
+- **"Insufficient data" is a normal state**, handled by the D-103 broader-statistic fallback (labeled), never an error.
+
+### D-135 — Profile setup fallback levels are support-shaped for every role — PROPOSED (BL-030a)
+
+`recommendProfileRunes`/`recommendProfileSpells` reuse the D-073 L1..L5 matchup predicates (ally ADC id, enemy support id, enemy `damageType:archetype` signature) for every role, and BL-030a parameterized only the game-role filter (SUPPORT -> the picked role, D-097). For TOP/JUNGLE the lane-shaped L1..L3 contexts (bot-lane ally/enemy ids) rarely match profile games, so profile pages mostly resolve at L4/L5 champion level — honest under D-103 but possibly thinner than intended. Question for the owner: define per-role matchup contexts for the profile fallback (e.g. TOP vs enemy TOP, JUNGLE vs enemy JUNGLE) in a later ticket, or keep champion-level-only profile setup for non-SUPPORT roles until then. Working assumption until answered: keep the shared predicates; insufficient matchup data falls back to champion level, clearly labeled.
+
 ### D-136 — Personalization role scope: drafted-role games, in-scope roles SUPPORT/TOP/JUNGLE — PROPOSED (BL-032)
 
 - Context: D-097 widened the profile scope beyond Support, but SPECS §18.2 does not say explicitly which stored games feed `personalize()`/`recommendProfileRunes`/`recommendProfileSpells` for a TOP or JUNGLE draft, or what happens for ADC/MID drafts.
@@ -1487,3 +1520,19 @@ The D-023 gate failed on the first real report (BL-014): on holdout patch 16.22 
   4. **L4 vs L5**: identical while the pool is single-role, as §18.2 states; the levels stay distinct so a later phase can widen L5 to champion-overall across roles without changing call sites.
 - Alternatives: (a) pool all in-scope roles' games regardless of drafted role — rejected, a champion's TOP win rate would be polluted by JUNGLE/SUPPORT games; (b) include ADC/MID games at champion level — rejected, §18.1 keeps them ignored until a later phase; (c) L5 spanning in-scope roles now — deferred, spec marks the levels "kept distinct for later phases".
 - Consequences: `PersonalizeContext` gains a required `role` field; `personalizeContext` fills it from `userRole`. SPECS §18.2/§18.5 clarified. Open gap flagged, not implemented: the export-time `favorites` are still a single SUPPORT-only recency list (`computeFavorites` in `packages/etl`) while §18.4/GLOSSARY describe per-role favorites — needs a schema decision (per-role favorites object) before implementation.
+
+### D-137 — Top Teleport quest check: summoner advice unchanged (BL-031a, D-106) — RECORDED
+
+D-106 asks to check the effect of Top's role-quest Teleport upgrade (live since public patch 26.1) on summoner advice. Verified against real match-v5 data, not assumed:
+
+- **Method**: sampled match details via the Riot API — the newest 400 stored matches (patch 16.23) plus 120-match samples of patches 16.13, 16.16, 16.19 and 16.21 — reading `spell1Id`/`spell2Id` per participant (spell id 12 = Teleport; the `_Jade` variant 712 never appeared).
+- **Finding**: Teleport is a strong minority pick for TOP, not a default. Patch 16.23 TOP share carrying Teleport = 31.0% (248/800); per-patch TOP TP share = 53.8% (16.13, n=26 — too small to read), 39.5% (16.16), 34.6% (16.19), 27.5% (16.21), 37.1% (16.23) — no trend break, noise band roughly 27–40%. The modal TOP pair stays Flash+Ignite (`4:14`, ~45–50%); Teleport rides mostly as `4:12` (~28–36%) with small `6:12`/`12:14` tails. MID shows a similar ~36% Teleport share, unrelated to the Top quest. JUNGLE and SUPPORT never take Teleport.
+- **Coverage caveat**: every collected patch (internal 16.4–16.23, i.e. public 26.4–26.23 under the D-108 +10 mapping) postdates the quest introduction (public 26.1), so the database holds no pre-quest baseline; the observed shares are the post-quest equilibrium. The pair-based recommendation path (`summoner_ctx`, unordered `minId:maxId` pairs) needs no quest special-casing: whatever the quest does to Teleport's strength is already baked into the recorded picks, and a future patch that makes TP near-mandatory for Top would surface automatically as a dominant `*:*12` pair share.
+- **Conclusion**: no change to summoner advice, no SPECS update required by this check. Revisit only if a data refresh shows TOP Teleport share collapsing the pair distribution (e.g. `4:12` > ~70%) or a new upgraded-Teleport spell id appearing in `participants.summoner*_id`.
+
+### D-138 — Setup screen enters no draft-slot context in v1 — PROPOSED (BL-030b)
+
+- Context: `SetupRuneResult`/`recommendSetupRunes` consume a full `DraftInput`, and the rune recommender's lane/matchup contexts (SPECS §8.1 back-off chain, D-073 L1..L3) only match when allies/enemies are known. The pick screen keeps its draft state internal, so BL-030b had no locked-champion or draft handoff to reuse.
+- Decision (implementation assumption, BL-030b): the setup screen offers role, champion and rank selection only; `DraftInput.allies`/`enemies` stay empty. Expert pages therefore resolve at the `damagemix:`/`global` levels and profile pages at the champion-record levels — every page still labels its source via `source`/`sourceLevel` (D-103), and "insufficient data" remains a normal state. The optional Master+ toggle maps to `evidenceMasterPlusOnly` (D-102, off by default).
+- Alternatives: (a) lift the pick screen's draft state into shared state so the setup screen reuses the locked champion and slots — rejected for this ticket (pick-screen changes are out of scope; revisit when summoners/starters land in BL-031b, which need the same context); (b) duplicate draft-slot entry on the setup screen — deferred, doubles input work for marginal context gain.
+- Consequences: rune pages are honest but broader than they could be; a later ticket can add draft handoff or slot entry without changing the engine contract.

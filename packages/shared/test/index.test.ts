@@ -32,6 +32,7 @@ import {
   manifestSchema,
   manifestSchemaV5,
   manifestSchemaV6,
+  manifestSchemaV7,
   pickRateSamplesSchema,
   rankBucketSchema,
   rankSchema,
@@ -270,7 +271,7 @@ describe('shared schemas', () => {
       roles: ['SUPPORT'],
       minimalRoles: [],
       files: [{ path: 'champions.json' }],
-      schemaVersion: 7,
+      schemaVersion: 8,
     };
     expect(manifestSchema.parse(manifest)).toEqual(manifest);
     // The frozen v6 layout still parses (latest-pointer guard, BL-052 merge).
@@ -278,6 +279,11 @@ describe('shared schemas', () => {
       schemaVersion: 6,
     });
     expect(() => manifestSchemaV6.parse(manifest)).toThrow();
+    // The frozen v7 layout still parses (latest-pointer guard, BL-031a).
+    expect(manifestSchemaV7.parse({ ...manifest, schemaVersion: 7 })).toMatchObject({
+      schemaVersion: 7,
+    });
+    expect(() => manifestSchemaV7.parse(manifest)).toThrow();
     // The frozen v5 layout still parses (latest-pointer guard, BL-013a/BL-052).
     expect(manifestSchemaV5.parse({ ...manifest, schemaVersion: 5 })).toMatchObject({
       schemaVersion: 5,

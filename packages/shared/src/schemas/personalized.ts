@@ -22,7 +22,7 @@ export const personalizedEntrySchema = z
     overallRank: z.number().int().positive(),
     /** Unchanged meta `score(c)` of the input recommendation. */
     metaScore: z.number(),
-    /** `(1 - trust) * metaNorm + trust * p`; metaNorm-only when insufficient. */
+    /** D-073/D-089 blended score; the meta reference when insufficient. */
     personalizedScore: z.number(),
     /** Shrunk profile win rate (fraction); null when data is insufficient. */
     profileWinRate: z.number().min(0).max(1).nullable(),

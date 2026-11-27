@@ -248,6 +248,18 @@ describe('loadPickData', () => {
     expect(pick?.pickRateSamples).toBeUndefined();
   });
 
+  it('skips per-champion rune exports: they are read lazily by the setup screen', async () => {
+    // A manifest-listed rune file is not part of RecommendData; loading it
+    // eagerly would defeat the setup screen's per-champion lazy reads.
+    seedCache({
+      patchFiles: { 'roles/SUPPORT/runes/412.json': { corrupt: 'not-a-rune-export' } },
+    });
+    const pick = await loadPickData('SUPPORT');
+    expect(pick?.data.baselines).toHaveLength(1);
+    const readNames = mockRead.mock.calls.map(([name]) => name);
+    expect(readNames).not.toContain('16.22/roles/SUPPORT/runes/412.json');
+  });
+
   it('rejects a malformed pick-rate-samples.json (fail-closed)', async () => {
     seedCache({
       patchFiles: { 'pick-rate-samples.json': { SUPPORT: { '412': -1 } } },
@@ -283,7 +295,7 @@ describe('loadPickData', () => {
         return JSON.stringify({
           patch: '16.21',
           generatedAt: '2026-11-21T00:00:00Z',
-          schemaVersion: 7,
+          schemaVersion: 8,
           region: 'euw',
           rankBuckets: ['IRON'],
           roles: ['SUPPORT'],

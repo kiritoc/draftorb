@@ -93,6 +93,9 @@ const L1_CONTEXT: PersonalizeContext = {
 
 const data: RecommendData = makeData({ champions: [1, 2, 3, 10, 200, 201, 30, 31, 32] });
 
+/** Legacy D-073 blend, still selectable via `blendMode` (D-089). */
+const RANKNORM_CONFIG = { ...DEFAULT_PERSONALIZE_CONFIG, blendMode: 'rankNorm' as const };
+
 describe('personalize: fallback levels and shrinkage', () => {
   it('matches L1 when ally ADC and enemy support align', () => {
     const games = [1, 2, 3].map(() => makeGame());
@@ -192,6 +195,7 @@ describe('personalize: fallback levels and shrinkage', () => {
       EMPTY_CONTEXT,
       data,
       NOW_MS,
+      RANKNORM_CONFIG,
     );
     const champ1 = must(result.entries.find((e) => e.championId === 1));
     expect(champ1.insufficientData).toBe(true);
@@ -238,8 +242,12 @@ describe('personalize: ordering, trust and purity', () => {
     const profileFew = makeProfile(wins(6));
     const profileMany = makeProfile(wins(60));
     const recs = [rec(1, 1, 0.5)];
-    const fewResult = must(personalize(recs, profileFew, EMPTY_CONTEXT, data, NOW_MS).entries[0]);
-    const manyResult = must(personalize(recs, profileMany, EMPTY_CONTEXT, data, NOW_MS).entries[0]);
+    const fewResult = must(
+      personalize(recs, profileFew, EMPTY_CONTEXT, data, NOW_MS, RANKNORM_CONFIG).entries[0],
+    );
+    const manyResult = must(
+      personalize(recs, profileMany, EMPTY_CONTEXT, data, NOW_MS, RANKNORM_CONFIG).entries[0],
+    );
     // metaNorm = 1 for a single-entry list; p ≈ 0.5 < 1, so a larger trust
     // pulls personalizedScore further below metaNorm.
     expect(manyResult.nEff).toBeGreaterThan(fewResult.nEff);
@@ -260,13 +268,14 @@ describe('personalize: ordering, trust and purity', () => {
   });
 
   it('metaNorm uses rank position: top of a 3-entry list gets 1, bottom 0', () => {
-    // All insufficient -> personalizedScore === metaNorm.
+    // All insufficient -> personalizedScore === metaNorm under 'rankNorm'.
     const result = personalize(
       [rec(1, 1, 0.5), rec(2, 2, 0.5), rec(3, 3, 0.5)],
       makeProfile([]),
       EMPTY_CONTEXT,
       data,
       NOW_MS,
+      RANKNORM_CONFIG,
     );
     const byChamp = new Map(result.entries.map((e) => [e.championId, e]));
     expect(must(byChamp.get(1)).personalizedScore).toBe(1);
@@ -487,7 +496,19 @@ describe('personalize: role scope (D-097, BL-032)', () => {
   });
 });
 
-describe('personalize: logit blendMode (D-089)', () => {
+describe('personalize: logit blendMode (D-089, BL-033)', () => {
+  it('is the default blend mode', () => {
+    expect(DEFAULT_PERSONALIZE_CONFIG.blendMode).toBe('logit');
+    const games = [1, 2, 3].map(() => makeGame());
+    const recs = [rec(1, 1, 0.55), rec(2, 2, 0.5)];
+    const implicit = personalize(recs, makeProfile(games), EMPTY_CONTEXT, data, NOW_MS);
+    const explicit = personalize(recs, makeProfile(games), EMPTY_CONTEXT, data, NOW_MS, {
+      ...DEFAULT_PERSONALIZE_CONFIG,
+      blendMode: 'logit',
+    });
+    expect(implicit.entries).toEqual(explicit.entries);
+  });
+
   it('blends metaScore and profile win rate in log-odds space', () => {
     const games = [1, 2, 3].map(() => makeGame());
     const cfg = {
@@ -508,6 +529,56 @@ describe('personalize: logit blendMode (D-089)', () => {
     expect(entry?.personalizedScore).toBeCloseTo(0.55, 6);
   });
 
+  it('matches the spec formula sigmoid((1-trust)*logit(meta) + trust*logit(p))', () => {
+    // 4 wins + 2 losses on champ 1 -> p shrunk toward p_profile = 2/3:
+    // p = (4 + 15*(2/3))/(6 + 15) = 14/21 = 2/3.
+    const games = [
+      ...[1, 2, 3, 4].map(() => makeGame({ championId: 1, win: true })),
+      ...[5, 6].map(() => makeGame({ championId: 1, win: false })),
+    ];
+    const result = personalize([rec(1, 1, 0.55)], makeProfile(games), EMPTY_CONTEXT, data, NOW_MS);
+    const entry = must(result.entries[0]);
+    expect(entry.insufficientData).toBe(false);
+    const p = 14 / 21;
+    // L4 fallback (no context match): levelFactor 0.7, nEff 6,
+    // trust = 6*0.7 / (6*0.7 + 20) = 4.2/24.2.
+    const trust = (6 * 0.7) / (6 * 0.7 + 20);
+    const eps = 1e-4;
+    const logitOf = (x: number) => {
+      const c = Math.min(Math.max(x, eps), 1 - eps);
+      return Math.log(c / (1 - c));
+    };
+    const sigmoid = (x: number) => 1 / (1 + Math.exp(-x));
+    const expected = sigmoid((1 - trust) * logitOf(0.55) + trust * logitOf(p));
+    expect(entry.personalizedScore).toBeCloseTo(expected, 10);
+  });
+
+  it('clamps log-odds at p = 0 and p = 1 (no ±Infinity)', () => {
+    // All wins -> p = 1 after shrinkage (p_profile = 1); all losses -> p = 0.
+    for (const win of [true, false]) {
+      const games = Array.from({ length: 10 }, () => makeGame({ win }));
+      const result = personalize([rec(1, 1, 0.9)], makeProfile(games), EMPTY_CONTEXT, data, NOW_MS);
+      const entry = must(result.entries[0]);
+      expect(entry.insufficientData).toBe(false);
+      expect(Number.isFinite(entry.personalizedScore)).toBe(true);
+      expect(entry.personalizedScore).toBeGreaterThan(0);
+      expect(entry.personalizedScore).toBeLessThan(1);
+    }
+  });
+
+  it('trust grows with n_eff under logit: larger samples land closer to p', () => {
+    // All wins -> p = 1 for both profiles; only trust differs, so the
+    // larger sample's score sits closer to the clamped logit(1).
+    const profileFew = makeProfile(Array.from({ length: 6 }, () => makeGame({ win: true })));
+    const profileMany = makeProfile(Array.from({ length: 60 }, () => makeGame({ win: true })));
+    const recs = [rec(1, 1, 0.5)];
+    const few = must(personalize(recs, profileFew, EMPTY_CONTEXT, data, NOW_MS).entries[0]);
+    const many = must(personalize(recs, profileMany, EMPTY_CONTEXT, data, NOW_MS).entries[0]);
+    expect(many.nEff).toBeGreaterThan(few.nEff);
+    expect(many.personalizedScore).toBeGreaterThan(few.personalizedScore);
+    expect(many.personalizedScore).toBeLessThan(1);
+  });
+
   it('keeps insufficient-data entries on the metaScore scale in logit mode', () => {
     const cfg = { ...DEFAULT_PERSONALIZE_CONFIG, blendMode: 'logit' as const };
     const result = personalize(
@@ -523,25 +594,16 @@ describe('personalize: logit blendMode (D-089)', () => {
     expect(entry.personalizedScore).toBe(0.42);
   });
 
-  it('defaults to the legacy rankNorm blend', () => {
-    expect(DEFAULT_PERSONALIZE_CONFIG.blendMode).toBe('rankNorm');
-    const games = [1, 2, 3].map(() => makeGame());
-    const legacy = personalize(
-      [rec(1, 1, 0.55), rec(2, 2, 0.5)],
-      makeProfile(games),
+  it('insufficient-data entries keep metaNorm under rankNorm', () => {
+    const result = personalize(
+      [rec(1, 1, 0.42), rec(2, 2, 0.4)],
+      makeProfile([]),
       EMPTY_CONTEXT,
       data,
       NOW_MS,
+      RANKNORM_CONFIG,
     );
-    const cfg = { ...DEFAULT_PERSONALIZE_CONFIG, kTrust: 1e9 };
-    const explicit = personalize(
-      [rec(1, 1, 0.55), rec(2, 2, 0.5)],
-      makeProfile(games),
-      EMPTY_CONTEXT,
-      data,
-      NOW_MS,
-      cfg,
-    );
-    expect(legacy.entries).toEqual(explicit.entries);
+    expect(must(result.entries.find((e) => e.championId === 1)).personalizedScore).toBe(1);
+    expect(must(result.entries.find((e) => e.championId === 2)).personalizedScore).toBe(0);
   });
 });

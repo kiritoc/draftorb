@@ -91,7 +91,14 @@ describe('recommendProfileRunes', () => {
       ...Array.from({ length: 6 }, () => makeGame()),
       ...Array.from({ length: 6 }, () => makeGame({ win: false, runes: OTHER_PAGE })),
     ];
-    const picks = recommendProfileRunes(makeProfile(games), 1, EMPTY_CONTEXT, data, NOW_MS);
+    const picks = recommendProfileRunes(
+      makeProfile(games),
+      1,
+      'SUPPORT',
+      EMPTY_CONTEXT,
+      data,
+      NOW_MS,
+    );
     expect(picks).toHaveLength(2);
     expect(must(picks[0]).keystoneId).toBe(8112);
     expect(must(picks[0]).insufficientData).toBe(false);
@@ -104,13 +111,20 @@ describe('recommendProfileRunes', () => {
 
   it('uses the matched fallback level when context aligns', () => {
     const games = Array.from({ length: 5 }, () => makeGame());
-    const picks = recommendProfileRunes(makeProfile(games), 1, L1_CONTEXT, data, NOW_MS);
+    const picks = recommendProfileRunes(makeProfile(games), 1, 'SUPPORT', L1_CONTEXT, data, NOW_MS);
     expect(must(picks[0]).fallbackLevel).toBe(1);
   });
 
   it('shows insufficient data below 5 effective games', () => {
     const games = Array.from({ length: 3 }, () => makeGame());
-    const picks = recommendProfileRunes(makeProfile(games), 1, EMPTY_CONTEXT, data, NOW_MS);
+    const picks = recommendProfileRunes(
+      makeProfile(games),
+      1,
+      'SUPPORT',
+      EMPTY_CONTEXT,
+      data,
+      NOW_MS,
+    );
     expect(must(picks[0]).insufficientData).toBe(true);
     expect(must(picks[0]).winRate).toBeNull();
     expect(must(picks[0]).nEff).toBeCloseTo(3, 3);
@@ -122,7 +136,14 @@ describe('recommendProfileRunes', () => {
       ...Array.from({ length: 5 }, () => makeGame({ championId: 2 })),
       makeGame({ runes: null }),
     ];
-    const picks = recommendProfileRunes(makeProfile(games), 1, EMPTY_CONTEXT, data, NOW_MS);
+    const picks = recommendProfileRunes(
+      makeProfile(games),
+      1,
+      'SUPPORT',
+      EMPTY_CONTEXT,
+      data,
+      NOW_MS,
+    );
     expect(picks).toHaveLength(1);
     expect(must(picks[0]).games).toBe(5);
   });
@@ -135,7 +156,14 @@ describe('recommendProfileSpells', () => {
       ...Array.from({ length: 4 }, () => makeGame({ summonerSpells: [7, 4] })),
       ...Array.from({ length: 6 }, () => makeGame({ summonerSpells: [4, 13], win: false })),
     ];
-    const picks = recommendProfileSpells(makeProfile(games), 1, EMPTY_CONTEXT, data, NOW_MS);
+    const picks = recommendProfileSpells(
+      makeProfile(games),
+      1,
+      'SUPPORT',
+      EMPTY_CONTEXT,
+      data,
+      NOW_MS,
+    );
     expect(picks).toHaveLength(2);
     // [4,7] normalized pair: 8 games, all wins -> ranks first.
     expect(must(picks[0]).spells).toEqual([4, 7]);
@@ -148,7 +176,14 @@ describe('recommendProfileSpells', () => {
 
   it('reports insufficient data below 5 effective games', () => {
     const games = Array.from({ length: 2 }, () => makeGame());
-    const picks = recommendProfileSpells(makeProfile(games), 1, EMPTY_CONTEXT, data, NOW_MS);
+    const picks = recommendProfileSpells(
+      makeProfile(games),
+      1,
+      'SUPPORT',
+      EMPTY_CONTEXT,
+      data,
+      NOW_MS,
+    );
     expect(must(picks[0]).insufficientData).toBe(true);
     expect(must(picks[0]).winRate).toBeNull();
   });
@@ -158,8 +193,8 @@ describe('recommendProfileSpells', () => {
       makeGame({ summonerSpells: i % 2 === 0 ? [4, 7] : [13, 14] }),
     );
     const profile = makeProfile(games);
-    const a = recommendProfileSpells(profile, 1, EMPTY_CONTEXT, data, NOW_MS);
-    const b = recommendProfileSpells(profile, 1, EMPTY_CONTEXT, data, NOW_MS);
+    const a = recommendProfileSpells(profile, 1, 'SUPPORT', EMPTY_CONTEXT, data, NOW_MS);
+    const b = recommendProfileSpells(profile, 1, 'SUPPORT', EMPTY_CONTEXT, data, NOW_MS);
     expect(JSON.stringify(a)).toBe(JSON.stringify(b));
   });
 });
@@ -172,7 +207,14 @@ describe('role scope (D-097, BL-032)', () => {
 
   it('recommends runes from TOP games for a TOP draft', () => {
     const games = Array.from({ length: 6 }, () => makeGame({ role: 'TOP' }));
-    const picks = recommendProfileRunes(makeProfile(games), 1, contextFor('TOP'), data, NOW_MS);
+    const picks = recommendProfileRunes(
+      makeProfile(games),
+      1,
+      'TOP',
+      contextFor('TOP'),
+      data,
+      NOW_MS,
+    );
     expect(picks).toHaveLength(1);
     expect(must(picks[0]).insufficientData).toBe(false);
     expect(must(picks[0]).fallbackLevel).toBe(4);
@@ -180,7 +222,14 @@ describe('role scope (D-097, BL-032)', () => {
 
   it('recommends spells from JUNGLE games for a JUNGLE draft', () => {
     const games = Array.from({ length: 6 }, () => makeGame({ role: 'JUNGLE' }));
-    const picks = recommendProfileSpells(makeProfile(games), 1, contextFor('JUNGLE'), data, NOW_MS);
+    const picks = recommendProfileSpells(
+      makeProfile(games),
+      1,
+      'JUNGLE',
+      contextFor('JUNGLE'),
+      data,
+      NOW_MS,
+    );
     expect(picks).toHaveLength(1);
     expect(must(picks[0]).insufficientData).toBe(false);
     expect(must(picks[0]).spells).toEqual([4, 7]);
@@ -189,11 +238,19 @@ describe('role scope (D-097, BL-032)', () => {
   it('ignores games played in other roles', () => {
     // Six SUPPORT games must not feed a TOP draft's "Profile's best".
     const games = Array.from({ length: 6 }, () => makeGame({ role: 'SUPPORT' }));
-    const runePicks = recommendProfileRunes(makeProfile(games), 1, contextFor('TOP'), data, NOW_MS);
+    const runePicks = recommendProfileRunes(
+      makeProfile(games),
+      1,
+      'TOP',
+      contextFor('TOP'),
+      data,
+      NOW_MS,
+    );
     expect(runePicks).toHaveLength(0);
     const spellPicks = recommendProfileSpells(
       makeProfile(games),
       1,
+      'JUNGLE',
       contextFor('JUNGLE'),
       data,
       NOW_MS,
@@ -204,7 +261,14 @@ describe('role scope (D-097, BL-032)', () => {
   it('reports insufficient data for ADC/MID drafts', () => {
     for (const role of ['ADC', 'MID'] as const) {
       const games = Array.from({ length: 6 }, () => makeGame({ role }));
-      const picks = recommendProfileRunes(makeProfile(games), 1, contextFor(role), data, NOW_MS);
+      const picks = recommendProfileRunes(
+        makeProfile(games),
+        1,
+        role,
+        contextFor(role),
+        data,
+        NOW_MS,
+      );
       expect(picks).toHaveLength(0);
     }
   });

@@ -5,6 +5,8 @@ import { getMigrationStatus, openDb } from '../db';
 import { aggregateBaseline } from '../aggregate-baseline';
 import { aggregatePairTables } from '../aggregate-pairs';
 import { aggregateRunesByContext } from '../aggregate-runes';
+import { aggregateSummonersByContext } from '../aggregate-summoners';
+import { aggregateStarterBundles } from '../aggregate-starters';
 import { aggregateItemBuilds } from '../aggregate-items';
 import { aggregateRoleProb, latestPatch, PATCH_PATTERN } from '../aggregate';
 import { loadPatchWindow } from '../aggregate-shared';
@@ -138,6 +140,47 @@ async function runAggregate(args: string[]): Promise<void> {
       );
     }
 
+    // Summoner pairs and starter bundles run after item builds: starter_ctx
+    // reads participant_starters, which aggregateItemBuilds rewrites.
+    let summonerCtxWritten = false;
+    const summonerRows = aggregateSummonersByContext(db, {
+      patch,
+      onWrite: () => {
+        summonerCtxWritten = true;
+      },
+    });
+    if (summonerRows.length === 0) {
+      console.log(
+        summonerCtxWritten
+          ? `All contributing summoner contexts were suppressed by the evidence rule${patch === undefined ? '' : ` up to patch ${patch}`}; summoner_ctx cleared.`
+          : `No contributing games${patch === undefined ? '' : ` up to patch ${patch}`}; summoner_ctx left unchanged.`,
+      );
+    } else {
+      const champions = new Set(summonerRows.map((row) => row.championId)).size;
+      console.log(
+        `Aggregated summoner contexts: ${summonerRows.length} row(s) for ${champions} champion(s) written to summoner_ctx.`,
+      );
+    }
+
+    let starterCtxWritten = false;
+    const starterRows = aggregateStarterBundles(db, {
+      patch,
+      onWrite: () => {
+        starterCtxWritten = true;
+      },
+    });
+    if (starterRows.length === 0) {
+      console.log(
+        starterCtxWritten
+          ? `All contributing starter bundles were suppressed by the evidence rule${patch === undefined ? '' : ` up to patch ${patch}`}; starter_ctx cleared.`
+          : `No starter bundles${patch === undefined ? '' : ` up to patch ${patch}`}; starter_ctx left unchanged.`,
+      );
+    } else {
+      console.log(
+        `Aggregated starter bundles: ${starterRows.length} row(s) written to starter_ctx.`,
+      );
+    }
+
     // Record which patch-catalog state the aggregates were computed against
     // (D-055): exported as patch-meta.json so results stay explainable when
     // the catalog later grows. Only when at least one table was rewritten —
@@ -150,7 +193,9 @@ async function runAggregate(args: string[]): Promise<void> {
         pairTables.laneVs.length +
         pairTables.laneFull.length +
         runeRows.length +
-        itemRows.length >
+        itemRows.length +
+        summonerRows.length +
+        starterRows.length >
       0;
     if (wroteRows) {
       const snapshotLabel = patch ?? latestPatch(db) ?? null;
@@ -172,6 +217,6 @@ export const aggregateCommand: Command = {
   name: 'aggregate',
   usage: 'aggregate [patch]',
   description:
-    'Compute aggregated tables (role probabilities, rank-weighted baselines, pair tables, rune contexts and item builds)',
+    'Compute aggregated tables (role probabilities, rank-weighted baselines, pair tables, rune/summoner contexts, item builds and starter bundles)',
   run: runAggregate,
 };

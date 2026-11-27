@@ -21,6 +21,7 @@ import {
   manifestSchema,
   manifestSchemaV5,
   manifestSchemaV6,
+  manifestSchemaV7,
   pickRateSamplesSchema,
   pickRateSchema,
   type AllyPairTable,
@@ -33,6 +34,7 @@ import {
   type Manifest,
   type ManifestV5,
   type ManifestV6,
+  type ManifestV7,
   type PickRateSamples,
   type RecommendData,
   type Role,
@@ -107,14 +109,17 @@ export function createRecommendData(
   };
 }
 
-/** Manifest shapes the cache accepts: the current schema plus the frozen v6
- *  and v5 layouts published before `pick-rate-samples.json` existed
- *  (BL-052 merged onto BL-013a's v6). A v5/v6 cache stays fully usable —
- *  the samples file is optional, so pick share is simply absent until the
- *  next republish. Older layouts (v4 and below) are still rejected: they
- *  predate `minimalRoles` and cannot drive the loader. */
-const cachedManifestSchema = manifestSchema.or(manifestSchemaV6).or(manifestSchemaV5);
-type CachedManifest = Manifest | ManifestV6 | ManifestV5;
+/** Manifest shapes the cache accepts: the current schema plus the frozen v7,
+ *  v6 and v5 layouts published before `pick-rate-samples.json` and the
+ *  summoner/starter files existed (BL-052, BL-031a). A v5/v6/v7 cache stays
+ *  fully usable — the optional files are simply absent until the next
+ *  republish. Older layouts (v4 and below) are still rejected: they predate
+ *  `minimalRoles` and cannot drive the loader. */
+const cachedManifestSchema = manifestSchema
+  .or(manifestSchemaV7)
+  .or(manifestSchemaV6)
+  .or(manifestSchemaV5);
+type CachedManifest = Manifest | ManifestV7 | ManifestV6 | ManifestV5;
 
 interface CachedRelease {
   latest: Latest;
@@ -176,7 +181,13 @@ export async function loadPickData(role: Role): Promise<PickData | null> {
   // Archive-root entries ('/latest.json', '/champion-tags.json') are already
   // loaded through their dedicated paths above/below; only patch-relative
   // entries belong to the RecommendData file map.
-  const patchEntries = manifest.files.filter((file) => !file.path.startsWith('/'));
+  // Per-champion rune exports (`roles/<ROLE>/runes/<championId>.json`) are
+  // not part of RecommendData: the setup screen reads them lazily per
+  // champion (setup-runes.ts), so parsing every manifest-listed rune file
+  // here would defeat that and slow startup.
+  const patchEntries = manifest.files.filter(
+    (file) => !file.path.startsWith('/') && !file.path.includes('/runes/'),
+  );
   // A corrupt file under another role's folder must not break this role
   // (D-126 already treats it as zero coverage for that role); anything
   // shared or belonging to `role` still fails loudly.

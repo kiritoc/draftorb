@@ -202,7 +202,7 @@ Order of preference (D-105):
 1. **LCU** (League client local API): champ select session -> fills draft; also bans.
 2. **Live Client Data API** (`https://127.0.0.1:2999/liveclientdata/allgamedata`): scores, items, champions of all players during game. (Gold not exposed for other players; win/lose/even is an estimate — the threat score uses kills, deaths, assists and items, D-105.)
 3. **Image recognition** (fallback only, if client access is not allowed or does not work): capture screen -> portraits (template matching/embeddings vs Data Dragon icons), scoreboard: items (template matching) + K/D/A/CS (OCR). Always followed by a **correction UI**. No memory reading, no input injection.
-   Read Riot's third-party policy before shipping E6/E7 (first ticket of the live phase); log result in DECISIONS.md (D-105). Policy research recorded in `docs/reports/bl-040-riot-policy.md` with findings as D-140 (PROPOSED, owner verdict pending, #180); the GO/NO-GO is per source (LCU, Live Client Data API) and requires the owner to read the cited passages plus the empirical `scripts/live-client-probe.mjs` run in a real game.
+   Read Riot's third-party policy before shipping E6/E7 (first ticket of the live phase); log result in DECISIONS.md (D-105). Policy research recorded in `docs/reports/bl-040-riot-policy.md` with findings as D-140 (client reading, #180) and D-141 (API terms already in use, #181), both PROPOSED pending owner verdict; the GO/NO-GO is per source (LCU, Live Client Data API) and requires the owner to read the cited passages plus the empirical `scripts/live-client-probe.mjs` run in a real game.
 
 ## 10. Non-functional
 

@@ -1562,3 +1562,14 @@ D-106 asks to check the effect of Top's role-quest Teleport upgrade (live since 
 - If NO-GO or ambiguous: default is NO-GO per the ticket; M3 scope reduces to manual input + screenshot fallback evaluation (D-007/D-105 plan B).
 - Status: **PROPOSED** — awaiting owner review of the cited passages and the probe output; the per-source verdict is recorded here on decision.
 
+### D-141 — Riot API terms already in use and the sharing boundary — PROPOSED (BL-040b, #181)
+
+- Context: document the Riot terms the project already relies on (personal key, scheduled ETL, published aggregates, Data Dragon/CommunityDragon assets) and what changes if the app is ever shared — feeding the "shareable code" boundary question raised in `docs/AUDIT.md` (profile exports carrying the owner's Riot ID). Citations: `docs/reports/bl-040-riot-policy.md` section B.
+- **The owner must read the linked policy passages themselves; an AI summary alone is not sign-off.**
+- Findings (neutral summary):
+  - Personal API keys are sanctioned for "products that are intended for just the developer or a small private community", limited to 20 req/s + 100 req/2 min per region, and may not serve public consumption including alpha/beta tests (report B1). DraftOrb is registered as a personal product; observed usage is within limits. Binding constraints found: no excessive/abusive request volume (A1), delete Game Information on termination (A1), GDPR erasure forwarding to developers (A1).
+  - Publishing derived aggregate statistics is addressed by the archived Data Policies: aggregates must identify their queues and must not enable player shaming (B3) — consistent with the anonymized aggregate JSON the ETL publishes (D-111).
+  - Data Dragon is a permitted asset under the API asset whitelist; CommunityDragon is a fan project under Riot's Legal Jibber Jabber with no redistribution terms of its own (B6).
+  - Sharing the app requires a production key (working prototype + Riot review), one product per key, the mandated "not endorsed by Riot Games" boilerplate, the key never shipped in binaries, and immediate shutdown on key revocation (B1/B4/B5).
+- Status: **PROPOSED** — recorded for owner review; no behavior change implied for the current single-user scope.
+

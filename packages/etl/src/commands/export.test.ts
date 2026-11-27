@@ -218,7 +218,7 @@ describe('exportCommand', () => {
       `INSERT INTO rune_ctx (
          champion_id, my_role, rank_bucket, context_key, context_level, perks_hash,
          perks_json, wins_w, games_w, games_w2, players
-       ) VALUES (412, 'SUPPORT', 'IRON', 'global', 5, 'bad', 'not json', 1, 10, 10, 1)`,
+       ) VALUES (412, 'SUPPORT', 'IRON', 'global', 5, 'bad', 'not json', 1, 10, 10, 3)`,
     ).run();
     db.close();
 

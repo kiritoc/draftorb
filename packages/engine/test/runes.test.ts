@@ -17,7 +17,7 @@ import {
   type RuneExport,
   type RuneRecommendData,
 } from '@draftorb/shared';
-import { DEFAULT_RUNE_CONFIG } from '../src/config.js';
+import { DEFAULT_CONFIG, DEFAULT_RUNE_CONFIG } from '../src/config.js';
 import { recommendRunes } from '../src/runes.js';
 import { computeEnemyDamageMix } from '../src/runes-context.js';
 import { makeTag } from '../src/recommend-test-utils.js';
@@ -279,6 +279,17 @@ describe('recommendRunes', () => {
     const result = recommendRunes(draft(), CHAMP, wrongBucket, runeData());
     expect(result.dataAvailable).toBe(false);
     expect(result.pages).toEqual([]);
+  });
+
+  it('uses MASTER_PLUS rune evidence only when evidenceMasterPlusOnly is set (D-102)', () => {
+    const masterOnly = runeExp([ctx(LANE3_KEY, 1, [mkPage(8701, 30, 40, 40)], 'MASTER_PLUS')]);
+    expect(recommendRunes(draft(), CHAMP, masterOnly, runeData()).dataAvailable).toBe(false);
+    const on = recommendRunes(draft(), CHAMP, masterOnly, runeData(), {
+      ...DEFAULT_CONFIG,
+      evidenceMasterPlusOnly: true,
+    });
+    expect(on.dataAvailable).toBe(true);
+    expect(on.pages[0]?.keystoneId).toBe(8701);
   });
 
   it('treats a mismatched champion or role export as absent', () => {

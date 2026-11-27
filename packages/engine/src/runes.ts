@@ -76,7 +76,7 @@ export function recommendRunes(
     damageMix: mix,
   } as const;
 
-  const userBucket = rankToBucket(input.userRank);
+  const userBucket = config.evidenceMasterPlusOnly ? 'MASTER_PLUS' : rankToBucket(input.userRank);
   // A mismatched export (wrong champion or role file) is treated as absent
   // rather than silently recommending another champion's pages.
   const usable =

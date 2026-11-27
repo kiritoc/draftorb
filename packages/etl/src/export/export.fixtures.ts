@@ -27,7 +27,7 @@ export function supportRuneRow(overrides: Partial<RuneCtxSeed> = {}): RuneCtxSee
     winsW: 6,
     gamesW: 10,
     gamesW2: 10,
-    players: 2,
+    players: 3,
     ...overrides,
   };
 }
@@ -45,6 +45,7 @@ export function supportBuildRow(overrides: Partial<ItemBuildSeed> = {}): ItemBui
     winsW: 6,
     gamesW: 10,
     gamesW2: 10,
+    players: 3,
     ...overrides,
   };
 }

@@ -115,7 +115,7 @@ describe('exportJson', () => {
         gamesW: 10,
         gamesW2: 10,
         winsW: 6,
-        players: 1,
+        players: 3,
       },
     ]);
 

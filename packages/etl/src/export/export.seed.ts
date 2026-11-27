@@ -35,6 +35,7 @@ export type ItemBuildSeed = Omit<WeightedSeed, 'rankBucket'> & {
   profileKey: string;
   laneKey: string | null;
   itemId: number;
+  players?: number;
 };
 
 interface SeedRows {
@@ -223,6 +224,7 @@ const TABLES = {
       'wins_w',
       'games_w',
       'games_w2',
+      'players',
     ],
     toRow: (row: ItemBuildSeed) => [
       row.championId,
@@ -236,6 +238,7 @@ const TABLES = {
       row.winsW,
       row.gamesW,
       row.gamesW2,
+      row.players ?? 3,
     ],
   },
 } satisfies TableDefinitions;

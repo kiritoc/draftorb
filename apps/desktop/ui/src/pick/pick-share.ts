@@ -1,5 +1,5 @@
 /**
- * Pick-share display model for champion cards (BL-052, D-129).
+ * Pick-share display model for champion cards (BL-052, D-131).
  *
  * The share comes from `pick-rate.json` and its role-wide effective sample
  * (`n_eff`) from `pick-rate-samples.json` — both computed from the same gated

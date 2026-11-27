@@ -148,7 +148,7 @@ Sorted desc. Always show why + sample sizes. Never show a % without sample size.
 
 Thin-data fallback (D-103): when data is too thin, champion picks and runes show a broader statistic instead (for example the champion's win rate in that role or its pick share), clearly labeled as broader; items fall back to a rule-based suggestion (the analytic model), clearly labeled as a rule. A prior-only 50% is never shown (golden rule 8).
 
-Champion cards also show the champion's **pick share in the drafted role** (`pick-rate.json`) next to the win-rate sample, for every role including the minimal ADC/MID (BL-052, D-129). The share carries its own sample label — the role-wide effective `n_eff` from `pick-rate-samples.json` (`n≈N · all ranks`, unlike the rank-bucketed win-rate `Sample`); below `minGames` the card shows "not enough data" instead of a share, and exports without the samples file show no pick-share figure at all. Pick share is display-only: it never feeds `score(c)`, candidate selection or ranks (D-024/D-101).
+Champion cards also show the champion's **pick share in the drafted role** (`pick-rate.json`) next to the win-rate sample, for every role including the minimal ADC/MID (BL-052, D-131). The share carries its own sample label — the role-wide effective `n_eff` from `pick-rate-samples.json` (`n≈N · all ranks`, unlike the rank-bucketed win-rate `Sample`); below `minGames` the card shows "not enough data" instead of a share, and exports without the samples file show no pick-share figure at all. Pick share is display-only: it never feeds `score(c)`, candidate selection or ranks (D-024/D-101).
 
 ## 7.1 Recommendation lists (D-024)
 

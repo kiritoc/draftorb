@@ -4,7 +4,7 @@ import type { PickRate, PickRateSamples } from '@draftorb/shared';
 import { DEFAULT_CONFIG } from '@draftorb/engine';
 import { pickShareDisplay } from './pick-share';
 
-// DEFAULT_CONFIG.minGames is the display minimum (BL-052, D-129).
+// DEFAULT_CONFIG.minGames is the display minimum (BL-052, D-131).
 const pickRate: PickRate = { SUPPORT: { '89': 0.25, '16': 0.75 } };
 const samples: PickRateSamples = {
   SUPPORT: { '89': DEFAULT_CONFIG.minGames, '16': DEFAULT_CONFIG.minGames - 1 },

@@ -138,12 +138,19 @@ export function buildEngineData(
  * engine data built from earlier patches — then the selected variant is
  * evaluated exactly once on the frozen holdout through the paired-bootstrap
  * gate. Returns null when there is no validation patch to select on.
+ *
+ * The two role sets are deliberately separate: `tuningRoles` (the requested
+ * `--roles`, never derived from holdout picks) drives k selection so holdout
+ * coverage cannot leak into tuning; `gateRoles` (the report's scored-covered
+ * roles) scopes the holdout evaluation and gate, and is recorded as
+ * `matchup.roles` — fallback-only roles cannot unlock matchup advice.
  */
 export function runMatchupExperiment(
   dbPath: string,
   rows: readonly DraftRow[],
   engine: BacktestEngineData,
-  roles: readonly Role[],
+  tuningRoles: readonly Role[],
+  gateRoles: readonly Role[],
 ): MatchupExperiment | null {
   const { holdoutPatch, trainingPatches } = draftPatchSplit(rows);
   const validationPatch = trainingPatches[trainingPatches.length - 1] ?? null;
@@ -164,7 +171,7 @@ export function runMatchupExperiment(
       matchupEnabled: k !== 'off',
       matchupShrinkK: typeof k === 'number' ? k : 0,
     };
-    const ev = evaluatePatch(rows, { ...engineSub, config }, roles, validationPatch, {
+    const ev = evaluatePatch(rows, { ...engineSub, config }, tuningRoles, validationPatch, {
       resamples: 0,
     });
     results.push({ shrinkageK: k, logLoss: ev.logLoss });
@@ -184,7 +191,7 @@ export function runMatchupExperiment(
       variant: 'off',
       shrinkageK: null,
       validationPatch,
-      roles: [...roles],
+      roles: [...gateRoles],
       candidates: results,
       gate: null,
     };
@@ -192,14 +199,14 @@ export function runMatchupExperiment(
 
   const k = best.k;
   const config = { ...baseConfig, matchupEnabled: true, matchupShrinkK: k };
-  const holdout = evaluatePatch(rows, { ...engine, config }, roles, holdoutPatch);
+  const holdout = evaluatePatch(rows, { ...engine, config }, gateRoles, holdoutPatch);
   const passed = holdout.gate?.passed ?? false;
   return {
     enabled: passed,
     variant: k === 0 ? 'full' : 'shrunk',
     shrinkageK: k,
     validationPatch,
-    roles: [...roles],
+    roles: [...gateRoles],
     candidates: results,
     gate: holdout.gate,
   };
@@ -300,11 +307,14 @@ async function runBacktest(args: string[]): Promise<void> {
       // run (DEFAULT_CONFIG + matchup flags): `--pair-adjust` is an A/B
       // experiment on the headline metrics only, so the experiment always
       // sees the unadjusted engine even when the shadow report used it.
-      // It gates only the report's scored-covered roles: a requested role
-      // whose holdout picks all fell back to the baseline prior carries no
-      // matchup evidence, so pooling it would dilute the gate while the
-      // report's `roles` (and the web gate) treat coverage as scored-only.
-      const matchup = runMatchupExperiment(dbPath, rows, engine, report.roles);
+      // It tunes on the requested roles only — never on holdout-derived
+      // coverage, which would let holdout picks leak into k selection —
+      // while the holdout gate covers exactly the report's scored-covered
+      // roles: a requested role whose holdout picks all fell back to the
+      // baseline prior carries no matchup evidence, so pooling it would
+      // dilute the gate while the report's `roles` (and the web gate)
+      // treat coverage as scored-only.
+      const matchup = runMatchupExperiment(dbPath, rows, engine, roles ?? ALL_ROLES, report.roles);
       if (matchup !== null) {
         const shadow = report.gate?.passed ? 'passed' : 'failed';
         finalReport = {

@@ -8,7 +8,9 @@ import Database from 'better-sqlite3';
 import { openDb, migrate } from '../db';
 import { seedGames } from '../aggregate-baseline-helpers';
 import { seedPatches } from '../patches.test-helpers';
-import { backtestCommand } from './backtest';
+import type { Role } from '@draftorb/shared';
+import type { DraftRow } from '../backtest/draft';
+import { backtestCommand, buildEngineData, runMatchupExperiment } from './backtest';
 
 describe('backtestCommand', () => {
   let directory: string;
@@ -261,6 +263,31 @@ describe('backtestCommand', () => {
     expect(report.matchup).not.toBeNull();
     expect(report.matchup.roles).toEqual(report.roles);
     expect(report.matchup.roles).not.toContain('MID');
+
+    // Tuning must not depend on holdout coverage: shrinking the gate role
+    // set leaves the validation-patch candidate losses (and therefore the
+    // selected variant) untouched.
+    const check = openDb(dbPath);
+    const rows = check
+      .prepare(
+        `SELECT
+           m.match_id AS matchId, m.patch AS patch, p.team_id AS teamId,
+           p.champion_id AS championId, p.role AS role, p.win AS win,
+           m.avg_rank_score AS matchRankScore, p.puuid AS playerId
+         FROM participants p
+         JOIN matches m ON m.match_id = p.match_id`,
+      )
+      .all() as DraftRow[];
+    check.close();
+    const engine = buildEngineData(dbPath, rows);
+    const requested: Role[] = ['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT'];
+    const covered = runMatchupExperiment(dbPath, rows, engine, requested, report.roles as Role[]);
+    const unfiltered = runMatchupExperiment(dbPath, rows, engine, requested, requested);
+    expect(covered).not.toBeNull();
+    expect(unfiltered).not.toBeNull();
+    expect(covered?.candidates).toEqual(unfiltered?.candidates);
+    expect(covered?.roles).toEqual(report.roles);
+    expect(unfiltered?.roles).toContain('MID');
   });
 
   it('restricts evaluated roles through --roles', async () => {

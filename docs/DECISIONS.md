@@ -1477,7 +1477,7 @@ The D-023 gate failed on the first real report (BL-014): on holdout patch 16.22 
 
 (Renumbered D-129→D-130 after BL-017 took D-129 on main, then D-130→D-133 after BL-025 claimed D-130 on `feat/bl-025-windows-installer`; D-131 is BL-052 and D-132 is BL-013.)
 
-### D-134 — Personalization role scope: drafted-role games, in-scope roles SUPPORT/TOP/JUNGLE — PROPOSED (BL-032)
+### D-136 — Personalization role scope: drafted-role games, in-scope roles SUPPORT/TOP/JUNGLE — PROPOSED (BL-032)
 
 - Context: D-097 widened the profile scope beyond Support, but SPECS §18.2 does not say explicitly which stored games feed `personalize()`/`recommendProfileRunes`/`recommendProfileSpells` for a TOP or JUNGLE draft, or what happens for ADC/MID drafts.
 - Decision (implementation assumption, BL-032):

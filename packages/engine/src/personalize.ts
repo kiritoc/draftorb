@@ -3,7 +3,10 @@
  *
  * Pure, deterministic. Blends the unchanged meta recommendations with the
  * configured profile's own recency-weighted win rate using the D-073
- * fallback hierarchy, Bayesian shrinkage and trust blend. `score(c)`,
+ * fallback hierarchy, Bayesian shrinkage and trust blend. Since BL-033
+ * (D-089 approved 2026-11-27) the default `blendMode` is `'logit'`: both
+ * terms are blended in log-odds space so they share probability units;
+ * `'rankNorm'` keeps the legacy D-073 formula. `score(c)`,
  * reasons and ranks of the input list are never touched — the personalized
  * list is a separate output, like the pool lists (D-024/D-072 invariant).
  *
@@ -50,10 +53,11 @@ export interface PersonalizeConfig {
   /** Prior strength `k0` for the baseline win rate `w0` (D-080, SPECS §5). */
   readonly baselineK0?: number;
   /**
-   * D-089 (PROPOSED): 'rankNorm' keeps the legacy D-073 blend of the
-   * rank-position metaNorm with the profile win rate; 'logit' blends
+   * D-089 (ACCEPTED 2026-11-27): 'logit' (default) blends
    * `logit(metaScore)` and `logit(p)` in log-odds space so both terms share
-   * probability units. Default 'rankNorm' until validated.
+   * probability units; 'rankNorm' keeps the legacy D-073 blend of the
+   * rank-position metaNorm with the profile win rate. All shrinkage/blend
+   * constants are PRIORS — tunable, not validated claims.
    */
   readonly blendMode?: 'rankNorm' | 'logit';
 }
@@ -64,10 +68,14 @@ export const DEFAULT_PERSONALIZE_CONFIG: PersonalizeConfig = Object.freeze({
   minGames: 3,
   kTrust: 20,
   levelFactors: Object.freeze([1.0, 0.9, 0.8, 0.7, 0.6]),
-  blendMode: 'rankNorm',
+  blendMode: 'logit',
 });
 
-/** Log-odds clamp for the D-089 blend (same scale as the engine `eps`). */
+/**
+ * Clamp bound for the D-089 log-odds blend: `logit` clamps its input to
+ * `[BLEND_EPS, 1 - BLEND_EPS]` so perfect (p = 0/1) records never produce
+ * ±Infinity. Same scale as the engine's `eps` (config.ts, 1e-4).
+ */
 const BLEND_EPS = 1e-4;
 
 /**
@@ -113,7 +121,13 @@ export interface PersonalizedEntry {
   readonly overallRank: number;
   /** Unchanged meta `score(c)` of the input recommendation. */
   readonly metaScore: number;
-  /** `(1 - trust) * metaNorm + trust * p`; metaNorm-only when insufficient. */
+  /**
+   * D-073/D-089 blend: `(1 - trust) * metaNorm + trust * p` under
+   * `blendMode: 'rankNorm'`, `sigmoid((1 - trust) * logit(metaScore) +
+   * trust * logit(p))` under `'logit'`; insufficient-data entries keep the
+   * meta reference (`metaScore` under 'logit', `metaNorm` under 'rankNorm')
+   * so all entries share the same units.
+   */
   readonly personalizedScore: number;
   /** Shrunk profile win rate (fraction); null when data is insufficient. */
   readonly profileWinRate: number | null;
@@ -356,7 +370,9 @@ export function personalize(
     const levelFactor = config.levelFactors[matchedLevel - 1] ?? 0.6;
     const trust = (matched.nEff * levelFactor) / (matched.nEff * levelFactor + config.kTrust);
     // D-073 legacy blend mixes ordinal metaNorm with a probability; D-089
-    // blends both terms in log-odds space so the units match.
+    // (default since BL-033) blends both terms in log-odds space —
+    // `logit(metaScore)` against `logit(p)` — so the units match. The
+    // log-odds are clamped at BLEND_EPS so p = 0/1 stays finite.
     const personalizedScore =
       config.blendMode === 'logit'
         ? sigmoid((1 - trust) * logit(rec.score, BLEND_EPS) + trust * logit(p, BLEND_EPS))

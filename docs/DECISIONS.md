@@ -804,7 +804,7 @@ Owner decision 2026-11-07.
 
 Owner decision 2026-11-08.
 
-### D-073 — Profile statistics: recency weighting, shrinkage, fallback hierarchy, trust blend — ACCEPTED, amended by D-097
+### D-073 — Profile statistics: recency weighting, shrinkage, fallback hierarchy, trust blend — ACCEPTED, amended by D-097, D-089
 
 - Context: same statistical need as D-064, but the subject is the configured profile's Support games (phase 1), not "the user's" games. Constants are priors in engine config, tunable later; there is still no personalization backtest (open question).
 - Decision (carried over from D-064 with profile semantics):
@@ -818,6 +818,8 @@ Owner decision 2026-11-08.
 - Consequences: new pure engine module + `PersonalConfig`; golden tests pin the arithmetic (TESTING.md); constants are priors pending a personalization backtest.
 
 Update (2026-11-07, D-080): the 'Reason badge ... +d vs meta' clause is SUPERSEDED by D-080. See also D-076 for the champion-scoped levels.
+
+Update (2026-11-27, D-089, BL-033): the trust-blend formula in item 5 is AMENDED — the default `blendMode: 'logit'` computes `personalizedScore = sigmoid((1 - trust) * logit(metaScore) + trust * logit(p))` with log-odds clamped at `BLEND_EPS = 1e-4`, and insufficient-data entries keep `metaScore` (all entries share probability units). `blendMode: 'rankNorm'` preserves the original `(1 - trust) * metaNorm + trust * p` formula for comparison. `metaNorm` stays defined for the legacy mode and as documentation of the rank normalization.
 
 Owner decision 2026-11-07.
 
@@ -1039,15 +1041,32 @@ dependent through the opponent distribution). Update:
 `packages/engine/src/{config,recommend,recommend-terms}.ts`, tests in
 `recommend-terms.test.ts` / `recommend-pairs.test.ts`.
 
-### D-089 — Personalization blend in log-odds space (`blendMode`) — PROPOSED
+### D-089 — Personalization blend in log-odds space (`blendMode`) — ACCEPTED (owner, 2026-11-27), implemented by BL-033
 
 Review finding F5: `personalizedScore = (1-trust)*metaNorm + trust*p` mixed
 an ordinal rank-position value in [0,1] with a win probability. New
-`PersonalizeConfig.blendMode`: `'rankNorm'` (default, legacy D-073) or
-`'logit'`, which blends `logit(metaScore)` and `logit(p)` and maps back
-through `sigmoid`; insufficient-data entries use `metaScore` directly so
-all entries share probability units. Update:
+`PersonalizeConfig.blendMode`: `'rankNorm'` (legacy D-073) or `'logit'`,
+which blends `logit(metaScore)` and `logit(p)` and maps back through
+`sigmoid`; insufficient-data entries use `metaScore` directly so all
+entries share probability units. Update:
 `packages/engine/src/personalize.ts`, tests in `personalize.test.ts`.
+
+Owner approval (2026-11-27): D-089 is APPROVED with these amendments —
+
+1. `blendMode: 'logit'` becomes the DEFAULT (replacing 'rankNorm' legacy
+   behavior); 'rankNorm' stays selectable via the config.
+2. Log-odds are CLAMPED at the edges: `logit` clamps its input to
+   `[BLEND_EPS, 1 - BLEND_EPS]` with `BLEND_EPS = 1e-4` (same scale as the
+   engine `eps`) so p = 0/1 never produces ±Infinity.
+3. D-073 is AMENDED accordingly (see the update note under D-073).
+4. Shrinkage/blend constants (`kShrink`, `kTrust`, `levelFactors`,
+   `halfLifeDays`, `BLEND_EPS`) are marked as PRIORS — tunable later, not
+   validated claims.
+5. Insufficient-data entries keep using `metaScore` directly (per the
+   original D-089 text) so all entries share probability units.
+
+Update: `packages/engine/src/personalize.ts`, `packages/engine/test/personalize.test.ts`,
+`packages/shared/src/schemas/personalized.ts` (doc comment only).
 
 ### D-090 — `pnpm etl tune-priors` grid search — PROPOSED
 
@@ -1264,7 +1283,7 @@ None is auto-approved; each needs an explicit owner OK when its phase starts.
 
 - Items and live game, kept as design direction: D-081, D-083, D-084, D-085, D-086, D-093.
 - Fold into the items rewrite: D-082, D-087, D-095.
-- Version 2: D-089.
+- Version 2: D-089 (approved by the owner 2026-11-27, implemented by BL-033).
 - Draft-model experiments, used only by the backtest until validated: D-088, D-090, D-092, D-092a.
 
 ### D-110 — ETL state upload gated on snapshot integrity — ACCEPTED (owner, 2026-11-15)

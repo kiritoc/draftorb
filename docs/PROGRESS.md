@@ -24,6 +24,17 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 - Blockers / next step: owner review; D-134 references in code comments resolve once PR #173 (BL-030a) merges — expected order #173 first. After merge run `pnpm etl migrate && pnpm etl backfill-summoners` on the real DB (resumable, `--call-budget` bounds calls), then `pnpm etl aggregate && pnpm etl export` to publish v8 files. BL-031b (#93) builds the UI on these exports.
 - Pitfalls: `participants` had NO summoner columns before migration 022 — spell ids only exist in match-v5 detail payloads, so historical rows need the backfill (NULL pairs are skipped by aggregation). `starter_ctx` uses a COALESCE expression unique index because SQLite treats NULLs as distinct in PRIMARY KEYs. Teleport = spell id 12 (`_Jade` variant 712 unused in observed data); Smite = 11.
 
+### Previous handoff (BL-033)
+
+- Date: 2026-11-28
+- Branch/PR: `feat/bl-033-logit-blend` (worktree `draftorb-bl033`) / BL-033 (#95), merged via PR #174
+- State: DONE (merged)
+- Done: `blendMode: 'logit'` is now the DEFAULT personalization blend (D-089 APPROVED by the owner 2026-11-27, recorded in DECISIONS.md with the five amendments). `personalizedScore = sigmoid((1 - trust) * logit(metaScore) + trust * logit(p))` with log-odds clamped at `BLEND_EPS = 1e-4` (documented, same scale as engine `eps`); insufficient-data entries keep `metaScore` directly so all entries share probability units; `blendMode: 'rankNorm'` still selectable and preserves the legacy `(1 - trust) * metaNorm + trust * p`. D-073 amended in place (header + Update note); D-109's "Version 2: D-089" line annotated as approved. UI unchanged — the profile-labeled list (D-072, never "For you") already renders `profileWinRate`/`nEff`/fallback level and the insufficient-data state with sample size; apps/desktop does not consume `personalize()` yet. All shrinkage/blend constants documented as PRIORS.
+- Files touched: `packages/engine/src/personalize.ts`, `packages/engine/test/personalize.test.ts`, `packages/shared/src/schemas/personalized.ts` (doc comment), `docs/{DECISIONS,PROGRESS}.md`.
+- Tests: `pnpm check` green (1716 tests, 161 files). New cases: default-is-logit equivalence, exact spec formula `sigmoid((1-trust)*logit(meta)+trust*logit(p))`, p = 0/1 clamp (finite score in (0,1)), logit trust-vs-n_eff monotonicity, insufficient-data metaScore (logit) vs metaNorm (rankNorm); legacy-mode tests pinned to `blendMode: 'rankNorm'`.
+- Blockers / next step: owner review; PR description must quote the owner's 2026-11-27 D-089 approval (issue #95 acceptance criterion). Note: issue #95's 2026-11-16 comment kept activation PROPOSED pending v2 and the flag off by default — the 2026-11-27 approval (logit as default) supersedes it; flag to owner if the v2 gating was still intended.
+- Pitfalls: `personalizedScore` semantics changed under the default — insufficient entries now carry `metaScore` (probability units), not `metaNorm` (rank position); any consumer assuming [0,1] rank-normalized scores must be re-checked (apps/web only displays it as a %). `metaNorm` is still computed for the legacy mode.
+
 ### Previous handoff (BL-032)
 
 - Date: 2026-11-28

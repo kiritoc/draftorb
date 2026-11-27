@@ -29,6 +29,7 @@ import {
   type ChampionCatalog,
   type PickData,
 } from '../data/export-data';
+import { loadMatchupConfig, type MatchupConfig } from '../data/backtest-report';
 import { championName } from '../champion-name';
 import { loadChampionIconVersion } from '../data/champion-icons';
 import { championsForSlot } from '../pick/champion-availability';
@@ -82,6 +83,10 @@ export function PickScreen({
   noEligibleRole = false,
 }: PickScreenProps) {
   const [pickData, setPickData] = useState<PickData | null>(null);
+  // D-133: matchup layers run only when the archived backtest report
+  // validates them for this role on the loaded patch; null keeps the
+  // champion-baseline ranking (fail-safe).
+  const [matchupConfig, setMatchupConfig] = useState<MatchupConfig | null>(null);
   const [catalog, setCatalog] = useState<ChampionCatalog | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [iconVersion, setIconVersion] = useState<string | null>(null);
@@ -107,10 +112,14 @@ export function PickScreen({
   useEffect(() => {
     if (noEligibleRole) {
       setPickData(null);
+      setMatchupConfig(null);
       setLoadError(null);
       return;
     }
     let cancelled = false;
+    // Fail-safe: never let a previous role/patch report config leak into the
+    // next load; the baseline ranking applies until the fresh report resolves.
+    setMatchupConfig(null);
     void (async () => {
       try {
         const loaded = await loadPickData(role);
@@ -121,6 +130,13 @@ export function PickScreen({
         }
         setLoadError(null);
         setPickData(loaded);
+        void loadMatchupConfig(role)
+          .then((config) => {
+            if (!cancelled) setMatchupConfig(config);
+          })
+          .catch(() => {
+            if (!cancelled) setMatchupConfig(null);
+          });
         void loadChampionIconVersion(loaded.patch)
           .then((version) => {
             if (!cancelled) setIconVersion(version);
@@ -222,12 +238,13 @@ export function PickScreen({
   useEffect(() => {
     if (pickData === null) return;
     try {
-      // D-133: the backtest report is not part of the aggregate archive yet,
-      // so the matchup flag stays off (champion-baseline ranking) until it is
-      // shipped and wired like the web app.
+      // D-133: the matchup layers run only when the archived backtest
+      // report validates them for this role on the loaded patch; anything
+      // else keeps the champion-baseline ranking (fail-safe).
       const result = recommend(draftInput, pickData.data, {
         ...DEFAULT_CONFIG,
-        matchupEnabled: false,
+        matchupEnabled: matchupConfig?.enabled ?? false,
+        matchupShrinkK: matchupConfig?.shrinkK ?? 0,
       });
       setRecommendations(result.recommendations);
       setPoolRecommendations(result.poolRecommendations ?? []);
@@ -241,7 +258,7 @@ export function PickScreen({
       setInsufficientData([]);
       setRecommendError(err instanceof Error ? err.message : String(err));
     }
-  }, [draftInput, pickData]);
+  }, [draftInput, pickData, matchupConfig]);
 
   const slotUpdater = (setter: SlotSetter) => (index: number, slot: DraftSlotState) =>
     setter((current) => current.map((entry, i) => (i === index ? slot : entry)));

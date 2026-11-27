@@ -15,6 +15,17 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 
 ## Current handoff
 
+- Date: 2026-11-27
+- Branch/PR: `main` @ `80cce4a` / BL-009 (#112) — docs-only verification PR `docs/bl-009-m1-verification`
+- State: REVIEW (v1a code verification complete; #112 stays OPEN for the owner-side Windows checks)
+- Done: final BL-009 verification against current `main`. Every dependency ticket is merged: BL-010a/b, BL-011, BL-012, BL-015, BL-016a/b, BL-017 (PR #164), BL-018..BL-023, BL-050 role enablement (PR #154), BL-024 ADC/MID minimal (PR #161), BL-014 backtest gate (PR #162 — D-133: baseline-only ranking), BL-025 unsigned NSIS installer (PR #165; `release.yml` dispatch run 46019354631 produced artifact `draftorb-windows-x64-setup-main`, ~3.6 MB, no GitHub release yet), BL-052 pick share + denominator (PR #168), BL-053 lint cleanup (PR #170, 0 warnings). `pnpm check` green on `main` including the `windows` job (CI run 46018407901). Code-verified on `main`: SUPPORT pick screen end-to-end (locked allies, role-less enemies with inferred confidence + manual override, bans, "From your pool" above "Best overall" with D-024 invariants, thin-data unavailable cards, personal-record badge, public patch label, theme toggle, portraits); role enablement is data-driven per D-126 (`role-coverage.ts`: >= 50 champions at `n_eff >= minGames` in DIAMOND); ADC/MID minimal via `MINIMAL_ROLES`/`manifest.minimalRoles` (BL-024); matchup layers pinned off with the "Baseline ranking" pill (D-133, B-080 open until `backtest-draft.json` ships in the aggregate archive); BL-022 keyboard-first entry bar present (engine p50 ~2 ms, far under 50 ms). SPECS §2/§7.1 verified; one wording fix (desktop page-size config path).
+- Files touched: `docs/PROGRESS.md`, `docs/SPECS.md` (one line).
+- Tests: docs-only; CI `pnpm check` green on `main` (run 46018407901, windows job included).
+- Blockers / next step: owner-side only — install the NSIS artifact on Windows 11 and run the timed manual draft+bans entry (protocol in PR #159); export `data/pool.config.json` via "Export to repo file"; republish `data-latest` (`pnpm etl aggregate && pnpm etl export` to produce manifest v7 + `pick-rate-samples.json`, then `pnpm etl publish-public` — it only packages the export the pointer selects) so the app picks up the newest export. Then close #112.
+- Pitfalls: `matchupEnabled` stays pinned `false` in `PickScreen` until the backtest report is part of the aggregate archive (B-080); TOP/JUNGLE/ADC/MID selectability depends on the republished export's baseline coverage (D-126), not on code.
+
+### Previous handoff (BL-030b)
+
 - Date: 2026-11-28
 - Branch/PR: `feat/bl-030b-runes-ui` (worktree `draftorb-bl030b`) / BL-030b (#91), stacked on `feat/bl-030a-runes-data-path` (PR #173)
 - State: REVIEW
@@ -71,8 +82,8 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 ### Previous handoff (BL-052)
 
 - Date: 2026-11-28
-- Branch/PR: `feat/bl-052-pick-share-denominator` (worktree `draftorb-bl052`) / BL-052 (#163)
-- State: REVIEW
+- Branch/PR: `feat/bl-052-pick-share-denominator` (worktree `draftorb-bl052`) / BL-052 (#163), merged via PR #168
+- State: DONE (merged)
 - Done: pick share with its sample denominator on champion cards, all roles (D-131 PROPOSED, owner-approved scope). ETL: new `pick-rate-samples.json` export (`{ [role]: { [championId]: n_eff } }`, `n_eff = games_w^2 / games_w2`) built from the same `exportMinGames`-gated `role_prob` rows as `pick-rate.json` via a shared `gatedRowsByRole` pass, so share and `n` can never diverge; `MANIFEST_SCHEMA_VERSION` 5 -> 7 (BL-013a merged first claiming v6 for `players`; this branch's bump became v7 carrying both features) with frozen `manifestSchemaV5`/`manifestSchemaV6` kept in `PUBLISHED_MANIFEST_SCHEMAS` for the latest-pointer guard and in the desktop cache union. Shared: `pickRateSamplesSchema` (fail-closed, positive finite `n_eff`). Desktop UI only: `PickData.pickRateSamples` sits next to `RecommendData` (never inside it, so it cannot reach `score(c)`); `pick/pick-share.ts` shows the rate only when share + `n_eff >= DEFAULT_CONFIG.minGames` (25), else "not enough data"; legacy exports without the file show no pick-share figure. `RecommendationCard` renders `Pick share P% · n≈N · all ranks` for every role including minimal ADC/MID. `apps/web` untouched except one manifest fixture bump (frozen app, D-121).
 - Files touched: `packages/etl/src/export/{pick-rate,index}.ts` + tests, `packages/shared/src/{index,schemas/{champions,core,manifest}}.ts` + tests, `apps/desktop/ui/src/{pick/pick-share.ts(+test),components/{RecommendationCard,RecommendationsList,PickRecommendations}.tsx(+test),data/{export-data.ts(+test),export-data-recovery.test.ts,role-coverage.test.ts},screens/PickScreen.tsx,strings.ts}`, `apps/web/src/data/loader.test.ts` (fixture only), `docs/{DATA_MODEL,SPECS,DECISIONS,PROGRESS}.md`.
 - Tests: `pnpm check` green.

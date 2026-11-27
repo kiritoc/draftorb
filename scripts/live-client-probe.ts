@@ -121,7 +121,7 @@ export function findLcuLockfile(explicit?: string): string | null {
 
   try {
     const script =
-      "(Get-Process LeagueClientUx,LeagueClient -ErrorAction SilentlyContinue | " +
+      '(Get-Process LeagueClientUx,LeagueClient -ErrorAction SilentlyContinue | ' +
       'Select-Object -First 1 -ExpandProperty Path)';
     for (const shell of ['powershell', 'pwsh']) {
       try {
@@ -155,7 +155,12 @@ function readLockfile(path: string): LcuLockfile | null {
 
 function httpJson(
   protocol: 'http' | 'https',
-  { port, auth, path, timeoutMs = 4000 }: { port: number; auth?: string; path: string; timeoutMs?: number },
+  {
+    port,
+    auth,
+    path,
+    timeoutMs = 4000,
+  }: { port: number; auth?: string; path: string; timeoutMs?: number },
 ): Promise<HttpResult> {
   return new Promise((resolve) => {
     const base: RequestOptions = {
@@ -247,20 +252,11 @@ const LIVE_ENDPOINTS = [
   '/liveclientdata/playerlist',
 ];
 
-function writeDump(
-  out: string,
-  filename: string,
-  payload: unknown,
-): void {
-  writeFileSync(
-    join(out, filename),
-    JSON.stringify(redactPersonalData(payload), null, 2),
-  );
+function writeDump(out: string, filename: string, payload: unknown): void {
+  writeFileSync(join(out, filename), JSON.stringify(redactPersonalData(payload), null, 2));
 }
 
-function summarize(
-  res: HttpResult & { protocol?: 'http' | 'https' },
-): EndpointSummary {
+function summarize(res: HttpResult & { protocol?: 'http' | 'https' }): EndpointSummary {
   return {
     status: res.status,
     error: res.error,
@@ -283,7 +279,11 @@ async function main(): Promise<void> {
 
   const lockfilePath = findLcuLockfile(lcuLockfile);
   const lockfile = lockfilePath ? readLockfile(lockfilePath) : null;
-  const summary: { checkedAt: string; lcu: Record<string, EndpointSummary>; live: Record<string, EndpointSummary> } = {
+  const summary: {
+    checkedAt: string;
+    lcu: Record<string, EndpointSummary>;
+    live: Record<string, EndpointSummary>;
+  } = {
     checkedAt: new Date().toISOString(),
     lcu: {},
     live: {},

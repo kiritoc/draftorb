@@ -56,7 +56,7 @@ Relevant verbatim passages:
 
 ### A2. Developer API Policy — League Client API and Game Client API / Live Client Data API sections
 
-**Source:** https://developer.riotgames.com/league-client-apis.html — this single page hosts the full "Developer API Policy" document including the `#league-client-api`, `#game-client-api`, `#live-client-data-api` anchors.
+**Source:** https://developer.riotgames.com/league-client-apis.html — the League of Legends "Developer API Policy" page (the legacy URL now serves the full policy document; it also appears under the League of Legends docs section). The `#league-client-api`, `#game-client-api` and `#live-client-data-api` anchors map to the same-named section headings on that page.
 **Fetched:** 2026-11-27 (live page returned full text).
 
 Verbatim passages:

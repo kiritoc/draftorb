@@ -43,8 +43,11 @@ pnpm --filter @draftorb/desktop tauri dev     # run with hot reload
 ```
 
 For a production binary: `pnpm --filter @draftorb/desktop tauri build --no-bundle`
-(see `docs/SETUP.md` > "Desktop app (dev)"). There is no signed installer yet;
-building from source is the supported path today.
+(see `docs/SETUP.md` > "Desktop app (dev)"). A prebuilt unsigned NSIS
+installer is also published on the GitHub releases page (BL-025) — see
+`docs/SETUP.md` > "Installing the Windows app" for the SmartScreen warning and
+install steps. Building from source remains the path when you need your own
+local changes.
 
 The first launch downloads the public aggregates by itself — the pick screen
 works with **no Riot key at all**. The key is only needed for your personal

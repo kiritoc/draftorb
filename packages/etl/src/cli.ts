@@ -26,6 +26,7 @@ import { playersCommand } from './commands/players';
 import { matchesCommand } from './commands/matches';
 import { timelineCommand } from './commands/timeline';
 import { backfillTimelinesCommand } from './commands/backfill';
+import { backfillSummonersCommand } from './commands/backfill-summoners';
 import { backfillChallengesCommand } from './commands/backfill-challenges';
 import { classifyItemsCommand } from './commands/classify-items';
 import { pruneCommand } from './commands/prune';
@@ -56,6 +57,7 @@ const COMMANDS: readonly Command[] = [
   matchesCommand,
   timelineCommand,
   backfillTimelinesCommand,
+  backfillSummonersCommand,
   backfillChallengesCommand,
   classifyItemsCommand,
   pruneCommand,

@@ -21,7 +21,7 @@ const MANIFEST = {
   ],
   roles: ['SUPPORT', 'TOP', 'JUNGLE'],
   minimalRoles: [],
-  schemaVersion: 7,
+  schemaVersion: 8,
   files: [
     { path: 'roles/TOP/baseline.json', sha256: 'x'.repeat(64) },
     { path: 'roles/JUNGLE/baseline.json', sha256: 'x'.repeat(64) },

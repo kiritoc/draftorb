@@ -319,6 +319,28 @@ export const DEFAULT_RUNE_CONFIG: RuneConfig = Object.freeze({
   laneGroups: DEFAULT_LANE_GROUPS,
 });
 
+// --- Summoner recommendation config (SPECS §8.1, BL-031a) ---
+
+/**
+ * Summoner-recommender config. Same shape as `RuneConfig`: the shrinkage
+ * prior, the number of pairs returned and the lane groups used for the
+ * context slots. Prior values until calibrated.
+ */
+export interface SummonerConfig {
+  /** Prior strength (equivalent games) for context-to-context shrinkage. */
+  readonly kSummoner: number;
+  /** Number of top pairs returned. */
+  readonly topPairs: number;
+  /** Lane groups per role (context slots, D-021). */
+  readonly laneGroups: Readonly<Record<Role, LaneGroup>>;
+}
+
+export const DEFAULT_SUMMONER_CONFIG: SummonerConfig = Object.freeze({
+  kSummoner: 40,
+  topPairs: 3,
+  laneGroups: DEFAULT_LANE_GROUPS,
+});
+
 // --- Threat score config (SPECS §8.2 step 2, T-053) ---
 
 /**

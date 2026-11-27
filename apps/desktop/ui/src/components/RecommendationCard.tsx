@@ -12,7 +12,9 @@ import {
   type Recommendation,
   type Role,
 } from '@draftorb/shared';
+import type { RankBucket } from '@draftorb/shared';
 import type { ProfileLoad } from '../profile/profile-export';
+import type { BaselineIndex } from '../pick/baseline-record';
 import { strings } from '../strings';
 import { championName } from '../champion-name';
 import { championIconUrl } from '../data/champion-icons';
@@ -27,6 +29,9 @@ export interface RecommendationCardProps {
   /** Profile load for the personal-record badge; undefined hides it. */
   profileLoad?: ProfileLoad;
   role?: Role;
+  /** Baseline lookup + bucket for the champion-average row (BL-051). */
+  baselineIndex?: BaselineIndex;
+  rankBucket?: RankBucket;
 }
 
 const LEVEL_LABEL: Record<number, string> = {
@@ -82,6 +87,8 @@ export function RecommendationCard({
   inPool = false,
   profileLoad,
   role,
+  baselineIndex,
+  rankBucket,
 }: RecommendationCardProps) {
   const { score, poolRank, reasons, reliability, warnings } = recommendation;
   const champion = champions.find((c) => c.id === recommendation.championId);
@@ -109,7 +116,13 @@ export function RecommendationCard({
               )}
             </div>
             {profileLoad !== undefined && role !== undefined && (
-              <RecordBadge load={profileLoad} championId={recommendation.championId} role={role} />
+              <RecordBadge
+                load={profileLoad}
+                championId={recommendation.championId}
+                role={role}
+                baselineIndex={baselineIndex}
+                rankBucket={rankBucket}
+              />
             )}
           </div>
         </div>

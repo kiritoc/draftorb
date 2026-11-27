@@ -126,6 +126,29 @@ describe('RecommendationsList', () => {
     expect(markup.indexOf('Leona')).toBeLessThan(markup.indexOf('Soraka'));
   });
 
+  it('tags a pool champion on an unavailable card in the overall list', () => {
+    const markup = renderToStaticMarkup(
+      createElement(RecommendationsList, {
+        title: 'Best overall',
+        recommendations: [rec(89, 1)],
+        resetKey: 'draft',
+        poolIds: new Set([16]),
+        unavailable: [
+          {
+            championId: 16,
+            reason: 'insufficientData',
+            sample: { championId: 16, nEff: 20, rawGames: 30, winRate: 0.51 },
+          },
+        ],
+        cardContext,
+      }),
+    );
+    // Soraka is a pool member: her thin-data card carries the pool tag (SPECS §7.1).
+    expect(markup).toContain('Soraka');
+    expect(markup).toContain('In your pool');
+    expect(markup.match(/In your pool/g)?.length).toBe(1);
+  });
+
   it('renders the empty state', () => {
     const markup = renderToStaticMarkup(
       createElement(RecommendationsList, {

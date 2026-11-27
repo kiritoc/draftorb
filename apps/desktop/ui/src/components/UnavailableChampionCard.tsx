@@ -24,6 +24,8 @@ export interface UnavailableChampionCardProps {
   championId: number;
   reason: PoolUnavailableEntry['reason'];
   sample?: InsufficientDataEntry;
+  /** Pool membership tag for lists where it is not implied (SPECS §7.1). */
+  inPool?: boolean;
   champions: Champion[];
   iconVersion?: string | null;
   /** Record badge inputs (BL-051); both undefined hides the badge. */
@@ -44,6 +46,7 @@ export function UnavailableChampionCard({
   championId,
   reason,
   sample,
+  inPool = false,
   champions,
   iconVersion = null,
   profileLoad,
@@ -66,6 +69,11 @@ export function UnavailableChampionCard({
           <span className="rounded bg-slate-200 px-1.5 py-0.5 text-xs font-bold text-slate-600 dark:bg-slate-700 dark:text-slate-300">
             {strings.notRecommended}
           </span>
+          {inPool && (
+            <span className="rounded border border-indigo-300 bg-indigo-50 px-1.5 py-0.5 text-xs font-bold text-indigo-700 dark:border-indigo-500/40 dark:bg-indigo-900/40 dark:text-indigo-300">
+              {strings.inPoolTag}
+            </span>
+          )}
         </div>
         <span className="text-xs text-slate-500 dark:text-slate-400">
           {REASON_LABEL[reason]}

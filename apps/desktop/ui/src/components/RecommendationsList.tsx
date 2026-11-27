@@ -116,6 +116,7 @@ export function RecommendationsList({
                   championId={entry.item.championId}
                   reason={entry.item.reason}
                   sample={entry.item.sample}
+                  inPool={poolIds?.has(entry.item.championId) ?? false}
                   champions={cardContext.champions}
                   iconVersion={cardContext.iconVersion}
                   profileLoad={cardContext.profileLoad}

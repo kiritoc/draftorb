@@ -335,7 +335,7 @@ Only edge cases not owned by sections 12-16; all other rules reference those sec
 
 Personal recommendations use a **configured profile's** match history, synced by the pipeline and shipped as static JSON — the app is local-only and never calls Riot; there is no login or server (D-002, D-067, D-079). `score(c)` and every existing list are **unchanged** by personalization (D-072, same invariant as D-024).
 
-Version split (D-100): **v1** shows only a per-champion personal-record badge on each recommendation card (games and win rate, or "not enough data" below the minimum sample, D-075; D-119: champion + drafted role, raw games, win rate from 5 games). The personalized list, the rune/summoner columns and item personalization described below are **v2**.
+Version split (D-100): **v1** shows only a per-champion record badge on each champion card — scored recommendations and pool-unavailable cards alike (games and win rate, or "not enough data" below the minimum sample, D-075; D-119: champion + drafted role, raw games, win rate from 5 games). Since BL-051 the badge carries three labeled figures: the champion's baseline win rate in the drafted role at the selected rank bucket (the `p0` source, shown only when the baseline gate passes), the profile's raw win rate on the champion across **all** roles, and the profile's raw win rate on the champion in the drafted role. All are labels: they never change `score(c)` or ranks. The personalized list, the rune/summoner columns and item personalization described below are **v2**.
 
 ### 18.1 Profile
 

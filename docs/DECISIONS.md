@@ -1404,7 +1404,17 @@ Agreed enablement rule (owner-confirmed in session 2026-11-26, implemented by BL
 
 `pnpm etl sample-report [patch]` (`packages/etl/src/export/sample-report.ts`) remains the tuning tool: it prints per-file row counts and min/median/max `n_eff` for every `roles/<ROLE>/` file in the published manifest, and it reads the published export so it also works on `pnpm etl pull` data.
 
-### D-127 — Minimal roles (ADC/MID): baseline-only export, champion-level recommendations — PROPOSED (BL-024)
+### D-127 — Record badge shows three win-rate figures (BL-051) — PROPOSED
+
+Extends D-119 (personal-record badge) per issue #158; owner confirmed the interpretations in session 2026-11-26.
+
+- The badge on every champion card (scored recommendations and pool-unavailable cards) shows three labeled figures: the champion's baseline win rate in the drafted role at the rank bucket selected in the UI (`roles/<ROLE>/baseline.json`, the `p0` source), the profile's raw win rate on the champion across **all** roles (not only D-097 in-scope roles — the badge is a personal stat, not an engine input), and the profile's raw win rate on the champion in the drafted role.
+- Counting rules unchanged from D-119: raw games and raw win rate, no recency weighting or shrinkage; a personal figure shows its rate only from `RECORD_MIN_GAMES` (5) games, else "not enough data" with the count; no profile export → "no data".
+- The champion average is the shrunk baseline `p0` (`baselinePrior` with `k0`) shown only when the row passes the same baseline gate the engine uses (`n_eff >= minGames`); otherwise "not enough data". Its sample is the effective `n_eff`, labeled `n≈`.
+- Everything stays presentation: the badge reads `recommend()` output plus the profile export and baseline tables; it never feeds `DraftInput` and never changes `score(c)`, reasons or ranks (D-072/D-101 invariant, same as D-119).
+- Implementation note: `indexBaselines` is newly exported from `@draftorb/engine` so the UI reuses the exact baseline indexing/gating instead of duplicating it.
+
+### D-128 — Minimal roles (ADC/MID): baseline-only export, champion-level recommendations — PROPOSED (BL-024)
 
 Implements the BL-024 half of D-097/D-126: ADC and MID become selectable roles backed by champion-level statistics only — no pair, lane, rune or build claims.
 

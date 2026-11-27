@@ -1572,4 +1572,3 @@ D-106 asks to check the effect of Top's role-quest Teleport upgrade (live since 
   - Data Dragon is a permitted asset under the API asset whitelist; CommunityDragon is a fan project under Riot's Legal Jibber Jabber with no redistribution terms of its own (B6).
   - Sharing the app requires a production key (working prototype + Riot review), one product per key, the mandated "not endorsed by Riot Games" boilerplate, the key never shipped in binaries, and immediate shutdown on key revocation (B1/B4/B5).
 - Status: **PROPOSED** — recorded for owner review; no behavior change implied for the current single-user scope.
-

@@ -24,6 +24,7 @@ import {
   stateScaleExportSchema,
   manifestSchema,
   manifestSchemaV4,
+  manifestSchemaV5,
   type ChampionTagsMap,
   type Latest,
   type Manifest,
@@ -101,8 +102,9 @@ function all<T>(db: Database.Database, sql: string, params: readonly unknown[] =
 }
 
 /** Published manifest shapes the pointer guard accepts, newest first: the
- *  current schema, then the frozen v4 layout from before the BL-024 v5 bump. */
-const PUBLISHED_MANIFEST_SCHEMAS = [manifestSchema, manifestSchemaV4] as const;
+ *  current schema, then the frozen v5 layout from before the BL-013a v6 bump,
+ *  then the frozen v4 layout from before the BL-024 v5 bump. */
+const PUBLISHED_MANIFEST_SCHEMAS = [manifestSchema, manifestSchemaV5, manifestSchemaV4] as const;
 
 /** Latest-patch pointer already published in `publicDir`, or undefined when
  *  `latest.json` is absent or does not validate against latestSchema.

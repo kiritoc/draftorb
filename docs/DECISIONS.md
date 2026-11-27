@@ -1426,3 +1426,10 @@ Implements the BL-024 half of D-097/D-126: ADC and MID become selectable roles b
 - **validate-export**: `checkPublishedExport` validates minimal roles from `baseline.json` alone (empty pair/lane tables) and keeps SUPPORT as the only release-blocking role.
 
 Open question for the owner: none blocking — if ADC/MID later get full matchup exports, dropping them from `minimalRoles` (engine config + manifest field) restores the full pipeline without code changes.
+
+### D-129 — Evidence rule edge semantics: cap scope and pick-share denominator — PROPOSED (BL-013a, PR #166 review)
+
+Two boundary questions raised by review of the D-102 mechanism (BL-013a); the implemented reading is recorded as the working assumption until the owner confirms.
+
+- **Cap scope.** `evidencePlayerWeightCap` is applied per aggregated row — per (context x choice) cell, i.e. per rune page (`perks_hash`) or per item (`item_id`) — not per context across all choices. A player active in several choices of the same context can therefore contribute up to the cap to each of them. Rationale: the aggregation row is the context-choice cell, the D-102 wording ("each player's weight within a context") is ambiguous on this point, and the BL-013b audit (`docs/reports/bl-013-evidence-rule.md`) measured and calibrated the cap per exported row. Alternative: cap the player's total weight across all choices of a context and scale each option proportionally — stricter, but it invalidates the audited values and needs re-measurement (T-027.b).
+- **Pick-share denominator.** `pickShare` uses the raw `games_w` total of the rows present at export (before the `n_eff`/`players` export gates), matching the pre-existing convention. Rows suppressed at aggregation by `evidenceMinDistinctPlayers` never reach the export, so they are absent from the denominator: exported pick shares are shares of retained (minimum-player) evidence, not of all observed weight. Alternative: persist pre-gate context totals so suppressed weight still counts in the denominator — a heavier pipeline change (new stored totals + migration), flagged for owner decision.

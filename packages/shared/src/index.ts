@@ -15,6 +15,7 @@ export {
   PROFILE_CONFIG_SCHEMA_VERSION,
   PROFILE_EXPORT_SCHEMA_VERSION,
   PERSONAL_RESULT_SCHEMA_VERSION,
+  SETUP_RESULT_SCHEMA_VERSION,
 } from './schemas/core.js';
 export { RUNE_CONTEXT_LEVELS } from './rune-context.js';
 
@@ -209,6 +210,29 @@ export type {
   RuneAdaptationHint,
   RuneRecommendationResult,
 } from './schemas/runes.js';
+
+export {
+  setupModeSchema,
+  setupDataSourceSchema,
+  setupPageSourceSchema,
+  setupExpertEvidenceSchema,
+  setupProfileEvidenceSchema,
+  setupEvidenceSchema,
+  setupRunePageSchema,
+  setupBroaderStatisticSchema,
+  setupRuneResultSchema,
+} from './schemas/setup.js';
+export type {
+  SetupMode,
+  SetupDataSource,
+  SetupPageSource,
+  SetupExpertEvidence,
+  SetupProfileEvidence,
+  SetupEvidence,
+  SetupRunePage,
+  SetupBroaderStatistic,
+  SetupRuneResult,
+} from './schemas/setup.js';
 
 export {
   profileIdSchema,

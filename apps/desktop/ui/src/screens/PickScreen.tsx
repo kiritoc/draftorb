@@ -21,6 +21,7 @@ import {
   type Role,
 } from '@draftorb/shared';
 import type { ProfileLoad } from '../profile/profile-export';
+import type { DraftHandoff } from '../draft-handoff';
 import { emptyPool, loadPool, savePool } from '../pool/pool-store';
 import { dropUnknownChampions, serializePoolConfig } from '../pool/pool-model';
 import {
@@ -71,6 +72,11 @@ export interface PickScreenProps {
   onPoolChanged?: () => void;
   /** D-126 empty verdict: skip recommendation data, keep the pool editor. */
   noEligibleRole?: boolean;
+  /**
+   * BL-058: reports the locked champion and draft input whenever they
+   * change so the setup screen can reuse them without re-entry.
+   */
+  onDraftHandoffChange?: (handoff: DraftHandoff) => void;
 }
 
 export function PickScreen({
@@ -80,6 +86,7 @@ export function PickScreen({
   repoFolder,
   onPoolChanged,
   noEligibleRole = false,
+  onDraftHandoffChange,
 }: PickScreenProps) {
   const [pickData, setPickData] = useState<PickData | null>(null);
   const [catalog, setCatalog] = useState<ChampionCatalog | null>(null);
@@ -218,6 +225,14 @@ export function PickScreen({
     }),
     [userRank, role, allies, enemies, poolIds, bans],
   );
+
+  // BL-058: the pick screen stays mounted while hidden, so it pushes the
+  // draft context up on every change — including the empty report after a
+  // new-game remount, which clears the setup screen's prefill.
+  const userChampionId = user.championId;
+  useEffect(() => {
+    onDraftHandoffChange?.({ championId: userChampionId, draft: draftInput });
+  }, [draftInput, userChampionId, onDraftHandoffChange]);
 
   useEffect(() => {
     if (pickData === null) return;

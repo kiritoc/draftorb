@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import type { Role } from '@draftorb/shared';
 import type { DataStatus } from '../data-status';
+import type { DraftHandoff } from '../draft-handoff';
 import { strings } from '../strings';
 import type { ResolvedTheme, ThemeSetting } from '../theme';
 import { Header } from './Header';
@@ -38,6 +40,10 @@ export interface AppShellProps {
 }
 
 export function AppShell(props: AppShellProps) {
+  // BL-058: draft context handed off from the pick screen (stays mounted
+  // while hidden) to the setup screen. A new-game reset remounts PickScreen,
+  // which reports a fresh empty handoff and clears this state again.
+  const [draftHandoff, setDraftHandoff] = useState<DraftHandoff | undefined>(undefined);
   return (
     <div className="min-h-screen text-lg">
       <Header
@@ -71,6 +77,7 @@ export function AppShell(props: AppShellProps) {
             dataReadyNonce={props.dataReadyNonce}
             repoFolder={props.repoFolder}
             onPoolChanged={props.onPoolChanged}
+            onDraftHandoffChange={setDraftHandoff}
           />
         </section>
         {props.screen === 'settings' && (
@@ -86,6 +93,7 @@ export function AppShell(props: AppShellProps) {
         {props.screen === 'setup' && (
           <SetupScreen
             preferredRole={props.role}
+            draftHandoff={draftHandoff}
             dataReadyNonce={props.dataReadyNonce}
             profileLoad={props.profileLoad ?? { kind: 'none', reason: 'noFolder' }}
             profileStatus={props.profileStatus}

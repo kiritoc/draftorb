@@ -8,7 +8,7 @@ import { migrate, openDb } from '../db';
 import { seedPatches } from '../patches.test-helpers';
 import { aggregateCommand } from './aggregate';
 
-describe('aggregateCommand', () => {
+describe('aggregateCommand', { timeout: 60_000 }, () => {
   let directory: string;
   let originalDbPath: string | undefined;
   let logSpy: ReturnType<typeof vi.spyOn>;

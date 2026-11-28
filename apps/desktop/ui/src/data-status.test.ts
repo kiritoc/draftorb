@@ -32,6 +32,7 @@ describe('Header patch display', () => {
         dataStatus: { kind: 'loaded', patch: '16.22', generatedAt: '2026-11-17' },
         resolvedTheme: 'light',
         onToggleTheme: () => {},
+        onNewGame: () => {},
       }),
     );
     expect(html).toContain('Patch 26.22 · data 16.22');

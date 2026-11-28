@@ -18,3 +18,12 @@ export function roleAvailability(
   }
   return result;
 }
+
+/**
+ * BL-055: role the "New game" reset returns the selector to — the first
+ * eligible role in ROLE_ORDER (SUPPORT first), falling back to SUPPORT
+ * when the verdict enables nothing.
+ */
+export function defaultRole(enabledRoles: readonly Role[] = DEFAULT_ENABLED_ROLES): Role {
+  return ROLE_ORDER.find((role) => enabledRoles.includes(role)) ?? 'SUPPORT';
+}

@@ -15,6 +15,9 @@ import {
   championTagsMapSchema,
   championsMapSchema,
   enemyPairTableSchema,
+  itemBuildExportSchema,
+  itemClassesExportSchema,
+  itemsMapSchema,
   laneFullTableSchema,
   laneVsTableSchema,
   latestSchema,
@@ -22,8 +25,16 @@ import {
   manifestSchemaV5,
   manifestSchemaV6,
   manifestSchemaV7,
+  patchMetaSchema,
   pickRateSamplesSchema,
   pickRateSchema,
+  runeExportSchema,
+  runeTreesSchema,
+  starterChampionExportSchema,
+  starterRoleExportSchema,
+  stateScaleExportSchema,
+  summonerExportSchema,
+  z,
   type AllyPairTable,
   type Champion,
   type ChampionTagsMap,
@@ -68,6 +79,71 @@ function requiredFile(files: Readonly<Record<string, unknown>>, path: string): u
     throw new Error(`Required recommendation data file is missing: ${path}`);
   }
   return file;
+}
+
+/**
+ * Zod schema for every manifest file shape `loadPickData` can eagerly load
+ * (B-075). Patch-root catalogs and global tables map by exact path; role
+ * files map by `roles/<ROLE>/<name>.json`, with `builds/` and `build-paths/`
+ * per-champion files sharing `itemBuildExportSchema`. The per-champion
+ * `runes/`, `summoners/` and `starters/` entries are unreachable today (the
+ * eager filter skips them) but are mapped anyway so a future filter change
+ * cannot silently drop their validation. Returns undefined for unrecognized
+ * paths: they stay plain `JSON.parse`d, so a newer export adding a file type
+ * does not break this loader.
+ */
+const PICK_DATA_FILE_SCHEMAS: Readonly<Record<string, z.ZodType>> = {
+  'champions.json': championsMapSchema,
+  'items.json': itemsMapSchema,
+  'runes.json': runeTreesSchema,
+  'role-prob.json': championRoleProbabilitiesSchema,
+  'pick-rate.json': pickRateSchema,
+  'pick-rate-samples.json': pickRateSamplesSchema,
+  'item-classes.json': itemClassesExportSchema,
+  'state-scale.json': stateScaleExportSchema,
+  'patch-meta.json': patchMetaSchema,
+};
+
+const ROLE_FILE_SCHEMAS: Readonly<Record<string, z.ZodType>> = {
+  'baseline.json': baselineTableSchema,
+  'ally-pairs.json': allyPairTableSchema,
+  'enemy-pairs.json': enemyPairTableSchema,
+  'lane-vs.json': laneVsTableSchema,
+  'lane-full.json': laneFullTableSchema,
+  'starters.json': starterRoleExportSchema,
+};
+
+const ROLE_SUBDIR_SCHEMAS: Readonly<Record<string, z.ZodType>> = {
+  builds: itemBuildExportSchema,
+  'build-paths': itemBuildExportSchema,
+  runes: runeExportSchema,
+  summoners: summonerExportSchema,
+  starters: starterChampionExportSchema,
+};
+
+function pickDataFileSchema(path: string): z.ZodType | undefined {
+  const exact = PICK_DATA_FILE_SCHEMAS[path];
+  if (exact !== undefined) return exact;
+  if (!path.startsWith('roles/')) return undefined;
+  const rest = path.slice('roles/'.length);
+  const roleEnd = rest.indexOf('/');
+  if (roleEnd === -1) return undefined;
+  const tail = rest.slice(roleEnd + 1);
+  if (!tail.includes('/')) return ROLE_FILE_SCHEMAS[tail];
+  return ROLE_SUBDIR_SCHEMAS[tail.slice(0, tail.indexOf('/'))];
+}
+
+/**
+ * Fail-closed schema check for one eagerly loaded manifest file (B-075).
+ * The error names the file and the failing field, like the missing-file
+ * error above; the raw parsed JSON (not the schema output) stays in the
+ * file map so downstream consumers keep their own `.parse` calls.
+ */
+function assertValidPickDataFile(path: string, value: unknown, schema: z.ZodType): void {
+  const result = schema.safeParse(value);
+  if (!result.success) {
+    throw new Error(`Invalid cached aggregate file ${path}: ${z.prettifyError(result.error)}`);
+  }
 }
 
 /**
@@ -218,7 +294,15 @@ export async function loadPickData(role: Role): Promise<PickData | null> {
   const loaded = await Promise.all(
     patchEntries.map(async (file) => {
       try {
-        return [file.path, await readJson(`${latest.patch}/${file.path}`)] as const;
+        const value = await readJson(`${latest.patch}/${file.path}`);
+        // B-075: schema-check every eagerly loaded manifest file, not only
+        // the ones RecommendData consumes. Files consumed downstream are
+        // parsed again by their dedicated validators; the check here is the
+        // fail-closed gate for catalogs, builds and patch-meta. A schema
+        // failure counts as corrupt, so it follows the same other-role skip.
+        const schema = pickDataFileSchema(file.path);
+        if (schema !== undefined) assertValidPickDataFile(file.path, value, schema);
+        return [file.path, value] as const;
       } catch (err) {
         if (file.path.startsWith('roles/') && !file.path.startsWith(ownRolePrefix)) return null;
         throw err;

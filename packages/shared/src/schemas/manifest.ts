@@ -135,3 +135,24 @@ export const latestSchema = z
   })
   .strict();
 export type Latest = z.infer<typeof latestSchema>;
+
+/**
+ * `patch-meta.json` — the patch-catalog state of the last aggregate run
+ * (D-055), exported verbatim from the ETL `ingest_state` snapshot. Written
+ * only when an aggregate run recorded it; older exports omit the file.
+ */
+export const patchMetaSchema = z
+  .object({
+    /** Snapshot patch label; null when the database had no stored patch. */
+    patch: z.string().min(1).nullable(),
+    /** `patch_index` of `patch` in the catalog (null when unresolvable). */
+    patchIndex: z.number().int().nullable(),
+    /** `currentPatchIndex` the aggregators used for recency (-1 when empty). */
+    currentPatchIndex: z.number().int(),
+    /** Highest `patch_index` in `patches` at aggregate time (null when empty). */
+    patchesMaxIndex: z.number().int().nullable(),
+    /** ISO timestamp of the aggregate run. */
+    aggregatedAt: z.string().min(1),
+  })
+  .strict();
+export type PatchMeta = z.infer<typeof patchMetaSchema>;

@@ -367,7 +367,7 @@ describe('shared schema parity (D-011)', () => {
 
   it('exports profile config and export schemas (T-090, D-068/D-069)', () => {
     expect(shared.PROFILE_CONFIG_SCHEMA_VERSION).toBe(1);
-    expect(shared.PROFILE_EXPORT_SCHEMA_VERSION).toBe(1);
+    expect(shared.PROFILE_EXPORT_SCHEMA_VERSION).toBe(2);
     expect(shared.profileConfigSchema).toBeDefined();
     expect(shared.profileConfigEntrySchema).toBeDefined();
     expect(shared.profileOptionsSchema).toBeDefined();
@@ -378,6 +378,7 @@ describe('shared schema parity (D-011)', () => {
     expect(shared.profileGameRunesSchema).toBeDefined();
     expect(shared.profileMasteryEntrySchema).toBeDefined();
     expect(shared.profileFavoritesSchema).toBeDefined();
+    expect(shared.profileFavoritesByRoleSchema).toBeDefined();
     expect(shared.profileIdSchema).toBeDefined();
   });
 

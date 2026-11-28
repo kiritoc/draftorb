@@ -13,6 +13,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import {
+  PROFILE_EXPORT_SCHEMA_VERSION,
   profileExportSchema,
   profileIndexSchema,
   type ProfileConfig,
@@ -117,41 +118,48 @@ function loadMastery(db: Database.Database, profileId: string): MasteryRow[] {
 }
 
 /**
- * Compute favorites over the exported game set (D-074): top
- * `profileFavRecencyCount` champions by recency-weighted SUPPORT games in
- * the last `profileFavRecencyDays`, union top `profileFavMasteryCount` by
- * mastery points.
+ * Compute per-role favorites over the exported game set (D-074, BL-057):
+ * for every role present in `games`, top `profileFavRecencyCount`
+ * champions by recency-weighted games in that role over the last
+ * `profileFavRecencyDays`, union top `profileFavMasteryCount` by mastery
+ * points (mastery is role-agnostic, so the same top-N joins every role's
+ * `combined`). Roles with no exported games get no entry.
  */
 export function computeFavorites(
   games: readonly ProfileGame[],
   mastery: readonly { championId: number; points: number }[],
   nowMs: number,
 ): ProfileExport['favorites'] {
-  const weights = new Map<number, number>();
-  for (const game of games) {
-    if (game.role !== 'SUPPORT') continue;
-    const ageDays = (nowMs - game.createdAtDay * DAY_MS) / DAY_MS;
-    if (ageDays > ETL_CONFIG.profileFavRecencyDays) continue;
-    weights.set(
-      game.championId,
-      (weights.get(game.championId) ?? 0) + profileRecencyWeight(ageDays),
-    );
-  }
-  const recency = [...weights.entries()]
-    .sort((a, b) => b[1] - a[1] || a[0] - b[0])
-    .slice(0, ETL_CONFIG.profileFavRecencyCount)
-    .map(([championId]) => championId);
-
   const masteryTop = [...mastery]
     .sort((a, b) => b.points - a.points || a.championId - b.championId)
     .slice(0, ETL_CONFIG.profileFavMasteryCount)
     .map((entry) => entry.championId);
 
-  const combined = [...recency];
-  for (const id of masteryTop) {
-    if (!combined.includes(id)) combined.push(id);
+  const roles = [...new Set(games.map((game) => game.role))];
+  const favorites: ProfileExport['favorites'] = {};
+  for (const role of roles) {
+    const weights = new Map<number, number>();
+    for (const game of games) {
+      if (game.role !== role) continue;
+      const ageDays = (nowMs - game.createdAtDay * DAY_MS) / DAY_MS;
+      if (ageDays > ETL_CONFIG.profileFavRecencyDays) continue;
+      weights.set(
+        game.championId,
+        (weights.get(game.championId) ?? 0) + profileRecencyWeight(ageDays),
+      );
+    }
+    const recency = [...weights.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0] - b[0])
+      .slice(0, ETL_CONFIG.profileFavRecencyCount)
+      .map(([championId]) => championId);
+
+    const combined = [...recency];
+    for (const id of masteryTop) {
+      if (!combined.includes(id)) combined.push(id);
+    }
+    favorites[role] = { combined, recency, mastery: masteryTop };
   }
-  return { combined, recency, mastery: masteryTop };
+  return favorites;
 }
 
 /**
@@ -189,7 +197,7 @@ export function buildProfileExport(
   }));
 
   return profileExportSchema.parse({
-    schemaVersion: 1,
+    schemaVersion: PROFILE_EXPORT_SCHEMA_VERSION,
     id: entry.id,
     riotId: { ...entry.riotId, platform: entry.platform },
     label: entry.label,
@@ -270,7 +278,7 @@ export function writeProfileExports(
     });
   }
   const index: ProfileIndex = profileIndexSchema.parse({
-    schemaVersion: 1,
+    schemaVersion: PROFILE_EXPORT_SCHEMA_VERSION,
     profiles: indexProfiles,
   });
   const indexPath = join(options.dir, 'index.json');

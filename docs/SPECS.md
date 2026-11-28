@@ -214,6 +214,7 @@ Order of preference (D-105):
 - The pool stays on the player's machine (never sent anywhere).
 - Show current patch + data freshness. The interface displays the public patch name (for example 26.22) mapped from the internal data label (for example 16.22, `major.minor`); the offset rule is unverified and must be checked against Data Dragon before it is coded (D-108).
 - Light/dark theme toggle that remembers the last choice; the first launch follows the Windows theme (D-107).
+- A "New game" button in the header (visible on every screen) asks for confirmation, then resets every per-game field on the Pick and Setup screens to defaults: empty bans and ally/enemy/pick slots, default rank, `activeIndex` reset and recommendations recomputed for the empty draft; champion empty, mode `topPlayers`, Master+ toggle off; the role selector returns to its default eligible role. Pool, settings (theme, repo folder), profile data and downloaded aggregates are never touched, and the current screen does not change (BL-055).
 
 ## 11. Out of scope (v1)
 
@@ -371,7 +372,7 @@ For candidate `c` in the current draft, over the profile's in-scope games played
 
 ### 18.4 Favorites (D-074)
 
-- Computed at export, per role: top 15 champions by recency-weighted games in that role (last 90 days) union top 5 by mastery points.
+- Computed at export, per role (champion x roles, D-101; BL-057): the export stores `favorites` as a partial record keyed by role — each entry holds top 15 champions by recency-weighted games in that role (last 90 days) union top 5 by mastery points (`combined`/`recency`/`mastery`). Only roles present in the exported games get an entry; mastery is role-agnostic and joins every role's `combined`. Export schema v2; v1 exports (single SUPPORT-scoped list) are normalized to `{ SUPPORT: favorites }` on load.
 - "Import favorites into pool" is explicit and respects `poolMaxSize`.
 - `favoritesMode`: `include` (default, star badge) / `only` (favorites only in the lists) / `hide` (favorites removed). Filters/flags displayed entries only; `score(c)` unchanged.
 

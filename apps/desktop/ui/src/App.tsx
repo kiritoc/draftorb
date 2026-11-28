@@ -18,6 +18,7 @@ import {
   type Settings,
 } from './settings';
 import { isTauri } from './tauri';
+import { defaultRole } from './roles';
 import { resolveTheme, toggledTheme, type ThemeSetting } from './theme';
 
 const DARK_QUERY = '(prefers-color-scheme: dark)';
@@ -45,6 +46,10 @@ export function App() {
   const [dataStatus, setDataStatus] = useState<DataStatus>(NO_DATA);
   const [dataReadyNonce, setDataReadyNonce] = useState(0);
   const [enabledRoles, setEnabledRoles] = useState<readonly Role[] | undefined>(undefined);
+  // BL-055: "New game" flow — dialog open state plus a nonce that remounts
+  // the Pick/Setup screens so every per-game field returns to defaults.
+  const [newGameOpen, setNewGameOpen] = useState(false);
+  const [gameResetNonce, setGameResetNonce] = useState(0);
   const prefersDark = usePrefersDark();
   const resolvedTheme = settings === null ? null : resolveTheme(settings.theme, prefersDark);
 
@@ -128,6 +133,16 @@ export function App() {
     [settings],
   );
 
+  // BL-055: confirmed reset — role back to the default eligible one, screens
+  // remount on the next render. Pool, settings, profile and aggregates live
+  // outside the remounted trees and are untouched; the current screen and
+  // the nav selection do not change.
+  const confirmNewGame = useCallback(() => {
+    setNewGameOpen(false);
+    setRole(defaultRole(enabledRoles));
+    setGameResetNonce((nonce) => nonce + 1);
+  }, [enabledRoles]);
+
   // Render nothing until the stored theme is known: no wrong-theme flash.
   if (settings === null || resolvedTheme === null) return null;
 
@@ -152,6 +167,10 @@ export function App() {
       repoFolderAvailable={isTauri()}
       profileStatus={describeProfileLoad(profileLoad)}
       profileLoad={profileLoad}
+      gameResetNonce={gameResetNonce}
+      newGameOpen={newGameOpen}
+      onNewGameOpenChange={setNewGameOpen}
+      onNewGameConfirm={confirmNewGame}
     />
   );
 }

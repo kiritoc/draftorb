@@ -6,9 +6,11 @@ export interface HeaderProps {
   dataStatus: DataStatus;
   resolvedTheme: ResolvedTheme;
   onToggleTheme: () => void;
+  /** Opens the "New game" confirmation dialog (BL-055). */
+  onNewGame: () => void;
 }
 
-export function Header({ dataStatus, resolvedTheme, onToggleTheme }: HeaderProps) {
+export function Header({ dataStatus, resolvedTheme, onToggleTheme, onNewGame }: HeaderProps) {
   const { patch, freshness } = describeDataStatus(dataStatus);
   return (
     <header className="flex flex-wrap items-center gap-4 border-b border-slate-200 bg-white px-6 py-4 dark:border-slate-700 dark:bg-slate-800">
@@ -26,8 +28,15 @@ export function Header({ dataStatus, resolvedTheme, onToggleTheme }: HeaderProps
       </span>
       <button
         type="button"
-        onClick={onToggleTheme}
+        onClick={onNewGame}
         className="ml-auto rounded-lg border border-slate-300 px-4 py-2 text-base hover:bg-slate-100 dark:border-slate-600 dark:hover:bg-slate-700"
+      >
+        {strings.newGame}
+      </button>
+      <button
+        type="button"
+        onClick={onToggleTheme}
+        className="rounded-lg border border-slate-300 px-4 py-2 text-base hover:bg-slate-100 dark:border-slate-600 dark:hover:bg-slate-700"
       >
         {resolvedTheme === 'dark' ? strings.themeToggleToLight : strings.themeToggleToDark}
       </button>

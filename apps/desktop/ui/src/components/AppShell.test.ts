@@ -15,6 +15,10 @@ const base: AppShellProps = {
   onToggleTheme: () => {},
   role: 'SUPPORT',
   onRoleChange: () => {},
+  gameResetNonce: 0,
+  newGameOpen: false,
+  onNewGameOpenChange: () => {},
+  onNewGameConfirm: () => {},
 };
 
 const DISABLED = /\sdisabled=""/;

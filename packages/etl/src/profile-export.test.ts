@@ -180,53 +180,35 @@ describe('buildProfileExport', () => {
 });
 
 describe('computeFavorites', () => {
-  it('ranks recency-weighted SUPPORT games and unions mastery top-N', () => {
+  const game = (
+    championId: number,
+    role: 'SUPPORT' | 'TOP' | 'JUNGLE' | 'MID' | 'ADC',
+    ageDays: number,
+  ) => ({
+    createdAtDay: Math.floor((NOW_MS - ageDays * DAY_MS) / DAY_MS),
+    championId,
+    role,
+    win: true,
+    allyAdcId: null,
+    enemySupportId: null,
+    enemyAdcId: null,
+    enemyChampionIds: [],
+    runes: null,
+    items: [],
+    itemsOrdered: null,
+    summonerSpells: [4, 7] as [number, number],
+  });
+
+  it('computes favorites per role: recency within the role, mastery unioned everywhere', () => {
     const games = [
-      // champion 23: 4 recent support wins -> highest weight
-      ...Array.from({ length: 4 }, (_, i) => ({
-        createdAtDay: Math.floor((NOW_MS - i * DAY_MS) / DAY_MS),
-        championId: 23,
-        role: 'SUPPORT' as const,
-        win: true,
-        allyAdcId: null,
-        enemySupportId: null,
-        enemyAdcId: null,
-        enemyChampionIds: [],
-        runes: null,
-        items: [],
-        itemsOrdered: null,
-        summonerSpells: [4, 7] as [number, number],
-      })),
-      // champion 99: older support games -> lower weight
-      {
-        createdAtDay: Math.floor((NOW_MS - 80 * DAY_MS) / DAY_MS),
-        championId: 99,
-        role: 'SUPPORT' as const,
-        win: false,
-        allyAdcId: null,
-        enemySupportId: null,
-        enemyAdcId: null,
-        enemyChampionIds: [],
-        runes: null,
-        items: [],
-        itemsOrdered: null,
-        summonerSpells: [4, 7] as [number, number],
-      },
-      // champion 7: many MID games must NOT count (phase 1 = SUPPORT only)
-      ...Array.from({ length: 10 }, () => ({
-        createdAtDay: Math.floor(NOW_MS / DAY_MS),
-        championId: 7,
-        role: 'MID' as const,
-        win: true,
-        allyAdcId: null,
-        enemySupportId: null,
-        enemyAdcId: null,
-        enemyChampionIds: [],
-        runes: null,
-        items: [],
-        itemsOrdered: null,
-        summonerSpells: [4, 7] as [number, number],
-      })),
+      // SUPPORT: champion 23 played 4 recent games -> highest weight.
+      ...Array.from({ length: 4 }, (_, i) => game(23, 'SUPPORT', i)),
+      // SUPPORT: champion 99 one game 80 days ago -> low but non-zero weight.
+      game(99, 'SUPPORT', 80),
+      // TOP: champion 7 dominates the TOP recency list.
+      ...Array.from({ length: 3 }, () => game(7, 'TOP', 5)),
+      // MID games of champion 23 must NOT leak into SUPPORT or TOP.
+      ...Array.from({ length: 10 }, () => game(23, 'MID', 1)),
     ];
     const favorites = computeFavorites(
       games,
@@ -237,14 +219,30 @@ describe('computeFavorites', () => {
       ],
       NOW_MS,
     );
-    expect(favorites.recency[0]).toBe(23);
-    // Champion 99 has one SUPPORT game 80 days ago: low but non-zero weight,
-    // so it ranks second. Champion 7's MID games never count (phase 1).
-    expect(favorites.recency).toEqual([23, 99]);
-    expect(favorites.mastery).toEqual([500, 23, 600]);
-    expect(favorites.combined[0]).toBe(23);
-    expect(favorites.combined).toContain(500);
-    expect(new Set(favorites.combined).size).toBe(favorites.combined.length);
+
+    const support = must(favorites.SUPPORT);
+    expect(support.recency).toEqual([23, 99]);
+    expect(support.mastery).toEqual([500, 23, 600]);
+    expect(support.combined[0]).toBe(23);
+    expect(support.combined).toContain(500);
+    expect(new Set(support.combined).size).toBe(support.combined.length);
+
+    const top = must(favorites.TOP);
+    expect(top.recency).toEqual([7]);
+    // Mastery is role-agnostic: the same top-N joins every role's combined.
+    expect(top.mastery).toEqual([500, 23, 600]);
+    expect(top.combined).toEqual([7, 500, 23, 600]);
+
+    // MID games produce a MID entry; champion 23's MID games never leak
+    // into the SUPPORT/TOP lists.
+    const mid = must(favorites.MID);
+    expect(mid.recency).toEqual([23]);
+    expect(favorites.JUNGLE).toBeUndefined();
+    expect(favorites.ADC).toBeUndefined();
+  });
+
+  it('returns an empty record when there are no games', () => {
+    expect(computeFavorites([], [{ championId: 500, points: 300_000 }], NOW_MS)).toEqual({});
   });
 });
 
@@ -263,6 +261,9 @@ describe('writeProfileExports', () => {
       JSON.parse(readFileSync(join(dir, 'test-profile.json'), 'utf-8')),
     );
     expect(exported.gameCount).toBe(1);
+    // Per-role favorites (BL-057): the SUPPORT game produces a SUPPORT entry.
+    expect(exported.favorites.SUPPORT?.recency).toEqual([23]);
+    expect(exported.favorites.TOP).toBeUndefined();
     const index = profileIndexSchema.parse(
       JSON.parse(readFileSync(join(dir, 'index.json'), 'utf-8')),
     );

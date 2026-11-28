@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { roleAvailability } from './roles';
+import { defaultRole, roleAvailability } from './roles';
 
 describe('roleAvailability', () => {
   it('enables only SUPPORT by default', () => {
@@ -24,5 +24,21 @@ describe('roleAvailability', () => {
     const a = roleAvailability(['SUPPORT', 'TOP']);
     expect(a.TOP).toEqual({ enabled: true });
     expect(a.JUNGLE.enabled).toBe(false);
+  });
+});
+
+describe('defaultRole (BL-055)', () => {
+  it('returns SUPPORT by default', () => {
+    expect(defaultRole()).toBe('SUPPORT');
+    expect(defaultRole(['SUPPORT', 'TOP'])).toBe('SUPPORT');
+  });
+
+  it('returns the first eligible role in ROLE_ORDER when SUPPORT is disabled', () => {
+    expect(defaultRole(['JUNGLE', 'TOP'])).toBe('TOP');
+    expect(defaultRole(['MID', 'ADC'])).toBe('ADC');
+  });
+
+  it('falls back to SUPPORT when no role is eligible', () => {
+    expect(defaultRole([])).toBe('SUPPORT');
   });
 });

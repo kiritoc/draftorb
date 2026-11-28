@@ -4,6 +4,7 @@ import { AppShell } from './components/AppShell';
 import { ROLE_ORDER } from './config';
 import type { ScreenId } from './components/Nav';
 import type { DataStatus } from './data-status';
+import type { DraftHandoff } from './draft-handoff';
 import { ensureData } from './data/aggregates';
 import { loadEnabledRoles } from './data/role-coverage';
 import { describeProfileLoad, loadProfileExport, type ProfileLoad } from './profile/profile-export';
@@ -50,6 +51,10 @@ export function App() {
   // the Pick/Setup screens so every per-game field returns to defaults.
   const [newGameOpen, setNewGameOpen] = useState(false);
   const [gameResetNonce, setGameResetNonce] = useState(0);
+  // BL-058: draft context handed off from the pick screen to the setup
+  // screen. Lives here (not in AppShell) so AppShell stays hook-free; the
+  // remounted PickScreen re-reports a fresh empty handoff after a reset.
+  const [draftHandoff, setDraftHandoff] = useState<DraftHandoff | undefined>(undefined);
   const prefersDark = usePrefersDark();
   const resolvedTheme = settings === null ? null : resolveTheme(settings.theme, prefersDark);
 
@@ -136,10 +141,12 @@ export function App() {
   // BL-055: confirmed reset — role back to the default eligible one, screens
   // remount on the next render. Pool, settings, profile and aggregates live
   // outside the remounted trees and are untouched; the current screen and
-  // the nav selection do not change.
+  // the nav selection do not change. BL-058: the draft handoff is cleared
+  // too, and the remounted PickScreen re-reports its empty draft anyway.
   const confirmNewGame = useCallback(() => {
     setNewGameOpen(false);
     setRole(defaultRole(enabledRoles));
+    setDraftHandoff(undefined);
     setGameResetNonce((nonce) => nonce + 1);
   }, [enabledRoles]);
 
@@ -171,6 +178,8 @@ export function App() {
       newGameOpen={newGameOpen}
       onNewGameOpenChange={setNewGameOpen}
       onNewGameConfirm={confirmNewGame}
+      draftHandoff={draftHandoff}
+      onDraftHandoffChange={setDraftHandoff}
     />
   );
 }

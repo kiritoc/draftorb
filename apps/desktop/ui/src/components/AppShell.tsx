@@ -1,5 +1,6 @@
 import type { Role } from '@draftorb/shared';
 import type { DataStatus } from '../data-status';
+import type { DraftHandoff } from '../draft-handoff';
 import { strings } from '../strings';
 import type { ResolvedTheme, ThemeSetting } from '../theme';
 import { Header } from './Header';
@@ -43,6 +44,13 @@ export interface AppShellProps {
   onNewGameOpenChange: (open: boolean) => void;
   /** Confirmed reset: clears every per-game field on Pick and Setup. */
   onNewGameConfirm: () => void;
+  /**
+   * BL-058: draft context reported by the pick screen (stays mounted while
+   * hidden), forwarded to the setup screen. State lives in App so this
+   * component stays hook-free and callable as a plain function in tests.
+   */
+  draftHandoff?: DraftHandoff;
+  onDraftHandoffChange?: (handoff: DraftHandoff) => void;
 }
 
 export function AppShell(props: AppShellProps) {
@@ -83,6 +91,7 @@ export function AppShell(props: AppShellProps) {
             dataReadyNonce={props.dataReadyNonce}
             repoFolder={props.repoFolder}
             onPoolChanged={props.onPoolChanged}
+            onDraftHandoffChange={props.onDraftHandoffChange}
           />
         </section>
         {props.screen === 'settings' && (
@@ -99,6 +108,7 @@ export function AppShell(props: AppShellProps) {
           <SetupScreen
             key={`setup-${props.gameResetNonce}`}
             preferredRole={props.role}
+            draftHandoff={props.draftHandoff}
             dataReadyNonce={props.dataReadyNonce}
             profileLoad={props.profileLoad ?? { kind: 'none', reason: 'noFolder' }}
             profileStatus={props.profileStatus}

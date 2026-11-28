@@ -147,6 +147,8 @@ describe('starterSourceLabel', () => {
     expect(starterSourceLabel('championContext', 2)).toBe('Champion context · level 2');
     expect(starterSourceLabel('roleContext', 3)).toBe('Role context · level 3');
     expect(starterSourceLabel('global', 4)).toBe('Global context');
+    expect(starterSourceLabel('profileMatchup', 2)).toBe('Matchup context · level 2');
+    expect(starterSourceLabel('profileChampion', 5)).toBe('Champion record · level 5');
     expect(starterSourceLabel('none', null)).toBe('No matching context');
   });
 });

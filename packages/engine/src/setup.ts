@@ -72,6 +72,7 @@ import {
   profileChampionWinRate,
   recommendProfileRunes,
   recommendProfileSpells,
+  recommendProfileStarters,
 } from './profile-setup.js';
 
 /**
@@ -317,10 +318,10 @@ export interface RecommendSetupStartersOptions {
   /** `roles/<ROLE>/starters.json` role/global fallback export. */
   readonly roleExport?: StarterRoleExport;
   /**
-   * Configured profile export (myData mode). The profile export records no
-   * starter-window purchases, so myData starters always report the
-   * insufficient-data state — the profile only feeds the labeled D-103
-   * broader statistic (D-139 PROPOSED).
+   * Configured profile export (myData mode). Schema v3 exports carry the
+   * per-game starter-window bundles recorded by `profile-sync` (BL-059);
+   * older exports have none and report the insufficient-data state — the
+   * profile only feeds the labeled D-103 broader statistic (D-139).
    */
   readonly profile?: ProfileExport;
   readonly nowMs: number;
@@ -329,6 +330,8 @@ export interface RecommendSetupStartersOptions {
   readonly personalizeConfig?: PersonalizeConfig;
   /** D-075 minimum effective games for the profile broader statistic. */
   readonly minSetupGames?: number;
+  /** Profile pick count (mirrors `topPicks`). */
+  readonly topPicks?: number;
 }
 
 function expertEvidence(config: RankWeightingConfig): SetupEvidence {
@@ -402,6 +405,26 @@ function expertStarterPicks(
     insufficientData: !meetsEvidenceGate(pick.nEff, pick.players, config),
     source: starterPageSource(pick.contextLevel),
     sourceLevel: pick.contextLevel,
+  }));
+}
+
+/** Map a profile fallback level (L1..L3 matchup, L4..L5 champion) to its label. */
+function profileStarterSource(fallbackLevel: number | null): SetupStarterSource {
+  if (fallbackLevel === null) return 'none';
+  return fallbackLevel <= 3 ? 'profileMatchup' : 'profileChampion';
+}
+
+function profileStarterPicks(
+  picks: ReturnType<typeof recommendProfileStarters>,
+): SetupStarterPick[] {
+  return picks.map((pick) => ({
+    items: pick.items.map((item) => ({ itemId: item.itemId, count: item.count })),
+    winRate: pick.winRate,
+    nEff: pick.nEff,
+    games: pick.games,
+    insufficientData: pick.insufficientData,
+    source: profileStarterSource(pick.fallbackLevel),
+    sourceLevel: pick.fallbackLevel,
   }));
 }
 
@@ -507,10 +530,11 @@ export function recommendSetupSpells(
  * Mode-switched starter-item setup result for the picked champion
  * (SPECS §18.5, BL-031b). `topPlayers` consumes the expert starter exports
  * (`starter_ctx` bundles within `starterWindowSeconds`, D-086/D-134) through
- * `recommendStarters`; `myData` has no profile starter source — the profile
- * export records no starter-window purchases, so it always reports the
- * insufficient-data state with the labeled D-103 profile broader statistic
- * (D-139 PROPOSED).
+ * `recommendStarters`; `myData` consumes the profile export through
+ * `recommendProfileStarters` — schema v3 exports carry the per-game
+ * starter-window bundles recorded by `profile-sync` (BL-059, D-139), while
+ * older exports report the insufficient-data state with the labeled D-103
+ * profile broader statistic.
  */
 export function recommendSetupStarters(
   input: DraftInput,
@@ -540,6 +564,22 @@ export function recommendSetupStarters(
         dataAvailable: false,
       };
     }
+    const context = personalizeContext(input, data);
+    const profilePicks = recommendProfileStarters(
+      profile,
+      championId,
+      myRole,
+      context,
+      data,
+      options.nowMs,
+      {
+        config: personalizeConfig,
+        minSetupGames,
+        ...(options.topPicks !== undefined ? { topPicks: options.topPicks } : {}),
+      },
+    );
+    const picks = profileStarterPicks(profilePicks);
+    const dataAvailable = picks.some((pick) => !pick.insufficientData);
     const stat = profileChampionWinRate(profile, championId, myRole, data, options.nowMs, {
       config: personalizeConfig,
       minSetupGames,
@@ -556,9 +596,9 @@ export function recommendSetupStarters(
       mode: 'myData',
       dataSource: 'profile',
       evidence: profileEvidence(minSetupGames),
-      picks: [],
-      broaderStatistic,
-      dataAvailable: false,
+      picks,
+      broaderStatistic: dataAvailable ? null : broaderStatistic,
+      dataAvailable,
     };
   }
 

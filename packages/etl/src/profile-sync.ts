@@ -18,7 +18,11 @@ import type { ProfileConfigEntry } from '@draftorb/shared';
 import { ETL_CONFIG } from './config/etl-config';
 import { defaultPublicDataDir, resolveDbPath } from './config/paths';
 import { openDb, migrate } from './db';
-import { extractItemsOrdered, extractProfileGame } from './profile-games';
+import {
+  extractItemsOrdered,
+  extractProfileGame,
+  extractProfileStarterItems,
+} from './profile-games';
 import { LOCAL_PROFILE_EXPORT_DIR, writeProfileExports } from './profile-export';
 import { loadProfilesConfig, profileRouting } from './profiles-config';
 import { MATCH_IDS_PAGE_SIZE } from './matches-store';
@@ -143,8 +147,8 @@ const INSERT_GAME = `INSERT INTO profile_games (
   profile_id, match_id, created_at, champion_id, role, win,
   ally_adc_id, enemy_support_id, enemy_adc_id, enemy_champions_json,
   keystone, primary_style, sub_style, perks_json,
-  items_json, items_ordered_json, summoner1_id, summoner2_id
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  items_json, items_ordered_json, starter_bundle_json, summoner1_id, summoner2_id
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
 /**
  * Sync one configured profile. Exported for tests; throws on RiotAuthError
@@ -297,10 +301,19 @@ export async function syncProfile(
     }
 
     let itemsOrderedJson: string | null = null;
+    let starterBundleJson: string | null = null;
     try {
       const timeline = await client.getMatchTimeline(region, matchId);
       const itemsOrdered = extractItemsOrdered(timeline, extraction.participantId);
       itemsOrderedJson = itemsOrdered === null ? null : JSON.stringify(itemsOrdered);
+      // Same timeline, same starterBundleKey netting as the aggregate path
+      // (BL-059): the profile's own starter-window bundle per game.
+      const starterItems = extractProfileStarterItems(
+        timeline,
+        match.info.participants,
+        extraction.participantId,
+      );
+      starterBundleJson = starterItems.length === 0 ? null : JSON.stringify(starterItems);
     } catch (error) {
       if (error instanceof RiotAuthError) throw error;
       // Timeline is best-effort: the game is still stored with NULL order.
@@ -328,6 +341,7 @@ export async function syncProfile(
         extraction.row.perks_json,
         extraction.row.items_json,
         itemsOrderedJson,
+        starterBundleJson,
         extraction.row.summoner1_id,
         extraction.row.summoner2_id,
       );

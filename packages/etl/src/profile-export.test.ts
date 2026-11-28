@@ -41,6 +41,7 @@ interface GameSeed {
   perksJson?: string | null;
   items?: number[];
   itemsOrdered?: number[] | null;
+  starterBundle?: { itemId: number; count: number }[] | null;
 }
 
 function seedGame(db: ReturnType<typeof openDb>, seed: GameSeed, profileId = ENTRY.id): void {
@@ -49,8 +50,8 @@ function seedGame(db: ReturnType<typeof openDb>, seed: GameSeed, profileId = ENT
       profile_id, match_id, created_at, champion_id, role, win,
       ally_adc_id, enemy_support_id, enemy_adc_id, enemy_champions_json,
       keystone, primary_style, sub_style, perks_json,
-      items_json, items_ordered_json, summoner1_id, summoner2_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      items_json, items_ordered_json, starter_bundle_json, summoner1_id, summoner2_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     profileId,
     seed.matchId,
@@ -80,6 +81,9 @@ function seedGame(db: ReturnType<typeof openDb>, seed: GameSeed, profileId = ENT
       : seed.itemsOrdered === null
         ? null
         : JSON.stringify(seed.itemsOrdered),
+    seed.starterBundle === undefined || seed.starterBundle === null
+      ? null
+      : JSON.stringify(seed.starterBundle),
     4,
     7,
   );
@@ -175,6 +179,36 @@ describe('buildProfileExport', () => {
     });
     const exported = buildProfileExport(db, ENTRY, NOW_MS);
     expect(must(exported.games[0]).runes).toBeNull();
+    db.close();
+  });
+
+  it('exports the recorded starter bundle and null when absent (BL-059)', () => {
+    const db = openDb(':memory:');
+    migrate(db);
+    seedProfile(db);
+    seedGame(db, {
+      matchId: 'WITHBUNDLE',
+      createdAt: NOW_MS - DAY_MS,
+      starterBundle: [
+        { itemId: 3340, count: 1 },
+        { itemId: 3858, count: 2 },
+      ],
+    });
+    seedGame(db, { matchId: 'NOBUNDLE', createdAt: NOW_MS - 2 * DAY_MS });
+    seedGame(db, {
+      matchId: 'CORRUPT',
+      createdAt: NOW_MS - 3 * DAY_MS,
+      starterBundle: 'not-json' as never,
+    });
+    const exported = buildProfileExport(db, ENTRY, NOW_MS);
+    const games = exported.games;
+    expect(must(games[0]).starterItems).toEqual([
+      { itemId: 3340, count: 1 },
+      { itemId: 3858, count: 2 },
+    ]);
+    expect(must(games[1]).starterItems).toBeNull();
+    // A corrupt stored payload degrades to null, never an invented bundle.
+    expect(must(games[2]).starterItems).toBeNull();
     db.close();
   });
 });

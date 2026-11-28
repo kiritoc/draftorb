@@ -123,8 +123,10 @@ export function dataSourceLabel(source: SetupDataSource, profileLabel?: string):
 
 /**
  * "Based on" label of the statistic behind a starter bundle (the D-103
- * adaptation hint): the starter back-off chain is exact lane -> champion ->
- * role -> global (D-134/D-086 bundle half), distinct from the rune chain.
+ * adaptation hint): the expert starter back-off chain is exact lane ->
+ * champion -> role -> global (D-134/D-086 bundle half); profile bundles
+ * use the D-073 matchup/champion fallback levels like runes and spells
+ * (BL-059).
  */
 export function starterSourceLabel(source: SetupStarterSource, sourceLevel: number | null): string {
   switch (source) {
@@ -142,6 +144,14 @@ export function starterSourceLabel(source: SetupStarterSource, sourceLevel: numb
         : strings.setupContextRoleLevel(sourceLevel);
     case 'global':
       return strings.setupContextGlobalAll;
+    case 'profileMatchup':
+      return sourceLevel === null
+        ? strings.setupContextNone
+        : strings.setupContextMatchup(sourceLevel);
+    case 'profileChampion':
+      return sourceLevel === null
+        ? strings.setupContextNone
+        : strings.setupContextChampionRecord(sourceLevel);
     case 'none':
       return strings.setupContextNone;
   }

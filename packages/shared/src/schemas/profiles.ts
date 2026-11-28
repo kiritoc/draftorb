@@ -19,6 +19,7 @@ import {
   itemIdSchema,
   roleSchema,
 } from './core.js';
+import { starterBundleItemSchema } from './starters.js';
 
 /** Stable slug used for the export file name (e.g. `kiritoctoc-euw1`). */
 export const profileIdSchema = z.string().regex(/^[a-z0-9][a-z0-9-]*$/);
@@ -100,6 +101,13 @@ export const profileGameSchema = z
     items: z.array(itemIdSchema),
     /** Build order from the match timeline; null when not fetched. */
     itemsOrdered: z.array(itemIdSchema).nullable(),
+    /**
+     * Net starter-window bundle (schema v3, BL-059/D-139): the
+     * `starterBundleKey` item set purchased within `starterWindowSeconds`,
+     * sorted by itemId. `null` when the match timeline was not fetched or
+     * recorded no in-window purchases; absent in v1/v2 exports.
+     */
+    starterItems: z.array(starterBundleItemSchema).nullable().optional(),
     /** [spell1Id, spell2Id]. */
     summonerSpells: z.tuple([z.number().int().positive(), z.number().int().positive()]),
   })
@@ -149,22 +157,35 @@ const profileExportSharedShape = {
 };
 
 /**
- * Schema v2 — `favorites` is a per-role record (BL-057). This is the
- * normalized shape every consumer sees.
+ * Schema v2 — `favorites` is a per-role record (BL-057). Still accepted so
+ * old exports keep loading; `profileExportSchema` normalizes them to v3.
  */
 const profileExportV2Schema = z
+  .object({
+    schemaVersion: z.literal(2),
+    ...profileExportSharedShape,
+    favorites: profileFavoritesByRoleSchema,
+  })
+  .strict();
+
+/**
+ * Schema v3 — games may carry `starterItems`, the net starter-window
+ * bundle recorded by `profile-sync` (BL-059, D-139). This is the normalized
+ * shape every consumer sees.
+ */
+const profileExportV3Schema = z
   .object({
     schemaVersion: z.literal(PROFILE_EXPORT_SCHEMA_VERSION),
     ...profileExportSharedShape,
     favorites: profileFavoritesByRoleSchema,
   })
   .strict();
-export type ProfileExport = z.infer<typeof profileExportV2Schema>;
+export type ProfileExport = z.infer<typeof profileExportV3Schema>;
 
 /**
  * Schema v1 — `favorites` was a single SUPPORT-scoped list (D-074).
  * Still accepted so old exports keep loading; `profileExportSchema`
- * normalizes them to the v2 shape (`{ SUPPORT: favorites }`).
+ * normalizes them to the v3 shape (`{ SUPPORT: favorites }`).
  */
 const profileExportV1Schema = z
   .object({
@@ -176,10 +197,15 @@ const profileExportV1Schema = z
 
 /** `data/public/profiles/<id>.json` — one file per configured profile. */
 export const profileExportSchema = z
-  .union([profileExportV2Schema, profileExportV1Schema])
+  .union([profileExportV3Schema, profileExportV2Schema, profileExportV1Schema])
   .transform((raw): ProfileExport => {
     if (raw.schemaVersion === PROFILE_EXPORT_SCHEMA_VERSION) {
       return raw;
+    }
+    if (raw.schemaVersion === 2) {
+      // v2 predates per-game starter bundles: `starterItems` stays absent,
+      // which readers treat exactly like `null` (no recorded bundle).
+      return { ...raw, schemaVersion: PROFILE_EXPORT_SCHEMA_VERSION };
     }
     // v1 favorites were computed from SUPPORT games only: they become the
     // SUPPORT entry of the per-role record.
@@ -207,8 +233,9 @@ export type ProfileIndexEntry = z.infer<typeof profileIndexEntrySchema>;
 
 export const profileIndexSchema = z
   .object({
-    // v1 and v2 share the same entry shape; accept both so old indexes load.
-    schemaVersion: z.union([z.literal(1), z.literal(PROFILE_EXPORT_SCHEMA_VERSION)]),
+    // v1/v2 indexes (pre-BL-057/BL-059) and the current version share the
+    // entry shape.
+    schemaVersion: z.union([z.literal(1), z.literal(2), z.literal(PROFILE_EXPORT_SCHEMA_VERSION)]),
     profiles: z.array(profileIndexEntrySchema),
   })
   .strict();

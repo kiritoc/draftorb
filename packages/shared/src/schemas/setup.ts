@@ -194,6 +194,8 @@ export const setupStarterSourceSchema = z.enum([
   'championContext',
   'roleContext',
   'global',
+  'profileMatchup',
+  'profileChampion',
   'none',
 ]);
 export type SetupStarterSource = z.infer<typeof setupStarterSourceSchema>;
@@ -201,8 +203,9 @@ export type SetupStarterSource = z.infer<typeof setupStarterSourceSchema>;
 /**
  * One recommended starter bundle (`starterBundleKey` "itemId:count" set),
  * normalized across modes like `SetupRunePage`. Expert figures carry
- * `players`/`pickShare`; there is no profile starter source, so `games`
- * only appears if a future profile export records starter bundles.
+ * `players`/`pickShare`; profile figures (schema v3 profile exports,
+ * BL-059) carry `games` and label their source `profileMatchup`/
+ * `profileChampion` like the rune/spell profile picks.
  */
 export const setupStarterPickSchema = z
   .object({

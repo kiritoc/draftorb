@@ -67,9 +67,11 @@ interface ScoredContext {
 /**
  * Stable identity of a bundle: its items sorted by itemId in the
  * `starterBundleKey` "itemId:count,..." form. The export already writes
- * sorted items; sorting again keeps hand-built fixtures honest.
+ * sorted items; sorting again keeps hand-built fixtures honest. Shared
+ * with the profile starter path (BL-059), which groups exported
+ * `starterItems` the same way.
  */
-function bundleKey(items: readonly StarterBundleItem[]): string {
+export function starterBundleItemsKey(items: readonly StarterBundleItem[]): string {
   return [...items]
     .sort((a, b) => a.itemId - b.itemId)
     .map((item) => `${item.itemId}:${item.count}`)
@@ -120,7 +122,7 @@ function aggregateContextBundles(entry: StarterContextEntry): ScoredContext | nu
     }
   >();
   for (const row of entry.bundles) {
-    const key = bundleKey(row.items);
+    const key = starterBundleItemsKey(row.items);
     const existing = accums.get(key);
     if (existing === undefined) {
       accums.set(key, {

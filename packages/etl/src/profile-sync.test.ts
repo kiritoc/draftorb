@@ -164,6 +164,11 @@ describe('syncProfiles', () => {
     );
     expect(exported.gameCount).toBe(2);
     expect(must(exported.games[0]).itemsOrdered).toEqual([3340, 3858]);
+    // BL-059: the same timeline yields the net starter-window bundle.
+    expect(must(exported.games[0]).starterItems).toEqual([
+      { itemId: 3340, count: 1 },
+      { itemId: 3858, count: 1 },
+    ]);
     expect(exported.mastery[0]).toMatchObject({ championId: 412, points: 5000 });
     const serialized = JSON.stringify(exported);
     expect(serialized).not.toContain('M1');

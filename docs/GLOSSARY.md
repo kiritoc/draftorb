@@ -52,6 +52,6 @@ Updated 2026-11-15 after the goal interview. Terms marked (new) or (changed) dif
 - **Pool-driven collection** (new): extra data collection for the champion-role pairs in the player's pool, used for runes and items (D-102).
 - **Broader-statistic fallback** (new): when data is thin, show a wider statistic such as the champion's win rate in that role, labeled (D-103).
 - **Rule fallback** (new): when item data is thin, show a labeled rule-based suggestion instead of a statistic (D-093, D-103).
-- **Starter bundle** (new): the net items bought in the first `starterWindowSeconds` (default 45 s) of the game (D-086).
+- **Starter bundle** (new): the net items bought in the first `starterWindowSeconds` (default 45 s) of the game (D-086). `profile-sync` also records it per profile game (`profile_games.starter_bundle_json`, exported as `starterItems` in profile schema v3, BL-059) so "my data" starters can use it.
 - **Role quest** (new): the per-role quest added in patch 26.1. ADC gets a seventh slot for boots; Mid gets free tier 3 boots; Support gets a slot for up to 2 Control Wards; Top's quest upgrades Teleport (D-106).
 - **Companion program** (new): the Windows 11 desktop program that replaces the web page (D-099).

@@ -19,6 +19,7 @@ import type {
   ProfileExport,
   ProfileGame,
   Role,
+  StarterBundleItem,
 } from '@draftorb/shared';
 
 import {
@@ -28,6 +29,7 @@ import {
   type PersonalizeContext,
   personalizeScopeRole,
 } from './personalize.js';
+import { starterBundleItemsKey } from './starters.js';
 import {
   matchupIdsMatch,
   resolveMatchupSpec,
@@ -72,6 +74,16 @@ export interface ProfileRunePick {
   /** Raw game count behind the estimate. */
   readonly games: number;
   /** Fallback level that supplied the estimate; null when insufficient. */
+  readonly fallbackLevel: FallbackLevel | null;
+  readonly insufficientData: boolean;
+}
+
+export interface ProfileStarterPick {
+  /** The bundle items, sorted by itemId (`starterBundleKey` grouping). */
+  readonly items: readonly StarterBundleItem[];
+  readonly winRate: number | null;
+  readonly nEff: number;
+  readonly games: number;
   readonly fallbackLevel: FallbackLevel | null;
   readonly insufficientData: boolean;
 }
@@ -537,6 +549,103 @@ export function recommendProfileSpells(
     const primary = b.insufficientData ? b.nEff - a.nEff : (b.winRate ?? 0) - (a.winRate ?? 0);
     if (primary !== 0) return primary;
     return spellPairKey(a.spells).localeCompare(spellPairKey(b.spells));
+  });
+  return picks.slice(0, topPicks);
+}
+
+/**
+ * Bundle identity of a profile game: the `starterBundleKey` "itemId:count"
+ * form of its exported `starterItems` (schema v3, BL-059). Games without a
+ * recorded bundle return null and count toward no bundle — the same
+ * treatment `runes === null` gets in the rune/spell aggregators.
+ */
+function starterBundleGameKey(game: ProfileGame): string | null {
+  const items = game.starterItems;
+  if (items === undefined || items === null || items.length === 0) return null;
+  return starterBundleItemsKey(items);
+}
+
+/**
+ * "Profile's best" starter bundles for `championId` in `role` (SPECS
+ * §18.5, BL-059): the profile's own net starter-window bundles (recorded
+ * per game by `profile-sync`, D-086/D-139) ranked by shrunk win rate under
+ * the current draft context, with the same fallback/shrinkage/insufficient
+ * rules as the rune pages and spell pairs. Only in-scope games recorded in
+ * `role` count (D-097/D-136); games synced before schema v3 carry no
+ * `starterItems` and simply never match a bundle.
+ */
+export function recommendProfileStarters(
+  profile: ProfileExport,
+  championId: number,
+  role: Role,
+  context: PersonalizeContext,
+  data: ProfileSetupData,
+  nowMs: number,
+  options: {
+    config?: PersonalizeConfig;
+    minSetupGames?: number;
+    topPicks?: number;
+  } = {},
+): ProfileStarterPick[] {
+  const config = options.config ?? DEFAULT_PERSONALIZE_CONFIG;
+  const minGames = options.minSetupGames ?? DEFAULT_MIN_SETUP_GAMES;
+  const topPicks = options.topPicks ?? DEFAULT_SETUP_PICKS;
+  const games = buildWeightedGames(profile, data, nowMs, config.halfLifeDays, role);
+  const matchContext = setupMatchContext(context, role);
+  const base = championBaseWinRate(games, championId);
+
+  const bundles = new Map<string, { items: readonly StarterBundleItem[]; games: number }>();
+  for (const weighted of games) {
+    const game = weighted.game;
+    if (game.championId !== championId) continue;
+    const items = game.starterItems;
+    if (items === undefined || items === null || items.length === 0) continue;
+    const key = starterBundleItemsKey(items);
+    const existing = bundles.get(key);
+    if (existing === undefined) {
+      bundles.set(key, { items, games: 1 });
+    } else {
+      existing.games += 1;
+    }
+  }
+
+  const picks: ProfileStarterPick[] = [];
+  for (const [key, bundle] of bundles) {
+    const { stats, level, bestNEff } = aggregateSetup(
+      games,
+      championId,
+      starterBundleGameKey,
+      key,
+      matchContext,
+      minGames,
+    );
+    if (stats === null) {
+      picks.push({
+        items: bundle.items,
+        winRate: null,
+        nEff: bestNEff,
+        games: bundle.games,
+        fallbackLevel: null,
+        insufficientData: true,
+      });
+      continue;
+    }
+    const p = (stats.winsW + config.kShrink * base) / (stats.gamesW + config.kShrink);
+    picks.push({
+      items: bundle.items,
+      winRate: p,
+      nEff: stats.nEff,
+      games: stats.rawGames,
+      fallbackLevel: level,
+      insufficientData: false,
+    });
+  }
+
+  picks.sort((a, b) => {
+    if (a.insufficientData !== b.insufficientData) return a.insufficientData ? 1 : -1;
+    const primary = b.insufficientData ? b.nEff - a.nEff : (b.winRate ?? 0) - (a.winRate ?? 0);
+    if (primary !== 0) return primary;
+    return starterBundleItemsKey(a.items).localeCompare(starterBundleItemsKey(b.items));
   });
   return picks.slice(0, topPicks);
 }

@@ -10,7 +10,7 @@
  * No DOM, no Node APIs, no network, no file I/O, no randomness.
  */
 
-import type { ChampionTagsMap } from '@draftorb/shared';
+import type { ChampionTagsMap, StarterBundleItem } from '@draftorb/shared';
 
 import { DEFAULT_ITEM_CONTEXT_CONFIG } from './config.js';
 import type { ItemContextConfig } from './config.js';
@@ -176,6 +176,25 @@ export function ownedItemsAt(
 }
 
 /**
+ * Net starter bundle items: the sorted `"itemId:count"` set of items
+ * purchased within `starterWindowSeconds` of game start, after netting
+ * undo/sold/destroyed (D-086). Structured form of `starterBundleKey` —
+ * the profile sync stores this per game (BL-059).
+ */
+export function starterBundleItems(
+  events: readonly ItemTimelineEvent[],
+  windowSeconds: number,
+  config: ItemContextConfig = DEFAULT_ITEM_CONTEXT_CONFIG,
+): StarterBundleItem[] {
+  const windowMs = (windowSeconds > 0 ? windowSeconds : config.starterWindowSeconds) * 1000;
+  const inWindow = events.filter((e) => e.ts <= windowMs);
+  const owned = netPurchasedItems(inWindow);
+  return [...owned.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([itemId, count]) => ({ itemId, count }));
+}
+
+/**
  * Starter bundle key: the sorted, de-duplicated `"itemId:count"` pairs of
  * items purchased within `starterWindowSeconds` of game start, after netting
  * undo/sold/destroyed. Stable string form for grouping and exports.
@@ -185,13 +204,9 @@ export function starterBundleKey(
   windowSeconds: number,
   config: ItemContextConfig = DEFAULT_ITEM_CONTEXT_CONFIG,
 ): string {
-  const windowMs = (windowSeconds > 0 ? windowSeconds : config.starterWindowSeconds) * 1000;
-  const inWindow = events.filter((e) => e.ts <= windowMs);
-  const owned = netPurchasedItems(inWindow);
-  const parts = [...owned.entries()]
-    .sort((a, b) => a[0] - b[0])
-    .map(([itemId, count]) => `${itemId}:${count}`);
-  return parts.join(',');
+  return starterBundleItems(events, windowSeconds, config)
+    .map((item) => `${item.itemId}:${item.count}`)
+    .join(',');
 }
 
 /**

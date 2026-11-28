@@ -15,6 +15,17 @@ Live handoff log for DraftOrb. Newest entries first. Historical session logs liv
 
 ## Current handoff
 
+- Date: 2026-11-29
+- Branch/PR: orchestrator wave merged to `main` — PRs #191–#203; BL-060 in flight as PR #204 (`feat/bl-060-backfill-starters`, worktree `draftorb-wt-bl060`)
+- State: REVIEW
+- Done: full autonomous orchestration pass over the post-M2 backlog. Merged: #183 BL-040b (API terms doc), #191 B-077 (SETUP.md), #192 B-078 (aggregate test timeout), #193 B-083 (streaming gunzip for `etl pull --db`), #194 B-080 (backtest report in aggregate archive), #195 B-075 (full zod validation of pick-data manifest), #196 BL-055 (new-game reset), #197 BL-057 (per-role favorites, export schema v2), #198 BL-056 (per-role matchup contexts, D-142 PROPOSED), #199 BL-058 (draft handoff pick→setup), #200 BL-059 (profile starter bundles, migration 023, export schema v3), #202 B-077 BUGS status, #203 B-089 (baseline pill driven by matchup state). Issues #184–#187 renumbered to BL-056..BL-059 and closed; board updated. New issue #201 (BL-060) filed for starter-bundle backfill of historical `profile_games`.
+- Files touched: see the merged PRs; orchestration artifacts only in `docs/BUGS.md`, `docs/PROGRESS.md`, GitHub issues/board.
+- Tests: every PR ran `pnpm check` green in CI (lint + format + typecheck + ~1900–1989 tests, Windows job included) plus a reviewer sub-agent per PR.
+- Blockers / next step: owner decisions still gate M3 — #180 BL-040a GO/NO-GO (read `docs/reports/bl-040-riot-policy.md` section A + run `scripts/live-client-probe.ts` in a live game, paste output on the issue), then #97–#107 unblock. B-079 (ETL on real Windows hardware) and the Tauri release stay owner-blocked. PROPOSED decisions awaiting owner batch review: D-081–D-088, D-090, D-092/D-092a, D-093, D-095 (items phase), D-125–D-132 (merged features, retroactive acceptance), D-139/D-142 assumptions, D-140/D-141 (resolve with #180).
+- Pitfalls: BUGS.md merge conflicts are constant — resolve by keeping both sides' newest rows and flipping statuses per branch intent. `pnpm lint` fails locally on the untracked `scenario-runner.ts` at repo root (allowDefaultProject) — not a code issue; CI is authoritative. Profile starter bundles only exist for games synced after migration 023 — historical rows stay NULL until `backfill-profile-starters` runs (PR #204).
+
+### Previous handoff (BL-040a)
+
 - Date: 2026-11-28
 - Branch/PR: `feat/bl-040a-riot-policy` / BL-040a (#180); stacked child `feat/bl-040b-api-terms` (PR #183, base this branch)
 - State: REVIEW

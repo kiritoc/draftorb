@@ -135,7 +135,9 @@ function readJsonLenient(path: string): unknown {
 /**
  * Lists the publishable set under `publicDir`: `latest.json` plus the
  * manifest-covered tree of the patch `latest.json` selects (other patches
- * and root-level reports are not packed), minus forbidden paths. Throws when
+ * and unlisted root-level files are not packed; the optional
+ * `backtest-draft.json` report is, when present — B-080), minus forbidden
+ * paths. Throws when
  * `latest.json` is invalid, the patch dir is missing, the manifest it points
  * to is missing, invalid or for another patch (e.g. invalidated by a
  * same-patch `pnpm etl static`), or a manifest-listed file is absent.
@@ -191,6 +193,16 @@ export function collectPublishFiles(publicDir: string): PublishFile[] {
     if (rel !== latest.manifest && !covered.has(patchRel)) continue;
     files.push({ rel, abs, size: statSync(abs).size });
   }
+  // Optional archive-root reports: `pnpm etl backtest draft` writes
+  // `backtest-draft.json` at the data/public root (B-080). It ships next to
+  // `latest.json` only when present — the apps gate the matchup layers on
+  // its content (D-133) and treat a missing report as "matchup off".
+  for (const name of OPTIONAL_ARCHIVE_ROOT_FILES) {
+    const abs = join(publicDir, name);
+    if (existsSync(abs)) {
+      files.push({ rel: name, abs, size: statSync(abs).size });
+    }
+  }
   for (const path of covered) {
     if (!present.has(path)) {
       throw new CliError(
@@ -234,6 +246,12 @@ export function toTarEntries(files: readonly PublishFile[]): TarFileEntry[] {
  * manifest lists. */
 const ARCHIVE_ROOT_FILES = ['latest.json', 'champion-tags.json'] as const;
 
+/** Optional archive-root files packed only when present in `data/public`
+ * (B-080): the backtest report `pnpm etl backtest draft` writes. Unlike
+ * ARCHIVE_ROOT_FILES they are not required — a publish without a fresh
+ * report is valid and simply leaves the matchup layers off (D-133). */
+const OPTIONAL_ARCHIVE_ROOT_FILES = ['backtest-draft.json'] as const;
+
 /**
  * Returns tar entries whose manifest copy also lists the archive-root files.
  *
@@ -261,6 +279,18 @@ export function augmentManifestWithRootFiles(entries: readonly TarFileEntry[]): 
       sha256: createHash('sha256').update(entry.data).digest('hex'),
     };
   });
+  // Optional root files (e.g. `backtest-draft.json`, B-080) join the manifest
+  // copy only when the publish set actually carries them, so the desktop
+  // loader's fail-closed coverage check accepts their absence too.
+  for (const name of OPTIONAL_ARCHIVE_ROOT_FILES) {
+    const entry = entries.find((e) => e.name === name);
+    if (entry !== undefined) {
+      rootEntries.push({
+        path: `/${name}`,
+        sha256: createHash('sha256').update(entry.data).digest('hex'),
+      });
+    }
+  }
   const merged = manifestSchema.parse({
     ...manifest,
     files: [...manifest.files, ...rootEntries].sort((a, b) => a.path.localeCompare(b.path)),

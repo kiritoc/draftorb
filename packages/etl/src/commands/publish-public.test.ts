@@ -207,6 +207,20 @@ describe('collectPublishFiles', () => {
     expect(rels).not.toContain('backtest-report.json');
   });
 
+  it('packs backtest-draft.json at the archive root when present (B-080)', () => {
+    const dir = makePublicDir();
+    touch(dir, 'backtest-draft.json', '{"validationStatus":"validated"}');
+    touch(dir, 'other-report.json', '{}');
+    const rels = collectPublishFiles(dir).map((f) => f.rel);
+    expect(rels).toContain('backtest-draft.json');
+    expect(rels).not.toContain('other-report.json');
+  });
+
+  it('publishes fine without backtest-draft.json (matchup stays off)', () => {
+    const rels = collectPublishFiles(makePublicDir()).map((f) => f.rel);
+    expect(rels).not.toContain('backtest-draft.json');
+  });
+
   it('packs only manifest-covered patch files (B-076)', () => {
     const dir = makePublicDir();
     touch(dir, '16.22/champions.bootstrap.json', '{}');
@@ -283,6 +297,28 @@ describe('augmentManifestWithRootFiles', () => {
       .map((e) => e.name)
       .filter((name) => name !== '16.22/manifest.json' && !covered.has(name));
     expect(uncovered).toEqual([]);
+  });
+
+  it('covers an optional backtest-draft.json root entry when present (B-080)', () => {
+    const dir = makePublicDir();
+    touch(dir, 'backtest-draft.json', '{"validationStatus":"validated"}');
+    const tagsPath = join(dir, 'champion-tags.json');
+    writeFileSync(tagsPath, '{"tags":{}}');
+    // collectPublishFiles already picks up backtest-draft.json from the root.
+    const entries = augmentManifestWithRootFiles(
+      toTarEntries([
+        ...collectPublishFiles(dir),
+        { rel: 'champion-tags.json', abs: tagsPath, size: 11 },
+      ]),
+    );
+    const manifest = must(entries.find((e) => e.name === '16.22/manifest.json'));
+    const parsed = JSON.parse(manifest.data.toString('utf8')) as {
+      files: Array<{ path: string; sha256?: string }>;
+    };
+    const report = must(entries.find((e) => e.name === 'backtest-draft.json'));
+    const sha = (buf: Buffer) => createHash('sha256').update(buf).digest('hex');
+    const entry = parsed.files.find((f) => f.path === '/backtest-draft.json');
+    expect(entry?.sha256).toBe(sha(report.data));
   });
 
   it('fails when a root file is missing from the publish set', () => {

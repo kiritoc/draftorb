@@ -117,7 +117,7 @@ function makeProfile(games: ProfileGame[]): ProfileExport {
     label: "Test's picks",
     syncedAt: NOW_MS,
     gameCount: games.length,
-    favorites: { combined: [], recency: [], mastery: [] },
+    favorites: {},
     games,
     mastery: [],
   };

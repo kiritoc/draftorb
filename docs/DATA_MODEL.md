@@ -255,16 +255,15 @@ profiles/<id>.json                   // one file per configured profile
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "kiritoctoc-euw1",
   "riotId": { "gameName": "KiriToc", "tagLine": "Toc", "platform": "EUW1" },
   "label": "KiriToc's picks",
   "syncedAt": 1730000000,
   "gameCount": 412,
   "favorites": {
-    "combined": [23, 143],
-    "recency": [23, 143],
-    "mastery": [999]
+    "SUPPORT": { "combined": [23, 143], "recency": [23, 143], "mastery": [999] },
+    "TOP": { "combined": [98, 999], "recency": [98], "mastery": [999] }
   },
   "games": [
     {
@@ -294,7 +293,7 @@ profiles/<id>.json                   // one file per configured profile
 
 Anonymization rules (D-069, enforced by the exporter and covered by tests): export ONLY champion ids, role, ally ADC and enemy ADC/support champion ids, enemy team champion ids, rune page ids, summoner spell ids, item ids in build order, win/loss and the game day (`createdAtDay` = unix days). NEVER export other players' names, Riot IDs or puuids, and no match ids. The profile owner's own Riot ID appears only in the `riotId`/`label` block — the owner's explicit, documented choice.
 
-Caps: at most the last 180 days and at most `profileMaxGames` (default 500, ETL config) games per profile; `favorites` and all statistics are computed over the exported set. All files are validated by shared zod schemas before writing; the web app validates again on load. `favorites` follows D-074 (top 15 by recency-weighted Support games in the last 90 days union top 5 by mastery). `itemsOrdered` is `null` when the match timeline was not fetched.
+Caps: at most the last 180 days and at most `profileMaxGames` (default 500, ETL config) games per profile; `favorites` and all statistics are computed over the exported set. All files are validated by shared zod schemas before writing; the web app validates again on load. `favorites` follows D-074 per role (BL-057, schema v2): a partial record keyed by role — top 15 by recency-weighted games in that role over the last 90 days union top 5 by mastery points; only roles present in the exported games get an entry, and the mastery top-N is role-agnostic so it joins every role's `combined`. Schema v1 exports (`favorites` as a single SUPPORT-scoped list) are still accepted: readers normalize them to `{ SUPPORT: favorites }`. `itemsOrdered` is `null` when the match timeline was not fetched.
 
 Personalized entries produced by `personalize` (engine output, not stored) may carry an optional baseline win rate and rank bucket used by the badge delta (D-080) — additive optional fields; whether they bump the result schema version is decided by the implementing ticket, as in D-054.
 

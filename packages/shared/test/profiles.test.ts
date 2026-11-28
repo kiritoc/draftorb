@@ -50,13 +50,16 @@ const validGame = {
 };
 
 const validExport = {
-  schemaVersion: 1,
+  schemaVersion: PROFILE_EXPORT_SCHEMA_VERSION,
   id: 'kiritoctoc-euw1',
   riotId: { gameName: 'KiriToc', tagLine: 'Toc', platform: 'EUW1' },
   label: "KiriToc's picks",
   syncedAt: 1730000000,
   gameCount: 1,
-  favorites: { combined: [23, 143], recency: [23, 143], mastery: [999] },
+  favorites: {
+    SUPPORT: { combined: [23, 143], recency: [23, 143], mastery: [999] },
+    TOP: { combined: [98], recency: [98], mastery: [999] },
+  },
   games: [validGame],
   mastery: [{ championId: 23, points: 152345, level: 7 }],
 };
@@ -103,7 +106,31 @@ describe('profileExportSchema', () => {
   it('accepts a valid anonymized export', () => {
     const export_ = { ...validExport, games: [{ ...validGame, itemsOrdered: null }] };
     expect(profileExportSchema.parse(export_)).toEqual(export_);
-    expect(PROFILE_EXPORT_SCHEMA_VERSION).toBe(1);
+    expect(PROFILE_EXPORT_SCHEMA_VERSION).toBe(2);
+  });
+
+  it('normalizes a v1 export: favorites become the SUPPORT entry', () => {
+    const v1 = {
+      ...validExport,
+      schemaVersion: 1,
+      favorites: { combined: [23, 143], recency: [23, 143], mastery: [999] },
+    };
+    const parsed = profileExportSchema.parse(v1);
+    expect(parsed.schemaVersion).toBe(PROFILE_EXPORT_SCHEMA_VERSION);
+    expect(parsed.favorites).toEqual({
+      SUPPORT: { combined: [23, 143], recency: [23, 143], mastery: [999] },
+    });
+  });
+
+  it('rejects favorites keyed by a non-role and unknown schema versions', () => {
+    expect(
+      profileExportSchema.safeParse({
+        ...validExport,
+        favorites: { MIDLANE: { combined: [], recency: [], mastery: [] } },
+      }).success,
+    ).toBe(false);
+    expect(profileExportSchema.safeParse({ ...validExport, schemaVersion: 3 }).success).toBe(false);
+    expect(profileExportSchema.safeParse({ ...validExport, schemaVersion: 0 }).success).toBe(false);
   });
 
   it('rejects foreign identifiers and match ids (anonymization whitelist)', () => {
@@ -126,7 +153,7 @@ describe('profileExportSchema', () => {
     expect(profileExportSchema.safeParse({ ...validExport, games: [withoutAlly] }).success).toBe(
       false,
     );
-    expect(profileExportSchema.safeParse({ ...validExport, schemaVersion: 2 }).success).toBe(false);
+    expect(profileExportSchema.safeParse({ ...validExport, schemaVersion: 3 }).success).toBe(false);
     expect(profileExportSchema.safeParse({ ...validExport, gameCount: -1 }).success).toBe(false);
   });
 });
@@ -148,7 +175,10 @@ describe('profileIndexSchema', () => {
       ],
     };
     expect(profileIndexSchema.parse(index)).toEqual(index);
-    expect(profileIndexSchema.safeParse({ schemaVersion: 2, profiles: [] }).success).toBe(false);
+    // v1 indexes (pre-BL-057) and the current version share the entry shape.
+    expect(profileIndexSchema.safeParse({ schemaVersion: 1, profiles: [] }).success).toBe(true);
+    expect(profileIndexSchema.safeParse({ schemaVersion: 2, profiles: [] }).success).toBe(true);
+    expect(profileIndexSchema.safeParse({ schemaVersion: 3, profiles: [] }).success).toBe(false);
     expect(
       profileIndexSchema.safeParse({
         schemaVersion: 1,

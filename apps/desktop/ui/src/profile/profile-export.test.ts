@@ -56,6 +56,25 @@ describe('loadProfileExport', () => {
     expect((await loadProfileExport('/r')).kind).toBe('invalid');
   });
 
+  it('loads a schema v1 export, normalizing favorites to the SUPPORT role', async () => {
+    const profile = makeProfile([{ championId: 1, role: 'SUPPORT', win: true }]);
+    // Pre-BL-057 shape: schemaVersion 1, single SUPPORT-scoped favorites list.
+    const v1 = {
+      ...profile,
+      schemaVersion: 1,
+      favorites: { combined: [1], recency: [1], mastery: [] },
+    };
+    files({
+      'index.json': JSON.stringify({ ...makeIndex(), schemaVersion: 1 }),
+      'kiritoctoc-euw1.json': JSON.stringify(v1),
+    });
+    const load = await loadProfileExport('/r');
+    expect(load.kind).toBe('loaded');
+    if (load.kind !== 'loaded') return;
+    expect(load.profile.schemaVersion).toBe(2);
+    expect(load.profile.favorites.SUPPORT?.combined).toEqual([1]);
+  });
+
   it('loads the first profile on the happy path', async () => {
     const profile = makeProfile([{ championId: 1, role: 'SUPPORT', win: true }]);
     files({

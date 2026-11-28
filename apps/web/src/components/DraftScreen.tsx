@@ -177,7 +177,10 @@ export function DraftScreen() {
 
   const poolChampionIds = useMemo(() => pool?.pools[USER_ROLE] ?? [], [pool]);
   const poolSet = useMemo(() => new Set(poolChampionIds), [poolChampionIds]);
-  const favoriteIds = useMemo(() => new Set(profile?.favorites.combined ?? []), [profile]);
+  const favoriteIds = useMemo(
+    () => new Set(profile?.favorites[USER_ROLE]?.combined ?? []),
+    [profile],
+  );
 
   const draftInput: DraftInput = useMemo(
     () => ({
@@ -336,7 +339,7 @@ export function DraftScreen() {
     if (profile === null) {
       return;
     }
-    const result = importFavoritesIntoPool(pool, profile.favorites.combined);
+    const result = importFavoritesIntoPool(pool, profile.favorites[USER_ROLE]?.combined ?? []);
     const { pool: filteredPool, dropped } = filterPoolByCatalogue(
       result.pool,
       champions.map((champion) => champion.id),

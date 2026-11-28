@@ -65,8 +65,11 @@ export const PROFILE_CONFIG_SCHEMA_VERSION = 1;
 /**
  * Version of the exported profile JSON under `data/public/profiles/`
  * (`<id>.json` and `index.json`, D-069). Bumped on every breaking change.
+ * v1: `favorites` was a single SUPPORT-scoped list (D-074).
+ * v2: `favorites` is a per-role record (champion x roles, D-101/D-136,
+ * BL-057); readers normalize v1 exports to `{ SUPPORT: favorites }`.
  */
-export const PROFILE_EXPORT_SCHEMA_VERSION = 1;
+export const PROFILE_EXPORT_SCHEMA_VERSION = 2;
 
 /**
  * Version of the engine personalization output contract (`PersonalizedResult`,

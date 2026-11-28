@@ -160,6 +160,7 @@ pnpm etl sample-report [patch]   # per-file row counts + n_eff distribution for 
 pnpm etl derive-roles [patch]  # rewrite champions.json.roles from observed roles (T-015.b); run after `matches`, and re-run after every `static`
 pnpm etl rekey [platform]      # rewrite stored PUUIDs to the current API key (after an RIOT_API_KEY change; --dry-run, --limit=N)
 pnpm etl profile-sync [id] [--publish]  # sync configured profiles -> SQLite -> data/public/profiles/ (T-091, D-068; --publish also packs exports into public-exports.tar.gz)
+pnpm etl backfill-profile-starters [id] [--limit=N] [--call-budget=N]  # fill starter_bundle_json for profile_games rows left NULL by pre-migration-023 syncs (BL-060; resumable, rerun after profile-sync/export)
 pnpm etl backtest draft [--out=<path>]  # offline validation of recommendations vs recorded outcomes (T-027)
 pnpm etl pull                # download newest state-* release exports into data/public (T-108, D-079)
 ```

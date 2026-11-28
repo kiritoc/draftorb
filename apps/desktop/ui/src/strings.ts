@@ -18,6 +18,12 @@ export const strings = {
   navGame: 'Game',
   navSettings: 'Settings',
   navGameDisabled: 'Coming in v3',
+  newGame: 'New game',
+  newGameDialogLabel: 'Start a new game',
+  newGameConfirmText:
+    'Clear the draft slots, bans and setup choices for a fresh game? Your pool, settings and profile are kept.',
+  newGameConfirm: 'Start new game',
+  newGameCancel: 'Cancel',
   roleSelectorLabel: 'Your role',
   roleNames: {
     SUPPORT: 'Support',

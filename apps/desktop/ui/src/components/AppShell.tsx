@@ -51,6 +51,10 @@ export interface AppShellProps {
    */
   draftHandoff?: DraftHandoff;
   onDraftHandoffChange?: (handoff: DraftHandoff) => void;
+  /** B-089: matchup layers active for the drafted role (reported by PickScreen via App). */
+  matchupEnabled?: boolean;
+  /** B-089: PickScreen reports its matchup state up through App. */
+  onMatchupEnabledChange?: (enabled: boolean) => void;
 }
 
 export function AppShell(props: AppShellProps) {
@@ -61,6 +65,7 @@ export function AppShell(props: AppShellProps) {
         resolvedTheme={props.resolvedTheme}
         onToggleTheme={props.onToggleTheme}
         onNewGame={() => props.onNewGameOpenChange(true)}
+        matchupEnabled={props.matchupEnabled}
       />
       {props.notice !== undefined && (
         <p
@@ -92,6 +97,7 @@ export function AppShell(props: AppShellProps) {
             repoFolder={props.repoFolder}
             onPoolChanged={props.onPoolChanged}
             onDraftHandoffChange={props.onDraftHandoffChange}
+            onMatchupEnabledChange={props.onMatchupEnabledChange}
           />
         </section>
         {props.screen === 'settings' && (

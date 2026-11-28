@@ -66,6 +66,12 @@ describe('AppShell', () => {
     }
   });
 
+  it('hides the baseline-ranking pill only when matchup layers are enabled (B-089)', () => {
+    expect(render({ matchupEnabled: true })).not.toContain('Baseline ranking');
+    expect(render({ matchupEnabled: false })).toContain('Baseline ranking');
+    expect(render()).toContain('Baseline ranking');
+  });
+
   it('renders the settings screen with the theme choice and a notice', () => {
     const settings = render({
       screen: 'settings',

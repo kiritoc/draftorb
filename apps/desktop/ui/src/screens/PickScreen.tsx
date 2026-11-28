@@ -78,6 +78,11 @@ export interface PickScreenProps {
    * change so the setup screen can reuse them without re-entry.
    */
   onDraftHandoffChange?: (handoff: DraftHandoff) => void;
+  /**
+   * B-089: reports whether the matchup layers are active for the loaded
+   * role/patch so the header can hide the baseline-ranking pill (D-133).
+   */
+  onMatchupEnabledChange?: (enabled: boolean) => void;
 }
 
 export function PickScreen({
@@ -88,6 +93,7 @@ export function PickScreen({
   onPoolChanged,
   noEligibleRole = false,
   onDraftHandoffChange,
+  onMatchupEnabledChange,
 }: PickScreenProps) {
   const [pickData, setPickData] = useState<PickData | null>(null);
   // D-133: matchup layers run only when the archived backtest report
@@ -159,6 +165,13 @@ export function PickScreen({
       cancelled = true;
     };
   }, [role, dataReadyNonce, noEligibleRole]);
+
+  // B-089: report whether matchup layers are active so the header pill can
+  // show "Baseline ranking" only in baseline mode (D-133). null config is
+  // the fail-safe baseline state and is reported as disabled.
+  useEffect(() => {
+    onMatchupEnabledChange?.(matchupConfig !== null);
+  }, [matchupConfig, onMatchupEnabledChange]);
 
   // Champion catalog for the pool editor: role-independent, so it stays
   // usable when no role is eligible or pick data fails to load (BL-050).

@@ -1,12 +1,12 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { gunzipSync } from 'node:zlib';
 
 import { CliError, UsageError } from '../cli-args';
 import { defaultPublicDataDir, resolveDbPath } from '../config/paths';
+import { gunzipFile } from '../gunzip-file';
 import {
   DB_ASSET_NAME,
   EXPORTS_ASSET_NAME,
@@ -116,7 +116,14 @@ async function runPull(args: string[]): Promise<void> {
         throw new CliError(`Release ${tag} has no ${DB_ASSET_NAME} asset (--db requested).`);
       }
       const dbPath = resolveDbPath();
-      writeFileSync(dbPath, gunzipSync(readFileSync(dbAsset)));
+      try {
+        // Streamed: the asset decompresses to ~5.6 GB, past the Buffer limit
+        // that made gunzipSync crash (B-083).
+        await gunzipFile(dbAsset, dbPath);
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        throw new CliError(`Failed to restore ${DB_ASSET_NAME} from release ${tag}: ${detail}`);
+      }
       log.info(`Database written to ${dbPath}`);
     }
   } finally {

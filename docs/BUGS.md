@@ -9,7 +9,7 @@ Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATI
 | B-088 | S3  | desktop        | Setup loaders (`setup-runes`, `setup-spells`, `setup-starters`) served stale cache files dropped by a same-patch refresh: the download keeps the patch directory and no loader checked the current manifest's file list                               | FIXED  | Devin Review/PR #179       | BL-031b |
 | B-087 | S3  | engine         | `recommendStarters` ranked the cross-role `global` level as a peer of the champion/role levels, so a Jungle pet could displace role-specific Top bundles; slots now fill narrowest-level first                                                        | FIXED  | Devin Review/PR #179       | BL-031b |
 | B-086 | S3  | engine         | `recommendStarters`/`recommendSummoners` filled display slots by shrunk score before the D-102 evidence gate, so thin picks could push sufficient ones out and the setup screen reported insufficient data despite a usable recommendation            | FIXED  | Devin Review/PR #179       | BL-031b |
-| B-083 | S2  | etl            | `etl pull --db` crashes on the current database: `gunzipSync` cannot return the ~5.6 GB `DraftOrb.sqlite` buffer (`length` out of range, max 2,147,483,647); needs streaming decompression instead of loading the asset into memory                   | OPEN   | Devin/2026-11-27           | –       |
+| B-083 | S2  | etl            | `etl pull --db` crashes on the current database: `gunzipSync` cannot return the ~5.6 GB `DraftOrb.sqlite` buffer (`length` out of range, max 2,147,483,647); needs streaming decompression instead of loading the asset into memory                   | FIXED  | Devin/2026-11-27           | –       |
 | B-082 | S3  | engine+desktop | Setup rune path counted every expert page as sufficient: thin pages (`lowData` or below the D-102 distinct-player gate) suppressed the D-103 broader-statistic fallback, and pre-D-102 (manifest v5) rune exports were accepted as evidence-compliant | FIXED  | Devin Review/PR #173       | BL-030a |
 | B-081 | S3  | engine         | `recommendProfileRunes`/`recommendProfileSpells` filtered profile games to `role === 'SUPPORT'` only, so the "my data" setup path silently returned nothing for TOP/JUNGLE (D-097 scope)                                                              | FIXED  | Devin/2026-11-28           | BL-030a |
 | B-081 | S3  | desktop        | Pool editor repo-file actions gave no visible feedback: the status message rendered at the top of the modal while the transfer buttons sit at the bottom, so a successful "Export to repo file" looked like a no-op                                   | FIXED  | owner/2026-11-27           | –       |
@@ -53,6 +53,13 @@ Review notes that predate the bug log live in [Review history](#review-history) 
 ```
 
 ## Fixed
+
+### B-083 — `etl pull --db` crashed on the ~5.6 GB database (gunzipSync buffer limit) — FIXED
+
+- Severity / Area: S2 / etl (`commands/pull.ts`, PR #193)
+- Steps to reproduce: `pnpm etl pull --db` against a state release whose `DraftOrb.sqlite.gz` decompresses to ~5.6 GB.
+- Expected / Actual: expected the database to download and decompress; actual `gunzipSync(readFileSync(asset))` exceeded the Node Buffer limit (2,147,483,647 bytes) and threw `ERR_OUT_OF_RANGE`/`length` out of range.
+- Fix (commit/ticket): new `gunzip-file.ts` streams `createReadStream` → `createGunzip` → `pipeline` → `createWriteStream` into a sibling `.partial-<pid>-<counter>` temp file, then `renameSync` into place (atomic, same filesystem); failures remove the temp file so a corrupt asset never lands at the destination. `pull.ts` awaits `gunzipFile(dbAsset, dbPath)` inside a `CliError` with release-tag context. Regression tests: `gunzip-file.test.ts` — SQLite round-trip opened via better-sqlite3, 64 MiB sha256-verified multi-chunk payload, overwrite, corrupt-gzip cleanup, missing-source cleanup.
 
 ### B-081 — Pool editor repo-file actions gave no visible feedback — FIXED
 

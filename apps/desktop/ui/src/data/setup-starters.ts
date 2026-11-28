@@ -8,9 +8,10 @@
  * file means "no starter data", never an error — same contract as the rune
  * loader) and runs the mode-switched engine entry point
  * `recommendSetupStarters`. `topPlayers` reads the expert aggregates;
- * `myData` has no profile starter source — the profile export records no
- * starter-window purchases, so it always reports the insufficient-data
- * state with the labeled D-103 broader statistic (D-139 PROPOSED).
+ * `myData` reads the profile export — schema v3 exports carry the per-game
+ * starter-window bundles recorded by `profile-sync` (BL-059); older exports
+ * report the insufficient-data state with the labeled D-103 broader
+ * statistic (D-139).
  */
 
 import {
@@ -99,7 +100,7 @@ export interface SetupStartersQuery {
   readonly draft: DraftInput;
   /** Pick-screen dataset for the same role (provides baselines/roleProb/tags). */
   readonly pickData: PickData;
-  /** Profile export for `myData` mode (broader statistic only); ignored by `topPlayers`. */
+  /** Profile export for `myData` mode (starter bundles + broader statistic); ignored by `topPlayers`. */
   readonly profile?: ProfileExport;
   /** Timestamp for profile recency weighting; defaults to `Date.now()`. */
   readonly nowMs?: number;
@@ -118,9 +119,9 @@ export interface SetupStartersQuery {
 export async function loadSetupStarters(
   query: SetupStartersQuery,
 ): Promise<SetupStartersResult> {
-  // The starter exports are only needed for the expert mode; myData never
-  // touches them (there is no profile starter source), so a mode switch
-  // costs at most two cache reads.
+  // The starter exports are only needed for the expert mode; myData reads
+  // the profile export instead, so a mode switch costs at most two cache
+  // reads.
   const exports =
     query.mode === 'topPlayers'
       ? await loadStarterExports(query.draft.userRole, query.championId)

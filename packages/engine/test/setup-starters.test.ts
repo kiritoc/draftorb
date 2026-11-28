@@ -203,7 +203,36 @@ describe('recommendSetupStarters — topPlayers mode', () => {
 });
 
 describe('recommendSetupStarters — myData mode', () => {
-  it('always reports the insufficient-data state: the profile has no starter-window data', () => {
+  const STARTER_BUNDLE = items([3340, 1], [3858, 1]);
+
+  it('recommends the profile starter bundles recorded by profile-sync (BL-059)', () => {
+    const games = Array.from({ length: 8 }, () =>
+      makeGame({ starterItems: STARTER_BUNDLE, win: true }),
+    );
+    const result = recommendSetupStarters(draft(), CHAMP, setupData(), {
+      mode: 'myData',
+      profile: makeProfile(games),
+      nowMs: NOW_MS,
+    });
+    expect(result.mode).toBe('myData');
+    expect(result.dataSource).toBe('profile');
+    expect(result.evidence).toEqual({ kind: 'profile', minSetupGames: 5 });
+    expect(result.dataAvailable).toBe(true);
+    expect(result.broaderStatistic).toBeNull();
+    const pick = must(result.picks[0]);
+    expect(pick.items).toEqual(STARTER_BUNDLE);
+    expect(pick.games).toBe(8);
+    expect(pick.nEff).toBeGreaterThan(0);
+    expect(pick.winRate).not.toBeNull();
+    expect(pick.insufficientData).toBe(false);
+    // The draft's ally ADC / enemy support match the fixture games, so the
+    // estimate comes from the L1 matchup level.
+    expect(pick.source).toBe('profileMatchup');
+    expect(pick.sourceLevel).toBe(1);
+    expect(() => setupStartersResultSchema.parse(result)).not.toThrow();
+  });
+
+  it('keeps the insufficient-data state when no game carries a bundle', () => {
     const games = Array.from({ length: 10 }, () => makeGame());
     const result = recommendSetupStarters(draft(), CHAMP, setupData(), {
       mode: 'myData',

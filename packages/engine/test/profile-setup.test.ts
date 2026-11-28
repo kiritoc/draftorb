@@ -12,7 +12,11 @@ import {
   type RecommendData,
 } from '@draftorb/shared';
 
-import { recommendProfileRunes, recommendProfileSpells } from '../src/profile-setup.js';
+import {
+  recommendProfileRunes,
+  recommendProfileSpells,
+  recommendProfileStarters,
+} from '../src/profile-setup.js';
 import type { PersonalizeContext } from '../src/personalize.js';
 import { makeData, must } from '../src/recommend-test-utils.js';
 
@@ -196,6 +200,93 @@ describe('recommendProfileSpells', () => {
     const a = recommendProfileSpells(profile, 1, 'SUPPORT', EMPTY_CONTEXT, data, NOW_MS);
     const b = recommendProfileSpells(profile, 1, 'SUPPORT', EMPTY_CONTEXT, data, NOW_MS);
     expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+  });
+});
+
+describe('recommendProfileStarters', () => {
+  const BUNDLE_A = [
+    { itemId: 3340, count: 1 },
+    { itemId: 3858, count: 1 },
+  ];
+  const BUNDLE_B = [{ itemId: 2003, count: 1 }];
+
+  it('ranks starter bundles by shrunk profile WR with sample sizes', () => {
+    const games = [
+      // Bundle A: 6 wins; bundle B: 6 losses -> A ranks first.
+      ...Array.from({ length: 6 }, () => makeGame({ starterItems: BUNDLE_A })),
+      ...Array.from({ length: 6 }, () => makeGame({ starterItems: BUNDLE_B, win: false })),
+    ];
+    const picks = recommendProfileStarters(
+      makeProfile(games),
+      1,
+      'SUPPORT',
+      EMPTY_CONTEXT,
+      data,
+      NOW_MS,
+    );
+    expect(picks).toHaveLength(2);
+    expect(must(picks[0]).items).toEqual(BUNDLE_A);
+    expect(must(picks[0]).insufficientData).toBe(false);
+    expect(must(picks[0]).winRate).toBeGreaterThan(0.5);
+    expect(must(picks[0]).nEff).toBeCloseTo(6, 3);
+    expect(must(picks[0]).games).toBe(6);
+    expect(must(picks[0]).fallbackLevel).toBe(4);
+    expect(must(picks[1]).items).toEqual(BUNDLE_B);
+    expect(must(picks[1]).winRate).toBeLessThan(0.5);
+  });
+
+  it('groups the same bundle regardless of item order and reports insufficient data below the minimum', () => {
+    const games = Array.from({ length: 3 }, (_, i) =>
+      makeGame({ starterItems: i % 2 === 0 ? BUNDLE_A : [...BUNDLE_A].reverse() }),
+    );
+    const picks = recommendProfileStarters(
+      makeProfile(games),
+      1,
+      'SUPPORT',
+      EMPTY_CONTEXT,
+      data,
+      NOW_MS,
+    );
+    // Both orderings collapse into one bundle with 3 games < minSetupGames.
+    expect(picks).toHaveLength(1);
+    expect(must(picks[0]).games).toBe(3);
+    expect(must(picks[0]).insufficientData).toBe(true);
+    expect(must(picks[0]).winRate).toBeNull();
+    expect(must(picks[0]).nEff).toBeCloseTo(3, 3);
+  });
+
+  it('ignores games without a recorded bundle and games on other champions', () => {
+    const games = [
+      ...Array.from({ length: 5 }, () => makeGame({ starterItems: BUNDLE_A })),
+      // Pre-v3 export rows (no starterItems) and explicit nulls count nowhere.
+      makeGame(),
+      makeGame({ starterItems: null }),
+      ...Array.from({ length: 5 }, () => makeGame({ championId: 2, starterItems: BUNDLE_B })),
+    ];
+    const picks = recommendProfileStarters(
+      makeProfile(games),
+      1,
+      'SUPPORT',
+      EMPTY_CONTEXT,
+      data,
+      NOW_MS,
+    );
+    expect(picks).toHaveLength(1);
+    expect(must(picks[0]).items).toEqual(BUNDLE_A);
+    expect(must(picks[0]).games).toBe(5);
+  });
+
+  it('uses the matched fallback level when context aligns', () => {
+    const games = Array.from({ length: 5 }, () => makeGame({ starterItems: BUNDLE_A }));
+    const picks = recommendProfileStarters(
+      makeProfile(games),
+      1,
+      'SUPPORT',
+      L1_CONTEXT,
+      data,
+      NOW_MS,
+    );
+    expect(must(picks[0]).fallbackLevel).toBe(1);
   });
 });
 

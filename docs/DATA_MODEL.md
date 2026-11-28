@@ -138,6 +138,7 @@ CREATE TABLE profile_games (
   perks_json TEXT,                   -- full rune page + stat shards
   items_json TEXT NOT NULL,          -- final items
   items_ordered_json TEXT,           -- build order from the match timeline; NULL when no timeline was fetched
+  starter_bundle_json TEXT,          -- net starter-window bundle [{itemId,count}] sorted by itemId (migration 023, BL-059); NULL when no timeline was fetched or the window recorded no purchases
   summoner1_id INTEGER NOT NULL,     -- match-v5 spell1Id
   summoner2_id INTEGER NOT NULL,     -- match-v5 spell2Id
   PRIMARY KEY (profile_id, match_id)
@@ -255,7 +256,7 @@ profiles/<id>.json                   // one file per configured profile
 
 ```json
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "id": "kiritoctoc-euw1",
   "riotId": { "gameName": "KiriToc", "tagLine": "Toc", "platform": "EUW1" },
   "label": "KiriToc's picks",
@@ -284,6 +285,10 @@ profiles/<id>.json                   // one file per configured profile
       },
       "items": [2055, 3865],
       "itemsOrdered": [3858, 2055, 3865],
+      "starterItems": [
+        { "itemId": 3340, "count": 1 },
+        { "itemId": 3858, "count": 1 }
+      ],
       "summonerSpells": [4, 7]
     }
   ],
@@ -293,7 +298,7 @@ profiles/<id>.json                   // one file per configured profile
 
 Anonymization rules (D-069, enforced by the exporter and covered by tests): export ONLY champion ids, role, ally ADC and enemy ADC/support champion ids, enemy team champion ids, rune page ids, summoner spell ids, item ids in build order, win/loss and the game day (`createdAtDay` = unix days). NEVER export other players' names, Riot IDs or puuids, and no match ids. The profile owner's own Riot ID appears only in the `riotId`/`label` block — the owner's explicit, documented choice.
 
-Caps: at most the last 180 days and at most `profileMaxGames` (default 500, ETL config) games per profile; `favorites` and all statistics are computed over the exported set. All files are validated by shared zod schemas before writing; the web app validates again on load. `favorites` follows D-074 per role (BL-057, schema v2): a partial record keyed by role — top 15 by recency-weighted games in that role over the last 90 days union top 5 by mastery points; only roles present in the exported games get an entry, and the mastery top-N is role-agnostic so it joins every role's `combined`. Schema v1 exports (`favorites` as a single SUPPORT-scoped list) are still accepted: readers normalize them to `{ SUPPORT: favorites }`. `itemsOrdered` is `null` when the match timeline was not fetched.
+Caps: at most the last 180 days and at most `profileMaxGames` (default 500, ETL config) games per profile; `favorites` and all statistics are computed over the exported set. All files are validated by shared zod schemas before writing; the web app validates again on load. `favorites` follows D-074 per role (BL-057, schema v2): a partial record keyed by role — top 15 by recency-weighted games in that role over the last 90 days union top 5 by mastery points; only roles present in the exported games get an entry, and the mastery top-N is role-agnostic so it joins every role's `combined`. Schema v1 exports (`favorites` as a single SUPPORT-scoped list) are still accepted: readers normalize them to `{ SUPPORT: favorites }`. Schema v2 exports predate per-game starter bundles: readers normalize them to v3 with `starterItems` absent. `itemsOrdered` is `null` when the match timeline was not fetched. `starterItems` (v3, BL-059/D-139) is the net starter-window bundle recorded by `profile-sync`: the same `starterBundleKey` item set the aggregate path stores in `participant_starters`, computed from the same match timeline with undo/sold/destroyed netted within `starterWindowSeconds` (45 s); it is `null` when no timeline was fetched or the window recorded no purchases, and absent in v1/v2 exports — readers treat absent and `null` identically (no recorded bundle). Games stored before migration 023 keep `NULL` until re-synced.
 
 Personalized entries produced by `personalize` (engine output, not stored) may carry an optional baseline win rate and rank bucket used by the badge delta (D-080) — additive optional fields; whether they bump the result schema version is decided by the implementing ticket, as in D-054.
 

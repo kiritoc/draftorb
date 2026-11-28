@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { extractItemsOrdered, extractProfileGame } from './profile-games';
+import {
+  extractItemsOrdered,
+  extractProfileGame,
+  extractProfileStarterItems,
+} from './profile-games';
 import { makeMatch } from './matches.test-helpers';
 import { riotMatchTimelineSchema } from './riot';
 
@@ -85,5 +89,75 @@ describe('extractItemsOrdered', () => {
     expect(extractItemsOrdered(timeline, 5)).toEqual([3340, 3858, 2055]);
     expect(extractItemsOrdered(timeline, 6)).toEqual([9999]);
     expect(extractItemsOrdered(timeline, 7)).toBeNull();
+  });
+});
+
+describe('extractProfileStarterItems', () => {
+  function starterTimeline(events: Record<string, unknown>[]) {
+    return riotMatchTimelineSchema.parse({ info: { frames: [{ events }] } });
+  }
+
+  it('returns the net starter-window bundle with the same rules as the aggregate path', () => {
+    const match = profileMatch('EUW1_S1');
+    const extraction = extractProfileGame(match, PROFILE_PUUID);
+    if (extraction === null) throw new Error('expected a profile game');
+    const pid = extraction.participantId;
+
+    const timeline = starterTimeline([
+      // Bought then undone inside the window: nets out.
+      { timestamp: 8_000, type: 'ITEM_PURCHASED', participantId: pid, itemId: 1111 },
+      { timestamp: 12_000, type: 'ITEM_UNDO', participantId: pid, itemId: 1111, beforeId: 1111 },
+      { timestamp: 10_000, type: 'ITEM_PURCHASED', participantId: pid, itemId: 3340 },
+      { timestamp: 20_000, type: 'ITEM_PURCHASED', participantId: pid, itemId: 3858 },
+      // Bought then sold inside the window: nets out.
+      { timestamp: 25_000, type: 'ITEM_PURCHASED', participantId: pid, itemId: 2000 },
+      { timestamp: 30_000, type: 'ITEM_SOLD', participantId: pid, itemId: 2000 },
+      // Outside the 45 s window: never part of the bundle.
+      { timestamp: 50_000, type: 'ITEM_PURCHASED', participantId: pid, itemId: 9999 },
+      // Another participant's purchases are ignored.
+      { timestamp: 15_000, type: 'ITEM_PURCHASED', participantId: pid + 100, itemId: 7777 },
+    ]);
+
+    expect(extractProfileStarterItems(timeline, match.info.participants, pid)).toEqual([
+      { itemId: 3340, count: 1 },
+      { itemId: 3858, count: 1 },
+    ]);
+  });
+
+  it('attributes pseudo-participant-0 support purchases like the aggregate path', () => {
+    const match = profileMatch('EUW1_S2');
+    const extraction = extractProfileGame(match, PROFILE_PUUID);
+    if (extraction === null) throw new Error('expected a profile game');
+    const pid = extraction.participantId;
+
+    const timeline = starterTimeline([
+      // World Atlas style purchase: participantId 0 at t=0, attributed to a
+      // SUPPORT participant that does not already own the item.
+      { timestamp: 0, type: 'ITEM_PURCHASED', participantId: 0, itemId: 3850 },
+      { timestamp: 10_000, type: 'ITEM_PURCHASED', participantId: pid, itemId: 3340 },
+    ]);
+
+    const items = extractProfileStarterItems(timeline, match.info.participants, pid);
+    // The profile participant is the only SUPPORT on team 100 without the
+    // item; the pseudo purchase joins their bundle.
+    expect(items).toContainEqual({ itemId: 3850, count: 1 });
+    expect(items).toContainEqual({ itemId: 3340, count: 1 });
+  });
+
+  it('returns an empty array when the window recorded no purchases', () => {
+    const match = profileMatch('EUW1_S3');
+    const extraction = extractProfileGame(match, PROFILE_PUUID);
+    if (extraction === null) throw new Error('expected a profile game');
+    const timeline = starterTimeline([
+      {
+        timestamp: 60_000,
+        type: 'ITEM_PURCHASED',
+        participantId: extraction.participantId,
+        itemId: 9999,
+      },
+    ]);
+    expect(
+      extractProfileStarterItems(timeline, match.info.participants, extraction.participantId),
+    ).toEqual([]);
   });
 });

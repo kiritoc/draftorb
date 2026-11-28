@@ -16,12 +16,14 @@ import {
   PROFILE_EXPORT_SCHEMA_VERSION,
   profileExportSchema,
   profileIndexSchema,
+  starterBundleItemSchema,
   type ProfileConfig,
   type ProfileConfigEntry,
   type ProfileExport,
   type ProfileGame,
   type ProfileIndex,
   type ProfileIndexEntry,
+  type StarterBundleItem,
 } from '@draftorb/shared';
 
 import { ETL_CONFIG } from './config/etl-config';
@@ -39,6 +41,27 @@ interface StoredGameRow extends ProfileGameRow {
 function parseJsonArray(text: string): number[] {
   const parsed: unknown = JSON.parse(text);
   return Array.isArray(parsed) ? parsed.filter((v): v is number => typeof v === 'number') : [];
+}
+
+/**
+ * Rebuild the whitelisted starter bundle (BL-059) from the stored JSON
+ * array of `{ itemId, count }` pairs. Corrupt payloads degrade to null —
+ * the game simply reports no bundle, never an invented one.
+ */
+function exportStarterItems(json: string | null): StarterBundleItem[] | null {
+  if (json === null) return null;
+  try {
+    const parsed: unknown = JSON.parse(json);
+    if (!Array.isArray(parsed)) return null;
+    const items: StarterBundleItem[] = [];
+    for (const entry of parsed) {
+      const result = starterBundleItemSchema.safeParse(entry);
+      if (result.success) items.push(result.data);
+    }
+    return items.length === 0 ? null : items;
+  } catch {
+    return null;
+  }
 }
 
 interface StoredPerks {
@@ -92,6 +115,7 @@ function toProfileGame(row: StoredGameRow): ProfileGame {
     runes: exportRunes(row),
     items: parseJsonArray(row.items_json),
     itemsOrdered: row.items_ordered_json === null ? null : parseJsonArray(row.items_ordered_json),
+    starterItems: exportStarterItems(row.starter_bundle_json),
     summonerSpells: [row.summoner1_id, row.summoner2_id],
   };
 }

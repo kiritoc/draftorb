@@ -46,6 +46,10 @@ const validGame = {
   },
   items: [2055, 3865],
   itemsOrdered: [3858, 2055, 3865],
+  starterItems: [
+    { itemId: 3340, count: 1 },
+    { itemId: 3858, count: 1 },
+  ],
   summonerSpells: [4, 7],
 };
 
@@ -106,13 +110,40 @@ describe('profileExportSchema', () => {
   it('accepts a valid anonymized export', () => {
     const export_ = { ...validExport, games: [{ ...validGame, itemsOrdered: null }] };
     expect(profileExportSchema.parse(export_)).toEqual(export_);
-    expect(PROFILE_EXPORT_SCHEMA_VERSION).toBe(2);
+    expect(PROFILE_EXPORT_SCHEMA_VERSION).toBe(3);
+  });
+
+  it('carries per-game starter bundles (schema v3, BL-059)', () => {
+    const parsed = profileExportSchema.parse(validExport);
+    expect(parsed.schemaVersion).toBe(3);
+    expect(parsed.games[0]?.starterItems).toEqual([
+      { itemId: 3340, count: 1 },
+      { itemId: 3858, count: 1 },
+    ]);
+    // null and absent starterItems are both accepted (no recorded bundle).
+    const noBundle = { ...validExport, games: [{ ...validGame, starterItems: null }] };
+    expect(profileExportSchema.parse(noBundle).games[0]?.starterItems).toBeNull();
+    const { starterItems: _omit, ...withoutStarter } = validGame;
+    expect(
+      profileExportSchema.parse({ ...validExport, games: [withoutStarter] }).games[0]?.starterItems,
+    ).toBeUndefined();
+  });
+
+  it('normalizes a v2 export: schemaVersion becomes 3, starterItems stays absent', () => {
+    const { starterItems: _omit, ...gameV2 } = validGame;
+    const v2 = { ...validExport, schemaVersion: 2, games: [gameV2] };
+    const parsed = profileExportSchema.parse(v2);
+    expect(parsed.schemaVersion).toBe(PROFILE_EXPORT_SCHEMA_VERSION);
+    expect(parsed.games[0]?.starterItems).toBeUndefined();
+    expect(parsed.favorites).toEqual(validExport.favorites);
   });
 
   it('normalizes a v1 export: favorites become the SUPPORT entry', () => {
+    const { starterItems: _omit, ...gameV1 } = validGame;
     const v1 = {
       ...validExport,
       schemaVersion: 1,
+      games: [gameV1],
       favorites: { combined: [23, 143], recency: [23, 143], mastery: [999] },
     };
     const parsed = profileExportSchema.parse(v1);
@@ -120,6 +151,7 @@ describe('profileExportSchema', () => {
     expect(parsed.favorites).toEqual({
       SUPPORT: { combined: [23, 143], recency: [23, 143], mastery: [999] },
     });
+    expect(parsed.games[0]?.starterItems).toBeUndefined();
   });
 
   it('rejects favorites keyed by a non-role and unknown schema versions', () => {
@@ -129,7 +161,7 @@ describe('profileExportSchema', () => {
         favorites: { MIDLANE: { combined: [], recency: [], mastery: [] } },
       }).success,
     ).toBe(false);
-    expect(profileExportSchema.safeParse({ ...validExport, schemaVersion: 3 }).success).toBe(false);
+    expect(profileExportSchema.safeParse({ ...validExport, schemaVersion: 4 }).success).toBe(false);
     expect(profileExportSchema.safeParse({ ...validExport, schemaVersion: 0 }).success).toBe(false);
   });
 
@@ -153,7 +185,7 @@ describe('profileExportSchema', () => {
     expect(profileExportSchema.safeParse({ ...validExport, games: [withoutAlly] }).success).toBe(
       false,
     );
-    expect(profileExportSchema.safeParse({ ...validExport, schemaVersion: 3 }).success).toBe(false);
+    expect(profileExportSchema.safeParse({ ...validExport, schemaVersion: 4 }).success).toBe(false);
     expect(profileExportSchema.safeParse({ ...validExport, gameCount: -1 }).success).toBe(false);
   });
 });
@@ -178,7 +210,8 @@ describe('profileIndexSchema', () => {
     // v1 indexes (pre-BL-057) and the current version share the entry shape.
     expect(profileIndexSchema.safeParse({ schemaVersion: 1, profiles: [] }).success).toBe(true);
     expect(profileIndexSchema.safeParse({ schemaVersion: 2, profiles: [] }).success).toBe(true);
-    expect(profileIndexSchema.safeParse({ schemaVersion: 3, profiles: [] }).success).toBe(false);
+    expect(profileIndexSchema.safeParse({ schemaVersion: 3, profiles: [] }).success).toBe(true);
+    expect(profileIndexSchema.safeParse({ schemaVersion: 4, profiles: [] }).success).toBe(false);
     expect(
       profileIndexSchema.safeParse({
         schemaVersion: 1,

@@ -198,7 +198,7 @@ export const strings = {
   setupSpellsTitle: (champion: string) => `Summoner spells — ${champion}`,
   setupStartersTitle: (champion: string) => `Starting items — ${champion}`,
   setupStartersNoProfileData:
-    'Your profile export does not record starter-window purchases, so "my data" has no starting items to rank. Switch to "Top players" for starter recommendations.',
+    'Your profile export does not record starter-window purchases for this champion, so "my data" has no starting items to rank. Switch to "Top players" for starter recommendations.',
   setupModeLabel: 'Data mode',
   setupModeTopPlayers: 'Top players',
   setupModeMyData: 'My data',

@@ -71,7 +71,7 @@ describe('loadProfileExport', () => {
     const load = await loadProfileExport('/r');
     expect(load.kind).toBe('loaded');
     if (load.kind !== 'loaded') return;
-    expect(load.profile.schemaVersion).toBe(2);
+    expect(load.profile.schemaVersion).toBe(3);
     expect(load.profile.favorites.SUPPORT?.combined).toEqual([1]);
   });
 

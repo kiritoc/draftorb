@@ -68,8 +68,11 @@ export const PROFILE_CONFIG_SCHEMA_VERSION = 1;
  * v1: `favorites` was a single SUPPORT-scoped list (D-074).
  * v2: `favorites` is a per-role record (champion x roles, D-101/D-136,
  * BL-057); readers normalize v1 exports to `{ SUPPORT: favorites }`.
+ * v3: each game may carry `starterItems` — the net starter-window bundle
+ * (D-086/D-139, BL-059); readers normalize v1/v2 exports by leaving the
+ * optional field absent.
  */
-export const PROFILE_EXPORT_SCHEMA_VERSION = 2;
+export const PROFILE_EXPORT_SCHEMA_VERSION = 3;
 
 /**
  * Version of the engine personalization output contract (`PersonalizedResult`,

@@ -262,6 +262,7 @@ describe('migration runner', () => {
       '020_participant_challenges',
       '021_item_build_players',
       '022_summoners_starters',
+      '023_profile_starter_bundles',
     ]);
     expect(migrate(db)).toEqual([]);
 
@@ -340,7 +341,7 @@ describe('migration runner', () => {
       ) VALUES (1, 'TOP', NULL, 10, 5, 'DIAMOND', 1, 1, 1)`,
     ).run();
     expect(db.prepare('SELECT COUNT(*) AS count FROM _migrations').get()).toMatchObject({
-      count: 22,
+      count: 23,
     });
     db.close();
   });
@@ -372,6 +373,7 @@ describe('migration runner', () => {
       '020_participant_challenges',
       '021_item_build_players',
       '022_summoners_starters',
+      '023_profile_starter_bundles',
     ]);
 
     const columns = db.prepare('PRAGMA table_info(patches)').all() as { name: string }[];
@@ -462,6 +464,7 @@ describe('migration runner', () => {
       '020_participant_challenges',
       '021_item_build_players',
       '022_summoners_starters',
+      '023_profile_starter_bundles',
     ]);
     expect(migrate(db)).toEqual([]);
 

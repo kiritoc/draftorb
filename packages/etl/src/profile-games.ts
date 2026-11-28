@@ -6,9 +6,15 @@
  * match-timeline item build order. No I/O, no randomness — unit-testable.
  */
 
-import type { Role } from '@draftorb/shared';
+import {
+  DEFAULT_ITEM_CONTEXT_CONFIG,
+  starterBundleItems,
+  type ItemTimelineEvent,
+} from '@draftorb/engine';
+import type { Role, StarterBundleItem } from '@draftorb/shared';
 
 import { ROLE_BY_TEAM_POSITION, MATCH_PARTICIPANT_COUNT } from './participants';
+import { extractTimelineEvents, type TimelineParticipantRef } from './timeline-events';
 import type { RiotMatchDto, RiotMatchTimeline, RiotParticipantDto } from './riot';
 
 export interface ProfileGameRow {
@@ -27,6 +33,8 @@ export interface ProfileGameRow {
   perks_json: string | null;
   items_json: string;
   items_ordered_json: string | null;
+  /** Net starter-window bundle items (JSON array); NULL until the timeline pass fills it. */
+  starter_bundle_json: string | null;
   summoner1_id: number;
   summoner2_id: number;
 }
@@ -129,6 +137,7 @@ export function extractProfileGame(
       perks_json: runes.perksJson,
       items_json: JSON.stringify(items),
       items_ordered_json: null,
+      starter_bundle_json: null,
       summoner1_id: spell1Id,
       summoner2_id: spell2Id,
     },
@@ -162,4 +171,45 @@ export function extractItemsOrdered(
   }
   purchases.sort((a, b) => a.timestamp - b.timestamp);
   return purchases.map((purchase) => purchase.itemId);
+}
+
+/**
+ * Net starter-window bundle for one participant (BL-059, D-086/D-139):
+ * reuses the aggregate path's `extractTimelineEvents` (including the
+ * pseudo-participant-0 support-quest attribution) and the engine
+ * `starterBundleItems` netting, so a profile game records exactly the
+ * bundle `starter_ctx` would aggregate. Returns an empty array when the
+ * window recorded no purchases.
+ */
+export function extractProfileStarterItems(
+  timeline: RiotMatchTimeline,
+  participants: readonly RiotParticipantDto[],
+  participantId: number,
+): StarterBundleItem[] {
+  const refs: TimelineParticipantRef[] = [];
+  for (const participant of participants) {
+    if (participant.participantId === undefined) continue;
+    refs.push({
+      participantId: participant.participantId,
+      puuid: participant.puuid,
+      teamId: participant.teamId,
+      role: ROLE_BY_TEAM_POSITION[participant.teamPosition] ?? '',
+    });
+  }
+  const extracted = extractTimelineEvents(timeline, refs);
+  const events: ItemTimelineEvent[] = extracted.itemEvents
+    .filter((event) => event.participant_id === participantId)
+    .map((event) => ({
+      ts: event.ts_ms,
+      seq: event.seq,
+      event_type: event.event_type,
+      item_id: event.item_id,
+      before_id: event.before_id,
+      after_id: event.after_id,
+    }));
+  return starterBundleItems(
+    events,
+    DEFAULT_ITEM_CONTEXT_CONFIG.starterWindowSeconds,
+    DEFAULT_ITEM_CONTEXT_CONFIG,
+  );
 }

@@ -10,8 +10,9 @@
  * distinct-player count for expert figures); insufficient picks show "Not
  * enough data", never a bare rate. Item names/icons resolve through the
  * cached `<patch>/items.json` catalog; unresolvable ids render a labeled
- * fallback. In "my data" mode the section also states honestly that the
- * profile export records no starter-window purchases (D-139 PROPOSED).
+ * fallback. In "my data" mode the section states honestly when the profile
+ * has no recorded starter-window bundles for the champion (pre-v3 exports
+ * or games synced before BL-059).
  */
 
 import { useState } from 'react';
@@ -123,7 +124,7 @@ export function SetupStarters({
       <p className="text-xs text-slate-500 dark:text-slate-400">
         {setupEvidenceText(result.evidence)}
       </p>
-      {result.mode === 'myData' && (
+      {result.mode === 'myData' && result.picks.length === 0 && (
         <p className="text-sm text-slate-600 dark:text-slate-300">
           {strings.setupStartersNoProfileData}
         </p>

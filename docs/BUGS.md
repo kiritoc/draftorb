@@ -6,7 +6,7 @@ Severity: S1 blocker, S2 major, S3 minor, S4 cosmetic. Status: OPEN, INVESTIGATI
 
 | ID    | Sev | Area           | Title                                                                                                                                                                                                                                                        | Status | Found by/date              | Ticket  |
 | ----- | --- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------ | -------------------------- | ------- |
-| B-089 | S3  | desktop        | Header "Baseline ranking" pill is unconditional: once a validated backtest report ships (D-133 `matchup.enabled`), the pill keeps claiming baseline ranking while matchup layers are active — needs to be driven by the same report gate as `matchupEnabled` | OPEN   | Devin Review/PR #194       | –       |
+| B-089 | S3  | desktop        | Header "Baseline ranking" pill is unconditional: once a validated backtest report ships (D-133 `matchup.enabled`), the pill keeps claiming baseline ranking while matchup layers are active — needs to be driven by the same report gate as `matchupEnabled` | FIXED  | Devin Review/PR #194       | –       |
 | B-088 | S3  | desktop        | Setup loaders (`setup-runes`, `setup-spells`, `setup-starters`) served stale cache files dropped by a same-patch refresh: the download keeps the patch directory and no loader checked the current manifest's file list                                      | FIXED  | Devin Review/PR #179       | BL-031b |
 | B-087 | S3  | engine         | `recommendStarters` ranked the cross-role `global` level as a peer of the champion/role levels, so a Jungle pet could displace role-specific Top bundles; slots now fill narrowest-level first                                                               | FIXED  | Devin Review/PR #179       | BL-031b |
 | B-086 | S3  | engine         | `recommendStarters`/`recommendSummoners` filled display slots by shrunk score before the D-102 evidence gate, so thin picks could push sufficient ones out and the setup screen reported insufficient data despite a usable recommendation                   | FIXED  | Devin Review/PR #179       | BL-031b |
@@ -54,6 +54,13 @@ Review notes that predate the bug log live in [Review history](#review-history) 
 ```
 
 ## Fixed
+
+### B-089 — Header "Baseline ranking" pill ignored the matchup flag — FIXED
+
+- Severity / Area: S3 / desktop (header pill, D-133, follow-up of B-080/PR #194)
+- Steps to reproduce: ship a validated `backtest-draft.json` (D-133 `matchup.enabled` for the drafted role); the header kept showing "Baseline ranking" while `PickScreen` scored with matchup layers.
+- Expected / Actual: expected the pill to disappear once matchup layers are active (D-133: the label "disappears only when `matchup.enabled`"); actual it was unconditional.
+- Fix (commit/ticket): `PickScreen` reports `matchupConfig !== null` through `onMatchupEnabledChange` (state lives in `App`, forwarded via `AppShell` — AppShell stays hook-free); `Header` renders the pill only when `matchupEnabled !== true`. Fail-safe: unresolved/absent report reports baseline. Regression test: `AppShell.test.ts` covers enabled/disabled/default.
 
 ### B-080 — Matchup layers pinned off: backtest report missing from aggregate archive — FIXED
 

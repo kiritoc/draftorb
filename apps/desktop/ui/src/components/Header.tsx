@@ -8,9 +8,21 @@ export interface HeaderProps {
   onToggleTheme: () => void;
   /** Opens the "New game" confirmation dialog (BL-055). */
   onNewGame: () => void;
+  /**
+   * B-089/D-133: true when the backtest-validated matchup layers are active
+   * for the drafted role — the "Baseline ranking" pill only shows in
+   * baseline mode and disappears once matchups are enabled.
+   */
+  matchupEnabled?: boolean;
 }
 
-export function Header({ dataStatus, resolvedTheme, onToggleTheme, onNewGame }: HeaderProps) {
+export function Header({
+  dataStatus,
+  resolvedTheme,
+  onToggleTheme,
+  onNewGame,
+  matchupEnabled,
+}: HeaderProps) {
   const { patch, freshness } = describeDataStatus(dataStatus);
   return (
     <header className="flex flex-wrap items-center gap-4 border-b border-slate-200 bg-white px-6 py-4 dark:border-slate-700 dark:bg-slate-800">
@@ -20,12 +32,14 @@ export function Header({ dataStatus, resolvedTheme, onToggleTheme, onNewGame }: 
         <span className="mx-2">·</span>
         <span>{freshness}</span>
       </div>
-      <span
-        className="rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-900 dark:bg-amber-900/40 dark:text-amber-200"
-        title={strings.baselineHint}
-      >
-        {strings.baselineLabel}
-      </span>
+      {matchupEnabled !== true && (
+        <span
+          className="rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-900 dark:bg-amber-900/40 dark:text-amber-200"
+          title={strings.baselineHint}
+        >
+          {strings.baselineLabel}
+        </span>
+      )}
       <button
         type="button"
         onClick={onNewGame}

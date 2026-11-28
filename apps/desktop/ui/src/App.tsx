@@ -55,6 +55,9 @@ export function App() {
   // screen. Lives here (not in AppShell) so AppShell stays hook-free; the
   // remounted PickScreen re-reports a fresh empty handoff after a reset.
   const [draftHandoff, setDraftHandoff] = useState<DraftHandoff | undefined>(undefined);
+  // B-089: whether the backtest-validated matchup layers are active for the
+  // drafted role — reported by PickScreen, drives the header pill (D-133).
+  const [matchupEnabled, setMatchupEnabled] = useState(false);
   const prefersDark = usePrefersDark();
   const resolvedTheme = settings === null ? null : resolveTheme(settings.theme, prefersDark);
 
@@ -180,6 +183,8 @@ export function App() {
       onNewGameConfirm={confirmNewGame}
       draftHandoff={draftHandoff}
       onDraftHandoffChange={setDraftHandoff}
+      matchupEnabled={matchupEnabled}
+      onMatchupEnabledChange={setMatchupEnabled}
     />
   );
 }

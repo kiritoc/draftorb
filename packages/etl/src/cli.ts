@@ -28,6 +28,7 @@ import { timelineCommand } from './commands/timeline';
 import { backfillTimelinesCommand } from './commands/backfill';
 import { backfillSummonersCommand } from './commands/backfill-summoners';
 import { backfillChallengesCommand } from './commands/backfill-challenges';
+import { backfillProfileStartersCommand } from './commands/backfill-profile-starters';
 import { classifyItemsCommand } from './commands/classify-items';
 import { pruneCommand } from './commands/prune';
 import { migrateCommand } from './commands/migrate';
@@ -59,6 +60,7 @@ const COMMANDS: readonly Command[] = [
   backfillTimelinesCommand,
   backfillSummonersCommand,
   backfillChallengesCommand,
+  backfillProfileStartersCommand,
   classifyItemsCommand,
   pruneCommand,
   migrateCommand,

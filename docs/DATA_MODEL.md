@@ -138,7 +138,7 @@ CREATE TABLE profile_games (
   perks_json TEXT,                   -- full rune page + stat shards
   items_json TEXT NOT NULL,          -- final items
   items_ordered_json TEXT,           -- build order from the match timeline; NULL when no timeline was fetched
-  starter_bundle_json TEXT,          -- net starter-window bundle [{itemId,count}] sorted by itemId (migration 023, BL-059); NULL when no timeline was fetched or the window recorded no purchases
+  starter_bundle_json TEXT,          -- net starter-window bundle [{itemId,count}] sorted by itemId (migration 023, BL-059); NULL until the timeline pass fills it — '[]' once checked with nothing recorded (backfill-profile-starters, BL-060)
   summoner1_id INTEGER NOT NULL,     -- match-v5 spell1Id
   summoner2_id INTEGER NOT NULL,     -- match-v5 spell2Id
   PRIMARY KEY (profile_id, match_id)

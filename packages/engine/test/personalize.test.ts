@@ -386,6 +386,9 @@ describe('personalizeContext', () => {
     expect(context.role).toBe('SUPPORT');
     expect(context.allyAdcId).toBe(10);
     expect(context.enemySupportId).toBe(200);
+    // BL-056: full role->championId maps for the per-role matchup contexts.
+    expect(context.allyRoleIds).toEqual({ ADC: 10 });
+    expect(context.enemyRoleIds).toEqual({ SUPPORT: 200, TOP: 30, JUNGLE: 31, MID: 32 });
     expect([...context.enemySignature].sort()).toEqual(['AP:mage', 'MIXED:tank']);
   });
 });

@@ -35,8 +35,10 @@ export type DataLoad =
 const META_NAME = 'cache-meta.json';
 const FETCH_TIMEOUT_MS = 15_000;
 /** Archive-root files written last so a mid-download crash leaves either the
- * old consistent cache or a detectable latest/meta mismatch. */
-const ROOT_FILES = new Set(['latest.json', 'champion-tags.json']);
+ * old consistent cache or a detectable latest/meta mismatch. `backtest-draft.json`
+ * is optional in the archive (B-080): when a republish drops it, the loader
+ * refuses the stale cached copy because the new manifest no longer lists it. */
+const ROOT_FILES = new Set(['latest.json', 'champion-tags.json', 'backtest-draft.json']);
 /** Top-level cache entries kept across patch upgrades. */
 const CACHE_KEEP = new Set([META_NAME, ...ROOT_FILES]);
 

@@ -10,13 +10,15 @@
  * data source. The optional Master+ toggle maps to the engine's
  * `evidenceMasterPlusOnly` config (off by default, D-102).
  *
- * Draft-slot context (allies/enemies) is intentionally not entered here
- * yet (D-138 PROPOSED): pages resolve at the broader labeled contexts
- * (damage mix / global for experts, champion level for the profile).
- * BL-031b (#93) added the summoner-spells and starter-items sections below
- * the runes one — they share the same mode switch and Master+ toggle and
- * query their own mode-switched loaders (`loadSetupSpells`,
- * `loadSetupStarters`) on the same inputs.
+ * BL-058 (D-138 follow-up): the pick screen hands off its locked champion
+ * and draft slots (`draftHandoff` prop), so rune/summoner/starter pages can
+ * resolve at the narrower lane/matchup levels — still labeled per D-103.
+ * Without a handoff the slots stay empty and pages resolve at the broader
+ * labeled contexts (damage mix / global for experts, champion level for
+ * the profile). BL-031b (#93) added the summoner-spells and starter-items
+ * sections below the runes one — they share the same mode switch and
+ * Master+ toggle and query their own mode-switched loaders
+ * (`loadSetupSpells`, `loadSetupStarters`) on the same inputs.
  */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -37,6 +39,7 @@ import {
 } from '@draftorb/shared';
 
 import { championName } from '../champion-name';
+import { setupDraftInput, type DraftHandoff } from '../draft-handoff';
 import { ChampionPicker } from '../components/ChampionPicker';
 import { RoleSelector } from '../components/RoleSelector';
 import { SetupRunePages } from '../components/SetupRunePages';
@@ -67,6 +70,12 @@ const EMPTY_ITEMS: ReadonlyMap<number, ItemIconInfo> = new Map();
 export interface SetupScreenProps {
   /** Role picked on the pick screen; used as the initial setup role. */
   preferredRole?: Role | null;
+  /**
+   * BL-058: locked champion and draft slots reported by the pick screen.
+   * Prefills the champion/rank and feeds the draft context of the setup
+   * queries; absent or empty means no draft context (pre-BL-058 behavior).
+   */
+  draftHandoff?: DraftHandoff;
   /** Bumped each time the launch data download settles; triggers reloads. */
   dataReadyNonce: number;
   profileLoad: ProfileLoad;
@@ -76,6 +85,7 @@ export interface SetupScreenProps {
 
 export function SetupScreen({
   preferredRole = null,
+  draftHandoff,
   dataReadyNonce,
   profileLoad,
   profileStatus,
@@ -83,8 +93,13 @@ export function SetupScreen({
   // undefined = verdict pending, null = no cached release, [] = no full role.
   const [setupRoles, setSetupRoles] = useState<readonly Role[] | null | undefined>(undefined);
   const [role, setRole] = useState<Role>(preferredRole ?? 'SUPPORT');
-  const [championId, setChampionId] = useState<ChampionId | null>(null);
-  const [rank, setRank] = useState<Rank>(DEFAULT_RANK);
+  // BL-058: the pick screen's locked champion and rank prefill the setup
+  // selection; the sync effects below re-apply them whenever the handoff
+  // changes (including the empty report after a new-game remount).
+  const handoffChampionId = draftHandoff?.championId ?? null;
+  const handoffRank = draftHandoff?.draft.userRank;
+  const [championId, setChampionId] = useState<ChampionId | null>(handoffChampionId);
+  const [rank, setRank] = useState<Rank>(handoffRank ?? DEFAULT_RANK);
   const [mode, setMode] = useState<SetupMode>('topPlayers');
   const [masterPlus, setMasterPlus] = useState(false);
   const [pickData, setPickData] = useState<PickData | null>(null);
@@ -124,6 +139,17 @@ export function SetupScreen({
       setRole(ROLE_ORDER.find((r) => setupRoles.includes(r)) ?? setupRoles[0] ?? role);
     }
   }, [setupRoles, role]);
+
+  // BL-058: the handoff is authoritative for the locked champion and rank —
+  // a changed or emptied handoff (pick edit, new-game reset) re-applies it.
+  // While the setup screen is mounted the pick screen cannot change, so a
+  // manual pick on this screen is never overridden by a stale handoff.
+  useEffect(() => {
+    setChampionId(handoffChampionId);
+  }, [handoffChampionId]);
+  useEffect(() => {
+    setRank(handoffRank ?? DEFAULT_RANK);
+  }, [handoffRank]);
 
   // Role-scoped recommendation data (baselines, roleProb, tags) for the
   // engine query; null means "no cached release".
@@ -229,18 +255,13 @@ export function SetupScreen({
   );
   const items = useMemo(() => itemCatalog ?? EMPTY_ITEMS, [itemCatalog]);
 
-  // The setup screen enters no draft slots yet (D-138): allies/enemies stay
-  // empty so lane/matchup contexts simply do not match and pages resolve at
-  // the broader labeled levels.
+  // BL-058: draft slots, bans and pool come from the pick screen's handoff
+  // when present; the screen's own role/rank stay authoritative. Without a
+  // handoff allies/enemies stay empty so lane/matchup contexts simply do
+  // not match and pages resolve at the broader labeled levels.
   const draft: DraftInput = useMemo(
-    () => ({
-      userRank: rank,
-      userRole: role,
-      allies: [],
-      enemies: [],
-      blindPick: false,
-    }),
-    [rank, role],
+    () => setupDraftInput(draftHandoff, role, rank),
+    [draftHandoff, role, rank],
   );
 
   const profile = useMemo(

@@ -16,6 +16,7 @@ export * from './recommend.js';
 export { resolveKnownSlots } from './recommend-slots.js';
 export { indexBaselines } from './recommend-indexes.js';
 export * from './personalize.js';
+export * from './matchup-context.js';
 export * from './profile-setup.js';
 export * from './setup.js';
 export * from './runes.js';

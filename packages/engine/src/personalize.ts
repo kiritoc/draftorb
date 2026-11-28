@@ -104,6 +104,14 @@ export interface PersonalizeContext {
   readonly allyAdcId: number | null;
   /** Resolved enemy support champion id; null when unknown. */
   readonly enemySupportId: number | null;
+  /**
+   * Resolved draft-slot champion ids per role, both sides (BL-056): filled
+   * by `personalizeContext` via the same role inference as the rest of the
+   * draft context. Optional so hand-built contexts keep working; the
+   * profile setup fallback falls back to `allyAdcId`/`enemySupportId`.
+   */
+  readonly allyRoleIds?: Readonly<Partial<Record<Role, number>>>;
+  readonly enemyRoleIds?: Readonly<Partial<Record<Role, number>>>;
   /** `damageType:archetype` signature of the known enemy champions (L3). */
   readonly enemySignature: ReadonlySet<string>;
   /** Rank bucket of `userRank` — the bucket baseline rows are read for (D-080). */
@@ -184,10 +192,19 @@ export function personalizeContext(
       enemySignature.add(`${tags.damageType}:${tags.archetype}`);
     }
   }
+  // BL-056: expose the full resolved role->championId maps so the profile
+  // setup fallback can match per-role matchup contexts (TOP/JUNGLE lane
+  // opponents), not only the Support-shaped ally-ADC/enemy-support pair.
+  const allyRoleIds: Partial<Record<Role, number>> = {};
+  for (const slot of allySlots) allyRoleIds[slot.role] = slot.championId;
+  const enemyRoleIds: Partial<Record<Role, number>> = {};
+  for (const slot of enemySlots) enemyRoleIds[slot.role] = slot.championId;
   return {
     role: input.userRole,
     allyAdcId,
     enemySupportId,
+    allyRoleIds,
+    enemyRoleIds,
     enemySignature,
     rankBucket: rankToBucket(input.userRank),
   };

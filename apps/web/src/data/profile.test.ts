@@ -14,7 +14,7 @@ const profileExport = {
   label: "Test's picks",
   syncedAt: 1_760_000_000_000,
   gameCount: 1,
-  favorites: { combined: [23], recency: [23], mastery: [] },
+  favorites: { SUPPORT: { combined: [23], recency: [23], mastery: [] } },
   games: [
     {
       createdAtDay: 20_000,

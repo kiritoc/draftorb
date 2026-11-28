@@ -14,7 +14,7 @@ import {
 
 import { recommendProfileRunes, recommendProfileSpells } from '../src/profile-setup.js';
 import type { PersonalizeContext } from '../src/personalize.js';
-import { makeData, must } from '../src/recommend-test-utils.js';
+import { asRoleProb, makeData, must } from '../src/recommend-test-utils.js';
 
 const NOW_MS = 20_370 * 86_400_000;
 
@@ -60,7 +60,7 @@ function makeProfile(games: ProfileGame[]): ProfileExport {
     label: "Test's picks",
     syncedAt: NOW_MS,
     gameCount: games.length,
-    favorites: { combined: [], recency: [], mastery: [] },
+    favorites: {},
     games,
     mastery: [],
   };
@@ -271,5 +271,111 @@ describe('role scope (D-097, BL-032)', () => {
       );
       expect(picks).toHaveLength(0);
     }
+  });
+});
+
+/**
+ * Per-role matchup contexts (BL-056, D-135): TOP matches enemy TOP
+ * (+ enemy JUNGLE at L1), JUNGLE matches enemy JUNGLE (+ enemy MID at L1).
+ * Enemy roles are not stored in the export — the engine infers them from
+ * `enemyChampionIds` via `roleProb`, so the fixture gives each enemy
+ * champion a single fixed role probability.
+ */
+describe('per-role matchup contexts (BL-056)', () => {
+  // Enemy team: 200 SUPPORT, 201 ADC, 31 TOP, 32 JUNGLE, 33 MID.
+  const LANE_CHAMPS = [1, 2, 10, 31, 32, 33, 200, 201];
+  const ENEMY_TEAM = [200, 201, 31, 32, 33];
+  const laneData = makeData({
+    champions: LANE_CHAMPS,
+    roleProb: asRoleProb({
+      '1': { TOP: 1 },
+      '2': { JUNGLE: 1 },
+      '10': { ADC: 1 },
+      '31': { TOP: 1 },
+      '32': { JUNGLE: 1 },
+      '33': { MID: 1 },
+      '200': { SUPPORT: 1 },
+      '201': { ADC: 1 },
+    }),
+  });
+
+  const laneGame = (over: Partial<ProfileGame> = {}): ProfileGame =>
+    makeGame({
+      enemyChampionIds: [...ENEMY_TEAM],
+      ...over,
+    });
+
+  const contextWithEnemies = (
+    role: PersonalizeContext['role'],
+    enemyRoleIds: Partial<Record<string, number>>,
+  ): PersonalizeContext => ({
+    ...EMPTY_CONTEXT,
+    role,
+    enemyRoleIds: enemyRoleIds as PersonalizeContext['enemyRoleIds'],
+  });
+
+  it('TOP draft: same enemy TOP + enemy JUNGLE resolves at L1', () => {
+    const games = Array.from({ length: 5 }, () => laneGame({ role: 'TOP' }));
+    const context = contextWithEnemies('TOP', {
+      SUPPORT: 200,
+      ADC: 201,
+      TOP: 31,
+      JUNGLE: 32,
+      MID: 33,
+    });
+    const picks = recommendProfileRunes(makeProfile(games), 1, 'TOP', context, laneData, NOW_MS);
+    expect(must(picks[0]).fallbackLevel).toBe(1);
+    expect(must(picks[0]).insufficientData).toBe(false);
+  });
+
+  it('TOP draft: same enemy TOP alone resolves at L2 when JUNGLE differs', () => {
+    const games = Array.from({ length: 5 }, () => laneGame({ role: 'TOP' }));
+    // Draft shows a different enemy jungler -> L1 cannot match, L2 can.
+    const context = contextWithEnemies('TOP', { TOP: 31, JUNGLE: 99 });
+    const picks = recommendProfileRunes(makeProfile(games), 1, 'TOP', context, laneData, NOW_MS);
+    expect(must(picks[0]).fallbackLevel).toBe(2);
+  });
+
+  it('TOP draft: enemy signature resolves at L3 when lane ids are unknown', () => {
+    const games = Array.from({ length: 5 }, () => laneGame({ role: 'TOP' }));
+    const context: PersonalizeContext = {
+      ...EMPTY_CONTEXT,
+      role: 'TOP',
+      // Every test tag is MIXED:tank, so the game signature is a subset match.
+      enemySignature: new Set(['MIXED:tank']),
+    };
+    const picks = recommendProfileRunes(makeProfile(games), 1, 'TOP', context, laneData, NOW_MS);
+    expect(must(picks[0]).fallbackLevel).toBe(3);
+  });
+
+  it('JUNGLE draft: same enemy JUNGLE + enemy MID resolves at L1', () => {
+    const games = Array.from({ length: 5 }, () => laneGame({ role: 'JUNGLE' }));
+    const context = contextWithEnemies('JUNGLE', { JUNGLE: 32, MID: 33 });
+    const picks = recommendProfileRunes(makeProfile(games), 1, 'JUNGLE', context, laneData, NOW_MS);
+    expect(must(picks[0]).fallbackLevel).toBe(1);
+  });
+
+  it('JUNGLE draft: same enemy JUNGLE alone resolves at L2', () => {
+    const games = Array.from({ length: 5 }, () => laneGame({ role: 'JUNGLE' }));
+    const context = contextWithEnemies('JUNGLE', { JUNGLE: 32 });
+    const picks = recommendProfileSpells(
+      makeProfile(games),
+      1,
+      'JUNGLE',
+      context,
+      laneData,
+      NOW_MS,
+    );
+    expect(must(picks[0]).fallbackLevel).toBe(2);
+  });
+
+  it('TOP draft: unresolvable enemy roles degrade to champion level, never a guess', () => {
+    // Default makeRoleProb marks every champion SUPPORT-only, so inferRoles
+    // cannot assign TOP/JUNGLE/MID -> matchup slots stay unknown.
+    const weakData = makeData({ champions: LANE_CHAMPS });
+    const games = Array.from({ length: 5 }, () => laneGame({ role: 'TOP' }));
+    const context = contextWithEnemies('TOP', { TOP: 31, JUNGLE: 32 });
+    const picks = recommendProfileRunes(makeProfile(games), 1, 'TOP', context, weakData, NOW_MS);
+    expect(must(picks[0]).fallbackLevel).toBe(4);
   });
 });

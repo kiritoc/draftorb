@@ -20,6 +20,7 @@ export default tseslint.config(
             'scripts/check-pr-title.mjs',
             'scripts/check-pr-title.test.ts',
             'scripts/items-smoke.ts',
+            'scripts/verify-profile-matchup.ts',
             'scripts/live-client-probe.ts',
             'scripts/live-client-probe.test.ts',
             'scripts/hooks/check-pr-create.mjs',

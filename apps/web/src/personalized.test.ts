@@ -33,7 +33,7 @@ const profile: ProfileExport = {
   label: "Test's picks",
   syncedAt: 1_760_000_000,
   gameCount: 0,
-  favorites: { combined: [], recency: [], mastery: [] },
+  favorites: {},
   games: [],
   mastery: [],
 };
